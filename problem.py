@@ -3,7 +3,7 @@ from pddlstream.language.generator import from_gen_fn, from_fn
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
-from pybullet_tools.utils import get_custom_limits, joint_from_name
+from pybullet_tools.utils import get_custom_limits, joint_from_name, get_joint_positions, get_joint_name
 from utils import STOVES
 from stream import get_stable_gen, get_grasp_gen, get_ik_ir_gen, get_motion_gen, distance_fn
 
@@ -66,6 +66,17 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
         #        init += [('Supported', body, pose, surface)]
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
+
+    for joint in world.kitchen_joints:
+        joint_name = get_joint_name(world.kitchen, joint)
+        initial_conf = Conf(world.kitchen, [joint])
+        init.extend([
+            ('Position', joint_name, initial_conf),
+            ('AtPosition', joint_name, initial_conf),
+        ])
+        for position in [world.open_conf(joint), world.closed_conf(joint)]:
+            conf = Conf(world.kitchen, [joint], [position])
+            init.append(('Position', joint_name, conf))
 
     block = list(world.movable)[0]
     goal_literals = [

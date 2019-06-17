@@ -134,7 +134,10 @@ class World(object):
         return set(self.body_from_name)
     @property
     def initial_conf(self):
-        return self.robot_yaml['default_q']
+        conf = np.array(self.robot_yaml['default_q'])
+        conf[1] += np.pi / 4
+        #conf[3] -= np.pi / 4
+        return conf
     def set_initial_conf(self):
         set_joint_positions(self.robot, self.base_joints, [2.0, 0, np.pi])
         for rule in self.robot_yaml['cspace_to_urdf_rules']:  # max is open
@@ -147,12 +150,18 @@ class World(object):
     def open_gripper(self):
         for joint in self.gripper_joints:
             set_joint_position(self.robot, joint, get_max_limit(self.robot, joint))
+    def closed_conf(self, joint):
+        if 'left' in get_joint_name(self.kitchen, joint):
+            return get_max_limit(self.kitchen, joint)
+        return get_min_limit(self.kitchen, joint)
+    def open_conf(self, joint):
+        if 'left' in get_joint_name(self.kitchen, joint):
+            return get_min_limit(self.kitchen, joint)
+        return get_max_limit(self.kitchen, joint)
     def close_door(self, joint):
-        close_fn = get_max_limit if 'left' in get_joint_name(self.kitchen, joint) else get_min_limit
-        set_joint_position(self.kitchen, joint, close_fn(self.kitchen, joint))
+        set_joint_position(self.kitchen, joint, self.closed_conf(joint))
     def open_door(self, joint):
-        close_fn = get_min_limit if 'left' in get_joint_name(self.kitchen, joint) else get_max_limit
-        set_joint_position(self.kitchen, joint, close_fn(self.kitchen, joint))
+        set_joint_position(self.kitchen, joint, self.open_conf(joint))
     def add_body(self, name, path, **kwargs):
         # TODO: support obj case
         assert name not in self.body_from_name

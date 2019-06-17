@@ -49,6 +49,22 @@ def commands_from_plan(world, plan):
             raise NotImplementedError(action)
     return commands
 
+def execute_plan(world, state, commands, time_step=None):
+    for i, command in enumerate(commands):
+        print('\nCommand {:2}: {}'.format(i, command))
+        # TODO: skip to end
+        # TODO: downsample
+        for j, _ in enumerate(command.iterate(world, state)):
+            state.derive()
+            if j == 0:
+                continue
+            if time_step is None:
+                wait_for_duration(1e-2)
+                user_input('Command {:2} | step {:2} | Next?'.format(i, j))
+            else:
+                wait_for_duration(time_step)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-algorithm', default='focused',
@@ -63,6 +79,8 @@ def main():
                         help='The random seed to use.')
     parser.add_argument('-max_time', default=120, type=int,
                         help='The max time')
+    parser.add_argument('-record', action='store_true',
+                        help='Records a video')
     parser.add_argument('-teleport', action='store_true',
                         help='Uses unit costs')
     parser.add_argument('-unit', action='store_true',
@@ -161,25 +179,15 @@ def main():
         world.destroy()
         return
 
+    initial_state = State()
     commands = commands_from_plan(world, plan)
-    state = State()
     wait_for_user()
-
     time_step = None if args.teleport else 0.02
-    with VideoSaver('video.mp4'):
-        for i, command in enumerate(commands):
-            print('\nCommand {:2}: {}'.format(i, command))
-            # TODO: skip to end
-            # TODO: downsample
-            for j, _ in enumerate(command.iterate(world, state)):
-                state.derive()
-                if j == 0:
-                    continue
-                if time_step is None:
-                    wait_for_duration(1e-2)
-                    user_input('Command {:2} | step {:2} | Next?'.format(i, j))
-                else:
-                    wait_for_duration(time_step)
+    if args.record:
+        with VideoSaver('video.mp4'):
+            execute_plan(world, initial_state, commands, time_step=time_step)
+    else:
+        execute_plan(world, initial_state, commands, time_step=time_step)
 
     wait_for_user()
     world.destroy()
