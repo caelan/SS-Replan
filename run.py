@@ -7,11 +7,11 @@ import argparse
 import random
 import cProfile
 import pstats
+import os
 
-sys.path.extend([
-    '/home/caelan/Programs/pddlstream',
-    '/home/caelan/Programs/pddlstream/examples/pybullet/utils',
-])
+PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
+PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
+sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 
 from pybullet_tools.utils import wait_for_user, sample_placement, link_from_name, \

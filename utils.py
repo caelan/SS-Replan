@@ -171,9 +171,10 @@ class World(object):
 ################################################################################
 
 class Grasp(object):
-    def __init__(self, world, body_name, index, grasp_pose, pregrasp_pose, grasp_width):
+    def __init__(self, world, body_name, grasp_type, index, grasp_pose, pregrasp_pose, grasp_width):
         self.world = world
         self.body_name = body_name
+        self.grasp_type = grasp_type
         self.index = index
         self.grasp_pose = grasp_pose
         self.pregrasp_pose = pregrasp_pose
@@ -182,26 +183,27 @@ class Grasp(object):
         return Attachment(self.world.robot, self.world.tool_link,
                           self.grasp_pose, self.world.get_body(self.body_name))
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, self.index)
+        return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
 
-def get_grasps(world, name, grasp_type):
+def get_grasps(world, name, grasp_types=['top', 'side']):
     pre_distance = 0.1
     body = world.get_body(name)
-    if grasp_type == 'top':
-        pre_direction = pre_distance * get_unit_vector([0, 0, 1])
-        generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
-                                   grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf)
-    elif grasp_type == 'side':
-        pre_direction = pre_distance * get_unit_vector([1, 0, 3])
-        generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
-                                    grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
-                                    top_offset=FINGER_EXTENT[0] / 2)
-    else:
-        raise ValueError(grasp_type)
-    for i, grasp_pose in enumerate(generator):
-        with BodySaver(world.robot):
-            grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
-        pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose)
-        grasp = Grasp(world, name, i, grasp_pose, pregrasp_pose, grasp_width)
-        yield grasp
+    for grasp_type in grasp_types:
+        if grasp_type == 'top':
+            pre_direction = pre_distance * get_unit_vector([0, 0, 1])
+            generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
+                                       grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf)
+        elif grasp_type == 'side':
+            pre_direction = pre_distance * get_unit_vector([1, 0, 3])
+            generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
+                                        grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
+                                        top_offset=FINGER_EXTENT[0] / 2)
+        else:
+            raise ValueError(grasp_type)
+        for i, grasp_pose in enumerate(generator):
+            with BodySaver(world.robot):
+                grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
+            pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose)
+            grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose, grasp_width)
+            yield grasp

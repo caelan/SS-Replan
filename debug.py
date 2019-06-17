@@ -108,7 +108,7 @@ def test_grasps(world, name):
     #wait_for_user()
 
     #tool_pose = get_link_pose(world.robot, link_from_name(world.robot, FRANKA_TOOL_LINK))
-    for grasp in get_grasps(world, name, grasp_type='top'):
+    for grasp in get_grasps(world, name, grasp_types=['top']):
         attachment = grasp.get_attachment()
         attachment.assign()
         #pregrasp = multiply(Pose(point=pre_direction), grasp)

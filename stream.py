@@ -48,9 +48,9 @@ def get_stable_gen(world, collisions=True, **kwargs):
     return gen
 
 
-def get_grasp_gen(world, collisions=False, randomize=True, grasp_type='side', **kwargs):
+def get_grasp_gen(world, collisions=False, randomize=True, **kwargs):
     def gen(name):
-        for grasp in get_grasps(world, name, grasp_type=grasp_type):
+        for grasp in get_grasps(world, name):
             yield (grasp,)
     return gen
 
