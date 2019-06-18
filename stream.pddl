@@ -18,13 +18,13 @@
     :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
                     (Kin ?o ?p ?g ?bq ?aq ?at))
   )
-  (:stream plan-pull
-    :inputs (?j ?q1 ?q2)
-    :domain (and (Conf ?j ?q1) (Conf ?j ?q2))
-    :outputs (?bq ?aq ?at)
-    :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
-                    (Pull ?j ?q1 ?q2 ?bq ?aq ?at))
-  )
+;  (:stream plan-pull
+;    :inputs (?j ?q1 ?q2)
+;    :domain (and (Conf ?j ?q1) (Conf ?j ?q2))
+;    :outputs (?bq ?aq ?at)
+;    :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
+;                    (Pull ?j ?q1 ?q2 ?bq ?aq ?at))
+;  )
   (:stream plan-base-motion
     :inputs (?bq1 ?bq2)
     :domain (and (BConf ?bq1) (BConf ?bq2))

@@ -15,9 +15,8 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 
 from pybullet_tools.utils import wait_for_user, sample_placement, link_from_name, \
-    LockRenderer, WorldSaver, user_input, wait_for_duration, draw_base_limits, aabb_union, get_aabb, \
-    get_bodies, VideoSaver
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES
+    LockRenderer, WorldSaver, user_input, wait_for_duration, VideoSaver
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits
 from problem import pdddlstream_from_problem
 from command import State, Wait
 
@@ -60,6 +59,7 @@ def execute_plan(world, state, commands, time_step=None):
             else:
                 wait_for_duration(time_step)
 
+
 ################################################################################
 
 def main():
@@ -93,7 +93,6 @@ def main():
         #world.open_door(joint)
         world.close_door(joint)
     world.open_gripper()
-    #print(world.door_links)
 
     block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     world.add_body(block_name, get_block_path(block_name))
@@ -104,19 +103,9 @@ def main():
                             bottom_link=link_from_name(world.kitchen, initial_surface))
     assert pose is not None
 
-    full_aabb = aabb_union(get_aabb(body) for body in get_bodies() if body != world.floor)
-    #draw_aabb(full_aabb)
-    lower, upper = full_aabb
-    base_limits = (lower[:2], upper[:2])
-    draw_base_limits(base_limits)
-    #wait_for_user()
-
-    pddlstream_problem = pdddlstream_from_problem(world, base_limits=base_limits,
+    custom_limits = compute_custom_base_limits(world)
+    pddlstream_problem = pdddlstream_from_problem(world, custom_limits=custom_limits,
                                                   collisions=not args.cfree, teleport=args.teleport)
-
-    #for joint in world.kitchen_joints:
-    #    joint_from_name(world.kitchen, joint)
-    #test_grasps(world, block_name)
 
     _, _, _, stream_map, init, goal = pddlstream_problem
     print('Init:', init)

@@ -7,7 +7,7 @@ from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_unti
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
-    get_link_descendants, get_link_subtree, get_link_name, get_links
+    get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, get_bodies, draw_base_limits
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -194,9 +194,9 @@ class Grasp(object):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
+GRASP_TYPES = ['top', 'side']
 
-def get_grasps(world, name, grasp_types=['top', 'side'], **kwargs):
-    pre_distance = 0.1
+def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
     body = world.get_body(name)
     for grasp_type in grasp_types:
         if grasp_type == 'top':
@@ -216,3 +216,27 @@ def get_grasps(world, name, grasp_types=['top', 'side'], **kwargs):
             pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose)
             grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose, grasp_width)
             yield grasp
+
+################################################################################
+
+def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
+    x_limits, y_limits = zip(*base_limits)
+    custom_limits = {
+        joint_from_name(robot, 'x'): x_limits,
+        joint_from_name(robot, 'y'): y_limits,
+    }
+    if yaw_limit is not None:
+        custom_limits.update({
+            joint_from_name(robot, 'theta'): yaw_limit,
+        })
+    return custom_limits
+
+
+def compute_custom_base_limits(world):
+    full_aabb = aabb_union(get_aabb(body) for body in get_bodies() if body != world.floor)
+    #draw_aabb(full_aabb)
+    lower, upper = full_aabb
+    base_limits = (lower[:2], upper[:2])
+    draw_base_limits(base_limits)
+    #wait_for_user()
+    return custom_limits_from_base_limits(world.robot, base_limits)

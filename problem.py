@@ -3,21 +3,10 @@ from pddlstream.language.generator import from_gen_fn, from_fn
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
-from pybullet_tools.utils import get_custom_limits, joint_from_name, get_joint_positions, get_joint_name
-from utils import STOVES
+from pybullet_tools.utils import get_joint_name
+from utils import STOVES, GRASP_TYPES, custom_limits_from_base_limits
 from stream import get_stable_gen, get_grasp_gen, get_ik_ir_gen, get_motion_gen, distance_fn, get_pull_gen
 
-def create_base_limits(robot, base_limits, yaw_limit=None):
-    x_limits, y_limits = zip(*base_limits)
-    custom_limits = {
-        joint_from_name(robot, 'x'): x_limits,
-        joint_from_name(robot, 'y'): y_limits,
-    }
-    if yaw_limit is not None:
-        custom_limits.update({
-            joint_from_name(robot, 'theta'): yaw_limit,
-        })
-    return custom_limits
 
 def existential_quantification(goal_literals):
     # TODO: merge with pddlstream-experiments
@@ -86,8 +75,8 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
     block = list(world.movable)[0]
     joint = 'chewie_door_left_joint' # baker_joint | chewie_door_left_joint | hitman_drawer_top_joint
     goal_literals = [
-        ('Open', joint),
-        #('Holding', block),
+        #('Open', joint),
+        ('Holding', block),
         #('Cooked', block),
         #('AtBConf', initial_bq),
     ]
@@ -107,16 +96,12 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
 
     goal_formula = existential_quantification(goal_literals)
 
-    custom_limits = {}
-    if base_limits is not None:
-        custom_limits.update(create_base_limits(world.robot, base_limits))
-
     stream_map = {
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
-        'sample-grasp': from_gen_fn(get_grasp_gen(world, **kwargs)),
-        'inverse-kinematics': from_gen_fn(get_ik_ir_gen(world, custom_limits=custom_limits, **kwargs)),
-        'plan-pull': from_gen_fn(get_pull_gen(world, custom_limits=custom_limits, **kwargs)),
-        'plan-base-motion': from_fn(get_motion_gen(world, custom_limits=custom_limits, **kwargs)),
+        'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
+        'inverse-kinematics': from_gen_fn(get_ik_ir_gen(world, **kwargs)),
+        'plan-pull': from_gen_fn(get_pull_gen(world, **kwargs)),
+        'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
 
         #'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(collisions=collisions)),
         #'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(problem, collisions=collisions)),
