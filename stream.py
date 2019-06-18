@@ -9,7 +9,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, wait_for_user, get_link_subtree, get_link_name, draw_pose, get_link_pose, \
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
-    plan_waypoints_joint_motion, INF
+    plan_waypoints_joint_motion, INF, set_color, get_links
 
 from utils import get_grasps, SURFACES
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
@@ -44,6 +44,12 @@ def get_stable_gen(world, collisions=True, **kwargs):
                 break
             p = Pose(body, body_pose)
             p.assign()
+            #print([get_link_name(obst, link) for obst, links in obstacles for link in links
+            #       if pairwise_collision(body, (obst, [link]))])
+            #for link in get_links(world.kitchen):
+            #    if link != 1:
+            #        set_color(world.kitchen, np.zeros(4), link=link)
+            #wait_for_user()
             if not any(pairwise_collision(body, obst) for obst in obstacles):
                        #if obst not in {body, surface}):
                 yield (p,)
