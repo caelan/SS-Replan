@@ -12,6 +12,8 @@ import time
 import numpy as np
 import datetime
 
+from itertools import product
+
 PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
@@ -49,24 +51,17 @@ def get_date():
 
 ################################################################################
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-cfree', action='store_true',
-                        help='When enabled, disables collision checking (for debugging).')
-    parser.add_argument('-grasp_type', default=GRASP_TYPES[0],
-                        help='Specifies the type of grasp.')
-    #parser.add_argument('-problem', default='test_block',
-    #                    help='The name of the problem to solve.')
-    parser.add_argument('-num_samples', default=1000, type=int,
-                        help='The number of samples')
-    parser.add_argument('-seed', default=None,
-                        help='The random seed to use.')
-    parser.add_argument('-teleport', action='store_true',
-                        help='Uses unit costs')
-    parser.add_argument('-visualize', action='store_true',
-                        help='When enabled, visualizes planning rather than the world (for debugging).')
-    args = parser.parse_args()
+def visualize_database(tool_from_base_list):
+    handles = []
+    if not has_gui():
+        return handles
+    for gripper_from_base in tool_from_base_list:
+        # TODO: move away from the environment
+        handles.extend(draw_point(point_from_pose(gripper_from_base), color=(1, 0, 0)))
+    wait_for_user()
+    return handles
 
+def collect_place(object_name, surface_name, grasp_type, args):
     date = get_date()
     #set_seed(args.seed)
     world = World(use_gui=args.visualize)
@@ -74,28 +69,23 @@ def main():
         world.close_door(joint)
     world.open_gripper()
 
-    print(get_body_name(world.kitchen))
-
-    robot_name = get_body_name(world.robot) # get_name | get_body_name | get_base_name
-    base_link = link_from_name(world.robot, BASE_LINK)
-    custom_limits = compute_custom_base_limits(world)
-    #dump_body(world.robot)
-
-    block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    world.add_body(block_name, get_block_path(block_name))
-    surface_name = SURFACES[0]
+    world.add_body(object_name, get_block_path(object_name))
     surface_pose = get_link_pose(world.kitchen, link_from_name(world.kitchen, surface_name))
 
-    # TODO: sample from set of objects
+    base_link = link_from_name(world.robot, BASE_LINK)
+    custom_limits = compute_custom_base_limits(world)
+    # dump_body(world.robot)
+
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
-    grasp_gen_fn = get_grasp_gen(world, grasp_types=[args.grasp_type])
+    grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
     ik_ir_gen = get_ik_ir_gen(world, custom_limits=custom_limits,
                               collisions=not args.cfree, teleport=args.teleport,
-                              learned=False, max_attempts=25, max_successes=1, max_failures=0)
+                              learned=False, max_attempts=args.attempts, max_successes=1, max_failures=0)
 
-    stable_gen = stable_gen_fn(block_name, surface_name)
-    grasps = list(grasp_gen_fn(block_name))
-    print('Grasp type: {} | Num grasps: {}'.format(args.grasp_type, len(grasps)))
+    stable_gen = stable_gen_fn(object_name, surface_name)
+    grasps = list(grasp_gen_fn(object_name))
+    print('Object name: {} | Surface name: {} | Grasp type: {} | Num grasps: {}'.format(
+        object_name, surface_name, grasp_type, len(grasps)))
     tool_from_base_list = []
     surface_from_object_list = []
 
@@ -103,7 +93,7 @@ def main():
     while len(tool_from_base_list) < args.num_samples:
         (pose,) = next(stable_gen)
         (grasp,) = random.choice(grasps)
-        result = next(ik_ir_gen(block_name, pose, grasp), None)
+        result = next(ik_ir_gen(object_name, pose, grasp), None)
         if result is None:
             continue
         bq, aq, at = result
@@ -129,25 +119,50 @@ def main():
     # TODO: could store per data point
     data = {
         'date': date,
-        'robot_name': robot_name,
-        'object_name': block_name,
-        'surface_name': surface_name,
-        'grasp_type': args.grasp_type,
+        'robot_name': get_body_name(world.robot), # get_name | get_body_name | get_base_name | world.robot_name
         'base_link': get_link_name(world.robot, base_link),
         'tool_link': get_link_name(world.robot, world.tool_link),
+        'kitchen_name': get_body_name(world.robot),
+        'surface_name': surface_name,
+        'object_name': object_name,
+        'grasp_type': args.grasp_type,
         'tool_from_base_list': tool_from_base_list,
         'surface_from_object_list': surface_from_object_list,
     }
 
-    if has_gui():
-        handles = []
-        for gripper_from_base in tool_from_base_list:
-            # TODO: move away from the environment
-            handles.extend(draw_point(point_from_pose(gripper_from_base), color=(1, 0, 0)))
-        wait_for_user()
-
+    #visualize_database(tool_from_base_list)
     write_json(path, data)
     world.destroy()
+
+################################################################################
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-attempts', default=100, type=int,
+                        help='The number of attempts')
+    parser.add_argument('-cfree', action='store_true',
+                        help='When enabled, disables collision checking (for debugging).')
+    #parser.add_argument('-grasp_type', default=GRASP_TYPES[0],
+    #                    help='Specifies the type of grasp.')
+    #parser.add_argument('-problem', default='test_block',
+    #                    help='The name of the problem to solve.')
+    parser.add_argument('-num_samples', default=1000, type=int,
+                        help='The number of samples')
+    parser.add_argument('-seed', default=None,
+                        help='The random seed to use.')
+    parser.add_argument('-teleport', action='store_true',
+                        help='Uses unit costs')
+    parser.add_argument('-visualize', action='store_true',
+                        help='When enabled, visualizes planning rather than the world (for debugging).')
+    args = parser.parse_args()
+
+    # TODO: sample from set of objects?
+    object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+    surface_names = SURFACES[1:]
+    grasp_types = GRASP_TYPES
+
+    for surface_name, grasp_type in product(surface_names, grasp_types):
+        collect_place(object_name, surface_name, grasp_type, args)
 
 if __name__ == '__main__':
     main()
