@@ -5,7 +5,7 @@ from pddlstream.utils import read, get_file_path
 from pybullet_tools.pr2_primitives import Conf, Pose
 from pybullet_tools.utils import get_custom_limits, joint_from_name, get_joint_positions, get_joint_name
 from utils import STOVES
-from stream import get_stable_gen, get_grasp_gen, get_ik_ir_gen, get_motion_gen, distance_fn
+from stream import get_stable_gen, get_grasp_gen, get_ik_ir_gen, get_motion_gen, distance_fn, get_pull_gen
 
 def create_base_limits(robot, base_limits, yaw_limit=None):
     x_limits, y_limits = zip(*base_limits)
@@ -52,6 +52,8 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
 
         Equal(('PickCost',), 1),
         Equal(('PlaceCost',), 1),
+        Equal(('PullCost',), 1),
+        Equal(('CookCost',), 1),
     ] + [('Type', name, 'stove') for name in STOVES]
 
     for name in world.movable:
@@ -70,19 +72,24 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
         initial_conf = Conf(world.kitchen, [joint])
+        open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
+        closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         init.extend([
-            ('Position', joint_name, initial_conf),
-            ('AtPosition', joint_name, initial_conf),
+            ('Conf', joint_name, initial_conf),
+            ('AtConf', joint_name, initial_conf),
+            ('Conf', joint_name, open_conf),
+            ('OpenConf', joint_name, open_conf),
+            ('Conf', joint_name, closed_conf),
+            ('ClosedConf', joint_name, closed_conf),
         ])
-        for position in [world.open_conf(joint), world.closed_conf(joint)]:
-            conf = Conf(world.kitchen, [joint], [position])
-            init.append(('Position', joint_name, conf))
 
     block = list(world.movable)[0]
+    joint = 'chewie_door_left_joint' # baker_joint | chewie_door_left_joint | hitman_drawer_top_joint
     goal_literals = [
-        ('Holding', block),
-        ('Cooked', block),
-        ('AtBConf', initial_bq),
+        ('Open', joint),
+        #('Holding', block),
+        #('Cooked', block),
+        #('AtBConf', initial_bq),
     ]
     #if problem.goal_conf is not None:
     #    goal_conf = Conf(robot, get_group_joints(robot, 'base'), problem.goal_conf)
@@ -108,6 +115,7 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world, **kwargs)),
         'inverse-kinematics': from_gen_fn(get_ik_ir_gen(world, custom_limits=custom_limits, **kwargs)),
+        'plan-pull': from_gen_fn(get_pull_gen(world, custom_limits=custom_limits, **kwargs)),
         'plan-base-motion': from_fn(get_motion_gen(world, custom_limits=custom_limits, **kwargs)),
 
         #'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(collisions=collisions)),

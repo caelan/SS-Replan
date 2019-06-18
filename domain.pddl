@@ -10,16 +10,19 @@
     (Supported ?o ?p ?r)
     (Grasp ?o ?g)
     (Kin ?o ?p ?g ?bq ?aq ?bt)
+    (Pull ?j ?q1 ?q2 ?bq ?aq ?at)
     (BaseMotion ?bq1 ?bq2 ?bt)
     (ArmMotion ?qq1 ?aq2 ?at)
     (BTraj ?bt)
     (ATraj ?at)
+    (Conf ?j ?q)
 
     (CFreePosePose ?o ?p ?o2 ?p2)
     (CFreeApproachPose ?o ?p ?g ?o2 ?p2)
     (CFreeTrajPose ?t ?o2 ?p2)
     (CFreeTrajGraspPose ?t ?a ?o1 ?g1 ?o2 ?p2)
 
+    (AtConf ?j ?q)
     (AtPose ?o ?p)
     (AtGrasp ?o ?g)
     (HandEmpty)
@@ -27,6 +30,11 @@
     (AtAConf ?aq)
     (CanMove)
     (Cooked ?o)
+
+    (OpenConf ?j ?q)
+    (ClosedConf ?j ?q)
+    (Open ?j)
+    (Closed ?j)
 
     (On ?o ?r)
     (Holding ?o)
@@ -40,6 +48,8 @@
     (MoveCost ?bt)
     (PickCost)
     (PlaceCost)
+    (PullCost)
+    (CookCost)
   )
 
   (:action move_base
@@ -83,12 +93,24 @@
                  (not (AtGrasp ?o ?g))
                  (increase (total-cost) (PlaceCost)))
   )
-  ; TODO: pull
+  (:action pull
+    :parameters (?j ?q1 ?q2 ?bq ?aq ?at)
+    :precondition (and (Pull ?j ?q1 ?q2 ?bq ?aq ?at)
+                       (AtConf ?j ?q1) (HandEmpty) (AtBConf ?bq) ; (AtAConf ?aq)
+                       ;(not (UnsafePose ?o ?p))
+                       ;(not (UnsafeApproach ?o ?p ?g))
+                       ;(not (UnsafeATraj ?t))
+                  )
+    :effect (and (AtConf ?j ?q2) (CanMove)
+                 (not (AtConf ?j ?q1))
+                 (increase (total-cost) (PullCost)))
+  )
 
   (:action cook
     :parameters (?r)
     :precondition (Type ?r @stove)
-    :effect (forall (?o) (when (On ?o ?r) (Cooked ?o)))
+    :effect (and (forall (?o) (when (On ?o ?r) (Cooked ?o)))
+                 (increase (total-cost) (PullCost)))
   )
 
   (:derived (On ?o ?r)
@@ -98,6 +120,14 @@
   (:derived (Holding ?o)
     (exists (?g) (and (Grasp ?o ?g)
                       (AtGrasp ?o ?g)))
+  )
+  (:derived (Open ?j)
+    (exists (?q) (and (OpenConf ?j ?q)
+                      (AtConf ?j ?q)))
+  )
+  (:derived (Closed ?j)
+    (exists (?q) (and (ClosedConf ?j ?q)
+                      (AtConf ?j ?q)))
   )
 
 ;  (:derived (UnsafePose ?o ?p)

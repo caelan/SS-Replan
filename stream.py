@@ -3,14 +3,16 @@ import numpy as np
 
 from itertools import islice
 
-from pybullet_tools.pr2_primitives import Pose, Conf
+from pybullet_tools.pr2_primitives import Pose, Conf, get_side_grasps
 from pybullet_tools.utils import sample_placement, pairwise_collision, multiply, invert, sub_inverse_kinematics, \
     get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
-    get_extend_fn
+    get_extend_fn, joint_from_name, wait_for_user, get_link_subtree, get_link_name, draw_pose, get_link_pose, \
+    remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
+    plan_waypoints_joint_motion
 
 from utils import get_grasps, SURFACES
-from command import Sequence, Trajectory, Attach, Detach, State
+from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 
 
 BASE_CONSTANT = 1
@@ -101,7 +103,8 @@ def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False):
         if teleport:
             path = [default_conf, approach_conf, grasp_conf]
         else:
-            grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf, attachments=attachments.values(),
+            grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
+                                                  attachments=attachments.values(),
                                                   obstacles=approach_obstacles, self_collisions=False,
                                                   custom_limits=custom_limits, resolutions=resolutions/2.)
             if grasp_path is None:
@@ -109,7 +112,8 @@ def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False):
                 return None
             set_joint_positions(world.robot, world.arm_joints, default_conf)
             # TODO: plan one with attachment placed and one held
-            approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf, attachments=attachments.values(),
+            approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
+                                              attachments=attachments.values(),
                                               obstacles=obstacles, self_collisions=False,
                                               custom_limits=custom_limits, resolutions=resolutions,
                                               restarts=2, iterations=25, smooth=25)
@@ -205,6 +209,59 @@ def get_ik_ir_gen(world, max_attempts=25, teleport=False, **kwargs):
     return gen
 
 ################################################################################
+
+def get_handle_link(world, joint):
+    for link in get_link_subtree(world.kitchen, joint):
+        if 'handle' in get_link_name(world.kitchen, link):
+            return link
+    raise RuntimeError()
+
+def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False):
+    grasp_pose = (unit_point(), quat_from_euler(Euler(pitch=np.pi / 2)))
+    # TODO: can adjust the position and orientation on the handle
+
+    def gen(joint_name, conf1, conf2):
+        if conf1 == conf2:
+            return
+        door_joint = joint_from_name(world.kitchen, joint_name)
+        handle_link = get_handle_link(world, door_joint)
+        #conf1.assign()
+        door_joints = [door_joint]
+        extend_fn = get_extend_fn(world.kitchen, door_joints, resolutions=[0.05])
+        door_path = [conf1.values] + list(extend_fn(conf1.values, conf2.values))
+        tool_path = []
+        set_joint_positions(world.robot, world.base_joints, [0.75, -0.5, np.pi])
+        for q in door_path:
+            set_joint_positions(world.kitchen, door_joints, q)
+            handle_pose = get_link_pose(world.kitchen, handle_link)
+            tool_pose = multiply(handle_pose, invert(grasp_pose))
+            tool_path.append(tool_pose)
+            #handles = draw_pose(handle_pose, length=0.25)
+            #handles.extend(draw_aabb(get_aabb(world.kitchen, link=handle_link)))
+            #wait_for_user()
+            #for handle in handles:
+            #    remove_debug(handle)
+
+
+        grasp_wayoinpts = plan_cartesian_motion(world.robot, world.arm_joints[0], world.tool_link, tool_path,
+                                                custom_limits=custom_limits, pos_tolerance=1e-3)
+        if grasp_wayoinpts is None:
+            return
+        #pull_joint_path = plan_waypoints_joint_motion(combined_joints, combined_waypoints,
+        #                                              collision_fn=lambda q: False)
+
+
+        aq = Conf(world.robot, world.arm_joints, approach_conf)
+        cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[ # , attachments=attachments
+            Trajectory(world, world.robot, world.arm_joints, path),
+            Trajectory(world, world.robot, world.gripper_joints, finger_path),
+            DoorTrajectory(world, world.robot, world.arm_joints, path,
+                           world.kitchen, door_joints, door_path),
+            Trajectory(world, world.robot, world.gripper_joints, reversed(path)),
+            Trajectory(world, world.robot, world.gripper_joints, finger_path),
+        ])
+        return (aq, cmd,)
+    return gen
 
 def get_motion_gen(world, custom_limits={}, collisions=True, teleport=False):
     # TODO: include fluents

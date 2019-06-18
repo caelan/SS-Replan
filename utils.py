@@ -90,14 +90,14 @@ class World(object):
             self.robot = load_pybullet(urdf_path)
         #dump_body(self.robot)
         self.robot_yaml = load_yaml(yaml_path)
-        print(self.robot_yaml)
+        #print(self.robot_yaml)
         self.set_initial_conf()
 
         with HideOutput():
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
-        dump_body(self.kitchen)
+        #dump_body(self.kitchen)
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
-        print(self.kitchen_yaml)
+        #print(self.kitchen_yaml)
         set_point(self.kitchen, Point(z=1.35))
 
         add_data_path()
@@ -195,19 +195,19 @@ class Grasp(object):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
 
-def get_grasps(world, name, grasp_types=['top', 'side']):
+def get_grasps(world, name, grasp_types=['top', 'side'], **kwargs):
     pre_distance = 0.1
     body = world.get_body(name)
     for grasp_type in grasp_types:
         if grasp_type == 'top':
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
-                                       grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf)
+                                       grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf, **kwargs)
         elif grasp_type == 'side':
             pre_direction = pre_distance * get_unit_vector([1, 0, 3])
             generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
                                         grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
-                                        top_offset=FINGER_EXTENT[0] / 2)
+                                        top_offset=FINGER_EXTENT[0] / 2, **kwargs)
         else:
             raise ValueError(grasp_type)
         for i, grasp_pose in enumerate(generator):

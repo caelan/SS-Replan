@@ -29,8 +29,6 @@ from pddlstream.utils import INF
 from pddlstream.language.stream import StreamInfo
 
 
-################################################################################
-
 def commands_from_plan(world, plan):
     if plan is None:
         return None
@@ -40,8 +38,6 @@ def commands_from_plan(world, plan):
         if action in ['move_base', 'move_arm', 'pick']:
             commands.extend(params[-1].commands)
         elif action == 'place':
-
-            print(params[-1].reverse().commands)
             commands.extend(params[-1].reverse().commands)
         elif action in ['cook']:
             commands.append(Wait(world, steps=100))
@@ -64,6 +60,7 @@ def execute_plan(world, state, commands, time_step=None):
             else:
                 wait_for_duration(time_step)
 
+################################################################################
 
 def main():
     parser = argparse.ArgumentParser()
@@ -129,6 +126,7 @@ def main():
     stream_info = {
         # TODO: check if already on the stove
         'inverse-kinematics': StreamInfo(),
+        'plan-pull': StreamInfo(),
         'plan-base-motion': StreamInfo(overhead=1e1),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),

@@ -46,16 +46,41 @@ class Trajectory(Command):
         self.path = tuple(path)
 
     def reverse(self):
-        return Trajectory(self.world, self.robot, self.joints, self.path[::-1])
+        return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
 
     def iterate(self, world, state):
         for positions in self.path:
-            set_joint_positions(world.robot, self.joints, positions)
-            yield positions
+            set_joint_positions(self.robot, self.joints, positions)
+            yield
 
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
 
+class DoorTrajectory(Command):
+    def __init__(self, world, robot, robot_joints, robot_path,
+                 door, door_joints, door_path):
+        super(DoorTrajectory, self).__init__(world)
+        self.robot = robot
+        self.robot_joints = tuple(robot_joints)
+        self.robot_path = tuple(robot_path)
+        self.door = door
+        self.door_joints = tuple(door_joints)
+        self.door_path = tuple(door_path)
+        assert len(self.robot_path) == len(self.door_path)
+
+    def reverse(self):
+        return self.__class__(self.world, self.robot, self.robot_joints, self.robot_path[::-1],
+                              self.door, self.door_joints, self.door_path[::-1])
+
+    def iterate(self, world, state):
+        for robot_conf, door_conf in zip(self.robot_path, self.door_path):
+            set_joint_positions(self.robot, self.robot_joints, robot_conf)
+            set_joint_positions(self.door, self.door_joints, door_conf)
+            yield
+
+    def __repr__(self):
+        return '{}({}x{})'.format(self.__class__.__name__, len(self.robot_joints) + len(self.door_joints),
+                                  len(self.robot_path))
 
 class Attach(Command):
     def __init__(self, world, robot, link, body):
