@@ -9,7 +9,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, wait_for_user, get_link_subtree, get_link_name, draw_pose, get_link_pose, \
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
-    plan_waypoints_joint_motion
+    plan_waypoints_joint_motion, INF
 
 from utils import get_grasps, SURFACES
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
@@ -58,7 +58,7 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
-def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False):
+def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **kwargs):
     obstacles = world.static_obstacles if collisions else []
     resolutions = 0.05 * np.ones(len(world.arm_joints))
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
@@ -136,7 +136,7 @@ def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False):
     return fn
 
 
-def get_ir_sampler(world, custom_limits={}, max_attempts=25, collisions=True, learned=False):
+def get_ir_sampler(world, custom_limits={}, max_attempts=25, collisions=True, learned=False, **kwargs):
     obstacles = world.static_obstacles if collisions else []
     #gripper = problem.get_gripper()
 
@@ -156,7 +156,6 @@ def get_ir_sampler(world, custom_limits={}, max_attempts=25, collisions=True, le
         else:
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
         lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, custom_limits)
-        #print(lower_limits, upper_limits)
 
         while True:
             count = 0
@@ -178,7 +177,7 @@ def get_ir_sampler(world, custom_limits={}, max_attempts=25, collisions=True, le
     return gen_fn
 
 
-def get_ik_ir_gen(world, max_attempts=25, teleport=False, **kwargs):
+def get_ik_ir_gen(world, max_attempts=25, max_successes=1, max_failures=0, teleport=False, **kwargs):
     # TODO: compose using general fn
     ir_sampler = get_ir_sampler(world, max_attempts=1, **kwargs)
     ik_fn = get_ik_fn(world, teleport=teleport, **kwargs)
@@ -186,6 +185,8 @@ def get_ik_ir_gen(world, max_attempts=25, teleport=False, **kwargs):
     def gen(*inputs):
         _, pose, _ = inputs
         ir_generator = ir_sampler(*inputs)
+        successes = 0
+        failures = 0
         while True:
             for attempt in range(max_attempts):
                 try:
@@ -197,13 +198,15 @@ def get_ik_ir_gen(world, max_attempts=25, teleport=False, **kwargs):
                 ik_outputs = ik_fn(*(inputs + ir_outputs))
                 if ik_outputs is None:
                     continue
+                successes += 1
                 print('IK attempt:', attempt)
                 yield ir_outputs + ik_outputs
-                # if pose.init:
-                #    break
-                return
+                if not pose.init and (max_successes < successes):
+                    return
+                break
             else:
-                if not pose.init:
+                failures += 1
+                if not pose.init and (max_failures < failures):
                     return
                 yield None
     return gen

@@ -103,6 +103,7 @@ class World(object):
         add_data_path()
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
         self.body_from_name = {}
+        self.path_from_name = {}
     @property
     def base_joints(self):
         return joints_from_names(self.robot, BASE_JOINTS)
@@ -165,6 +166,7 @@ class World(object):
     def add_body(self, name, path, **kwargs):
         # TODO: support obj case
         assert name not in self.body_from_name
+        self.path_from_name[name] = path
         self.body_from_name[name] = load_pybullet(path, **kwargs)
         return name
     def get_body(self, name):
