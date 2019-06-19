@@ -64,7 +64,76 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
-def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **kwargs):
+def inverse_reachability(world, base_generator, obstacles=[], custom_limits={}, max_attempts=25, **kwargs):
+    default_conf = world.initial_conf  # arm_conf(arm, grasp.carry)
+    lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, custom_limits)
+    while True:
+        for i, base_conf in enumerate(islice(base_generator, max_attempts)):
+            if not all_between(lower_limits, base_conf, upper_limits):
+                continue
+            #pose.assign()
+            bq = Conf(world.robot, world.base_joints, base_conf)
+            bq.assign()
+            set_joint_positions(world.robot, world.arm_joints, default_conf)
+            if any(pairwise_collision(world.robot, b) for b in obstacles): #  + [obj]
+                continue
+            # print('IR attempts:', i)
+            yield (bq,)
+            break
+        else:
+            yield None
+
+def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, max_failures=0, **kwargs):
+    successes = 0
+    failures = 0
+    ir_generator = ir_sampler(*inputs)
+    while True:
+        for attempt in range(max_attempts):
+            try:
+                ir_outputs = next(ir_generator)
+            except StopIteration:
+                return
+            if ir_outputs is None:
+                continue
+            ik_outputs = ik_fn(*(inputs + ir_outputs))
+            if ik_outputs is None:
+                continue
+            successes += 1
+            print('IK attempt:', attempt)
+            yield ir_outputs + ik_outputs
+            if max_successes < successes:
+                return
+            break
+        else:
+            failures += 1
+            if max_failures < failures: # pose.init
+                return
+            yield None
+
+################################################################################
+
+def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
+    obstacles = world.static_obstacles if collisions else []
+    #gripper = problem.get_gripper()
+
+    def gen_fn(name, pose, grasp):
+        obj = world.get_body(name)
+        pose.assign()
+        #approach_obstacles = {obst for obst in obstacles if not is_placement(obj, obst)}
+        #for _ in iterate_approach_path(robot, arm, gripper, pose, grasp, body=obj):
+        #    if any(pairwise_collision(gripper, b) or pairwise_collision(obj, b) for b in approach_obstacles):
+        #        return
+        # TODO: check collisions with obj at pose
+        gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
+        if learned:
+            raise NotImplementedError()
+            # base_generator = learned_pose_generator(robot, gripper_pose, arm=arm, grasp_type=grasp.grasp_type)
+        else:
+            base_generator = uniform_pose_generator(world.robot, gripper_pose)
+        return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+    return gen_fn
+
+def get_pick_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **kwargs):
     obstacles = world.static_obstacles if collisions else []
     resolutions = 0.05 * np.ones(len(world.arm_joints))
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
@@ -142,79 +211,14 @@ def get_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **kwargs
     return fn
 
 
-def get_ir_sampler(world, custom_limits={}, max_attempts=25, collisions=True, learned=False, **kwargs):
-    obstacles = world.static_obstacles if collisions else []
-    #gripper = problem.get_gripper()
-
-    def gen_fn(name, pose, grasp):
-        obj = world.get_body(name)
-        pose.assign()
-        #approach_obstacles = {obst for obst in obstacles if not is_placement(obj, obst)}
-        #for _ in iterate_approach_path(robot, arm, gripper, pose, grasp, body=obj):
-        #    if any(pairwise_collision(gripper, b) or pairwise_collision(obj, b) for b in approach_obstacles):
-        #        return
-
-        gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        default_conf = world.initial_conf  # arm_conf(arm, grasp.carry)
-        if learned:
-            raise NotImplementedError()
-            #base_generator = learned_pose_generator(robot, gripper_pose, arm=arm, grasp_type=grasp.grasp_type)
-        else:
-            base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, custom_limits)
-
-        while True:
-            count = 0
-            for base_conf in islice(base_generator, max_attempts):
-                count += 1
-                if not all_between(lower_limits, base_conf, upper_limits):
-                    continue
-                pose.assign()
-                bq = Conf(world.robot, world.base_joints, base_conf)
-                bq.assign()
-                set_joint_positions(world.robot, world.arm_joints, default_conf)
-                if any(pairwise_collision(world.robot, b) for b in obstacles + [obj]):
-                    continue
-                #print('IR attempts:', count)
-                yield (bq,)
-                break
-            else:
-                yield None
-    return gen_fn
-
-
-def get_ik_ir_gen(world, max_attempts=25, max_successes=1, max_failures=0, teleport=False, **kwargs):
+def get_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn
-    ir_sampler = get_ir_sampler(world, max_attempts=1, **kwargs)
-    ik_fn = get_ik_fn(world, teleport=teleport, **kwargs)
+    ir_sampler = get_pick_ir_gen(world, max_attempts=1, **kwargs)
+    ik_fn = get_pick_ik_fn(world, teleport=teleport, **kwargs)
 
     def gen(*inputs):
         _, pose, _ = inputs
-        ir_generator = ir_sampler(*inputs)
-        successes = 0
-        failures = 0
-        while True:
-            for attempt in range(max_attempts):
-                try:
-                    ir_outputs = next(ir_generator)
-                except StopIteration:
-                    return
-                if ir_outputs is None:
-                    continue
-                ik_outputs = ik_fn(*(inputs + ir_outputs))
-                if ik_outputs is None:
-                    continue
-                successes += 1
-                print('IK attempt:', attempt)
-                yield ir_outputs + ik_outputs
-                if not pose.init and (max_successes < successes):
-                    return
-                break
-            else:
-                failures += 1
-                if not pose.init and (max_failures < failures):
-                    return
-                yield None
+        return compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=max_attempts, **kwargs)
     return gen
 
 ################################################################################
@@ -225,7 +229,7 @@ def get_handle_link(world, joint):
             return link
     raise RuntimeError()
 
-def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False):
+def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False, learned=False):
     grasp_pose = (unit_point(), quat_from_euler(Euler(pitch=np.pi / 2)))
     # TODO: can adjust the position and orientation on the handle
 
@@ -252,9 +256,9 @@ def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False):
             #    remove_debug(handle)
 
 
-        grasp_wayoinpts = plan_cartesian_motion(world.robot, world.arm_joints[0], world.tool_link, tool_path,
+        grasp_waypoints = plan_cartesian_motion(world.robot, world.arm_joints[0], world.tool_link, tool_path,
                                                 custom_limits=custom_limits, pos_tolerance=1e-3)
-        if grasp_wayoinpts is None:
+        if grasp_waypoints is None:
             return
         #pull_joint_path = plan_waypoints_joint_motion(combined_joints, combined_waypoints,
         #                                              collision_fn=lambda q: False)

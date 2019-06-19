@@ -20,7 +20,7 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, point_from_pose
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, GRASP_TYPES
-from stream import get_ik_ir_gen, get_stable_gen, get_grasp_gen
+from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 
 CARTER_BASE_LINK = 'carter_base_link'
 
@@ -66,9 +66,9 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
-    ik_ir_gen = get_ik_ir_gen(world, custom_limits=custom_limits,
-                              collisions=not args.cfree, teleport=args.teleport,
-                              learned=False, max_attempts=args.attempts, max_successes=1, max_failures=0)
+    ik_ir_gen = get_pick_gen(world, custom_limits=custom_limits,
+                             collisions=not args.cfree, teleport=args.teleport,
+                             learned=False, max_attempts=args.attempts, max_successes=1, max_failures=0)
 
     stable_gen = stable_gen_fn(object_name, surface_name)
     grasps = list(grasp_gen_fn(object_name))

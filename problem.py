@@ -5,7 +5,7 @@ from pddlstream.utils import read, get_file_path
 from pybullet_tools.pr2_primitives import Conf, Pose
 from pybullet_tools.utils import get_joint_name
 from utils import STOVES, GRASP_TYPES, custom_limits_from_base_limits
-from stream import get_stable_gen, get_grasp_gen, get_ik_ir_gen, get_motion_gen, distance_fn, get_pull_gen
+from stream import get_stable_gen, get_grasp_gen, get_pick_gen, get_motion_gen, distance_fn, get_pull_gen
 
 
 def existential_quantification(goal_literals):
@@ -77,8 +77,8 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
     goal_literals = [
         #('Open', joint),
         ('Holding', block),
-        #('Cooked', block),
-        #('AtBConf', initial_bq),
+        ('Cooked', block),
+        ('AtBConf', initial_bq),
     ]
     #if problem.goal_conf is not None:
     #    goal_conf = Conf(robot, get_group_joints(robot, 'base'), problem.goal_conf)
@@ -99,7 +99,7 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
     stream_map = {
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
-        'inverse-kinematics': from_gen_fn(get_ik_ir_gen(world, **kwargs)),
+        'inverse-kinematics': from_gen_fn(get_pick_gen(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen(world, **kwargs)),
         'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
 

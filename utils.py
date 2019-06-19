@@ -7,7 +7,8 @@ from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_unti
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
-    get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, get_bodies, draw_base_limits
+    get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
+    get_bodies, draw_base_limits, wait_for_user, draw_pose
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -34,7 +35,9 @@ BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf')
 YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 
-KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen.urdf')
+#KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen.urdf')
+#KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_concave.urdf')
+KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_obj.urdf')
 #KITCHEN_PATH = '/home/caelan/Programs/robot_kitchen/model/robot_kitchen.sdf'
 #KITCHEN_PATH = os.path.join(SRL_PATH, 'packages/kitchen_description/urdf/kitchen_part_right_gen.urdf')
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
@@ -86,15 +89,17 @@ class World(object):
             urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
         else:
             raise ValueError(self.robot_name)
-        with HideOutput():
+        with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
         #dump_body(self.robot)
         self.robot_yaml = load_yaml(yaml_path)
         #print(self.robot_yaml)
         self.set_initial_conf()
 
-        with HideOutput():
+        with HideOutput(enable=True):
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
+        draw_pose(Pose(point=Point(z=1e-2)), length=3)
+        #wait_for_user()
         #dump_body(self.kitchen)
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         #print(self.kitchen_yaml)
