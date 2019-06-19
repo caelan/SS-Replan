@@ -27,7 +27,7 @@ from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 CARTER_BASE_LINK = 'carter_base_link'
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
-IR_FILENAME = '{surface_name}-{grasp_type}-place.json'
+IR_FILENAME = '{robot-name}-{surface_name}-{grasp_type}-place.json'
 
 def get_random_seed():
     # random.getstate()[1][0]
@@ -59,7 +59,8 @@ def visualize_database(tool_from_base_list):
 
 def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
     # quantify out grasp_type
-    filename = IR_FILENAME.format(surface_name=surface_name, grasp_type=grasp_type)
+    filename = IR_FILENAME.format(robot_name=world.robot_name, surface_name=surface_name,
+                                  grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     data = read_json(path)
     surface_pose = get_reference_pose(world.kitchen, surface_name)
@@ -146,7 +147,8 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         'surface_from_object_list': surface_from_object_list,
     }
 
-    filename = IR_FILENAME.format(surface_name=surface_name, grasp_type=grasp_type)
+    filename = IR_FILENAME.format(robot_name=world.robot_name, surface_name=surface_name,
+                                  grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
     return data

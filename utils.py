@@ -139,19 +139,19 @@ def iterate_approach_path(robot, gripper, pose, grasp, body=None):
         yield
 
 def get_gripper_link(robot):
-    robot_name = get_body_name(robot).lower()
-    if robot_name == 'franka_carter':
+    robot_name = get_body_name(robot)
+    if robot_name == FRANKA_CARTER:
         return FRANKA_GRIPPER_LINK
-    elif robot_name == 'eve':
+    elif robot_name == EVE:
         #return EVE_GRIPPER_LINK.format(a='l') # TODO: issue copying *.dae
         return EVE_GRIPPER_LINK.format(arm='left')
     raise ValueError(robot_name)
 
 def get_tool_link(robot):
-    robot_name = get_body_name(robot).lower()
-    if robot_name == 'franka_carter':
+    robot_name = get_body_name(robot)
+    if robot_name == FRANKA_CARTER:
         return FRANKA_TOOL_LINK
-    elif robot_name == 'eve':
+    elif robot_name == EVE:
         return EVE_TOOL_LINK.format(arm='left')
     raise ValueError(robot_name)
 
@@ -179,19 +179,22 @@ EVE_WHEEL_JOINTS = ['j_{a}_wheel_y', 'j_{a}_wheel_y']
 EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
                   'j_{a}_elbow_y', 'j_{a}_elbow_z', 'j_{a}_wrist_y', 'j_{a}_wrist_x'] # j_neck_y
 
+FRANKA_CARTER = 'franka_carter'
+EVE = 'Eve'
+
 def get_eve_arm_joints(robot, arm):
     name = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
     return joints_from_names(robot, name)
 
 class World(object):
-    def __init__(self, robot_name='eve', use_gui=True):
+    def __init__(self, robot_name=EVE, use_gui=True):
         self.client = connect(use_gui=use_gui)
         add_data_path()
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
         self.robot_name = robot_name
-        if self.robot_name == 'franka_carter':
+        if self.robot_name == FRANKA_CARTER:
             urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
-        elif self.robot_name == 'eve':
+        elif self.robot_name == EVE:
             urdf_path, yaml_path = EVE_PATH, None
         else:
             raise ValueError(self.robot_name)
