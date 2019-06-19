@@ -18,7 +18,8 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 
 from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
-    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, point_from_pose
+    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
+    point_from_pose, read_json, RED, BLUE
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, GRASP_TYPES
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 
@@ -50,8 +51,23 @@ def visualize_database(tool_from_base_list):
         return handles
     for gripper_from_base in tool_from_base_list:
         # TODO: move away from the environment
-        handles.extend(draw_point(point_from_pose(gripper_from_base), color=(1, 0, 0)))
+        handles.extend(draw_point(point_from_pose(gripper_from_base), color=RED))
     wait_for_user()
+    return handles
+
+def draw_picks(world, surface_name, grasp_type, **kwargs):
+    # quantify out
+
+    filename = IR_FILENAME.format(surface_name=surface_name, grasp_type=grasp_type)
+    path = os.path.join(DATABASE_DIRECTORY, filename)
+    data = read_json(path)
+    #tool_from_base_list
+    surface_link = link_from_name(world.kitchen, surface_name)
+    surface_pose = get_link_pose(world.kitchen, surface_link)
+    handles = []
+    for surface_from_object in data['surface_from_object_list']:
+        object_pose = multiply(surface_pose, surface_from_object)
+        handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
     return handles
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
@@ -72,8 +88,6 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
     stable_gen = stable_gen_fn(object_name, surface_name)
     grasps = list(grasp_gen_fn(object_name))
-    print('Object name: {} | Surface name: {} | Grasp type: {} | Num grasps: {}'.format(
-        object_name, surface_name, grasp_type, len(grasps)))
     tool_from_base_list = []
     surface_from_object_list = []
 
@@ -95,8 +109,9 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         surface_from_object = multiply(invert(surface_pose), pose.value)
         surface_from_object_list.append(surface_from_object)
 
-        print('{} / {} [{:.3f}]'.format(
-            len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
+        print('Object name: {} | Surface name: {} | Grasp type: {} | {} / {} [{:.3f}]'.format(
+            object_name, surface_name, grasp_type, len(tool_from_base_list),
+            args.num_samples, elapsed_time(start_time)))
         if has_gui():
             wait_for_user()
     #visualize_database(tool_from_base_list)
@@ -146,7 +161,7 @@ def main():
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    surface_names = SURFACES[1:]
+    surface_names = SURFACES
     grasp_types = GRASP_TYPES
 
     world = World(use_gui=args.visualize)
@@ -155,8 +170,16 @@ def main():
     world.open_gripper()
     world.add_body(object_name, get_block_path(object_name))
 
+
+
+    grasp_colors = {
+        'top': RED,
+        'side': BLUE,
+    }
     for surface_name, grasp_type in product(surface_names, grasp_types):
-        collect_place(world, object_name, surface_name, grasp_type, args)
+        draw_picks(world, surface_name, grasp_type, color=grasp_colors[grasp_type])
+        #collect_place(world, object_name, surface_name, grasp_type, args)
+    wait_for_user()
     world.destroy()
 
 if __name__ == '__main__':
