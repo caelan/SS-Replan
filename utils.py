@@ -8,7 +8,8 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
     get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
-    get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent
+    get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent, clone_body, \
+    set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, LockRenderer
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -46,6 +47,8 @@ BASE_JOINTS = ['x', 'y', 'theta']
 FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda_forearm_end_pt
 # +z: pointing, +y: left finger
 FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
+
+FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
 
 KITCHEN = 'kitchen'
 STOVES = ['range']
@@ -114,6 +117,35 @@ def get_block_path(name):
 
 ################################################################################
 
+def get_tool_from_root(robot):
+    root_link = link_from_name(robot, FRANKA_GRIPPER_LINK)
+    tool_link = link_from_name(robot, FRANKA_TOOL_LINK)
+    return multiply(invert(get_link_pose(robot, tool_link)),
+                    get_link_pose(robot, root_link))
+
+def iterate_approach_path(robot, gripper, pose, grasp, body=None):
+    root_from_urdf = multiply(invert(get_link_pose(gripper, 0)), get_pose(gripper))
+    tool_from_root = get_tool_from_root(robot)
+    grasp_pose = multiply(pose.value, invert(grasp.grasp_pose))
+    approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
+    for tool_pose in interpolate_poses(grasp_pose, approach_pose):
+        set_pose(gripper, multiply(tool_pose, tool_from_root, root_from_urdf))
+        if body is not None:
+            set_pose(body, multiply(tool_pose, grasp.grasp_pose))
+        yield
+
+def create_gripper(robot, visual=False):
+    #dump_body(robot)
+    links = get_link_subtree(robot, link_from_name(robot, FRANKA_GRIPPER_LINK))
+    with LockRenderer():
+        gripper = clone_body(robot, links=links, visual=False, collision=True)  # TODO: joint limits
+        if not visual:
+            for link in get_all_links(gripper):
+                set_color(gripper, np.zeros(4), link)
+    return gripper
+
+################################################################################
+
 class World(object):
     def __init__(self, robot_name='carter_franka', use_gui=True):
         self.client = connect(use_gui=use_gui)
@@ -128,6 +160,9 @@ class World(object):
         self.robot_yaml = load_yaml(yaml_path)
         #print(self.robot_yaml)
         self.set_initial_conf()
+        self.gripper = create_gripper(self.robot)
+        #wait_for_user()
+        #dump_body(self.gripper)
 
         with HideOutput(enable=True):
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)

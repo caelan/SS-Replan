@@ -173,8 +173,7 @@ def main():
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     surface_names = SURFACES
-    surface_names = DRAWER_JOINTS[1:2]
-    #surface_names = CABINET_JOINTS[:1]
+    surface_names = DRAWER_JOINTS + CABINET_JOINTS
 
     world = World(use_gui=args.visualize)
     for joint in world.kitchen_joints:

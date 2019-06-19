@@ -13,7 +13,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, \
     get_data_pose, sample_placement_on_aabb
 
-from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT
+from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 
 #from pddlstream.utils import get_connected_components
@@ -137,11 +137,13 @@ def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
 
     def gen_fn(name, pose, grasp):
         obj = world.get_body(name)
-        pose.assign()
-        #approach_obstacles = {obst for obst in obstacles if not is_placement(obj, obst)}
-        #for _ in iterate_approach_path(robot, arm, gripper, pose, grasp, body=obj):
-        #    if any(pairwise_collision(gripper, b) or pairwise_collision(obj, b) for b in approach_obstacles):
-        #        return
+        approach_obstacles = [obst for obst in obstacles] # if not is_placement(obj, obst)}
+        for _ in iterate_approach_path(world.robot, world.gripper, pose, grasp, body=obj):
+            #wait_for_user()
+            if any(pairwise_collision(world.gripper, b) or pairwise_collision(obj, b)
+                   for b in approach_obstacles):
+                return iter([])
+
         # TODO: check collisions with obj at pose
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
@@ -149,6 +151,7 @@ def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
             # base_generator = learned_pose_generator(robot, gripper_pose, arm=arm, grasp_type=grasp.grasp_type)
         else:
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
+        pose.assign()
         return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
     return gen_fn
 
@@ -308,7 +311,7 @@ def get_motion_gen(world, custom_limits={}, collisions=True, teleport=False):
         else:
             path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=[],
                                             obstacles=obstacles, custom_limits=custom_limits, self_collisions=False,
-                                            restarts=4, iterations=50, smooth=50)
+                                            restarts=4, iterations=50, smooth=100)
             if path is None:
                 print('Failed motion plan!')
                 return None

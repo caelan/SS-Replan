@@ -8,6 +8,7 @@ import random
 import cProfile
 import pstats
 import os
+import numpy as np
 
 PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
@@ -87,6 +88,7 @@ def main():
     args = parser.parse_args()
     #if args.seed is not None:
     #    set_seed(args.seed)
+    np.set_printoptions(precision=3, suppress=True)
 
     world = World(use_gui=True)
     for joint in world.kitchen_joints:
