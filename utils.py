@@ -9,7 +9,8 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
     get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
     get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent, clone_body, \
-    set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, LockRenderer
+    set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
+    LockRenderer, get_sample_fn, get_movable_joints
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -49,6 +50,9 @@ FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda
 FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
 
 FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
+
+EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.urdf')
+
 
 KITCHEN = 'kitchen'
 STOVES = ['range']
@@ -152,22 +156,31 @@ class World(object):
         self.robot_name = robot_name
         if self.robot_name == 'carter_franka':
             urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
+        elif self.robot_name == 'eve':
+            urdf_path, yaml_path = EVE_PATH, None
         else:
             raise ValueError(self.robot_name)
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
-        #dump_body(self.robot)
-        self.robot_yaml = load_yaml(yaml_path)
+        dump_body(self.robot)
+
+        #movable_joints = get_movable_joints(self.robot)
+        #sample_fn = get_sample_fn(self.robot, movable_joints)
+        #wait_for_user()
+        #while True:
+        #    q = sample_fn()
+        #    set_joint_positions(self.robot, movable_joints, q)
+        #    wait_for_user()
+
+        self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
         #print(self.robot_yaml)
         self.set_initial_conf()
         self.gripper = create_gripper(self.robot)
-        #wait_for_user()
         #dump_body(self.gripper)
 
         with HideOutput(enable=True):
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
         draw_pose(Pose(point=Point(z=1e-2)), length=3)
-        #wait_for_user()
         #dump_body(self.kitchen)
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         #print(self.kitchen_yaml)

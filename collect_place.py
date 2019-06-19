@@ -19,7 +19,7 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
-    point_from_pose, read_json, RED, BLUE, dump_body, LockRenderer
+    point_from_pose, read_json, RED, BLUE, dump_body, LockRenderer, INF, set_pose
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, \
     GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, get_kitchen_parent, TOP_GRASP, SIDE_GRASP
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
@@ -47,6 +47,7 @@ def get_date():
 ################################################################################
 
 def visualize_database(tool_from_base_list):
+    #tool_from_base_list
     handles = []
     if not has_gui():
         return handles
@@ -56,20 +57,24 @@ def visualize_database(tool_from_base_list):
     wait_for_user()
     return handles
 
-def draw_picks(world, surface_name, grasp_type, **kwargs):
-    # quantify out
-
+def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
+    # quantify out grasp_type
     filename = IR_FILENAME.format(surface_name=surface_name, grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     data = read_json(path)
-    #tool_from_base_list
-    surface_link = link_from_name(world.kitchen, surface_name)
-    surface_pose = get_link_pose(world.kitchen, surface_link)
+    surface_pose = get_reference_pose(world.kitchen, surface_name)
     handles = []
     for surface_from_object in data['surface_from_object_list']:
         object_pose = multiply(surface_pose, surface_from_object)
         handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
+        set_pose(world.get_body(object_name), object_pose)
+        #wait_for_user()
     return handles
+
+def get_reference_pose(kitchen, surface_name):
+    parent_name = get_kitchen_parent(surface_name)
+    parent_link = link_from_name(kitchen, parent_name)
+    return get_link_pose(kitchen, parent_link)
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()
@@ -78,9 +83,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     base_link = link_from_name(world.robot, CARTER_BASE_LINK)
     custom_limits = compute_custom_base_limits(world)
     #dump_body(world.robot)
-    parent_name = get_kitchen_parent(surface_name)
-    parent_link = link_from_name(world.kitchen, parent_name)
-    parent_pose = get_link_pose(world.kitchen, parent_link)
+    parent_pose = get_reference_pose(world.kitchen, surface_name)
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
@@ -99,7 +102,8 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
           (object_name, surface_name, grasp_type))
     start_time = time.time()
     failures = 0
-    while len(tool_from_base_list) < args.num_samples:
+    while (len(tool_from_base_list) < args.num_samples) and \
+            (elapsed_time(start_time) < args.max_time): #and (failures <= max_failures):
         (pose,) = next(stable_gen)
         if pose is None:
             break
@@ -159,6 +163,8 @@ def main():
     #                    help='Specifies the type of grasp.')
     #parser.add_argument('-problem', default='test_block',
     #                    help='The name of the problem to solve.')
+    parser.add_argument('-max_time', default=INF, type=float,
+                        help='The maximum runtime')
     parser.add_argument('-num_samples', default=1000, type=int,
                         help='The number of samples')
     parser.add_argument('-seed', default=None,
@@ -172,8 +178,8 @@ def main():
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    surface_names = SURFACES
-    surface_names = DRAWER_JOINTS + CABINET_JOINTS
+    #surface_names = SURFACES
+    surface_names = SURFACES + DRAWER_JOINTS + CABINET_JOINTS
 
     world = World(use_gui=args.visualize)
     for joint in world.kitchen_joints:
@@ -193,8 +199,8 @@ def main():
         else:
             grasp_types = GRASP_TYPES
         for grasp_type in grasp_types:
-            #draw_picks(world, surface_name, grasp_type, color=grasp_colors[grasp_type])
-            collect_place(world, object_name, surface_name, grasp_type, args)
+            draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
+            #collect_place(world, object_name, surface_name, grasp_type, args)
     wait_for_user()
     world.destroy()
 
