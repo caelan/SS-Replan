@@ -19,6 +19,7 @@ from pybullet_tools.utils import wait_for_user, sample_placement, link_from_name
     LockRenderer, WorldSaver, user_input, wait_for_duration, VideoSaver
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits
 from problem import pdddlstream_from_problem
+from debug import test_grasps
 from command import State, Wait
 
 #from examples.pybullet.pr2.run import post_process
@@ -98,6 +99,7 @@ def main():
 
     block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     world.add_body(block_name, get_block_path(block_name))
+    #test_grasps(world, block_name)
 
     initial_surface = random.choice(SURFACES)
     print('Initial surface:', initial_surface)

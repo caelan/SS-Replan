@@ -59,6 +59,18 @@ def test_kitchen_joints(world):
         set_joint_positions(world.kitchen, joints, conf)
         wait_for_user()
 
+def test_eve_joints(robot):
+    joint_names = [j.format(a='l') for j in EVE_ARM_JOINTS]
+    joint_names = EVE_HIP_JOINTS # EVE_HIP_JOINTS | EVE_ANKLE_JOINTS
+    joints = joints_from_names(robot, joint_names)
+    #joints = get_movable_joints(robot)
+    sample_fn = get_sample_fn(robot, joints)
+    wait_for_user()
+    while True:
+       q = sample_fn()
+       set_joint_positions(robot, joints, q)
+       wait_for_user()
+
 ################################################################################
 
 def place_on_surface(item, drawer, drawer_link=BASE_LINK, step_size=0.001):
@@ -108,7 +120,8 @@ def test_grasps(world, name):
     #wait_for_user()
 
     #tool_pose = get_link_pose(world.robot, link_from_name(world.robot, FRANKA_TOOL_LINK))
-    for grasp in get_grasps(world, name, grasp_types=['top']):
+    for grasp in get_grasps(world, name):
+        print(grasp)
         attachment = grasp.get_attachment()
         attachment.assign()
         #pregrasp = multiply(Pose(point=pre_direction), grasp)

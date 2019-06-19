@@ -10,7 +10,7 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
     get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent, clone_body, \
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
-    LockRenderer, get_sample_fn, get_movable_joints
+    LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -122,8 +122,8 @@ def get_block_path(name):
 ################################################################################
 
 def get_tool_from_root(robot):
-    root_link = link_from_name(robot, FRANKA_GRIPPER_LINK)
-    tool_link = link_from_name(robot, FRANKA_TOOL_LINK)
+    root_link = link_from_name(robot, get_gripper_link(robot))
+    tool_link = link_from_name(robot, get_tool_link(robot))
     return multiply(invert(get_link_pose(robot, tool_link)),
                     get_link_pose(robot, root_link))
 
@@ -138,9 +138,26 @@ def iterate_approach_path(robot, gripper, pose, grasp, body=None):
             set_pose(body, multiply(tool_pose, grasp.grasp_pose))
         yield
 
-def create_gripper(robot, visual=False):
+def get_gripper_link(robot):
+    robot_name = get_body_name(robot).lower()
+    if robot_name == 'franka_carter':
+        return FRANKA_GRIPPER_LINK
+    elif robot_name == 'eve':
+        #return EVE_GRIPPER_LINK.format(a='l') # TODO: issue copying *.dae
+        return EVE_GRIPPER_LINK.format(arm='left')
+    raise ValueError(robot_name)
+
+def get_tool_link(robot):
+    robot_name = get_body_name(robot).lower()
+    if robot_name == 'franka_carter':
+        return FRANKA_TOOL_LINK
+    elif robot_name == 'eve':
+        return EVE_TOOL_LINK.format(arm='left')
+    raise ValueError(robot_name)
+
+def create_gripper(robot, visual=True):
     #dump_body(robot)
-    links = get_link_subtree(robot, link_from_name(robot, FRANKA_GRIPPER_LINK))
+    links = get_link_subtree(robot, link_from_name(robot, get_gripper_link(robot)))
     with LockRenderer():
         gripper = clone_body(robot, links=links, visual=False, collision=True)  # TODO: joint limits
         if not visual:
@@ -150,11 +167,29 @@ def create_gripper(robot, visual=False):
 
 ################################################################################
 
+EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
+#EVE_GRIPPER_LINK = '{a}_palm' # Technically the start
+
+#EVE_TOOL_LINK = 'qbhand_{arm}_palm_link'
+EVE_TOOL_LINK = 'qbhand_{arm}_tendon_virtual_link'
+
+EVE_HIP_JOINTS = ['j_hip_z', 'j_hip_x', 'j_hip_y']
+EVE_ANKLE_JOINTS = ['j_knee_y', 'j_ankle_y', 'j_ankle_x']
+EVE_WHEEL_JOINTS = ['j_{a}_wheel_y', 'j_{a}_wheel_y']
+EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
+                  'j_{a}_elbow_y', 'j_{a}_elbow_z', 'j_{a}_wrist_y', 'j_{a}_wrist_x'] # j_neck_y
+
+def get_eve_arm_joints(robot, arm):
+    name = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
+    return joints_from_names(robot, name)
+
 class World(object):
-    def __init__(self, robot_name='carter_franka', use_gui=True):
+    def __init__(self, robot_name='eve', use_gui=True):
         self.client = connect(use_gui=use_gui)
+        add_data_path()
+        self.floor = load_pybullet('plane.urdf', fixed_base=True)
         self.robot_name = robot_name
-        if self.robot_name == 'carter_franka':
+        if self.robot_name == 'franka_carter':
             urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
         elif self.robot_name == 'eve':
             urdf_path, yaml_path = EVE_PATH, None
@@ -163,14 +198,8 @@ class World(object):
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
         dump_body(self.robot)
-
-        #movable_joints = get_movable_joints(self.robot)
-        #sample_fn = get_sample_fn(self.robot, movable_joints)
-        #wait_for_user()
-        #while True:
-        #    q = sample_fn()
-        #    set_joint_positions(self.robot, movable_joints, q)
-        #    wait_for_user()
+        set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
+        #draw_aabb(get_aabb(self.robot))
 
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
         #print(self.robot_yaml)
@@ -186,8 +215,7 @@ class World(object):
         #print(self.kitchen_yaml)
         set_point(self.kitchen, Point(z=1.35))
 
-        add_data_path()
-        self.floor = load_pybullet('plane.urdf', fixed_base=True)
+
         self.body_from_name = {}
         self.path_from_name = {}
     @property
@@ -195,16 +223,20 @@ class World(object):
         return joints_from_names(self.robot, BASE_JOINTS)
     @property
     def arm_joints(self):
+        if self.robot_yaml is None:
+            return get_eve_arm_joints(self.robot, arm='left')
         return joints_from_names(self.robot, self.robot_yaml['cspace'])
     @property
     def gripper_joints(self):
+        if self.robot_yaml is None:
+            return []
         return [joint_from_name(self.robot, rule['name']) for rule in self.robot_yaml['cspace_to_urdf_rules']]
     @property
     def kitchen_joints(self):
         return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
     @property
     def tool_link(self):
-        return link_from_name(self.robot, FRANKA_TOOL_LINK)
+        return link_from_name(self.robot, get_tool_link(self.robot))
     @property
     def door_links(self):
         door_links = set()
@@ -221,15 +253,19 @@ class World(object):
         return set(self.body_from_name)
     @property
     def initial_conf(self):
+        if self.robot_yaml is None:
+            conf = np.zeros(len(self.arm_joints))
+            conf[3] -= np.pi / 2
+            return conf
         conf = np.array(self.robot_yaml['default_q'])
         conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
     def set_initial_conf(self):
         set_joint_positions(self.robot, self.base_joints, [2.0, 0, np.pi])
-        for rule in self.robot_yaml['cspace_to_urdf_rules']:  # max is open
-            joint = joint_from_name(self.robot, rule['name'])
-            set_joint_position(self.robot, joint, rule['value'])
+        #for rule in self.robot_yaml['cspace_to_urdf_rules']:  # gripper: max is open
+        #    joint = joint_from_name(self.robot, rule['name'])
+        #    set_joint_position(self.robot, joint, rule['value'])
         set_joint_positions(self.robot, self.arm_joints, self.initial_conf)  # active_task_spaces
     def close_gripper(self):
         for joint in self.gripper_joints:
@@ -303,6 +339,8 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
         for i, grasp_pose in enumerate(generator):
             with BodySaver(world.robot):
                 grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
+            #if grasp_width is None:
+            #    continue
             pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose)
             grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose, grasp_width)
             yield grasp
