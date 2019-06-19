@@ -19,8 +19,9 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
-    point_from_pose, read_json, RED, BLUE
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, GRASP_TYPES
+    point_from_pose, read_json, RED, BLUE, dump_body, LockRenderer
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, \
+    GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, get_kitchen_parent, TOP_GRASP, SIDE_GRASP
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 
 CARTER_BASE_LINK = 'carter_base_link'
@@ -76,27 +77,39 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
     base_link = link_from_name(world.robot, CARTER_BASE_LINK)
     custom_limits = compute_custom_base_limits(world)
-    # dump_body(world.robot)
-    surface_link = link_from_name(world.kitchen, surface_name)
-    surface_pose = get_link_pose(world.kitchen, surface_link)
+    #dump_body(world.robot)
+    parent_name = get_kitchen_parent(surface_name)
+    parent_link = link_from_name(world.kitchen, parent_name)
+    parent_pose = get_link_pose(world.kitchen, parent_link)
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
     ik_ir_gen = get_pick_gen(world, custom_limits=custom_limits,
                              collisions=not args.cfree, teleport=args.teleport,
-                             learned=False, max_attempts=args.attempts, max_successes=1, max_failures=0)
+                             learned=False, max_attempts=args.attempts,
+                             max_successes=1, max_failures=0)
 
     stable_gen = stable_gen_fn(object_name, surface_name)
     grasps = list(grasp_gen_fn(object_name))
     tool_from_base_list = []
     surface_from_object_list = []
 
+    print('\n' + 50*'-' + '\n')
+    print('Object name: {} | Surface name: {} | Grasp type: {}'.format
+          (object_name, surface_name, grasp_type))
     start_time = time.time()
+    failures = 0
     while len(tool_from_base_list) < args.num_samples:
         (pose,) = next(stable_gen)
+        if pose is None:
+            break
         (grasp,) = random.choice(grasps)
-        result = next(ik_ir_gen(object_name, pose, grasp), None)
+        with LockRenderer():
+            result = next(ik_ir_gen(object_name, pose, grasp), None)
         if result is None:
+            print('Failure! | {} / {} [{:.3f}]'.format(
+                len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
+            failures += 1
             continue
         bq, aq, at = result
         pose.assign()
@@ -106,12 +119,10 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         tool_pose = multiply(pose.value, invert(grasp.grasp_pose))
         tool_from_base = multiply(invert(tool_pose), base_pose)
         tool_from_base_list.append(tool_from_base)
-        surface_from_object = multiply(invert(surface_pose), pose.value)
+        surface_from_object = multiply(invert(parent_pose), pose.value)
         surface_from_object_list.append(surface_from_object)
-
-        print('Object name: {} | Surface name: {} | Grasp type: {} | {} / {} [{:.3f}]'.format(
-            object_name, surface_name, grasp_type, len(tool_from_base_list),
-            args.num_samples, elapsed_time(start_time)))
+        print('Success! | {} / {} [{:.3f}]'.format(
+            len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
         if has_gui():
             wait_for_user()
     #visualize_database(tool_from_base_list)
@@ -162,23 +173,29 @@ def main():
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     surface_names = SURFACES
-    grasp_types = GRASP_TYPES
+    surface_names = DRAWER_JOINTS[1:2]
+    #surface_names = CABINET_JOINTS[:1]
 
     world = World(use_gui=args.visualize)
     for joint in world.kitchen_joints:
-        world.close_door(joint)
+        world.open_door(joint) # open_door | close_door
     world.open_gripper()
     world.add_body(object_name, get_block_path(object_name))
 
-
-
     grasp_colors = {
-        'top': RED,
-        'side': BLUE,
+        TOP_GRASP: RED,
+        SIDE_GRASP: BLUE,
     }
-    for surface_name, grasp_type in product(surface_names, grasp_types):
-        draw_picks(world, surface_name, grasp_type, color=grasp_colors[grasp_type])
-        #collect_place(world, object_name, surface_name, grasp_type, args)
+    for surface_name in surface_names:
+        if surface_name in CABINET_JOINTS:
+            grasp_types = [SIDE_GRASP]
+        elif surface_name in DRAWER_JOINTS:
+            grasp_types = [TOP_GRASP]
+        else:
+            grasp_types = GRASP_TYPES
+        for grasp_type in grasp_types:
+            #draw_picks(world, surface_name, grasp_type, color=grasp_colors[grasp_type])
+            collect_place(world, object_name, surface_name, grasp_type, args)
     wait_for_user()
     world.destroy()
 

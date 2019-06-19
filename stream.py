@@ -9,10 +9,14 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, wait_for_user, get_link_subtree, get_link_name, draw_pose, get_link_pose, \
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
-    plan_waypoints_joint_motion, INF, set_color, get_links
+    plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
+    draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, \
+    get_data_pose, sample_placement_on_aabb
 
-from utils import get_grasps, SURFACES
+from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
+
+#from pddlstream.utils import get_connected_components
 
 
 BASE_CONSTANT = 1
@@ -32,24 +36,39 @@ def move_cost_fn(t):
 ################################################################################
 
 def get_stable_gen(world, collisions=True, **kwargs):
-    obstacles = world.static_obstacles if collisions else []
+    fixed_obstacles = world.static_obstacles if collisions else []
 
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
         surface_names = SURFACES if surface_name is None else [surface_name]
         while True:
-            surface_link = link_from_name(world.kitchen, random.choice(surface_names))
-            body_pose = sample_placement(body, world.kitchen, bottom_link=surface_link)
+            selected_name, shape_name = random.choice(surface_names), None
+            if selected_name in LINK_SHAPE_FROM_JOINT:
+                selected_name, shape_name = LINK_SHAPE_FROM_JOINT[selected_name]
+            surface_link = link_from_name(world.kitchen, selected_name)
+            surface_pose = get_link_pose(world.kitchen, surface_link)
+            if shape_name is None:
+                surface_aabb = get_aabb(world.kitchen, surface_link)
+            else:
+                [data] = get_collision_data(world.kitchen, surface_link)
+                local_pose = get_data_pose(data)
+                meshes = read_obj(data.filename)
+                mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=meshes[shape_name])
+                # vertices = list(range(len(mesh.vertices)))
+                # edges = {edge for face in mesh.faces for edge in get_face_edges(face)}
+                # print(get_connected_components(vertices, edges))
+                surface_aabb = aabb_from_points(mesh.vertices)
+                #add_text(surface_name, position=surface_aabb[1])
+                #draw_mesh(mesh)
+            #draw_aabb(surface_aabb)
+            body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=2e-3)
             if body_pose is None:
                 break
             p = Pose(body, body_pose)
             p.assign()
-            #print([get_link_name(obst, link) for obst, links in obstacles for link in links
-            #       if pairwise_collision(body, (obst, [link]))])
-            #for link in get_links(world.kitchen):
-            #    if link != 1:
-            #        set_color(world.kitchen, np.zeros(4), link=link)
+            #print(any(pairwise_collision(body, obst) for obst in fixed_obstacles))
             #wait_for_user()
+            obstacles = fixed_obstacles # TODO: include doors/drawer
             if not any(pairwise_collision(body, obst) for obst in obstacles):
                        #if obst not in {body, surface}):
                 yield (p,)

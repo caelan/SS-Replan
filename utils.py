@@ -8,7 +8,7 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
     get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
-    get_bodies, draw_base_limits, wait_for_user, draw_pose
+    get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -49,7 +49,40 @@ FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
 
 KITCHEN = 'kitchen'
 STOVES = ['range']
-SURFACES = ['hitman_tmp', 'indigo_tmp'] + STOVES
+COUNTERS = ['hitman_tmp', 'indigo_tmp']
+SURFACES = COUNTERS + STOVES
+
+LINK_SHAPE_FROM_JOINT = {
+    'baker_joint': ('sektion', 'Cube.bottom.004_Cube.028'),
+    'chewie_door_left_joint': ('sektion', 'Cube.bottom.002_Cube.020'),
+    'chewie_door_right_joint': ('sektion', 'Cube.bottom_Cube.000'),
+
+    'dagger_door_left_joint': ('dagger', 'Cube.bottom.008_Cube.044'),
+    'dagger_door_right_joint': ('dagger', 'Cube.bottom.012_Cube.060'),
+
+    'hitman_drawer_top_joint': ('hitman_drawer_top', 'Cube_Cube.001'),
+    'hitman_drawer_bottom_joint': ('hitman_drawer_bottom', 'Cube_Cube.001'),
+
+    #'indigo_door_left_joint': ('indigo_tmp', 'Sektion'), # TODO: extract out just the base
+    #'indigo_door_right_joint': ('indigo_tmp', 'Sektion'),
+    'indigo_drawer_top_joint': ('indigo_drawer_top', 'Cube_Cube.001'),
+    'indigo_drawer_bottom_joint': ('indigo_drawer_bottom', 'Cube_Cube.001'),
+}
+
+CABINET_JOINTS = [
+    'baker_joint', 'chewie_door_left_joint', 'chewie_door_right_joint',
+    'dagger_door_left_joint', 'dagger_door_right_joint',
+    #'indigo_door_left_joint', 'indigo_door_right_joint',
+] # door
+DRAWER_JOINTS = [
+    'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
+    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
+] # drawer
+
+def get_kitchen_parent(link_name):
+    if link_name in LINK_SHAPE_FROM_JOINT:
+        return LINK_SHAPE_FROM_JOINT[link_name][0]
+    return link_name
 
 #CABINET_PATH = os.path.join(SRL_PATH, 'packages/sektion_cabinet_model/urdf/sektion_cabinet.urdf')
 # Could recursively find all *.urdf | *.sdf
@@ -201,16 +234,18 @@ class Grasp(object):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
-GRASP_TYPES = ['top', 'side']
+TOP_GRASP = 'top'
+SIDE_GRASP = 'side'
+GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
     body = world.get_body(name)
     for grasp_type in grasp_types:
-        if grasp_type == 'top':
+        if grasp_type == TOP_GRASP:
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
                                        grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf, **kwargs)
-        elif grasp_type == 'side':
+        elif grasp_type == SIDE_GRASP:
             pre_direction = pre_distance * get_unit_vector([1, 0, 3])
             generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
                                         grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
