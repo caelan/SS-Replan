@@ -3,9 +3,10 @@ from pddlstream.language.generator import from_gen_fn, from_fn
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
-from pybullet_tools.utils import get_joint_name
-from utils import STOVES, GRASP_TYPES
-from stream import get_stable_gen, get_grasp_gen, get_pick_gen, get_motion_gen, distance_fn, get_pull_gen
+from pybullet_tools.utils import get_joint_name, is_placed_on_aabb
+from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
+from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
+    get_motion_gen, distance_fn, get_pull_gen, compute_surface_aabb
 
 
 def existential_quantification(goal_literals):
@@ -21,6 +22,20 @@ def existential_quantification(goal_literals):
     return And(*goal_formula)
 
 ################################################################################
+
+JOINT_THRESHOLD = 1e-3
+
+def is_closed_conf(world, conf):
+    [joint] = conf.joints
+    [position] = conf.values
+    closed_position = world.closed_conf(joint)
+    return abs(position - closed_position) <= JOINT_THRESHOLD
+
+def is_open_conf(world, conf):
+    [joint] = conf.joints
+    [position] = conf.values
+    open_position = world.open_conf(joint)
+    return abs(position - open_position) <= JOINT_THRESHOLD
 
 def pdddlstream_from_problem(world, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
@@ -46,15 +61,17 @@ def pdddlstream_from_problem(world, **kwargs):
     ] + [('Type', name, 'stove') for name in STOVES]
 
     for name in world.movable:
-        pose = Pose(world.get_body(name), init=True)  # TODO: supported here
+        body = world.get_body(name)
+        [surface] = [surface for surface in ALL_SURFACES
+                     if is_placed_on_aabb(body, compute_surface_aabb(world, surface))]
+        pose = Pose(body, support=surface, init=True)
         init += [
             ('Graspable', name),
             ('Pose', name, pose),
+            ('Supported', name, pose, surface),
+            ('Stackable', name, None),
             ('AtPose', name, pose),
-        ] + [('Stackable', name, surface) for surface in STOVES + [None]]
-        #for surface in problem.surfaces:
-        #    if is_placement(body, surface):
-        #        init += [('Supported', body, pose, surface)]
+        ] # + [('Stackable', name, surface) for surface in STOVES + [None]]
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
 
@@ -63,17 +80,21 @@ def pdddlstream_from_problem(world, **kwargs):
         initial_conf = Conf(world.kitchen, [joint])
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
-        init.extend([
-            ('Conf', joint_name, initial_conf),
-            ('AtConf', joint_name, initial_conf),
-            ('Conf', joint_name, open_conf),
-            ('OpenConf', joint_name, open_conf),
-            ('Conf', joint_name, closed_conf),
-            ('ClosedConf', joint_name, closed_conf),
-        ])
+        init.append(('AtConf', joint_name, initial_conf))
+        for conf in [initial_conf, open_conf, closed_conf]:
+            init.append(('Conf', joint_name, conf))
+            if is_closed_conf(world, conf):
+                init.append(('ClosedConf', joint_name, conf))
+            elif is_closed_conf(world, conf):
+                init.append(('OpenConf', joint_name, conf))
 
     block = list(world.movable)[0]
     joint = 'chewie_door_left_joint' # baker_joint | chewie_door_left_joint | hitman_drawer_top_joint
+    surface = CABINET_JOINTS[0]
+
+    goal_on = {
+        #block: surface,
+    }
     goal_literals = [
         #('Open', joint),
         ('Holding', block),
@@ -86,10 +107,11 @@ def pdddlstream_from_problem(world, **kwargs):
     #    goal_literals += [('AtBConf', goal_conf)]
 
     #bodies_from_type = get_bodies_from_type(problem)
-    #for ty, s in problem.goal_on:
-    #    bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
-    #    init += [('Stackable', b, s) for b in bodies]
-    #    goal_literals += [('On', ty, s)]
+    for ty, s in goal_on.items():
+        #bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
+        #init += [('Stackable', b, s) for b in bodies]
+        init += [('Stackable', ty, s)]
+        goal_literals += [('On', ty, s)]
     #goal_literals += [('Holding', a, b) for a, b in problem.goal_holding] + \
     #                 [('Cleaned', b) for b in problem.goal_cleaned] + \
     #                 [('Cooked', b) for b in problem.goal_cooked]

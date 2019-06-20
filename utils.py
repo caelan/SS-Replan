@@ -90,6 +90,8 @@ DRAWER_JOINTS = [
     'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
 
+ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
+
 USE_TRACK_IK = True
 
 def get_kitchen_parent(link_name):
@@ -385,6 +387,7 @@ class Grasp(object):
 
 TOP_GRASP = 'top'
 SIDE_GRASP = 'side'
+UNDER_GRASP = 'under' # TODO: for franka_carter
 GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):

@@ -15,7 +15,7 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, sample_placement, link_from_name, \
     LockRenderer, WorldSaver, user_input, wait_for_duration, VideoSaver
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, ALL_SURFACES, DRAWER_JOINTS
 from problem import pdddlstream_from_problem
 from debug import test_grasps
 from command import State, Wait
@@ -100,7 +100,7 @@ def main():
     world.add_body(block_name, get_block_path(block_name))
     #test_grasps(world, block_name)
 
-    surface_name = random.choice(SURFACES)
+    surface_name = random.choice(DRAWER_JOINTS)
     print('Initial surface:', surface_name)
     placement_gen = get_stable_gen(world)
     pose, = next(placement_gen(block_name, surface_name), (None,))

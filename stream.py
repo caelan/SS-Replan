@@ -15,7 +15,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
-from database import load_placements, get_surface_reference_pose
+from database import load_placements, get_surface_reference_pose, load_base_poses
 
 #from pddlstream.utils import get_connected_components
 
@@ -59,7 +59,7 @@ def compute_surface_aabb(world, surface_name):
     # draw_aabb(surface_aabb)
     return surface_aabb
 
-def get_stable_gen(world, learned=True, collisions=True, scale=0.01, **kwargs):
+def get_stable_gen(world, learned=True, collisions=True, scale=0.01, z_offset=5e-3, **kwargs):
     fixed_obstacles = world.static_obstacles if collisions else []
 
     def gen(body_name, surface_name):
@@ -78,13 +78,13 @@ def get_stable_gen(world, learned=True, collisions=True, scale=0.01, **kwargs):
                 quat = quat_from_euler(Euler(yaw=np.random.uniform(*CIRCULAR_LIMITS)))
                 dx, dy = (0, 0) if scale == 0 else np.random.normal(scale=scale, size=2)
                 z = stable_z_on_aabb(body, surface_aabb)
-                body_pose = (x+dx, y+dy, z), quat
+                body_pose = (x+dx, y+dy, z+z_offset), quat
                 # TODO: project onto the surface
             else:
-                body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=2e-3)
+                body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=z_offset)
                 if body_pose is None:
                     break
-            p = Pose(body, body_pose)
+            p = Pose(body, body_pose, support=selected_name)
             p.assign()
             if not is_placed_on_aabb(body, surface_aabb):
                 continue
@@ -153,7 +153,7 @@ def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, m
 
 ################################################################################
 
-def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
+def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
     obstacles = world.static_obstacles if collisions else []
     #gripper = problem.get_gripper()
 
@@ -174,8 +174,8 @@ def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
         # TODO: check collisions with obj at pose
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
-            raise NotImplementedError()
-            # base_generator = learned_pose_generator(robot, gripper_pose, arm=arm, grasp_type=grasp.grasp_type)
+            assert pose.support is not None
+            base_generator = load_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
         else:
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
         pose.assign()
