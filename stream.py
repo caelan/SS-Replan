@@ -11,7 +11,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
     plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
     draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, \
-    get_data_pose, sample_placement_on_aabb, get_sample_fn
+    get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
@@ -142,6 +142,11 @@ def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
             #wait_for_user()
             if any(pairwise_collision(world.gripper, b) or pairwise_collision(obj, b)
                    for b in approach_obstacles):
+                #print([b for b in approach_obstacles if pairwise_collision(world.gripper, b)])
+                #print([b for b in approach_obstacles if pairwise_collision(obj, b)])
+                #print(pose, grasp, 'collide!')
+                #print(get_pose(obj))
+                #wait_for_user()
                 return iter([])
 
         # TODO: check collisions with obj at pose
@@ -155,8 +160,8 @@ def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
         return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
     return gen_fn
 
-def get_pick_ik_fn(world, randomize=True, collisions=True,
-                   switches=True, teleport=True, **kwargs):
+def get_pick_ik_fn(world, randomize=False, collisions=True,
+                   switches=False, teleport=True, **kwargs):
     obstacles = world.static_obstacles if collisions else []
     resolutions = 0.05 * np.ones(len(world.arm_joints))
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
@@ -174,6 +179,7 @@ def get_pick_ik_fn(world, randomize=True, collisions=True,
         holding_conf = [grasp.grasp_width] * len(world.gripper_joints)
         finger_path = [open_conf] + list(extend_fn(open_conf, holding_conf))
 
+        # TODO: could search over multiple arm confs
         default_conf = sample_fn() if randomize else world.initial_conf
         pose.assign()
         base_conf.assign()
@@ -183,9 +189,6 @@ def get_pick_ik_fn(world, randomize=True, collisions=True,
         if (full_grasp_conf is None): # or any(pairwise_collision(world.robot, b) for b in obstacles):
             return None
         grasp_conf = get_joint_positions(world.robot, world.arm_joints)
-
-        #grasp_conf = pr2_inverse_kinematics(robot, arm, gripper_pose, custom_limits=world.custom_limits) #, upper_limits=USE_CURRENT)
-        #                                    #nearby_conf=USE_CURRENT) # upper_limits=USE_CURRENT,
         if (grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles): # [obj]
             #print('Grasp IK failure', grasp_conf)
             return None
@@ -200,8 +203,7 @@ def get_pick_ik_fn(world, randomize=True, collisions=True,
             ])
             return (aq, cmd,)
 
-        full_approach_conf = sub_inverse_kinematics(world.robot, world.arm_joints[0], world.tool_link, approach_pose,
-                                               custom_limits=world.custom_limits)
+        full_approach_conf = world.solve_inverse_kinematics(approach_pose)
         if (full_approach_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles + [obj]):
             #print('Approach IK failure', approach_conf)
             return None

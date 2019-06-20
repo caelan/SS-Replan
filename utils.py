@@ -13,7 +13,7 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb, \
     get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions
+    get_configuration, get_joint_positions, randomize, unit_point
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -195,7 +195,7 @@ def get_eve_arm_joints(robot, arm):
     return joints_from_names(robot, name)
 
 class World(object):
-    def __init__(self, robot_name=EVE, use_gui=True):
+    def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.client = connect(use_gui=use_gui)
         add_data_path()
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
@@ -296,8 +296,9 @@ class World(object):
         conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
-    def solve_inverse_kinematics(self, world_from_tool, **kwargs):
-        if USE_TRACK_IK:
+    def solve_inverse_kinematics(self, world_from_tool, use_track_ik=USE_TRACK_IK, **kwargs):
+        if use_track_ik:
+            assert self.ik_solver is not None
             base_link = link_from_name(self.robot, self.ik_solver.base_link)
             world_from_base = get_link_pose(self.robot, base_link)
             tip_link = link_from_name(self.robot, self.ik_solver.tip_link)
@@ -389,22 +390,34 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
     body = world.get_body(name)
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
+            continue
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
+            post_direction = unit_point()
+
             generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
                                        grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf, **kwargs)
         elif grasp_type == SIDE_GRASP:
-            pre_direction = pre_distance * get_unit_vector([1, 0, 3])
+            x, z = pre_distance * get_unit_vector([3, -1])
+            pre_direction = [0, 0, x]
+            post_direction = [0, 0, z]
+            # Under grasps are actually easier for this robot
             generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
                                         grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
                                         top_offset=FINGER_EXTENT[0] / 2, **kwargs)
+            #generator = grasps[4:]
+            #rotate_z = unit_pose()
+            rotate_z = Pose(euler=[0, 0, np.pi])
+            generator = (multiply(rotate_z, grasp) for grasp in generator)
         else:
             raise ValueError(grasp_type)
-        for i, grasp_pose in enumerate(generator):
+
+
+        for i, grasp_pose in enumerate(randomize(list(generator))):
             with BodySaver(world.robot):
                 grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
             #if grasp_width is None:
             #    continue
-            pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose)
+            pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose, Pose(point=post_direction))
             grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose, grasp_width)
             yield grasp
 
