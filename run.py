@@ -19,6 +19,7 @@ from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, co
 from problem import pdddlstream_from_problem
 from debug import test_grasps
 from command import State, Wait
+from stream import get_stable_gen
 
 #from examples.pybullet.pr2.run import post_process
 from pddlstream.algorithms.incremental import solve_incremental
@@ -99,11 +100,12 @@ def main():
     world.add_body(block_name, get_block_path(block_name))
     #test_grasps(world, block_name)
 
-    initial_surface = random.choice(SURFACES)
-    print('Initial surface:', initial_surface)
-    pose = sample_placement(world.get_body(block_name), world.kitchen,
-                            bottom_link=link_from_name(world.kitchen, initial_surface))
+    surface_name = random.choice(SURFACES)
+    print('Initial surface:', surface_name)
+    placement_gen = get_stable_gen(world)
+    pose, = next(placement_gen(block_name, surface_name), (None,))
     assert pose is not None
+    pose.assign()
 
     pddlstream_problem = pdddlstream_from_problem(world, collisions=not args.cfree, teleport=args.teleport)
 

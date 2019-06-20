@@ -10,11 +10,12 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     get_extend_fn, joint_from_name, wait_for_user, get_link_subtree, get_link_name, draw_pose, get_link_pose, \
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
     plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
-    draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, \
-    get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose
+    draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, CIRCULAR_LIMITS, \
+    get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose, stable_z_on_aabb, is_placed_on_aabb
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
+from database import load_placements, get_surface_reference_pose
 
 #from pddlstream.utils import get_connected_components
 
@@ -35,37 +36,58 @@ def move_cost_fn(t):
 
 ################################################################################
 
-def get_stable_gen(world, collisions=True, **kwargs):
+def compute_surface_aabb(world, surface_name):
+    if surface_name in LINK_SHAPE_FROM_JOINT:
+        link_name, shape_name = LINK_SHAPE_FROM_JOINT[surface_name]
+    else:
+        link_name, shape_name = surface_name, None
+    surface_link = link_from_name(world.kitchen, link_name)
+    surface_pose = get_link_pose(world.kitchen, surface_link)
+    if shape_name is None:
+        surface_aabb = get_aabb(world.kitchen, surface_link)
+    else:
+        [data] = get_collision_data(world.kitchen, surface_link)
+        local_pose = get_data_pose(data)
+        meshes = read_obj(data.filename)
+        mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=meshes[shape_name])
+        # vertices = list(range(len(mesh.vertices)))
+        # edges = {edge for face in mesh.faces for edge in get_face_edges(face)}
+        # print(get_connected_components(vertices, edges))
+        surface_aabb = aabb_from_points(mesh.vertices)
+        # add_text(surface_name, position=surface_aabb[1])
+        # draw_mesh(mesh)
+    # draw_aabb(surface_aabb)
+    return surface_aabb
+
+def get_stable_gen(world, learned=True, collisions=True, scale=0.01, **kwargs):
     fixed_obstacles = world.static_obstacles if collisions else []
 
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
         surface_names = SURFACES if surface_name is None else [surface_name]
         while True:
-            selected_name, shape_name = random.choice(surface_names), None
-            if selected_name in LINK_SHAPE_FROM_JOINT:
-                selected_name, shape_name = LINK_SHAPE_FROM_JOINT[selected_name]
-            surface_link = link_from_name(world.kitchen, selected_name)
-            surface_pose = get_link_pose(world.kitchen, surface_link)
-            if shape_name is None:
-                surface_aabb = get_aabb(world.kitchen, surface_link)
+            selected_name = random.choice(surface_names)
+            surface_aabb = compute_surface_aabb(world, selected_name)
+            if learned:
+                poses = load_placements(world, selected_name)
+                if not poses:
+                    break
+                surface_pose = get_surface_reference_pose(world.kitchen, selected_name)
+                body_pose = multiply(surface_pose, random.choice(poses))
+                [x, y, z], quat = body_pose
+                quat = quat_from_euler(Euler(yaw=np.random.uniform(*CIRCULAR_LIMITS)))
+                dx, dy = (0, 0) if scale == 0 else np.random.normal(scale=scale, size=2)
+                z = stable_z_on_aabb(body, surface_aabb)
+                body_pose = (x+dx, y+dy, z), quat
+                # TODO: project onto the surface
             else:
-                [data] = get_collision_data(world.kitchen, surface_link)
-                local_pose = get_data_pose(data)
-                meshes = read_obj(data.filename)
-                mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=meshes[shape_name])
-                # vertices = list(range(len(mesh.vertices)))
-                # edges = {edge for face in mesh.faces for edge in get_face_edges(face)}
-                # print(get_connected_components(vertices, edges))
-                surface_aabb = aabb_from_points(mesh.vertices)
-                #add_text(surface_name, position=surface_aabb[1])
-                #draw_mesh(mesh)
-            #draw_aabb(surface_aabb)
-            body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=2e-3)
-            if body_pose is None:
-                break
+                body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=2e-3)
+                if body_pose is None:
+                    break
             p = Pose(body, body_pose)
             p.assign()
+            if not is_placed_on_aabb(body, surface_aabb):
+                continue
             #print(any(pairwise_collision(body, obst) for obst in fixed_obstacles))
             #wait_for_user()
             obstacles = fixed_obstacles # TODO: include doors/drawer

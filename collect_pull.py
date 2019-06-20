@@ -22,8 +22,7 @@ from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, co
     CARTER_BASE_LINK
 from stream import get_pull_gen
 
-
-from collect_place import get_date, DATABASE_DIRECTORY
+from database import DATABASE_DIRECTORY, get_date
 
 PULL_IR_FILENAME = '{joint_name}-pull.json'
 

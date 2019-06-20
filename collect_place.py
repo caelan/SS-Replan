@@ -1,46 +1,23 @@
 #!/usr/bin/env python2
 
 import argparse
-import datetime
 import os
 import random
 import sys
 import time
-import numpy as np
 
 PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
-
-from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
+from database import DATABASE_DIRECTORY, IR_FILENAME, get_date, load_placements, get_surface_reference_pose
+from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
-    point_from_pose, read_json, RED, BLUE, LockRenderer, INF, set_pose, child_link_from_joint, unit_quat
-from pybullet_tools.pr2_primitives import Pose
+    point_from_pose, RED, BLUE, LockRenderer, set_pose, child_link_from_joint
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, \
-    GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, get_kitchen_parent, TOP_GRASP, \
+    GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
-
-DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
-IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
-
-def get_random_seed():
-    # random.getstate()[1][0]
-    return np.random.get_state()[1][0]
-
-def set_seed(seed):
-    # These generators are different and independent
-    if seed is None:
-        return
-    random.seed(seed)
-    np.random.seed(seed % (2**32))
-    print('Seed:', seed)
-
-def get_date():
-    return datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
-
-################################################################################
 
 def visualize_database(tool_from_base_list):
     #tool_from_base_list
@@ -53,32 +30,18 @@ def visualize_database(tool_from_base_list):
     wait_for_user()
     return handles
 
-def load_place_database(robot_name, surface_name, grasp_type, field):
-    filename = IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
-                                  grasp_type=grasp_type)
-    path = os.path.join(DATABASE_DIRECTORY, filename)
-    if not os.path.exists(path):
-        return []
-    data = read_json(path)
-    return data[field]
 
 def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
-    # quantify out grasp_type
-
-    surface_pose = get_reference_pose(world.kitchen, surface_name)
+    surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
     handles = []
-    for surface_from_object in load_place_database(
-            world.robot_name, surface_name, grasp_type, field='surface_from_object_list'):
+    for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
         object_pose = multiply(surface_pose, surface_from_object)
         handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
         set_pose(world.get_body(object_name), object_pose)
         #wait_for_user()
     return handles
 
-def get_reference_pose(kitchen, surface_name):
-    parent_name = get_kitchen_parent(surface_name)
-    parent_link = link_from_name(kitchen, parent_name)
-    return get_link_pose(kitchen, parent_link)
+################################################################################
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()
@@ -86,7 +49,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
     base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
     #dump_body(world.robot)
-    parent_pose = get_reference_pose(world.kitchen, surface_name)
+    parent_pose = get_surface_reference_pose(world.kitchen, surface_name)
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])

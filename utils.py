@@ -161,7 +161,7 @@ def get_tool_link(robot):
         return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
-def create_gripper(robot, visual=True):
+def create_gripper(robot, visual=False):
     #dump_body(robot)
     links = get_link_subtree(robot, link_from_name(robot, get_gripper_link(robot)))
     with LockRenderer():
@@ -208,7 +208,7 @@ class World(object):
             raise ValueError(self.robot_name)
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
-        dump_body(self.robot)
+        #dump_body(self.robot)
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
         #draw_aabb(get_aabb(self.robot))
 
@@ -236,7 +236,7 @@ class World(object):
             from trac_ik_python.trac_ik import IK # killall -9 rosmaster
             base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
             tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
-            dump_body(self.robot)
+            #dump_body(self.robot)
             #print(base_link, tip_link)
             # limit effort and velocities are required
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
