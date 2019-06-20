@@ -85,9 +85,10 @@ CABINET_JOINTS = [
     'dagger_door_left_joint', 'dagger_door_right_joint',
     #'indigo_door_left_joint', 'indigo_door_right_joint',
 ] # door
+# TODO: cannot actually do any drawers yet due to nonconvex hitman and indigo
 DRAWER_JOINTS = [
-    'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
-    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
+    #'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
+    #'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
 
 ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
@@ -283,7 +284,9 @@ class World(object):
     @property
     def static_obstacles(self):
         # link=None is fine
-        return [(self.kitchen, frozenset(get_links(self.kitchen)) - self.door_links)]
+        # TODO: decompose obstacles
+        #return [(self.kitchen, frozenset(get_links(self.kitchen)) - self.door_links)]
+        return {(self.kitchen, frozenset([link])) for link in set(get_links(self.kitchen)) - self.door_links}
     @property
     def movable(self):
         return set(self.body_from_name) # frozenset?

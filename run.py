@@ -100,7 +100,8 @@ def main():
     world.add_body(block_name, get_block_path(block_name))
     #test_grasps(world, block_name)
 
-    surface_name = random.choice(DRAWER_JOINTS)
+    surface_name = random.choice(ALL_SURFACES)
+    #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     placement_gen = get_stable_gen(world)
     pose, = next(placement_gen(block_name, surface_name), (None,))

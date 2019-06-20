@@ -11,13 +11,12 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
     plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
     draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, CIRCULAR_LIMITS, \
-    get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose, stable_z_on_aabb, is_placed_on_aabb
+    get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose, stable_z_on_aabb, \
+    is_placed_on_aabb, spaced_colors
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_base_poses
-
-#from pddlstream.utils import get_connected_components
 
 
 BASE_CONSTANT = 1
@@ -49,13 +48,14 @@ def compute_surface_aabb(world, surface_name):
         [data] = get_collision_data(world.kitchen, surface_link)
         local_pose = get_data_pose(data)
         meshes = read_obj(data.filename)
-        mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=meshes[shape_name])
-        # vertices = list(range(len(mesh.vertices)))
-        # edges = {edge for face in mesh.faces for edge in get_face_edges(face)}
-        # print(get_connected_components(vertices, edges))
+        # colors = spaced_colors(len(meshes))
+        # for i, (name, mesh) in enumerate(meshes.items()):
+        mesh = meshes[shape_name]
+        mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=mesh)
         surface_aabb = aabb_from_points(mesh.vertices)
-        # add_text(surface_name, position=surface_aabb[1])
-        # draw_mesh(mesh)
+        #add_text(surface_name, position=surface_aabb[1])
+        #draw_mesh(mesh, color=colors[i])
+        #wait_for_user()
     # draw_aabb(surface_aabb)
     return surface_aabb
 
@@ -88,9 +88,10 @@ def get_stable_gen(world, learned=True, collisions=True, scale=0.01, z_offset=5e
             p.assign()
             if not is_placed_on_aabb(body, surface_aabb):
                 continue
-            #print(any(pairwise_collision(body, obst) for obst in fixed_obstacles))
-            #wait_for_user()
             obstacles = fixed_obstacles # TODO: include doors/drawer
+            #print([get_link_name(obst[0], *obst[1]) for obst in obstacles
+            #       if pairwise_collision(body, obst)])
+            #wait_for_user()
             if not any(pairwise_collision(body, obst) for obst in obstacles):
                        #if obst not in {body, surface}):
                 yield (p,)

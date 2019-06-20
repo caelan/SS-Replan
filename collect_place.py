@@ -118,7 +118,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
                                   grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
-    print('Saved', data)
+    print('Saved', path)
     return data
 
 ################################################################################
@@ -171,8 +171,8 @@ def main():
         else:
             grasp_types = GRASP_TYPES
         for grasp_type in grasp_types:
-            draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
-            #collect_place(world, object_name, surface_name, grasp_type, args)
+            #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
+            collect_place(world, object_name, surface_name, grasp_type, args)
     wait_for_user()
     world.destroy()
 
