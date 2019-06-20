@@ -53,15 +53,22 @@ def visualize_database(tool_from_base_list):
     wait_for_user()
     return handles
 
-def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
-    # quantify out grasp_type
-    filename = IR_FILENAME.format(robot_name=world.robot_name, surface_name=surface_name,
+def load_place_database(robot_name, surface_name, grasp_type, field):
+    filename = IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
                                   grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
+    if not os.path.exists(path):
+        return []
     data = read_json(path)
+    return data[field]
+
+def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
+    # quantify out grasp_type
+
     surface_pose = get_reference_pose(world.kitchen, surface_name)
     handles = []
-    for surface_from_object in data['surface_from_object_list']:
+    for surface_from_object in load_place_database(
+            world.robot_name, surface_name, grasp_type, field='surface_from_object_list'):
         object_pose = multiply(surface_pose, surface_from_object)
         handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
         set_pose(world.get_body(object_name), object_pose)
@@ -102,10 +109,9 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         (pose,) = next(stable_gen)
         if pose is None:
             break
-        pose = Pose(world.get_body(object_name), ([2, 0, 1.15], unit_quat()))
-
+        #pose = Pose(world.get_body(object_name), ([2, 0, 1.15], unit_quat()))
         (grasp,) = random.choice(grasps)
-        with LockRenderer(lock=False):
+        with LockRenderer(lock=True):
             result = next(ik_ir_gen(object_name, pose, grasp), None)
         if result is None:
             print('Failure! | {} / {} [{:.3f}]'.format(
@@ -127,6 +133,8 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         if has_gui():
             wait_for_user()
     #visualize_database(tool_from_base_list)
+    if not tool_from_base_list:
+        return None
 
     # Assuming the kitchen is fixed but the objects might be open world
     # TODO: could store per data point
@@ -147,6 +155,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
                                   grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
+    print('Saved', data)
     return data
 
 ################################################################################
@@ -161,7 +170,7 @@ def main():
     #                    help='Specifies the type of grasp.')
     #parser.add_argument('-problem', default='test_block',
     #                    help='The name of the problem to solve.')
-    parser.add_argument('-max_time', default=INF, type=float,
+    parser.add_argument('-max_time', default=10*60, type=float,
                         help='The maximum runtime')
     parser.add_argument('-num_samples', default=1000, type=int,
                         help='The number of samples')
@@ -176,14 +185,16 @@ def main():
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    surface_names = CABINET_JOINTS
+    surface_names = SURFACES
     #surface_names = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
+    surface_names = CABINET_JOINTS + SURFACES + DRAWER_JOINTS
 
     world = World(use_gui=args.visualize)
     for joint in world.kitchen_joints:
         world.open_door(joint) # open_door | close_door
     world.open_gripper()
     world.add_body(object_name, get_block_path(object_name))
+    # TODO: could constrain eve to be within a torso cone
 
     grasp_colors = {
         TOP_GRASP: RED,
@@ -197,8 +208,8 @@ def main():
         else:
             grasp_types = GRASP_TYPES
         for grasp_type in grasp_types:
-            #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
-            collect_place(world, object_name, surface_name, grasp_type, args)
+            draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
+            #collect_place(world, object_name, surface_name, grasp_type, args)
     wait_for_user()
     world.destroy()
 

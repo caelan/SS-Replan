@@ -263,7 +263,8 @@ class World(object):
     def gripper_joints(self):
         if self.robot_yaml is None:
             return []
-        return [joint_from_name(self.robot, rule['name']) for rule in self.robot_yaml['cspace_to_urdf_rules']]
+        return [joint_from_name(self.robot, rule['name'])
+                for rule in self.robot_yaml['cspace_to_urdf_rules']]
     @property
     def kitchen_joints(self):
         return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
@@ -280,10 +281,10 @@ class World(object):
     @property
     def static_obstacles(self):
         # link=None is fine
-        return [(self.kitchen, set(get_links(self.kitchen)) - self.door_links)]
+        return [(self.kitchen, frozenset(get_links(self.kitchen)) - self.door_links)]
     @property
     def movable(self):
-        return set(self.body_from_name)
+        return set(self.body_from_name) # frozenset?
     @property
     def initial_conf(self):
         if self.robot_yaml is None:
@@ -390,7 +391,6 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
     body = world.get_body(name)
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
-            continue
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
 
@@ -405,8 +405,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
                                         grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
                                         top_offset=FINGER_EXTENT[0] / 2, **kwargs)
             #generator = grasps[4:]
-            #rotate_z = unit_pose()
-            rotate_z = Pose(euler=[0, 0, np.pi])
+            rotate_z = Pose(euler=[0, 0, np.pi]) if world.robot_name == FRANKA_CARTER else unit_pose()
             generator = (multiply(rotate_z, grasp) for grasp in generator)
         else:
             raise ValueError(grasp_type)
