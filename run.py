@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-#from __future__ import printfunction, divide
+#!/usr/bin/env python2
 
 import sys
 import argparse
@@ -107,9 +105,7 @@ def main():
                             bottom_link=link_from_name(world.kitchen, initial_surface))
     assert pose is not None
 
-    custom_limits = compute_custom_base_limits(world)
-    pddlstream_problem = pdddlstream_from_problem(world, custom_limits=custom_limits,
-                                                  collisions=not args.cfree, teleport=args.teleport)
+    pddlstream_problem = pdddlstream_from_problem(world, collisions=not args.cfree, teleport=args.teleport)
 
     _, _, _, stream_map, init, goal = pddlstream_problem
     print('Init:', init)

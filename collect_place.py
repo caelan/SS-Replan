@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-#from __future__ import printfunction, divide
+#!/usr/bin/env python2
 
 import argparse
 import datetime
@@ -9,8 +7,6 @@ import random
 import sys
 import time
 import numpy as np
-from itertools import product
-
 
 PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
@@ -19,15 +15,15 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
-    point_from_pose, read_json, RED, BLUE, dump_body, LockRenderer, INF, set_pose
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, \
-    GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, get_kitchen_parent, TOP_GRASP, SIDE_GRASP
+    point_from_pose, read_json, RED, BLUE, LockRenderer, INF, set_pose, child_link_from_joint, unit_quat
+from pybullet_tools.pr2_primitives import Pose
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, \
+    GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, get_kitchen_parent, TOP_GRASP, \
+    SIDE_GRASP, BASE_JOINTS, joint_from_name
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 
-CARTER_BASE_LINK = 'carter_base_link'
-
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
-IR_FILENAME = '{robot-name}-{surface_name}-{grasp_type}-place.json'
+IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
 
 def get_random_seed():
     # random.getstate()[1][0]
@@ -81,15 +77,13 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()
     #set_seed(args.seed)
 
-    base_link = link_from_name(world.robot, CARTER_BASE_LINK)
-    custom_limits = compute_custom_base_limits(world)
+    base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
     #dump_body(world.robot)
     parent_pose = get_reference_pose(world.kitchen, surface_name)
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
-    ik_ir_gen = get_pick_gen(world, custom_limits=custom_limits,
-                             collisions=not args.cfree, teleport=args.teleport,
+    ik_ir_gen = get_pick_gen(world, collisions=not args.cfree, teleport=args.teleport,
                              learned=False, max_attempts=args.attempts,
                              max_successes=1, max_failures=0)
 
@@ -108,8 +102,10 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         (pose,) = next(stable_gen)
         if pose is None:
             break
+        pose = Pose(world.get_body(object_name), ([2, 0, 1.15], unit_quat()))
+
         (grasp,) = random.choice(grasps)
-        with LockRenderer():
+        with LockRenderer(lock=False):
             result = next(ik_ir_gen(object_name, pose, grasp), None)
         if result is None:
             print('Failure! | {} / {} [{:.3f}]'.format(
@@ -180,8 +176,8 @@ def main():
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    #surface_names = SURFACES
-    surface_names = SURFACES + DRAWER_JOINTS + CABINET_JOINTS
+    surface_names = CABINET_JOINTS
+    #surface_names = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
 
     world = World(use_gui=args.visualize)
     for joint in world.kitchen_joints:
@@ -201,8 +197,8 @@ def main():
         else:
             grasp_types = GRASP_TYPES
         for grasp_type in grasp_types:
-            draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
-            #collect_place(world, object_name, surface_name, grasp_type, args)
+            #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
+            collect_place(world, object_name, surface_name, grasp_type, args)
     wait_for_user()
     world.destroy()
 

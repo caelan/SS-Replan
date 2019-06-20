@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import yaml
+import rospy
 
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
@@ -10,7 +11,9 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
     get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent, clone_body, \
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
-    LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb
+    LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb, \
+    get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
+    get_configuration, get_joint_positions
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -53,6 +56,7 @@ FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
 
 EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.urdf')
 
+#CARTER_BASE_LINK = 'carter_base_link'
 
 KITCHEN = 'kitchen'
 STOVES = ['range']
@@ -85,6 +89,8 @@ DRAWER_JOINTS = [
     'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
     'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
+
+USE_TRACK_IK = True
 
 def get_kitchen_parent(link_name):
     if link_name in LINK_SHAPE_FROM_JOINT:
@@ -144,7 +150,7 @@ def get_gripper_link(robot):
         return FRANKA_GRIPPER_LINK
     elif robot_name == EVE:
         #return EVE_GRIPPER_LINK.format(a='l') # TODO: issue copying *.dae
-        return EVE_GRIPPER_LINK.format(arm='left')
+        return EVE_GRIPPER_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
 def get_tool_link(robot):
@@ -152,7 +158,7 @@ def get_tool_link(robot):
     if robot_name == FRANKA_CARTER:
         return FRANKA_TOOL_LINK
     elif robot_name == EVE:
-        return EVE_TOOL_LINK.format(arm='left')
+        return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
 def create_gripper(robot, visual=True):
@@ -181,6 +187,8 @@ EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
 
 FRANKA_CARTER = 'franka_carter'
 EVE = 'Eve'
+ARMS = ['left', 'right']
+DEFAULT_ARM = ARMS[0]
 
 def get_eve_arm_joints(robot, arm):
     name = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
@@ -218,16 +226,38 @@ class World(object):
         #print(self.kitchen_yaml)
         set_point(self.kitchen, Point(z=1.35))
 
-
+        if USE_TRACK_IK:
+            #import roslaunch
+            #import rospy
+            #self.ros_core = roslaunch.parent.ROSLaunchParent(
+            #    run_id='master',  roslaunch_files=[], is_core=True)
+            #self.ros_core.start()
+            #rospy.set_param('/robot_description', read(urdf_path))
+            from trac_ik_python.trac_ik import IK # killall -9 rosmaster
+            base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
+            tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
+            dump_body(self.robot)
+            #print(base_link, tip_link)
+            # limit effort and velocities are required
+            self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
+                                timeout=0.005, epsilon=1e-5, solve_type="Speed",
+                                urdf_string=read(urdf_path))
+            #print(self.ik_solver.joint_names, self.ik_solver.link_names)
+            # https://bitbucket.org/traclabs/trac_ik/src/master/trac_ik_python/
+            #self.ik_solver.set_joint_limits([0.0] * self.ik_solver.number_of_joints, upper_bound)
+        else:
+            self.ik_solver = None
+            self.ros_core = None
         self.body_from_name = {}
         self.path_from_name = {}
+        self.custom_limits = compute_custom_base_limits(self)
     @property
     def base_joints(self):
         return joints_from_names(self.robot, BASE_JOINTS)
     @property
     def arm_joints(self):
         if self.robot_yaml is None:
-            return get_eve_arm_joints(self.robot, arm='left')
+            return get_eve_arm_joints(self.robot, arm=DEFAULT_ARM)
         return joints_from_names(self.robot, self.robot_yaml['cspace'])
     @property
     def gripper_joints(self):
@@ -257,19 +287,47 @@ class World(object):
     @property
     def initial_conf(self):
         if self.robot_yaml is None:
-            conf = np.zeros(len(self.arm_joints))
-            conf[3] -= np.pi / 2
+            # Eve starts outside of joint limits
+            conf = [np.average(get_joint_limits(self.robot, joint)) for joint in self.arm_joints]
+            #conf = np.zeros(len(self.arm_joints))
+            #conf[3] -= np.pi / 2
             return conf
         conf = np.array(self.robot_yaml['default_q'])
         conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
+    def solve_inverse_kinematics(self, world_from_tool, **kwargs):
+        if USE_TRACK_IK:
+            base_link = link_from_name(self.robot, self.ik_solver.base_link)
+            world_from_base = get_link_pose(self.robot, base_link)
+            tip_link = link_from_name(self.robot, self.ik_solver.tip_link)
+            tool_from_tip = multiply(invert(get_link_pose(self.robot, self.tool_link)),
+                                      get_link_pose(self.robot, tip_link))
+            world_from_tip = multiply(world_from_tool, tool_from_tip)
+            base_from_tip = multiply(invert(world_from_base), world_from_tip)
+
+            joints = joints_from_names(self.robot, self.ik_solver.joint_names)
+            seed_state = get_joint_positions(self.robot, joints)
+            #seed_state = [0.0] * self.ik_solver.number_of_joints
+            (x, y, z), (rx, ry, rz, rw) = base_from_tip
+            # TODO: can also adjust tolerances
+            conf = self.ik_solver.get_ik(seed_state, x, y, z, rx, ry, rz, rw)
+            if conf is None:
+                return conf
+            set_joint_positions(self.robot, joints, conf)
+            return get_configuration(self.robot)
+        return sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
+                                     custom_limits=self.custom_limits, **kwargs)
     def set_initial_conf(self):
         set_joint_positions(self.robot, self.base_joints, [2.0, 0, np.pi])
         #for rule in self.robot_yaml['cspace_to_urdf_rules']:  # gripper: max is open
         #    joint = joint_from_name(self.robot, rule['name'])
         #    set_joint_position(self.robot, joint, rule['value'])
         set_joint_positions(self.robot, self.arm_joints, self.initial_conf)  # active_task_spaces
+        if self.robot_name == EVE:
+            for arm in ARMS:
+                joints = get_eve_arm_joints(self.robot, arm)[2:4]
+                set_joint_positions(self.robot, joints, -0.2*np.ones(len(joints)))
     def close_gripper(self):
         for joint in self.gripper_joints:
             set_joint_position(self.robot, joint, get_min_limit(self.robot, joint))
@@ -302,6 +360,8 @@ class World(object):
         inverse = {v: k for k, v in self.body_from_name.items()}
         return inverse.get(name, None)
     def destroy(self):
+        #if self.ros_core is not None:
+        #    self.ros_core.shutdown()
         disconnect()
 
 ################################################################################

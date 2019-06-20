@@ -11,7 +11,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
     plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
     draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, \
-    get_data_pose, sample_placement_on_aabb
+    get_data_pose, sample_placement_on_aabb, get_sample_fn
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
@@ -83,9 +83,9 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
-def inverse_reachability(world, base_generator, obstacles=[], custom_limits={}, max_attempts=25, **kwargs):
+def inverse_reachability(world, base_generator, obstacles=[],  max_attempts=25, **kwargs):
     default_conf = world.initial_conf  # arm_conf(arm, grasp.carry)
-    lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, custom_limits)
+    lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, world.custom_limits)
     while True:
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
             if not all_between(lower_limits, base_conf, upper_limits):
@@ -155,12 +155,14 @@ def get_pick_ir_gen(world, collisions=True, learned=False, **kwargs):
         return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
     return gen_fn
 
-def get_pick_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **kwargs):
+def get_pick_ik_fn(world, randomize=True, collisions=True,
+                   switches=True, teleport=True, **kwargs):
     obstacles = world.static_obstacles if collisions else []
     resolutions = 0.05 * np.ones(len(world.arm_joints))
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
     extend_fn = get_extend_fn(world.robot, world.gripper_joints,
                               resolutions=0.01*np.ones(len(world.gripper_joints)))
+    sample_fn = get_sample_fn(world.robot, world.arm_joints)
 
     def fn(name, pose, grasp, base_conf):
         obj = world.get_body(name)
@@ -169,27 +171,37 @@ def get_pick_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **k
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
 
-        default_conf = world.initial_conf
-        #sample_fn = get_sample_fn(robot, arm_joints)
+        holding_conf = [grasp.grasp_width] * len(world.gripper_joints)
+        finger_path = [open_conf] + list(extend_fn(open_conf, holding_conf))
+
+        default_conf = sample_fn() if randomize else world.initial_conf
         pose.assign()
         base_conf.assign()
         #open_arm(robot, arm)
         set_joint_positions(world.robot, world.arm_joints, default_conf) # default_conf | sample_fn()
-
-        full_grasp_conf = sub_inverse_kinematics(world.robot, world.arm_joints[0], world.tool_link, gripper_pose,
-                                          custom_limits=custom_limits)
-        if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
+        full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
+        if (full_grasp_conf is None): # or any(pairwise_collision(world.robot, b) for b in obstacles):
             return None
         grasp_conf = get_joint_positions(world.robot, world.arm_joints)
 
-        #grasp_conf = pr2_inverse_kinematics(robot, arm, gripper_pose, custom_limits=custom_limits) #, upper_limits=USE_CURRENT)
+        #grasp_conf = pr2_inverse_kinematics(robot, arm, gripper_pose, custom_limits=world.custom_limits) #, upper_limits=USE_CURRENT)
         #                                    #nearby_conf=USE_CURRENT) # upper_limits=USE_CURRENT,
         if (grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles): # [obj]
             #print('Grasp IK failure', grasp_conf)
             return None
 
+        if switches:
+            aq = Conf(world.robot, world.arm_joints, grasp_conf)
+            cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
+                Trajectory(world, world.robot, world.arm_joints, [grasp_conf, grasp_conf]),
+                #Trajectory(world, world.robot, world.gripper_joints, finger_path),
+                Attach(world, world.robot, world.tool_link, obj),
+                Trajectory(world, world.robot, world.arm_joints, [grasp_conf, grasp_conf]),
+            ])
+            return (aq, cmd,)
+
         full_approach_conf = sub_inverse_kinematics(world.robot, world.arm_joints[0], world.tool_link, approach_pose,
-                                               custom_limits=custom_limits)
+                                               custom_limits=world.custom_limits)
         if (full_approach_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles + [obj]):
             #print('Approach IK failure', approach_conf)
             return None
@@ -203,7 +215,7 @@ def get_pick_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **k
             grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
                                                   attachments=attachments.values(),
                                                   obstacles=approach_obstacles, self_collisions=False,
-                                                  custom_limits=custom_limits, resolutions=resolutions/2.)
+                                                  custom_limits=world.custom_limits, resolutions=resolutions/2.)
             if grasp_path is None:
                 print('Grasp path failure')
                 return None
@@ -212,18 +224,15 @@ def get_pick_ik_fn(world, custom_limits={}, collisions=True, teleport=False, **k
             approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
                                               attachments=attachments.values(),
                                               obstacles=obstacles, self_collisions=False,
-                                              custom_limits=custom_limits, resolutions=resolutions,
+                                              custom_limits=world.custom_limits, resolutions=resolutions,
                                               restarts=2, iterations=25, smooth=25)
             if approach_path is None:
                 print('Approach path failure')
                 return None
             path = approach_path + grasp_path
 
-        holding_conf = [grasp.grasp_width] * len(world.gripper_joints)
-        finger_path = [open_conf] + list(extend_fn(open_conf, holding_conf))
-
         aq = Conf(world.robot, world.arm_joints, approach_conf)
-        cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[ # , attachments=attachments
+        cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
             Trajectory(world, world.robot, world.gripper_joints, finger_path),
             Attach(world, world.robot, world.tool_link, obj),
@@ -251,7 +260,7 @@ def get_handle_link(world, joint):
             return link
     raise RuntimeError()
 
-def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False, learned=False):
+def get_pull_gen(world, collisions=True, teleport=False, learned=False):
     grasp_pose = (unit_point(), quat_from_euler(Euler(pitch=np.pi / 2)))
     # TODO: can adjust the position and orientation on the handle
 
@@ -279,7 +288,7 @@ def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False, learn
 
 
         grasp_waypoints = plan_cartesian_motion(world.robot, world.arm_joints[0], world.tool_link, tool_path,
-                                                custom_limits=custom_limits, pos_tolerance=1e-3)
+                                                custom_limits=world.custom_limits, pos_tolerance=1e-3)
         if grasp_waypoints is None:
             return
         #pull_joint_path = plan_waypoints_joint_motion(combined_joints, combined_waypoints,
@@ -298,7 +307,7 @@ def get_pull_gen(world, custom_limits={}, collisions=True, teleport=False, learn
         return (aq, cmd,)
     return gen
 
-def get_motion_gen(world, custom_limits={}, collisions=True, teleport=False):
+def get_motion_gen(world, collisions=True, teleport=False):
     # TODO: include fluents
     saver = BodySaver(world.robot)
     obstacles = world.static_obstacles if collisions else []
@@ -310,7 +319,7 @@ def get_motion_gen(world, custom_limits={}, collisions=True, teleport=False):
             path = [bq1.values, bq2.values]
         else:
             path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=[],
-                                            obstacles=obstacles, custom_limits=custom_limits, self_collisions=False,
+                                            obstacles=obstacles, custom_limits=world.custom_limits, self_collisions=False,
                                             restarts=4, iterations=50, smooth=100)
             if path is None:
                 print('Failed motion plan!')

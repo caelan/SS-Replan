@@ -4,7 +4,7 @@ from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
 from pybullet_tools.utils import get_joint_name
-from utils import STOVES, GRASP_TYPES, custom_limits_from_base_limits
+from utils import STOVES, GRASP_TYPES
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, get_motion_gen, distance_fn, get_pull_gen
 
 
@@ -22,7 +22,7 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
-def pdddlstream_from_problem(world, base_limits=None, **kwargs):
+def pdddlstream_from_problem(world, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
@@ -77,7 +77,7 @@ def pdddlstream_from_problem(world, base_limits=None, **kwargs):
     goal_literals = [
         #('Open', joint),
         ('Holding', block),
-        ('Cooked', block),
+        #('Cooked', block),
         ('AtBConf', initial_bq),
     ]
     #if problem.goal_conf is not None:

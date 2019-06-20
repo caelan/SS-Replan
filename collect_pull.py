@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-#from __future__ import printfunction, divide
+#!/usr/bin/env python2
 
 import argparse
 import datetime
@@ -20,11 +18,12 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, point_from_pose, \
     get_joint_name, joint_from_name
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, GRASP_TYPES
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, compute_custom_base_limits, GRASP_TYPES, \
+    CARTER_BASE_LINK
 from stream import get_pull_gen
 
 
-from collect_place import get_date, CARTER_BASE_LINK, DATABASE_DIRECTORY
+from collect_place import get_date, DATABASE_DIRECTORY
 
 PULL_IR_FILENAME = '{joint_name}-pull.json'
 
