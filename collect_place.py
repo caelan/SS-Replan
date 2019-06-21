@@ -10,7 +10,7 @@ PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
-from database import DATABASE_DIRECTORY, IR_FILENAME, get_date, load_placements, get_surface_reference_pose, SEPARATOR
+from database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_date, load_placements, get_surface_reference_pose, SEPARATOR
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
     point_from_pose, RED, BLUE, LockRenderer, set_pose, child_link_from_joint
@@ -116,8 +116,8 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         'surface_from_object_list': surface_from_object_list,
     }
 
-    filename = IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
-                                  grasp_type=grasp_type)
+    filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
+                                        grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
     print('Saved', path)

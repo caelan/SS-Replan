@@ -1,32 +1,22 @@
 #!/usr/bin/env python2
 
 import argparse
-import datetime
 import os
-import random
 import sys
 import time
-import numpy as np
-from itertools import product
-
 
 PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.pr2_primitives import Conf
-from pybullet_tools.utils import wait_for_user, link_from_name, elapsed_time, multiply, \
-    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, point_from_pose, \
-    get_joint_name, joint_from_name, child_link_from_joint
-from utils import World, BASE_JOINTS, compute_custom_base_limits, GRASP_TYPES
-from stream import get_pull_gen, get_handle_grasp
+from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
+    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, get_joint_name, joint_from_name, child_link_from_joint
+from utils import World, BASE_JOINTS
+from stream import get_pull_gen
 
-from database import DATABASE_DIRECTORY, get_date, get_surface_reference_pose
+from database import DATABASE_DIRECTORY, get_date, get_surface_reference_pose, PULL_IR_FILENAME
 
-PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
-
-
-################################################################################
 
 def collect_pull(world, joint_name, args):
     date = get_date()

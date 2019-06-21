@@ -1,8 +1,8 @@
-import os
+from __future__ import print_function
 
+import os
 import numpy as np
 import yaml
-import rospy
 
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
@@ -13,7 +13,8 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb, \
     get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent
+    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, \
+    get_collision_data, draw_mesh, read_obj, get_data_pose, tform_mesh, spaced_colors, aabb_from_points
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -28,10 +29,14 @@ LBR4_PATH = os.path.join(SRL_PATH, 'packages/third_party/ll4ma_robots_descriptio
 FRANKA_PATH = os.path.join(MODELS_PATH, 'lula_franka_gen.urdf')
 #FRANKA_PATH = os.path.join(SRL_PATH, 'packages/external/lula_franka/urdf/lula_franka_gen.urdf')
 # ./packages/third_party/franka_ros/franka_description
+
 CARTER_PATH = os.path.join(SRL_PATH, 'packages/third_party/carter_description/urdf/carter.urdf')
 CARTER_FRANKA_PATH = os.path.join(MODELS_PATH, 'carter_description/urdf/carter_franka.urdf')
 
-FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_carter.urdf')
+#FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_carter.urdf')
+#FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_description/robots/panda_arm_hand_on_carter.urdf')
+FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter.urdf')
+
 #CARTER_FRANKA_PATH = os.path.join(SRL_PATH, 'packages/third_party/carter_description/urdf/carter_franka.urdf')
 FRANKA_YAML = os.path.join(SRL_PATH, 'packages/external/lula_franka/config/robot_descriptor.yaml')
 
@@ -177,6 +182,24 @@ def create_gripper(robot, visual=False):
                 set_color(gripper, np.zeros(4), link)
     return gripper
 
+
+"""
+hitman_tmp Sektion.001
+0 [-0.3659, -0.353204, -0.351749, -0.351666, -0.3469, -0.327754, -0.327671, -0.326216, 0.210606, 0.212061, 0.212144, 0.236056, 0.236139, 0.237594, 0.2441]
+1 [-0.762, -0.761979, -0.743113, -0.743018, -0.743, -0.019, -0.018958, -0.018887, 0.0, 7e-06]
+2 [-0.799, -0.78, -0.038, -0.037, -0.036]
+AABB(lower=array([-0.3659, -0.762 , -0.799 ]), upper=array([ 0.2441  ,  0.000007, -0.036   ]))
+"""
+
+
+Y1 = -0.762
+Y2 = 0.000007
+
+Z1 = -0.799
+Z2 = -0.78
+Z3 = -0.036
+
+
 ################################################################################
 
 EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
@@ -214,10 +237,9 @@ class World(object):
             raise ValueError(self.robot_name)
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
-        #dump_body(self.robot)
+        dump_body(self.robot)
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
         #draw_aabb(get_aabb(self.robot))
-
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
         #print(self.robot_yaml)
         self.set_initial_conf()
@@ -230,6 +252,28 @@ class World(object):
         #dump_body(self.kitchen)
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         #print(self.kitchen_yaml)
+
+        """
+        for joint in self.kitchen_joints:
+            self.open_door(joint)
+        link_name = 'hitman_tmp' # hitman_tmp
+        link = link_from_name(self.kitchen, link_name) # hitman_tmp
+        [data] = get_collision_data(self.kitchen, link)
+
+        meshes = read_obj(data.filename)
+        colors = spaced_colors(len(meshes))
+        link_pose = get_link_pose(self.kitchen, link)
+        for i, (name, mesh) in enumerate(meshes.items()):
+            print(link_name, name)
+            for k in range(3):
+                print(k, sorted({vertex[k]  for vertex in mesh.vertices}))
+            print(aabb_from_points(mesh.vertices))
+            local_pose = get_data_pose(data)
+            tformed_mesh = tform_mesh(multiply(link_pose, local_pose), mesh=mesh)
+            draw_mesh(tformed_mesh, color=colors[i])
+            wait_for_user()
+        """
+
         set_point(self.kitchen, Point(z=1.35))
 
         if USE_TRACK_IK:
@@ -273,6 +317,7 @@ class World(object):
                 for rule in self.robot_yaml['cspace_to_urdf_rules']]
     @property
     def kitchen_joints(self):
+        #return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
         return joints_from_names(self.kitchen, filter(
             CABINET_JOINTS.__contains__, self.kitchen_yaml['cspace']))
     @property

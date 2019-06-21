@@ -6,10 +6,11 @@ import numpy as np
 
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
     euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names
-from utils import GRASP_TYPES, get_kitchen_parent, BASE_JOINTS
+from utils import GRASP_TYPES, get_kitchen_parent, BASE_JOINTS, joint_from_name
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
-IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
+PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
+PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
 
 SEPARATOR = '\n' + 50*'-' + '\n'
 
@@ -39,8 +40,8 @@ def get_surface_reference_pose(kitchen, surface_name):
 
 
 def load_place_database(robot_name, surface_name, grasp_type, field):
-    filename = IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
-                                  grasp_type=grasp_type)
+    filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
+                                        grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     if not os.path.exists(path):
         return []
@@ -57,7 +58,14 @@ def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
     random.shuffle(placements)
     return placements
 
-def load_base_poses(world, tool_pose, surface_name, grasp_type):
+def project_base_pose(base_pose):
+    base_point, base_quat = base_pose
+    x, y, _ = base_point
+    _, _, theta = euler_from_quat(base_quat)
+    base_values = (x, y, theta)
+    return base_values
+
+def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
     # TODO: should I not actually use surface?
     # TODO: Gaussian perturbation
     gripper_from_base_list = load_place_database(world.robot_name, surface_name, grasp_type,
@@ -65,12 +73,31 @@ def load_base_poses(world, tool_pose, surface_name, grasp_type):
     random.shuffle(gripper_from_base_list)
     handles = []
     for gripper_from_base in gripper_from_base_list:
-        base_point, base_quat = multiply(tool_pose, gripper_from_base)
-        x, y, _ = base_point
-        _, _, theta = euler_from_quat(base_quat)
-        base_values = (x, y, theta)
+        base_values = project_base_pose(multiply(tool_pose, gripper_from_base))
         #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
         #handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))
         yield base_values
     #wait_for_user()
-    #return None
+
+################################################################################
+
+def load_pull_database(robot_name, joint_name):
+    filename = PULL_IR_FILENAME.format(robot_name=robot_name, joint_name=joint_name)
+    path = os.path.join(DATABASE_DIRECTORY, filename)
+    if not os.path.exists(path):
+        return []
+    data = read_json(path)
+    return data['joint_from_base_list']
+
+def load_pull_base_poses(world, joint_name):
+    joint_from_base_list = load_pull_database(world.robot_name, joint_name)
+    parent_pose = get_surface_reference_pose(world.kitchen, joint_name)
+    random.shuffle(joint_from_base_list)
+    handles = []
+    for joint_from_base in joint_from_base_list:
+        base_values = project_base_pose(multiply(parent_pose, joint_from_base))
+        #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
+        x, y, _ = base_values
+        handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))
+        yield base_values
+    #wait_for_user()

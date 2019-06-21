@@ -18,7 +18,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
     set_tool_pose, close_until_collision
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
-from database import load_placements, get_surface_reference_pose, load_base_poses
+from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
 
 BASE_CONSTANT = 1
@@ -192,7 +192,7 @@ def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
         # TODO: check collisions with obj at pose
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
-            base_generator = load_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
+            base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
         else:
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
         pose.assign()
@@ -371,7 +371,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
     return (bq, aq, cmd,)
 
 
-def get_pull_gen(world, teleport=False, learned=False, **kwargs):
+def get_pull_gen(world, teleport=False, learned=True, **kwargs):
 
     def gen(joint_name, door_conf1, door_conf2):
         if door_conf1 == door_conf2:
@@ -411,7 +411,7 @@ def get_pull_gen(world, teleport=False, learned=False, **kwargs):
         #index = 0
         target_pose = tool_path[index]
         if learned:
-            base_generator = load_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
+            base_generator = load_pull_base_poses(world, joint_name)
         else:
             base_generator = uniform_pose_generator(world.robot, target_pose)
 
