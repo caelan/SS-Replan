@@ -6,7 +6,7 @@ from pybullet_tools.pr2_primitives import Conf, Pose
 from pybullet_tools.utils import get_joint_name, is_placed_on_aabb
 from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
-    get_motion_gen, distance_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES
+    get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES
 
 
 def existential_quantification(goal_literals):
@@ -118,7 +118,7 @@ def pdddlstream_from_problem(world, **kwargs):
         # 'test-cfree-traj-grasp-pose': from_test(get_cfree_traj_grasp_pose_test(problem, collisions=collisions)),
 
         # 'MoveCost': move_cost_fn,
-        'Distance': distance_fn,
+        'Distance': base_cost_fn,
     }
     #stream_map = DEBUG
 

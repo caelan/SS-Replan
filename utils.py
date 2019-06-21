@@ -136,13 +136,16 @@ def get_tool_from_root(robot):
     return multiply(invert(get_link_pose(robot, tool_link)),
                     get_link_pose(robot, root_link))
 
-def iterate_approach_path(robot, gripper, pose, grasp, body=None):
-    root_from_urdf = multiply(invert(get_link_pose(gripper, 0)), get_pose(gripper))
-    tool_from_root = get_tool_from_root(robot)
+def set_tool_pose(world, tool_pose):
+    root_from_urdf = multiply(invert(get_link_pose(world.gripper, 0)), get_pose(world.gripper))
+    tool_from_root = get_tool_from_root(world.robot)
+    set_pose(world.gripper, multiply(tool_pose, tool_from_root, root_from_urdf))
+
+def iterate_approach_path(world, pose, grasp, body=None):
     grasp_pose = multiply(pose.value, invert(grasp.grasp_pose))
     approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
     for tool_pose in interpolate_poses(grasp_pose, approach_pose):
-        set_pose(gripper, multiply(tool_pose, tool_from_root, root_from_urdf))
+        set_tool_pose(world, tool_pose)
         if body is not None:
             set_pose(body, multiply(tool_pose, grasp.grasp_pose))
         yield
@@ -164,7 +167,7 @@ def get_tool_link(robot):
         return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
-def create_gripper(robot, visual=False):
+def create_gripper(robot, visual=True):
     #dump_body(robot)
     links = get_link_subtree(robot, link_from_name(robot, get_gripper_link(robot)))
     with LockRenderer():

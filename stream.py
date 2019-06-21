@@ -1,7 +1,7 @@
 import random
 import numpy as np
 
-from itertools import islice
+from itertools import islice, product
 
 from pybullet_tools.pr2_primitives import Pose, Conf, get_side_grasps
 from pybullet_tools.utils import sample_placement, pairwise_collision, multiply, invert, sub_inverse_kinematics, \
@@ -12,9 +12,10 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
     draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, CIRCULAR_LIMITS, \
     get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose, stable_z_on_aabb, \
-    is_placed_on_aabb, spaced_colors, euler_from_quat, quat_from_pose, wrap_angle
+    is_placed_on_aabb, spaced_colors, euler_from_quat, quat_from_pose, wrap_angle, \
+    unit_pose, safe_zip, set_pose, get_distance_fn
 
-from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
+from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, set_tool_pose
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_base_poses
 
@@ -25,12 +26,12 @@ SELF_COLLISIONS = False # TODO: include self-collisions
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
-def distance_fn(q1, q2):
+def base_cost_fn(q1, q2):
     distance = get_distance(q1.values[:2], q2.values[:2])
     return BASE_CONSTANT + distance / BASE_VELOCITY
 
 
-def move_cost_fn(t):
+def trajectory_cost_fn(t):
     distance = t.distance(distance_fn=lambda q1, q2: get_distance(q1[:2], q2[:2]))
     return BASE_CONSTANT + distance / BASE_VELOCITY
 
@@ -182,15 +183,9 @@ def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
         obstacles = world.static_obstacles | get_door_obstacles(world, pose.support)
         if not collisions:
             obstacles = set()
-        for _ in iterate_approach_path(world.robot, world.gripper, pose, grasp, body=obj):
-            #wait_for_user()
+        for _ in iterate_approach_path(world, pose, grasp, body=obj):
             if any(pairwise_collision(world.gripper, b) or pairwise_collision(obj, b)
                    for b in obstacles):
-                #print([b for b in obstacles if pairwise_collision(world.gripper, b)])
-                #print([b for b in obstacles if pairwise_collision(obj, b)])
-                #print(pose, grasp, 'collide!')
-                #print(get_pose(obj))
-                #wait_for_user()
                 return iter([])
 
         # TODO: check collisions with obj at pose
@@ -223,19 +218,17 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
         if not collisions:
             obstacles = set()
 
-        # TODO: could search over multiple arm confs
         default_conf = sample_fn() if randomize else world.initial_conf
         pose.assign()
         base_conf.assign()
-        #open_arm(robot, arm)
-        set_joint_positions(world.robot, world.arm_joints, default_conf) # default_conf | sample_fn()
+        world.open_gripper()
+
+        set_joint_positions(world.robot, world.arm_joints, default_conf)
         full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
-        if (full_grasp_conf is None): # or any(pairwise_collision(world.robot, b) for b in obstacles):
-            return None
-        grasp_conf = get_joint_positions(world.robot, world.arm_joints)
-        if (grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles): # [obj]
+        if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
             #print('Grasp IK failure', grasp_conf)
             return None
+        grasp_conf = get_joint_positions(world.robot, world.arm_joints)
 
         if switches:
             aq = Conf(world.robot, world.arm_joints, grasp_conf)
@@ -299,37 +292,88 @@ def get_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
 
 ################################################################################
 
-def get_handle_link(world, joint):
+def get_handle_grasp(world, joint):
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
-            return link
+            # TODO: can adjust the position and orientation on the handle
+            handle_grasp = (unit_point(), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2)))
+            return link, handle_grasp
     raise RuntimeError()
 
-def get_pull_gen(world, collisions=True, teleport=False, learned=False):
-    grasp_pose = (unit_point(), quat_from_euler(Euler(pitch=np.pi / 2)))
-    # TODO: can adjust the position and orientation on the handle
+
+def get_pull_gen(world, randomize=True, collisions=True, teleport=False, learned=False):
 
     def gen(joint_name, conf1, conf2):
         if conf1 == conf2:
             return
         door_joint = joint_from_name(world.kitchen, joint_name)
-        handle_link = get_handle_link(world, door_joint)
         #conf1.assign()
         door_joints = [door_joint]
         extend_fn = get_extend_fn(world.kitchen, door_joints, resolutions=[0.05])
         door_path = [conf1.values] + list(extend_fn(conf1.values, conf2.values))
-        tool_path = []
-        set_joint_positions(world.robot, world.base_joints, [0.75, -0.5, np.pi])
-        for q in door_path:
-            set_joint_positions(world.kitchen, door_joints, q)
-            handle_pose = get_link_pose(world.kitchen, handle_link)
-            tool_pose = multiply(handle_pose, invert(grasp_pose))
-            tool_path.append(tool_pose)
-            #handles = draw_pose(handle_pose, length=0.25)
+        if teleport:
+            door_path = [conf1.values, conf2.values]
+
+        #door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
+        obstacles = world.static_obstacles
+        handle_link, handle_grasp = get_handle_grasp(world, door_joint)
+        handle_path = []
+        for door_conf in door_path:
+            set_joint_positions(world.kitchen, door_joints, door_conf)
+            #if any(pairwise_collision(door_obst, obst)
+            #       for door_obst, obst in product(door_obstacles, obstacles)):
+            #    return
+            handle_path.append(get_link_pose(world.kitchen, handle_link))\
+            # Collide due to adjacency
+
+        tool_path = [multiply(handle_pose, invert(handle_grasp)) for handle_pose in handle_path]
+        for i, tool_pose in enumerate(tool_path):
+            #set_joint_positions(world.kitchen, door_joints, door_path[i])
+            set_tool_pose(world, tool_pose)
+            #handles = draw_pose(handle_path[i], length=0.25)
             #handles.extend(draw_aabb(get_aabb(world.kitchen, link=handle_link)))
             #wait_for_user()
             #for handle in handles:
             #    remove_debug(handle)
+            if any(pairwise_collision(world.gripper, obst) for obst in obstacles):
+                return
+
+
+        #index = int(len(tool_path)/2)
+        index = 0
+        target_pose = tool_path[index]
+        if learned:
+            base_generator = load_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
+        else:
+            base_generator = uniform_pose_generator(world.robot, target_pose)
+
+        distance_fn = get_distance_fn(world.robot, world.arm_joints)
+        sample_fn = get_sample_fn(world.robot, world.arm_joints)
+        for bq, in inverse_reachability(world, base_generator, obstacles=obstacles):
+            # TODO: check door/bq collisions
+            #bq.assign()
+            #wait_for_user()
+            default_conf = sample_fn() if randomize else world.initial_conf
+            world.open_gripper()
+            set_joint_positions(world.robot, world.arm_joints, default_conf)
+
+
+            arm_path = []
+            for i, tool_pose in enumerate(tool_path):
+                full_arm_conf = world.solve_inverse_kinematics(tool_pose)
+                if (full_arm_conf is None): # or any(pairwise_collision(world.robot, b) for b in obstacles | {obj}):
+                    # print('Approach IK failure', approach_conf)
+                    break
+                arm_conf = get_joint_positions(world.robot, world.arm_joints)
+                if arm_path and (distance_fn(arm_path[-1], arm_conf) < 0.5):
+                    break
+                #arm_path.append(arm_conf)
+                #wait_for_user()
+            else:
+                pass
+
+
+        #close_until_collision(world.robot, world.gripper_joints, bodies=[body])
 
 
         grasp_waypoints = plan_cartesian_motion(world.robot, world.arm_joints[0], world.tool_link, tool_path,
@@ -337,10 +381,11 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=False):
         if grasp_waypoints is None:
             return
         #pull_joint_path = plan_waypoints_joint_motion(combined_joints, combined_waypoints,
-        #                                              collision_fn=lambda q: False)
+        #                                              collision_fn=lambda door_conf: False)
 
 
-        aq = Conf(world.robot, world.arm_joints, approach_conf)
+        aq1 = Conf(world.robot, world.arm_joints, approach_conf)
+        aq2 = Conf(world.robot, world.arm_joints, approach_conf)
         cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[ # , attachments=attachments
             Trajectory(world, world.robot, world.arm_joints, path),
             Trajectory(world, world.robot, world.gripper_joints, finger_path),
