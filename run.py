@@ -14,8 +14,8 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 
 from pybullet_tools.utils import wait_for_user, sample_placement, link_from_name, \
-    LockRenderer, WorldSaver, user_input, wait_for_duration, VideoSaver
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, ALL_SURFACES, DRAWER_JOINTS
+    LockRenderer, WorldSaver, user_input, wait_for_duration, VideoSaver, get_joint_name
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, ALL_SURFACES, DRAWER_JOINTS, CABINET_JOINTS
 from problem import pdddlstream_from_problem
 from debug import test_grasps
 from command import State, Wait
@@ -92,8 +92,9 @@ def main():
 
     world = World(use_gui=True)
     for joint in world.kitchen_joints:
-        #world.open_door(joint)
-        world.close_door(joint)
+        if get_joint_name(world.kitchen, joint) in CABINET_JOINTS:
+            world.open_door(joint)
+            #world.close_door(joint)
     world.open_gripper()
 
     block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
@@ -103,8 +104,9 @@ def main():
     surface_name = random.choice(ALL_SURFACES)
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
-    placement_gen = get_stable_gen(world)
-    pose, = next(placement_gen(block_name, surface_name), (None,))
+    with WorldSaver():
+        placement_gen = get_stable_gen(world)
+        pose, = next(placement_gen(block_name, surface_name), (None,))
     assert pose is not None
     pose.assign()
 

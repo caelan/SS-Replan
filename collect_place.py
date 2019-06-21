@@ -148,9 +148,9 @@ def main():
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    surface_names = SURFACES
+    surface_names = CABINET_JOINTS
     #surface_names = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
-    surface_names = CABINET_JOINTS + SURFACES + DRAWER_JOINTS
+    #surface_names = CABINET_JOINTS + SURFACES + DRAWER_JOINTS
 
     world = World(use_gui=args.visualize)
     for joint in world.kitchen_joints:
@@ -163,6 +163,7 @@ def main():
         TOP_GRASP: RED,
         SIDE_GRASP: BLUE,
     }
+    combinations = []
     for surface_name in surface_names:
         if surface_name in CABINET_JOINTS:
             grasp_types = [SIDE_GRASP]
@@ -170,9 +171,11 @@ def main():
             grasp_types = [TOP_GRASP]
         else:
             grasp_types = GRASP_TYPES
-        for grasp_type in grasp_types:
-            #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
-            collect_place(world, object_name, surface_name, grasp_type, args)
+        combinations.extend((surface_name, grasp_type) for grasp_type in grasp_types)
+    print('Combinations:', combinations)
+    for surface_name, grasp_type in combinations:
+        #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
+        collect_place(world, object_name, surface_name, grasp_type, args)
     wait_for_user()
     world.destroy()
 

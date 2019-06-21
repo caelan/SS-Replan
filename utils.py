@@ -389,7 +389,7 @@ class Grasp(object):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
 TOP_GRASP = 'top'
-SIDE_GRASP = 'side'
+SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
 UNDER_GRASP = 'under' # TODO: for franka_carter
 GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 
@@ -415,7 +415,6 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
             generator = (multiply(rotate_z, grasp) for grasp in generator)
         else:
             raise ValueError(grasp_type)
-
 
         for i, grasp_pose in enumerate(randomize(list(generator))):
             with BodySaver(world.robot):
