@@ -270,7 +270,8 @@ class World(object):
                 for rule in self.robot_yaml['cspace_to_urdf_rules']]
     @property
     def kitchen_joints(self):
-        return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
+        return joints_from_names(self.kitchen, filter(
+            CABINET_JOINTS.__contains__, self.kitchen_yaml['cspace']))
     @property
     def tool_link(self):
         return link_from_name(self.robot, get_tool_link(self.robot))

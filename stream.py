@@ -254,12 +254,11 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
         approach_conf = get_joint_positions(world.robot, world.arm_joints)
 
         attachment = grasp.get_attachment()
-        attachments = {attachment.child: attachment}
         if teleport:
             path = [default_conf, approach_conf, grasp_conf]
         else:
             grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
-                                                  attachments=attachments.values(),
+                                                  attachments=[attachment],
                                                   obstacles=obstacles, self_collisions=SELF_COLLISIONS,
                                                   custom_limits=world.custom_limits, resolutions=resolutions/2.)
             if grasp_path is None:
@@ -268,7 +267,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
             set_joint_positions(world.robot, world.arm_joints, default_conf)
             # TODO: plan one with attachment placed and one held
             approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
-                                              attachments=attachments.values(),
+                                              attachments=[attachment],
                                               obstacles=obstacles, self_collisions=SELF_COLLISIONS,
                                               custom_limits=world.custom_limits, resolutions=resolutions,
                                               restarts=2, iterations=25, smooth=25)
@@ -277,7 +276,6 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
                 return None
             path = approach_path + grasp_path
 
-        # TODO: should place the attachments here
         aq = Conf(world.robot, world.arm_joints, approach_conf)
         cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
@@ -354,6 +352,8 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=False):
         return (aq, cmd,)
     return gen
 
+################################################################################
+
 def get_motion_gen(world, collisions=True, teleport=False):
     # TODO: ensure only forward drive?
     saver = BodySaver(world.robot)
@@ -365,10 +365,10 @@ def get_motion_gen(world, collisions=True, teleport=False):
         attachments = []
         for fluent in fluents:
             predicate, args = fluent[0], fluent[1:]
-            if predicate == 'AtConf'.lower():
-                j, q = args
-                q.assign()
-                obstacles.update(get_descendant_obstacles(q.body, q.joints[0]))
+            if predicate == 'AtAngle'.lower():
+                j, a = args
+                a.assign()
+                obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
             elif predicate == 'AtPose'.lower():
                 b, p = args
                 p.assign()
@@ -402,3 +402,23 @@ def get_motion_gen(world, collisions=True, teleport=False):
         ])
         return (cmd,)
     return fn
+
+################################################################################
+
+OPEN = 'open'
+CLOSED = 'closed'
+DOOR_STATUSES = [OPEN, CLOSED]
+JOINT_THRESHOLD = 1e-3
+
+def get_door_test(world):
+    def test(joint_name, conf, status):
+        [joint] = conf.joints
+        [position] = conf.values
+        if status == OPEN:
+            status_position = world.open_conf(joint)
+        elif status == CLOSED:
+            status_position = world.closed_conf(joint)
+        else:
+            raise NotImplementedError(status)
+        return abs(position - status_position) <= JOINT_THRESHOLD
+    return test

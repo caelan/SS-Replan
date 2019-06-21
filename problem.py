@@ -1,12 +1,12 @@
 from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, And, Equal, PDDLProblem
-from pddlstream.language.generator import from_gen_fn, from_fn
+from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
 from pybullet_tools.utils import get_joint_name, is_placed_on_aabb
 from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
-    get_motion_gen, distance_fn, get_pull_gen, compute_surface_aabb
+    get_motion_gen, distance_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES
 
 
 def existential_quantification(goal_literals):
@@ -22,20 +22,6 @@ def existential_quantification(goal_literals):
     return And(*goal_formula)
 
 ################################################################################
-
-JOINT_THRESHOLD = 1e-3
-
-def is_closed_conf(world, conf):
-    [joint] = conf.joints
-    [position] = conf.values
-    closed_position = world.closed_conf(joint)
-    return abs(position - closed_position) <= JOINT_THRESHOLD
-
-def is_open_conf(world, conf):
-    [joint] = conf.joints
-    [position] = conf.values
-    open_position = world.open_conf(joint)
-    return abs(position - open_position) <= JOINT_THRESHOLD
 
 def pdddlstream_from_problem(world, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
@@ -58,7 +44,19 @@ def pdddlstream_from_problem(world, **kwargs):
         Equal(('PlaceCost',), 1),
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
-    ] + [('Type', name, 'stove') for name in STOVES]
+    ] + [('Type', name, 'stove') for name in STOVES] + \
+           [('Status', status) for status in DOOR_STATUSES]
+
+    block = list(world.movable)[0]
+    joint = 'chewie_door_left_joint' # baker_joint | chewie_door_left_joint
+    surface = CABINET_JOINTS[0]
+
+    goal_literals = [
+        #('Open', joint),
+        #('Holding', block),
+        #('Cooked', block),
+        ('AtBConf', initial_bq),
+    ]
 
     for name in world.movable:
         body = world.get_body(name)
@@ -80,27 +78,15 @@ def pdddlstream_from_problem(world, **kwargs):
         initial_conf = Conf(world.kitchen, [joint])
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
-        init.append(('AtConf', joint_name, initial_conf))
+        init.append(('AtAngle', joint_name, initial_conf))
+        goal_literals.append(('DoorStatus', joint_name, CLOSED))
         for conf in [initial_conf, open_conf, closed_conf]:
-            init.append(('Conf', joint_name, conf))
-            if is_closed_conf(world, conf):
-                init.append(('ClosedConf', joint_name, conf))
-            elif is_closed_conf(world, conf):
-                init.append(('OpenConf', joint_name, conf))
-
-    block = list(world.movable)[0]
-    joint = 'chewie_door_left_joint' # baker_joint | chewie_door_left_joint | hitman_drawer_top_joint
-    surface = CABINET_JOINTS[0]
+            init.append(('Angle', joint_name, conf))
 
     goal_on = {
         #block: surface,
     }
-    goal_literals = [
-        #('Open', joint),
-        ('Holding', block),
-        #('Cooked', block),
-        ('AtBConf', initial_bq),
-    ]
+
     #if problem.goal_conf is not None:
     #    goal_conf = Conf(robot, get_group_joints(robot, 'base'), problem.goal_conf)
     #    init += [('BConf', goal_conf)]
@@ -119,6 +105,7 @@ def pdddlstream_from_problem(world, **kwargs):
     goal_formula = existential_quantification(goal_literals)
 
     stream_map = {
+        'test-door': from_test(get_door_test(world)),
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
         'inverse-kinematics': from_gen_fn(get_pick_gen(world, **kwargs)),

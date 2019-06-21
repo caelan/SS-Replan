@@ -18,15 +18,15 @@
     :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
                     (Kin ?o ?p ?g ?bq ?aq ?at))
   )
-;  (:stream plan-pull
-;    :inputs (?j ?q1 ?q2)
-;    :domain (and (Conf ?j ?q1) (Conf ?j ?q2))
-;    :outputs (?bq ?aq ?at)
-;    :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
-;                    (Pull ?j ?q1 ?q2 ?bq ?aq ?at))
-;  )
+  (:stream plan-pull
+    :inputs (?j ?a1 ?a2)
+    :domain (and (Angle ?j ?a1) (Angle ?j ?a2))
+    :outputs (?bq ?aq ?at)
+    :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+  )
   (:stream plan-base-motion
-    :fluents (AtPose AtGrasp AtConf) ; TODO: AtAngle/AtPosition instead?
+    :fluents (AtPose AtGrasp AtAngle)
     :inputs (?bq1 ?bq2)
     :domain (and (BConf ?bq1) (BConf ?bq2))
     :outputs (?bt)
@@ -53,6 +53,13 @@
   ;  :domain (and (BTraj ?t) (Arm ?a) (Grasp ?o1 ?g1) (Pose ?o2 ?p2))
   ;  :certified (CFreeTrajGraspPose ?t ?a ?o1 ?g1 ?o2 ?p2)
   ;)
+
+
+  (:stream test-door
+    :inputs (?j ?a ?s)
+    :domain (and (Angle ?j ?a) (Status ?s))
+    :certified (AngleWithin ?j ?a ?s)
+  )
 
   (:function (Distance ?bq1 ?bq2)
     (and (BConf ?bq1) (BConf ?bq2))

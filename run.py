@@ -91,10 +91,9 @@ def main():
     np.set_printoptions(precision=3, suppress=True)
 
     world = World(use_gui=True)
-    for joint in world.kitchen_joints:
-        if get_joint_name(world.kitchen, joint) in CABINET_JOINTS:
-            world.open_door(joint)
-            #world.close_door(joint)
+    for joint in world.kitchen_joints[:1]:
+        world.open_door(joint)
+        #world.close_door(joint)
     world.open_gripper()
 
     block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
@@ -119,6 +118,7 @@ def main():
 
     stream_info = {
         # TODO: check if already on the stove
+        'test-door': StreamInfo(eager=True),
         'inverse-kinematics': StreamInfo(),
         'plan-pull': StreamInfo(),
         'plan-base-motion': StreamInfo(overhead=1e1),
