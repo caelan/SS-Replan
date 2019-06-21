@@ -58,6 +58,7 @@ def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
 
 def load_base_poses(world, tool_pose, surface_name, grasp_type):
     # TODO: should I not actually use surface?
+    # TODO: Gaussian perturbation
     gripper_from_base_list = load_place_database(world.robot_name, surface_name, grasp_type,
                                                  field='tool_from_base_list')
     random.shuffle(gripper_from_base_list)

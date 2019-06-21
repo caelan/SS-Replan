@@ -13,7 +13,7 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb, \
     get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions, randomize, unit_point
+    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -441,10 +441,12 @@ def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
 
 
 def compute_custom_base_limits(world):
-    full_aabb = aabb_union(get_aabb(body) for body in get_bodies() if body != world.floor)
-    #draw_aabb(full_aabb)
-    lower, upper = full_aabb
-    base_limits = (lower[:2], upper[:2])
+    robot_extent = get_aabb_extent(get_aabb(world.robot))
+    min_extent = min(robot_extent[:2])*np.ones(2) / 2
+
+    full_lower, full_upper = aabb_union(get_aabb(body) for body in get_bodies()
+                                        if body != world.floor)
+    base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
     draw_base_limits(base_limits)
     #wait_for_user()
     return custom_limits_from_base_limits(world.robot, base_limits)

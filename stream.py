@@ -12,7 +12,7 @@ from pybullet_tools.utils import sample_placement, pairwise_collision, multiply,
     plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
     draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, CIRCULAR_LIMITS, \
     get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose, stable_z_on_aabb, \
-    is_placed_on_aabb, spaced_colors
+    is_placed_on_aabb, spaced_colors, euler_from_quat, quat_from_pose, wrap_angle
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
@@ -74,7 +74,8 @@ def get_door_obstacles(world, surface_name):
 
 ################################################################################
 
-def get_stable_gen(world, learned=True, collisions=True, scale=0.01, z_offset=5e-3, **kwargs):
+def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
+                   z_offset=5e-3, **kwargs):
 
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
@@ -88,10 +89,13 @@ def get_stable_gen(world, learned=True, collisions=True, scale=0.01, z_offset=5e
                     break
                 surface_pose = get_surface_reference_pose(world.kitchen, selected_name)
                 body_pose = multiply(surface_pose, random.choice(poses))
-                [x, y, _], quat = body_pose
-                quat = quat_from_euler(Euler(yaw=np.random.uniform(*CIRCULAR_LIMITS)))
-                dx, dy = (0, 0) if scale == 0 else np.random.normal(scale=scale, size=2)
+                [x, y, _] = point_from_pose(body_pose)
+                _, _, yaw = euler_from_quat(quat_from_pose(body_pose))
+                dx, dy = np.random.normal(scale=pos_scale, size=2)
                 z = stable_z_on_aabb(body, surface_aabb)
+                theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
+                #yaw = np.random.uniform(*CIRCULAR_LIMITS)
+                quat = quat_from_euler(Euler(yaw=theta))
                 body_pose = (x+dx, y+dy, z+z_offset), quat
                 # TODO: project onto the surface
             else:
@@ -122,7 +126,7 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
-def inverse_reachability(world, base_generator, obstacles=[],  max_attempts=25, **kwargs):
+def inverse_reachability(world, base_generator, obstacles=[], max_attempts=25, **kwargs):
     default_conf = world.initial_conf  # arm_conf(arm, grasp.carry)
     lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, world.custom_limits)
     while True:
@@ -135,7 +139,7 @@ def inverse_reachability(world, base_generator, obstacles=[],  max_attempts=25, 
             set_joint_positions(world.robot, world.arm_joints, default_conf)
             if any(pairwise_collision(world.robot, b) for b in obstacles): #  + [obj]
                 continue
-            # print('IR attempts:', i)
+            print('IR attempts:', i)
             yield (bq,)
             break
         else:
@@ -375,6 +379,7 @@ def get_motion_gen(world, collisions=True, teleport=False):
                 attachments[-1].assign()
             else:
                 raise NotImplementedError(predicate)
+        # TODO: need to collision check with doors otherwise collision
 
         if not collisions:
             obstacles = set()
@@ -384,9 +389,12 @@ def get_motion_gen(world, collisions=True, teleport=False):
             path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=attachments,
                                             obstacles=obstacles, custom_limits=world.custom_limits,
                                             self_collisions=False,
-                                            restarts=4, iterations=50, smooth=100)
+                                            restarts=4, iterations=75, smooth=100)
             if path is None:
                 print('Failed motion plan!')
+                #for bq in [bq1, bq2]:
+                #    bq.assign()
+                #    wait_for_user()
                 return None
         # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
