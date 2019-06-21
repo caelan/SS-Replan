@@ -316,16 +316,16 @@ def get_pull_gen(world, randomize=True, collisions=True, teleport=False, learned
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
 
-    def gen(joint_name, conf1, conf2):
-        if conf1 == conf2:
+    def gen(joint_name, door_conf1, door_conf2):
+        if door_conf1 == door_conf2:
             return
         door_joint = joint_from_name(world.kitchen, joint_name)
-        #conf1.assign()
         door_joints = [door_joint]
+        # TODO: could unify with grasp path
         door_extend_fn = get_extend_fn(world.kitchen, door_joints, resolutions=[DOOR_RESOLUTION])
-        door_path = [conf1.values] + list(door_extend_fn(conf1.values, conf2.values))
+        door_path = [door_conf1.values] + list(door_extend_fn(door_conf1.values, door_conf2.values))
         if teleport:
-            door_path = [conf1.values, conf2.values]
+            door_path = [door_conf1.values, door_conf2.values]
 
         #door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
         handle_link, handle_grasp, handle_pregrasp = get_handle_grasp(world, door_joint)
@@ -383,7 +383,7 @@ def get_pull_gen(world, randomize=True, collisions=True, teleport=False, learned
                     # print('Approach IK failure', approach_conf)
                     break
                 arm_conf = get_joint_positions(world.robot, world.arm_joints)
-                if arm_path:
+                if arm_path and not teleport:
                     distance = distance_fn(arm_path[-1], arm_conf)
                     #print(distance)
                     if max_distance < distance:
@@ -394,12 +394,6 @@ def get_pull_gen(world, randomize=True, collisions=True, teleport=False, learned
                 success = True
             if not success:
                 continue
-
-            set_joint_positions(world.kitchen, door_joints, door_path[0])
-            set_joint_positions(world.robot, world.arm_joints, arm_path[0])
-            grasp_width = close_until_collision(world.robot, world.gripper_joints, **kwargs)
-            finger_path = plan_gripper_path(world, grasp_width, **kwargs)
-            world.open_gripper()
 
             approach_paths = []
             for index in [0, -1]:
@@ -414,6 +408,12 @@ def get_pull_gen(world, randomize=True, collisions=True, teleport=False, learned
                 approach_paths.append(approach_path)
             if approach_paths is None:
                 continue
+
+            set_joint_positions(world.kitchen, door_joints, door_path[0])
+            set_joint_positions(world.robot, world.arm_joints, arm_path[0])
+            grasp_width = close_until_collision(world.robot, world.gripper_joints,
+                                                bodies=[(world.kitchen, [handle_link])])
+            finger_path = plan_gripper_path(world, grasp_width, teleport=teleport)
 
             aq = Conf(world.robot, world.arm_joints, world.initial_conf)
             cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
