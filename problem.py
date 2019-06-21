@@ -53,7 +53,7 @@ def pdddlstream_from_problem(world, **kwargs):
 
     goal_literals = [
         #('Open', joint),
-        ('Holding', block),
+        #('Holding', block),
         #('Cooked', block),
         ('AtBConf', initial_bq),
     ]
@@ -79,7 +79,7 @@ def pdddlstream_from_problem(world, **kwargs):
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         init.append(('AtAngle', joint_name, initial_conf))
-        #goal_literals.append(('DoorStatus', joint_name, CLOSED))
+        goal_literals.append(('DoorStatus', joint_name, CLOSED))
         for conf in [initial_conf, open_conf, closed_conf]:
             init.append(('Angle', joint_name, conf))
 
