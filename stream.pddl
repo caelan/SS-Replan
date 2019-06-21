@@ -26,6 +26,7 @@
 ;                    (Pull ?j ?q1 ?q2 ?bq ?aq ?at))
 ;  )
   (:stream plan-base-motion
+    :fluents (AtPose AtGrasp AtConf) ; TODO: AtAngle/AtPosition instead?
     :inputs (?bq1 ?bq2)
     :domain (and (BConf ?bq1) (BConf ?bq2))
     :outputs (?bt)

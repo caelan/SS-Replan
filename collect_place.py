@@ -39,6 +39,7 @@ def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
         handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
         set_pose(world.get_body(object_name), object_pose)
         #wait_for_user()
+    wait_for_user()
     return handles
 
 ################################################################################
@@ -176,7 +177,6 @@ def main():
     for surface_name, grasp_type in combinations:
         #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
         collect_place(world, object_name, surface_name, grasp_type, args)
-    wait_for_user()
     world.destroy()
 
 if __name__ == '__main__':

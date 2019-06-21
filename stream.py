@@ -21,6 +21,7 @@ from database import load_placements, get_surface_reference_pose, load_base_pose
 
 BASE_CONSTANT = 1
 BASE_VELOCITY = 0.25
+SELF_COLLISIONS = False # TODO: include self-collisions
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
@@ -59,17 +60,21 @@ def compute_surface_aabb(world, surface_name):
     # draw_aabb(surface_aabb)
     return surface_aabb
 
+def get_descendant_obstacles(kitchen, joint):
+    return {(kitchen, frozenset([link]))
+            for link in get_link_subtree(kitchen, joint)}
+
 def get_door_obstacles(world, surface_name):
     if surface_name not in LINK_SHAPE_FROM_JOINT:
         return set() # Could just return the link I suppose
     joint = joint_from_name(world.kitchen, surface_name)
     world.open_door(joint)
     # Be careful to call this before each check
-    return {(world.kitchen, frozenset([link]))
-             for link in get_link_subtree(world.kitchen, joint)}
+    return get_descendant_obstacles(world.kitchen, joint)
+
+################################################################################
 
 def get_stable_gen(world, learned=True, collisions=True, scale=0.01, z_offset=5e-3, **kwargs):
-    fixed_obstacles = world.static_obstacles if collisions else []
 
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
@@ -97,7 +102,9 @@ def get_stable_gen(world, learned=True, collisions=True, scale=0.01, z_offset=5e
             p.assign()
             if not is_placed_on_aabb(body, surface_aabb):
                 continue
-            obstacles = fixed_obstacles | get_door_obstacles(world, selected_name)
+            obstacles = world.static_obstacles | get_door_obstacles(world, selected_name)
+            if not collisions:
+                obstacles = set()
             #print([get_link_name(obst[0], *obst[1]) for obst in obstacles
             #       if pairwise_collision(body, obst)])
             #wait_for_user()
@@ -164,13 +171,13 @@ def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, m
 ################################################################################
 
 def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
-    fixed_obstacles = world.static_obstacles if collisions else []
-    #gripper = problem.get_gripper()
 
     def gen_fn(name, pose, grasp):
         assert pose.support is not None
         obj = world.get_body(name)
-        obstacles = fixed_obstacles | get_door_obstacles(world, pose.support) # if not is_placement(obj, obst)}
+        obstacles = world.static_obstacles | get_door_obstacles(world, pose.support)
+        if not collisions:
+            obstacles = set()
         for _ in iterate_approach_path(world.robot, world.gripper, pose, grasp, body=obj):
             #wait_for_user()
             if any(pairwise_collision(world.gripper, b) or pairwise_collision(obj, b)
@@ -194,7 +201,7 @@ def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
 
 def get_pick_ik_fn(world, randomize=False, collisions=True,
                    switches=False, teleport=True, **kwargs):
-    fixed_obstacles = world.static_obstacles if collisions else []
+
     resolutions = 0.05 * np.ones(len(world.arm_joints))
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
     extend_fn = get_extend_fn(world.robot, world.gripper_joints,
@@ -208,7 +215,9 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
 
         holding_conf = [grasp.grasp_width] * len(world.gripper_joints)
         finger_path = [open_conf] + list(extend_fn(open_conf, holding_conf))
-        obstacles = fixed_obstacles | get_door_obstacles(world, pose.support)
+        obstacles = world.static_obstacles | get_door_obstacles(world, pose.support)
+        if not collisions:
+            obstacles = set()
 
         # TODO: could search over multiple arm confs
         default_conf = sample_fn() if randomize else world.initial_conf
@@ -247,7 +256,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
         else:
             grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
                                                   attachments=attachments.values(),
-                                                  obstacles=obstacles, self_collisions=False,
+                                                  obstacles=obstacles, self_collisions=SELF_COLLISIONS,
                                                   custom_limits=world.custom_limits, resolutions=resolutions/2.)
             if grasp_path is None:
                 print('Grasp path failure')
@@ -256,7 +265,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
             # TODO: plan one with attachment placed and one held
             approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
                                               attachments=attachments.values(),
-                                              obstacles=obstacles, self_collisions=False,
+                                              obstacles=obstacles, self_collisions=SELF_COLLISIONS,
                                               custom_limits=world.custom_limits, resolutions=resolutions,
                                               restarts=2, iterations=25, smooth=25)
             if approach_path is None:
@@ -264,6 +273,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
                 return None
             path = approach_path + grasp_path
 
+        # TODO: should place the attachments here
         aq = Conf(world.robot, world.arm_joints, approach_conf)
         cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
@@ -341,23 +351,44 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=False):
     return gen
 
 def get_motion_gen(world, collisions=True, teleport=False):
-    # TODO: include fluents
     # TODO: ensure only forward drive?
     saver = BodySaver(world.robot)
-    obstacles = world.static_obstacles if collisions else []
 
-    def fn(bq1, bq2):
+    def fn(bq1, bq2, fluents=[]):
         saver.restore()
         bq1.assign()
+        obstacles = set(world.static_obstacles)
+        attachments = []
+        for fluent in fluents:
+            predicate, args = fluent[0], fluent[1:]
+            if predicate == 'AtConf'.lower():
+                j, q = args
+                q.assign()
+                obstacles.update(get_descendant_obstacles(q.body, q.joints[0]))
+            elif predicate == 'AtPose'.lower():
+                b, p = args
+                p.assign()
+                obstacles.add(world.get_body(b))
+            elif predicate == 'AtGrasp'.lower():
+                b, g = args
+                attachments.append(g.get_attachment())
+                attachments[-1].assign()
+            else:
+                raise NotImplementedError(predicate)
+
+        if not collisions:
+            obstacles = set()
         if teleport:
             path = [bq1.values, bq2.values]
         else:
-            path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=[],
-                                            obstacles=obstacles, custom_limits=world.custom_limits, self_collisions=False,
+            path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=attachments,
+                                            obstacles=obstacles, custom_limits=world.custom_limits,
+                                            self_collisions=False,
                                             restarts=4, iterations=50, smooth=100)
             if path is None:
                 print('Failed motion plan!')
                 return None
+        # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
             Trajectory(world, world.robot, world.base_joints, path),
         ])
