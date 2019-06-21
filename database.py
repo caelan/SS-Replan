@@ -11,6 +11,7 @@ from utils import GRASP_TYPES, get_kitchen_parent, BASE_JOINTS
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
 
+SEPARATOR = '\n' + 50*'-' + '\n'
 
 def get_random_seed():
     # random.getstate()[1][0]

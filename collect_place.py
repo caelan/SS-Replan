@@ -10,12 +10,11 @@ PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
 PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
-from database import DATABASE_DIRECTORY, IR_FILENAME, get_date, load_placements, get_surface_reference_pose
+from database import DATABASE_DIRECTORY, IR_FILENAME, get_date, load_placements, get_surface_reference_pose, SEPARATOR
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
     point_from_pose, RED, BLUE, LockRenderer, set_pose, child_link_from_joint
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, SURFACES, \
-    GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 
@@ -60,12 +59,14 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
     stable_gen = stable_gen_fn(object_name, surface_name)
     grasps = list(grasp_gen_fn(object_name))
+
+    robot_name = get_body_name(world.robot)
+    print(SEPARATOR)
+    print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {}'.format(
+        robot_name, object_name, surface_name, grasp_type))
+
     tool_from_base_list = []
     surface_from_object_list = []
-
-    print('\n' + 50*'-' + '\n')
-    print('Object name: {} | Surface name: {} | Grasp type: {}'.format
-          (object_name, surface_name, grasp_type))
     start_time = time.time()
     failures = 0
     while (len(tool_from_base_list) < args.num_samples) and \
@@ -104,10 +105,10 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     # TODO: could store per data point
     data = {
         'date': date,
-        'robot_name': get_body_name(world.robot), # get_name | get_body_name | get_base_name | world.robot_name
+        'robot_name': robot_name, # get_name | get_body_name | get_base_name | world.robot_name
         'base_link': get_link_name(world.robot, base_link),
         'tool_link': get_link_name(world.robot, world.tool_link),
-        'kitchen_name': get_body_name(world.robot),
+        'kitchen_name': get_body_name(world.kitchen),
         'surface_name': surface_name,
         'object_name': object_name,
         'grasp_type': grasp_type,
@@ -115,7 +116,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         'surface_from_object_list': surface_from_object_list,
     }
 
-    filename = IR_FILENAME.format(robot_name=world.robot_name, surface_name=surface_name,
+    filename = IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
                                   grasp_type=grasp_type)
     path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
