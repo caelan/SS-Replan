@@ -202,10 +202,43 @@ ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.05
 
-def get_pick_ik_fn(world, randomize=False, collisions=True,
-                   switches=False, teleport=True, **kwargs):
+def plan_approach(world, approach_pose, obstacles=[], attachments=[],
+                  teleport=False, switches_only=False):
+    grasp_conf = get_joint_positions(world.robot, world.arm_joints)
+    if switches_only:
+        return [world.initial_conf, grasp_conf]
+
+    full_approach_conf = world.solve_inverse_kinematics(approach_pose)
+    if (full_approach_conf is None) or \
+            any(pairwise_collision(world.robot, b) for b in obstacles): # TODO: | {obj}
+        # print('Approach IK failure', approach_conf)
+        return None
+    approach_conf = get_joint_positions(world.robot, world.arm_joints)
+    if teleport:
+        return [world.initial_conf, approach_conf, grasp_conf]
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
+    grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
+                                          attachments=attachments,
+                                          obstacles=obstacles, self_collisions=SELF_COLLISIONS,
+                                          custom_limits=world.custom_limits, resolutions=resolutions / 2.)
+    if grasp_path is None:
+        print('Grasp path failure')
+        return None
+    set_joint_positions(world.robot, world.arm_joints, world.initial_conf)
+    # TODO: plan one with attachment placed and one held
+    approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
+                                      attachments=attachments,
+                                      obstacles=obstacles, self_collisions=SELF_COLLISIONS,
+                                      custom_limits=world.custom_limits, resolutions=resolutions,
+                                      restarts=2, iterations=25, smooth=25)
+    if approach_path is None:
+        print('Approach path failure')
+        return None
+    return approach_path + grasp_path
+
+def get_pick_ik_fn(world, randomize=False, collisions=True, teleport=False, **kwargs):
+
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
     extend_fn = get_extend_fn(world.robot, world.gripper_joints,
                               resolutions=GRIPPER_RESOLUTION*np.ones(len(world.gripper_joints)))
@@ -215,10 +248,13 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
         obj = world.get_body(name)
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
+        attachment = grasp.get_attachment()
 
         holding_conf = [grasp.grasp_width] * len(world.gripper_joints)
         finger_path = [open_conf] + list(extend_fn(open_conf, holding_conf))
-        obstacles = world.static_obstacles | get_door_obstacles(world, pose.support)
+        if teleport:
+            finger_path = [open_conf, holding_conf]
+        obstacles = world.static_obstacles | get_door_obstacles(world, pose.support) # | {obj}
         if not collisions:
             obstacles = set()
 
@@ -229,55 +265,19 @@ def get_pick_ik_fn(world, randomize=False, collisions=True,
         set_joint_positions(world.robot, world.arm_joints, sample_fn() if randomize else world.initial_conf)
         full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
         if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
-            #print('Grasp IK failure', grasp_conf)
+            # print('Grasp IK failure', grasp_conf)
             return None
-        grasp_conf = get_joint_positions(world.robot, world.arm_joints)
-
-        if switches:
-            aq = Conf(world.robot, world.arm_joints, grasp_conf)
-            cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
-                Trajectory(world, world.robot, world.arm_joints, [grasp_conf, grasp_conf]),
-                #Trajectory(world, world.robot, world.gripper_joints, finger_path),
-                Attach(world, world.robot, world.tool_link, obj),
-                Trajectory(world, world.robot, world.arm_joints, [grasp_conf, grasp_conf]),
-            ])
-            return (aq, cmd,)
-
-        full_approach_conf = world.solve_inverse_kinematics(approach_pose)
-        if (full_approach_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles | {obj}):
-            #print('Approach IK failure', approach_conf)
+        approach_path = plan_approach(world, approach_pose, obstacles=obstacles,
+                                      attachments=[attachment], teleport=teleport, **kwargs)
+        if approach_path is None:
             return None
-        approach_conf = get_joint_positions(world.robot, world.arm_joints)
-
-        attachment = grasp.get_attachment()
-        if teleport:
-            path = [world.initial_conf, approach_conf, grasp_conf]
-        else:
-            grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
-                                                  attachments=[attachment],
-                                                  obstacles=obstacles, self_collisions=SELF_COLLISIONS,
-                                                  custom_limits=world.custom_limits, resolutions=resolutions/2.)
-            if grasp_path is None:
-                print('Grasp path failure')
-                return None
-            set_joint_positions(world.robot, world.arm_joints, world.initial_conf)
-            # TODO: plan one with attachment placed and one held
-            approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
-                                              attachments=[attachment],
-                                              obstacles=obstacles, self_collisions=SELF_COLLISIONS,
-                                              custom_limits=world.custom_limits, resolutions=resolutions,
-                                              restarts=2, iterations=25, smooth=25)
-            if approach_path is None:
-                print('Approach path failure')
-                return None
-            path = approach_path + grasp_path
 
         aq = Conf(world.robot, world.arm_joints, world.initial_conf)
         cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
-            Trajectory(world, world.robot, world.arm_joints, path),
+            Trajectory(world, world.robot, world.arm_joints, approach_path),
             Trajectory(world, world.robot, world.gripper_joints, finger_path),
             Attach(world, world.robot, world.tool_link, obj),
-            Trajectory(world, world.robot, world.arm_joints, reversed(path)),
+            Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ])
         return (aq, cmd,)
     return fn
