@@ -12,7 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, \
     is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat
+    get_distance_fn, get_unit_vector, unit_quat, wait_for_user
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles
@@ -260,6 +260,8 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
         pose.assign()
         base_conf.assign()
         world.open_gripper()
+        robot_saver = BodySaver(world.robot)
+        obj_saver = BodySaver(obj)
 
         set_joint_positions(world.robot, world.arm_joints, sample_fn() if randomize else world.initial_conf)
         full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
@@ -272,7 +274,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
             return None
 
         aq = Conf(world.robot, world.arm_joints, world.initial_conf)
-        cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
+        cmd = Sequence(State(savers=[robot_saver, obj_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, approach_path),
             Trajectory(world, world.robot, world.gripper_joints, finger_path),
             Attach(world, world.robot, world.tool_link, obj),
@@ -316,6 +318,8 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
 
     bq.assign()
     world.open_gripper()
+    #door_saver = BodySaver()
+    robot_saver = BodySaver(world.robot)
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
     set_joint_positions(world.robot, world.arm_joints,
@@ -356,7 +360,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
     finger_path = plan_gripper_path(world, grasp_width, teleport=teleport)
 
     aq = Conf(world.robot, world.arm_joints, world.initial_conf)
-    cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
+    cmd = Sequence(State(savers=[robot_saver]), commands=[
         Trajectory(world, world.robot, world.arm_joints, approach_paths[0]),
         Trajectory(world, world.robot, world.gripper_joints, finger_path),
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
@@ -426,11 +430,12 @@ def get_pull_gen(world, teleport=False, learned=True, **kwargs):
 
 def get_motion_gen(world, collisions=True, teleport=False):
     # TODO: ensure only forward drive?
-    saver = BodySaver(world.robot)
+    default_saver = BodySaver(world.robot)
 
     def fn(bq1, bq2, fluents=[]):
-        saver.restore()
+        default_saver.restore()
         bq1.assign()
+        initial_saver = BodySaver(world.robot)
         obstacles = set(world.static_obstacles)
         attachments = []
         for fluent in fluents:
@@ -467,7 +472,7 @@ def get_motion_gen(world, collisions=True, teleport=False):
                 #    wait_for_user()
                 return None
         # TODO: could actually plan with all joints as long as we return to the same config
-        cmd = Sequence(State(savers=[BodySaver(world.robot)]), commands=[
+        cmd = Sequence(State(savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.base_joints, path),
         ])
         return (cmd,)
@@ -498,14 +503,16 @@ def get_door_test(world):
 def check_collision_free(world, state, sequence, obstacles):
     if not obstacles:
         return True
+    # TODO: check door collisions
+    state.assign()
     for command in sequence.commands:
         for _ in command.iterate(world, state):
             state.derive()
-        for attachment in state.attachments.values():
-            if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
+            for attachment in state.attachments.values():
+                if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
+                    return False
+            if any(pairwise_collision(world.robot, obst) for obst in obstacles):
                 return False
-        if any(pairwise_collision(world.robot, obst) for obst in obstacles):
-            return False
     # TODO: just check collisions with moving links
     return True
 
