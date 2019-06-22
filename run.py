@@ -75,9 +75,9 @@ def main():
     np.set_printoptions(precision=3, suppress=True)
 
     world = World(use_gui=True)
-    for joint in world.kitchen_joints[:1]:
-        world.open_door(joint)
-        #world.close_door(joint)
+    #for joint in world.kitchen_joints[:1]:
+    #    world.open_door(joint)
+    #    #world.close_door(joint)
     world.open_gripper()
 
     block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
@@ -108,6 +108,7 @@ def main():
         'plan-base-motion': StreamInfo(overhead=1e1),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
+        'test-cfree-approach-angle': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
         'test-cfree-traj-angle': StreamInfo(p_success=1e-1, negate=True),
         # 'test-cfree-traj-grasp-pose': StreamInfo(negate=True),

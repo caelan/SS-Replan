@@ -500,6 +500,31 @@ def get_door_test(world):
 
 ################################################################################
 
+def get_cfree_pose_pose_test(collisions=True, **kwargs):
+    def test(o1, p1, o2, p2):
+        if not collisions or (o1 == o2):
+            return True
+        p1.assign()
+        p2.assign()
+        return not pairwise_collision(p1.body, p2.body)
+    return test
+
+def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
+    def test(o1, p1, g1, o2, p2):
+        if not collisions:
+            return True
+        return True
+    return test
+
+def get_cfree_approach_angle_test(world, collisions=True, **kwargs):
+    def test(o1, p1, g1, j, a):
+        if not collisions:
+            return True
+        return True
+    return test
+
+################################################################################
+
 def check_collision_free(world, state, sequence, obstacles):
     if not obstacles:
         return True
