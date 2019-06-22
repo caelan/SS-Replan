@@ -1,23 +1,22 @@
+import copy
 import random
 import numpy as np
 
-from itertools import islice, product
+from itertools import islice
 
-from pybullet_tools.pr2_primitives import Pose, Conf, get_side_grasps
-from pybullet_tools.utils import sample_placement, pairwise_collision, multiply, invert, sub_inverse_kinematics, \
-    get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
+from pybullet_tools.pr2_primitives import Pose, Conf
+from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
-    get_extend_fn, joint_from_name, wait_for_user, get_link_subtree, get_link_name, draw_pose, get_link_pose, \
-    remove_debug, draw_aabb, get_aabb, unit_point, Euler, quat_from_euler, plan_cartesian_motion, \
-    plan_waypoints_joint_motion, INF, set_color, get_links, get_collision_data, read_obj, \
-    draw_mesh, tform_mesh, add_text, point_from_pose, aabb_from_points, get_face_edges, CIRCULAR_LIMITS, \
-    get_data_pose, sample_placement_on_aabb, get_sample_fn, get_pose, stable_z_on_aabb, \
-    is_placed_on_aabb, spaced_colors, euler_from_quat, quat_from_pose, wrap_angle, \
-    unit_pose, safe_zip, set_pose, get_distance_fn, get_unit_vector, unit_quat
+    get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
+    get_aabb, unit_point, Euler, quat_from_euler, get_collision_data, read_obj, \
+    tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
+    stable_z_on_aabb, \
+    is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
+    get_distance_fn, get_unit_vector, unit_quat
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
-    set_tool_pose, close_until_collision
-from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
+    set_tool_pose, close_until_collision, get_descendant_obstacles
+from command import Sequence, Trajectory, Attach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
 
@@ -62,9 +61,6 @@ def compute_surface_aabb(world, surface_name):
     # draw_aabb(surface_aabb)
     return surface_aabb
 
-def get_descendant_obstacles(kitchen, joint):
-    return {(kitchen, frozenset([link]))
-            for link in get_link_subtree(kitchen, joint)}
 
 def get_door_obstacles(world, surface_name):
     if surface_name not in LINK_SHAPE_FROM_JOINT:
@@ -495,4 +491,41 @@ def get_door_test(world):
         else:
             raise NotImplementedError(status)
         return abs(position - status_position) <= JOINT_THRESHOLD
+    return test
+
+################################################################################
+
+def check_collision_free(world, state, sequence, obstacles):
+    if not obstacles:
+        return True
+    for command in sequence.commands:
+        for _ in command.iterate(world, state):
+            state.derive()
+        for attachment in state.attachments.values():
+            if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
+                return False
+        if any(pairwise_collision(world.robot, obst) for obst in obstacles):
+            return False
+    # TODO: just check collisions with moving links
+    return True
+
+def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
+    def test(at, o2, p2):
+        if not collisions:
+            return True
+        obstacles = {world.get_body(o2)} - at.bodies
+        state = copy.copy(at.context)
+        p2.assign()
+        return check_collision_free(world, state, at, obstacles)
+    return test
+
+def get_cfree_traj_angle_test(world, collisions=True, **kwargs):
+    def test(at, j, q):
+        if not collisions:
+            return True
+        joint = joint_from_name(world.kitchen, j)
+        obstacles = get_descendant_obstacles(world.kitchen, joint) - at.bodies
+        state = copy.copy(at.context)
+        q.assign()
+        return check_collision_free(world, state, at, obstacles)
     return test

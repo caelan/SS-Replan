@@ -43,17 +43,16 @@
 ;    :domain (and (Pose ?o1 ?p1) (Grasp ?o1 ?g1) (Pose ?o2 ?p2))
 ;    :certified (CFreeApproachPose ?o1 ?p1 ?g1 ?o2 ?p2)
 ;  )
-;  (:stream test-cfree-traj-pose
-;    :inputs (?t ?o2 ?p2)
-;    :domain (and (ATraj ?t) (Pose ?o2 ?p2))
-;    :certified (CFreeTrajPose ?t ?o2 ?p2)
-;  )
-  ;(:stream test-cfree-traj-grasp-pose
-  ;  :inputs (?t ?a ?o1 ?g1 ?o2 ?p2)
-  ;  :domain (and (BTraj ?t) (Arm ?a) (Grasp ?o1 ?g1) (Pose ?o2 ?p2))
-  ;  :certified (CFreeTrajGraspPose ?t ?a ?o1 ?g1 ?o2 ?p2)
-  ;)
-
+  (:stream test-cfree-traj-pose
+    :inputs (?at ?o2 ?p2)
+    :domain (and (ATraj ?at) (Pose ?o2 ?p2))
+    :certified (CFreeTrajPose ?at ?o2 ?p2)
+  )
+  (:stream test-cfree-traj-angle
+    :inputs (?at ?j ?a)
+    :domain (and (ATraj ?at) (Angle ?j ?a))
+    :certified (CFreeTrajAngle ?at ?j ?a)
+  )
 
   (:stream test-door
     :inputs (?j ?a ?s)

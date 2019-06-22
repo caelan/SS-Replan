@@ -97,7 +97,7 @@ def load_pull_base_poses(world, joint_name):
     for joint_from_base in joint_from_base_list:
         base_values = project_base_pose(multiply(parent_pose, joint_from_base))
         #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
-        x, y, _ = base_values
-        handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))
+        #x, y, _ = base_values
+        #handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))
         yield base_values
     #wait_for_user()

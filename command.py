@@ -1,10 +1,15 @@
-from pybullet_tools.utils import set_joint_positions, create_attachment
+from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input
+from utils import get_descendant_obstacles
+
 
 class State(object):
     def __init__(self, savers=[], attachments={}):
         # a part of the state separate from pybullet
         self.savers = tuple(savers)
         self.attachments = dict(attachments)
+    @property
+    def bodies(self):
+        return {saver.body for saver in self.savers} | set(self.attachments)
     def derive(self):
         for attachment in self.attachments.values():
             # Derived values
@@ -14,11 +19,17 @@ class State(object):
         for saver in self.savers:
             saver.restore()
         self.derive()
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__, list(self.savers), self.attachments)
     # TODO: copy?
 
 class Command(object):
     def __init__(self, world):
         self.world = world
+
+    @property
+    def bodies(self):
+        raise NotImplementedError()
 
     def reverse(self):
         raise NotImplementedError()
@@ -30,6 +41,12 @@ class Sequence(object):
     def __init__(self, context, commands=[]):
         self.context = context
         self.commands = tuple(commands)
+    @property
+    def bodies(self):
+        bodies = set(self.context.bodies)
+        for command in self.commands:
+            bodies.update(command.bodies)
+        return bodies
     def reverse(self):
         return Sequence(self.context, [command.reverse() for command in reversed(self.commands)])
     def __repr__(self):
@@ -44,6 +61,10 @@ class Trajectory(Command):
         self.robot = robot
         self.joints = tuple(joints)
         self.path = tuple(path)
+
+    @property
+    def bodies(self):
+        return {self.robot}
 
     def reverse(self):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
@@ -68,6 +89,10 @@ class DoorTrajectory(Command):
         self.door_path = tuple(door_path)
         assert len(self.robot_path) == len(self.door_path)
 
+    @property
+    def bodies(self):
+        return {self.robot} | get_descendant_obstacles(self.world.kitchen, self.door_joints[0])
+
     def reverse(self):
         return self.__class__(self.world, self.robot, self.robot_joints, self.robot_path[::-1],
                               self.door, self.door_joints, self.door_path[::-1])
@@ -90,6 +115,10 @@ class Attach(Command):
         self.link = link
         self.body = body
 
+    @property
+    def bodies(self):
+        return {self.robot, self.body}
+
     def reverse(self):
         return Detach(self.world, self.robot, self.link, self.body)
 
@@ -108,6 +137,10 @@ class Detach(Command):
         self.link = link
         self.body = body
 
+    @property
+    def bodies(self):
+        return {self.robot, self.body}
+
     def reverse(self):
         return Attach(self.world, self.robot, self.link, self.body)
 
@@ -124,6 +157,10 @@ class Wait(Command):
         super(Wait, self).__init__(world)
         self.steps = steps
 
+    @property
+    def bodies(self):
+        return {}
+
     def reverse(self):
         return self
 
@@ -135,3 +172,20 @@ class Wait(Command):
         return '{}({})'.format(self.__class__.__name__, self.steps)
 
 # TODO: cook that includes a wait
+
+################################################################################s
+
+def execute_plan(world, state, commands, time_step=None):
+    for i, command in enumerate(commands):
+        print('\nCommand {:2}: {}'.format(i, command))
+        # TODO: skip to end
+        # TODO: downsample
+        for j, _ in enumerate(command.iterate(world, state)):
+            state.derive()
+            if j == 0:
+                continue
+            if time_step is None:
+                wait_for_duration(1e-2)
+                user_input('Command {:2} | step {:2} | Next?'.format(i, j))
+            else:
+                wait_for_duration(time_step)

@@ -13,12 +13,11 @@ PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 
-from pybullet_tools.utils import wait_for_user, sample_placement, link_from_name, \
-    LockRenderer, WorldSaver, user_input, wait_for_duration, VideoSaver, get_joint_name
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, ALL_SURFACES, DRAWER_JOINTS, CABINET_JOINTS
+from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver
+from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
+    SURFACES
 from problem import pdddlstream_from_problem
-from debug import test_grasps
-from command import State, Wait
+from command import State, Wait, execute_plan
 from stream import get_stable_gen
 
 #from examples.pybullet.pr2.run import post_process
@@ -44,21 +43,6 @@ def commands_from_plan(world, plan):
         else:
             raise NotImplementedError(action)
     return commands
-
-def execute_plan(world, state, commands, time_step=None):
-    for i, command in enumerate(commands):
-        print('\nCommand {:2}: {}'.format(i, command))
-        # TODO: skip to end
-        # TODO: downsample
-        for j, _ in enumerate(command.iterate(world, state)):
-            state.derive()
-            if j == 0:
-                continue
-            if time_step is None:
-                wait_for_duration(1e-2)
-                user_input('Command {:2} | step {:2} | Next?'.format(i, j))
-            else:
-                wait_for_duration(time_step)
 
 
 ################################################################################
@@ -100,7 +84,7 @@ def main():
     world.add_body(block_name, get_block_path(block_name))
     #test_grasps(world, block_name)
 
-    surface_name = random.choice(CABINET_JOINTS)
+    surface_name = random.choice(SURFACES) # SURFACES | CABINET_JOINTS
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():
@@ -124,7 +108,8 @@ def main():
         'plan-base-motion': StreamInfo(overhead=1e1),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
-        'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),  # TODO: this applies to arm and base trajs
+        'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
+        'test-cfree-traj-angle': StreamInfo(p_success=1e-1, negate=True),
         # 'test-cfree-traj-grasp-pose': StreamInfo(negate=True),
         #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda q1, q2: BASE_CONSTANT),
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),

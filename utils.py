@@ -8,13 +8,11 @@ from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_unti
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
-    get_link_descendants, get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
-    get_bodies, draw_base_limits, wait_for_user, draw_pose, get_link_parent, clone_body, \
+    get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
+    get_bodies, draw_base_limits, draw_pose, clone_body, \
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
-    LockRenderer, get_sample_fn, get_movable_joints, get_body_name, stable_z, draw_aabb, \
-    get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, \
-    get_collision_data, draw_mesh, read_obj, get_data_pose, tform_mesh, spaced_colors, aabb_from_points
+    LockRenderer, get_body_name, stable_z, get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
+    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -237,7 +235,7 @@ class World(object):
             raise ValueError(self.robot_name)
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
-        dump_body(self.robot)
+        #dump_body(self.robot)
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
         #draw_aabb(get_aabb(self.robot))
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
@@ -396,8 +394,16 @@ class World(object):
         return get_min_limit(self.kitchen, joint)
     def open_conf(self, joint):
         if 'left' in get_joint_name(self.kitchen, joint):
-            return get_min_limit(self.kitchen, joint)
-        return get_max_limit(self.kitchen, joint)
+            #print(get_joint_name(self.kitchen, joint), get_max_limit(self.kitchen, joint), get_min_limit(self.kitchen, joint))
+            open_position = get_min_limit(self.kitchen, joint)
+        else:
+            open_position = get_max_limit(self.kitchen, joint)
+        #print(get_joint_name(self.kitchen, joint), get_min_limit(self.kitchen, joint), get_max_limit(self.kitchen, joint))
+        # drawers: [0.0, 0.4]
+        # doors: [0.0, 1.57]
+        if get_joint_name(self.kitchen, joint) in CABINET_JOINTS:
+            return (4*np.pi / 9) * open_position / abs(open_position)
+        return open_position
     def close_door(self, joint):
         set_joint_position(self.kitchen, joint, self.closed_conf(joint))
     def open_door(self, joint):
@@ -499,3 +505,8 @@ def compute_custom_base_limits(world):
     draw_base_limits(base_limits)
     #wait_for_user()
     return custom_limits_from_base_limits(world.robot, base_limits)
+
+
+def get_descendant_obstacles(kitchen, joint):
+    return {(kitchen, frozenset([link]))
+            for link in get_link_subtree(kitchen, joint)}
