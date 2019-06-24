@@ -200,7 +200,7 @@ GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
 
 def plan_approach(world, approach_pose, obstacles=[], attachments=[],
-                  teleport=False, switches_only=False):
+                  teleport=False, switches_only=False, **kwargs):
     grasp_conf = get_joint_positions(world.robot, world.arm_joints)
     if switches_only:
         return [world.initial_conf, grasp_conf]
@@ -234,7 +234,7 @@ def plan_approach(world, approach_pose, obstacles=[], attachments=[],
         return None
     return approach_path + grasp_path
 
-def plan_gripper_path(world, grasp_width, teleport=False):
+def plan_gripper_path(world, grasp_width, teleport=False, **kwargs):
     open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
     extend_fn = get_extend_fn(world.robot, world.gripper_joints,
                               resolutions=GRIPPER_RESOLUTION*np.ones(len(world.gripper_joints)))
