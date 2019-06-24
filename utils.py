@@ -61,6 +61,8 @@ EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.ur
 
 #CARTER_BASE_LINK = 'carter_base_link'
 
+CAMERA_FRAME = '00_zed_left'
+
 KITCHEN = 'kitchen'
 STOVES = ['range']
 COUNTERS = ['hitman_tmp', 'indigo_tmp']

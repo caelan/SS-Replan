@@ -5,6 +5,7 @@
     (Stackable ?o ?r)
     (Stove ?r)
     (Type ?t ?b)
+    (NoisyBase)
 
     (Angle ?j ?a)
     (Pose ?o ?p)
@@ -14,6 +15,7 @@
     (Pull ?j ?q1 ?q2 ?bq ?aq ?at)
     (BaseMotion ?bq1 ?bq2 ?bt)
     (ArmMotion ?qq1 ?aq2 ?at)
+    (CalibrateMotion ?bq ?aq ?at)
     (BTraj ?bt)
     (ATraj ?at)
     (Conf ?j ?q)
@@ -32,6 +34,7 @@
     (AtAConf ?aq)
     (CanMove)
     (Cooked ?o)
+    (Calibrated)
 
     (Status ?s)
     (DoorStatus ?j ?s)
@@ -56,10 +59,11 @@
   (:action move_base
     :parameters (?bq1 ?bq2 ?bt)
     :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
-                       (AtBConf ?bq1) (CanMove)
+                       (AtBConf ?bq1) (CanMove) (Calibrated)
                    )
     :effect (and (AtBConf ?bq2)
                  (not (AtBConf ?bq1)) (not (CanMove))
+                 (when (NoisyBase) (not (Calibrated)))
                  (increase (total-cost) (Distance ?bq1 ?bq2)))
                  ; (increase (total-cost) (MoveCost ?bt)))
   )
@@ -70,10 +74,21 @@
   ;  :effect (and (AtAConf ?a ?q2)
   ;               (not (AtAConf ?a ?q1)))
   ;)
+  (:action calibrate
+    :parameters (?bq ?aq ?at)
+    :precondition (and (CalibrateMotion ?bq ?aq ?at)
+                       (AtBConf ?bq) ; (AtAConf ?aq)
+                       (not (Calibrated))
+                       ; TODO: visibility constraints
+                   )
+    :effect (and (Calibrated) ; Could make this be a new pose ?bq2
+                 ; (not (AtBConf ?bq))
+                 (increase (total-cost) (CalibrateCost)))
+  )
   (:action pick
     :parameters (?o ?p ?g ?bq ?aq ?at)
     :precondition (and (Kin ?o ?p ?g ?bq ?aq ?at)
-                       (AtPose ?o ?p) (HandEmpty) (AtBConf ?bq) ; (AtAConf ?aq)
+                       (AtPose ?o ?p) (HandEmpty) (AtBConf ?bq) (Calibrated) ; (AtAConf ?aq)
                        (not (UnsafeApproach ?o ?p ?g))
                        (not (UnsafeATraj ?at))
                   )
@@ -84,7 +99,7 @@
   (:action place
     :parameters (?o ?p ?g ?bq ?aq ?at)
     :precondition (and (Kin ?o ?p ?g ?bq ?aq ?at)
-                       (AtGrasp ?o ?g) (AtBConf ?bq) ; (AtAConf ?aq)
+                       (AtGrasp ?o ?g) (AtBConf ?bq) (Calibrated) ; (AtAConf ?aq)
                        (not (UnsafePose ?o ?p))
                        (not (UnsafeApproach ?o ?p ?g))
                        (not (UnsafeATraj ?at))
@@ -96,7 +111,7 @@
   (:action pull
     :parameters (?j ?a1 ?a2 ?bq ?aq ?at)
     :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq ?at)
-                       (AtAngle ?j ?a1) (HandEmpty) (AtBConf ?bq) ; (AtAConf ?aq)
+                       (AtAngle ?j ?a1) (HandEmpty) (AtBConf ?bq) (Calibrated); (AtAConf ?aq)
                        ; TODO: final conf safe
                        (not (UnsafeApproach ?o ?p ?g))
                        (not (UnsafeATraj ?at))

@@ -8,7 +8,7 @@ from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_cfree_approach_angle_test
+    get_cfree_approach_angle_test, get_calibrate_gen
 
 
 def existential_quantification(goal_literals):
@@ -25,7 +25,7 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
-def pdddlstream_from_problem(world, **kwargs):
+def pdddlstream_from_problem(world, noisy_base=False, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
@@ -42,12 +42,15 @@ def pdddlstream_from_problem(world, **kwargs):
         ('HandEmpty',),
         ('CanMove',),
 
+        Equal(('CalibrateCost',), 1),
         Equal(('PickCost',), 1),
         Equal(('PlaceCost',), 1),
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
     ] + [('Type', name, 'stove') for name in STOVES] + \
            [('Status', status) for status in DOOR_STATUSES]
+    if noisy_base:
+        init.append(('NoisyBase',))
 
     goal_block = list(world.movable)[0]
     goal_surface = CABINET_JOINTS[0]
@@ -110,6 +113,7 @@ def pdddlstream_from_problem(world, **kwargs):
         'inverse-kinematics': from_gen_fn(get_pick_gen(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen(world, **kwargs)),
         'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
+        'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),

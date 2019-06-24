@@ -478,6 +478,21 @@ def get_motion_gen(world, collisions=True, teleport=False):
         return (cmd,)
     return fn
 
+def get_calibrate_gen(world, collisions=True, teleport=False):
+
+    def fn(bq):
+        # TODO: include if holding anything?
+        bq.assign()
+        world.open_gripper()
+        aq = Conf(world.robot, world.arm_joints, world.initial_conf)
+        robot_saver = BodySaver(world.robot)
+        cmd = Sequence(State(savers=[robot_saver]), commands=[
+            #Trajectory(world, world.robot, world.arm_joints, approach_path),
+            # TODO: calibrate command
+        ])
+        return (aq, cmd,)
+    return fn
+
 ################################################################################
 
 OPEN = 'open'

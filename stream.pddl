@@ -32,6 +32,13 @@
     :outputs (?bt)
     :certified (and (BTraj ?bt) (BaseMotion ?bq1 ?bq2 ?bt))
   )
+  (:stream plan-calibrate-motion
+    :inputs (?bq)
+    :domain (BConf ?bq)
+    :outputs (?aq ?at)
+    :certified (and (AConf ?aq) (ATraj ?at)
+                    (CalibrateMotion ?bq ?aq ?at))
+  )
 
   (:stream test-cfree-pose-pose
     :inputs (?o1 ?p1 ?o2 ?p2)
