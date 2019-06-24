@@ -511,8 +511,14 @@ def get_cfree_pose_pose_test(collisions=True, **kwargs):
 
 def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
     def test(o1, p1, g1, o2, p2):
-        if not collisions:
+        if not collisions or (o1 == o2):
             return True
+        body = world.get_body(o1)
+        obst = world.get_body(o2)
+        p2.assign()
+        for _ in iterate_approach_path(world, p1, g1, body=world.get_body(o1)):
+            if pairwise_collision(world.gripper, obst) or pairwise_collision(body, obst):
+                return False
         return True
     return test
 
@@ -520,6 +526,13 @@ def get_cfree_approach_angle_test(world, collisions=True, **kwargs):
     def test(o1, p1, g1, j, a):
         if not collisions:
             return True
+        body = world.get_body(o1)
+        joint = joint_from_name(world.kitchen, j)
+        obstacles = get_descendant_obstacles(world.kitchen, joint) # - at.bodies
+        a.assign()
+        for _ in iterate_approach_path(world, p1, g1, body=body):
+            if any(pairwise_collision(part, obst) for part in [world.gripper, body] for obst in obstacles):
+                return False
         return True
     return test
 
@@ -552,12 +565,12 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
     return test
 
 def get_cfree_traj_angle_test(world, collisions=True, **kwargs):
-    def test(at, j, q):
+    def test(at, j, a):
         if not collisions:
             return True
         joint = joint_from_name(world.kitchen, j)
         obstacles = get_descendant_obstacles(world.kitchen, joint) - at.bodies
         state = copy.copy(at.context)
-        q.assign()
+        a.assign()
         return check_collision_free(world, state, at, obstacles)
     return test
