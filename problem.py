@@ -44,7 +44,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         ('AConf', init_aq),
         ('AtAConf', init_aq),
         ('HandEmpty',),
-        ('CanMove',),
+        ('CanMove',), # TODO: could always remove this
 
         Equal(('CalibrateCost',), 1),
         Equal(('PickCost',), 1),
@@ -59,6 +59,9 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         init.append(('InitBConf', init_bq))
     if noisy_base:
         init.append(('NoisyBase',))
+
+    if fixed_base:
+        ALL_SURFACES[:] = ['indigo_tmp'] # TODO: hack for now
 
     goal_block = list(world.movable)[0]
     goal_surface = CABINET_JOINTS[0]
@@ -75,7 +78,6 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     for name in world.movable:
         # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(name)
-        #ALL_SURFACES = ['indigo_tmp']
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
             body, compute_surface_aabb(world, surface), above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:

@@ -4,6 +4,7 @@ import os
 import numpy as np
 import yaml
 
+from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
@@ -329,6 +330,7 @@ class World(object):
         self.custom_limits = {}
         self.base_limits_handles = []
         self.update_custom_limits()
+        self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
     @property
     def base_joints(self):
         return joints_from_names(self.robot, BASE_JOINTS)
@@ -368,7 +370,7 @@ class World(object):
     def movable(self):
         return set(self.body_from_name) # frozenset?
     @property
-    def initial_conf(self):
+    def default_conf(self):
         if self.robot_yaml is None:
             # Eve starts outside of joint limits
             conf = [np.average(get_joint_limits(self.robot, joint)) for joint in self.arm_joints]
@@ -426,7 +428,7 @@ class World(object):
         #for rule in self.robot_yaml['cspace_to_urdf_rules']:  # gripper: max is open
         #    joint = joint_from_name(self.robot, rule['name'])
         #    set_joint_position(self.robot, joint, rule['value'])
-        set_joint_positions(self.robot, self.arm_joints, self.initial_conf)  # active_task_spaces
+        set_joint_positions(self.robot, self.arm_joints, self.default_conf)  # active_task_spaces
         if self.robot_name == EVE:
             for arm in ARMS:
                 joints = get_eve_arm_joints(self.robot, arm)[2:4]

@@ -113,7 +113,7 @@ from pybullet_tools.utils import user_input, wait_for_user, HideOutput, get_samp
     get_pose, get_point, set_point, tform_from_pose, get_movable_joints, get_joint_position, get_joint_name
 from pybullet_tools.pr2_utils import get_viewcone, draw_viewcone
 from utils import World, load_ycb, get_ycb_obj_path, CAMERA_POSE
-from run import solve_pddlstream, create_args
+from run import solve_pddlstream, create_args, simulate_plan
 from problem import pdddlstream_from_problem
 
 from pddlstream.language.constants import Not, And
@@ -331,10 +331,12 @@ def main():
     #wait_for_user()
 
     # TODO: initial robot conf is in collision
-    problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True)
+    problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
+                                       collisions=not args.cfree, teleport=args.teleport)
     problem = problem[:-1] + (goal_formula,)
     plan = solve_pddlstream(args, problem)
-    wait_for_user()
+    simulate_plan(world, plan, args)
+    world.destroy()
     return
 
     #arm = domain.get_robot() # actor

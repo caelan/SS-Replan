@@ -106,6 +106,21 @@ def solve_pddlstream(args, pddlstream_problem):
     pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
     return plan
 
+def simulate_plan(world, plan, args):
+    if plan is None:
+        wait_for_user()
+        return
+    initial_state = State()
+    commands = commands_from_plan(world, plan)
+    wait_for_user()
+    time_step = None if args.teleport else 0.02
+    if args.record:
+        with VideoSaver('video.mp4'):
+            execute_plan(world, initial_state, commands, time_step=time_step)
+    else:
+        execute_plan(world, initial_state, commands, time_step=time_step)
+    wait_for_user()
+
 def create_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-algorithm', default='focused',
@@ -157,24 +172,10 @@ def main():
     assert pose is not None
     pose.assign()
 
-    pddlstream_problem = pdddlstream_from_problem(world, collisions=not args.cfree, teleport=args.teleport)
+    pddlstream_problem = pdddlstream_from_problem(
+        world, collisions=not args.cfree, teleport=args.teleport)
     plan = solve_pddlstream(args, pddlstream_problem)
-    if plan is None:
-        wait_for_user()
-        world.destroy()
-        return
-
-    initial_state = State()
-    commands = commands_from_plan(world, plan)
-    wait_for_user()
-    time_step = None if args.teleport else 0.02
-    if args.record:
-        with VideoSaver('video.mp4'):
-            execute_plan(world, initial_state, commands, time_step=time_step)
-    else:
-        execute_plan(world, initial_state, commands, time_step=time_step)
-
-    wait_for_user()
+    simulate_plan(world, plan, args)
     world.destroy()
 
 if __name__ == '__main__':
