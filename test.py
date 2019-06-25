@@ -43,9 +43,9 @@ def dump_dict(obj):
 # set_pose, set_joints, exit
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
 
-class CaelanManager(TrialManager):
-    def get_plan(self, goal, plan, plan_args):
-        return []
+# class CaelanManager(TrialManager):
+#     def get_plan(self, goal, plan, plan_args):
+#         return []
 
 ################################################################################
 
@@ -65,12 +65,12 @@ def close_gripper():
 # Policies: LulaStepAxis, LulaSendPose, OpenGripper, CloseGripper, PlanExecutionPolicy, LulaTracker, CarterSimpleMove, CarterMoveToPose
 # wait_for_target_config
 
-def stuff():
-    lula_policies.LulaSendPose(
-        lookup_table=kitchen_poses.drawer_to_approach_handle,
-        config_modulator=self.config_modulator,
-        is_transport=True,
-        config=kitchen_poses.open_drawer_q, )
+# def stuff():
+#     lula_policies.LulaSendPose(
+#         lookup_table=kitchen_poses.drawer_to_approach_handle,
+#         config_modulator=self.config_modulator,
+#         is_transport=True,
+#         config=kitchen_poses.open_drawer_q, )
 
 # open(self, speed=.2, actuate_gripper=True, wait=True)
 # close(self, attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
@@ -79,27 +79,27 @@ def stuff():
 
 ################################################################################
 
-class FollowTrajectory(Policy):
-
-    def __init__(self):
-        pass
-
-    def enter(self, domain, world_state, actor, goal):
-        self.cmd_sent = False
-        self.start_time = rospy.Time.now()
-        return True
-
-    def __call__(self, domain, world_state, actor, goal):
-        #if domain.sigma > 0:
-        #    self.noise = np.random.randn(3) * domain.sigma
-        #else:
-        #    self.noise = np.zeros((3,))
-        # Get the arm/actor -- this should be the franka.
-        arm = world_state[actor]
-        move = arm.get_motion_interface()
-
-    def exit(self, domain, world_state, actor, x):
-        return True
+# class FollowTrajectory(Policy):
+#
+#     def __init__(self):
+#         pass
+#
+#     def enter(self, domain, world_state, actor, goal):
+#         self.cmd_sent = False
+#         self.start_time = rospy.Time.now()
+#         return True
+#
+#     def __call__(self, domain, world_state, actor, goal):
+#         #if domain.sigma > 0:
+#         #    self.noise = np.random.randn(3) * domain.sigma
+#         #else:
+#         #    self.noise = np.zeros((3,))
+#         # Get the arm/actor -- this should be the franka.
+#         arm = world_state[actor]
+#         move = arm.get_motion_interface()
+#
+#     def exit(self, domain, world_state, actor, x):
+#         return True
 
 
 ################################################################################
@@ -195,7 +195,7 @@ def goal_formula_from_goal(goals):
         goal_literals.append(atom if value else Not(atom))
     return And(*goal_literals)
 
-def create_trial_args():
+def create_trial_args(**kwargs):
     args = lambda: None # Dummy class
     args.side = 'right'
     args.drawer = 'top'
@@ -255,7 +255,7 @@ def main():
     objects, goal, plan = manager.get_task(task=task, reset=True) # Need to reset at the start
     goals = [(h.format(o), v) for h, v in goal for o in objects]
     print(goals)
-    print(goal_formula_from_goal(goals))
+    goal_formula = goal_formula_from_goal(goals)
 
     world = World(use_gui=True) # args.visualize)
     #observer = ros.RosObserver(domain, sigma=domain.sigma, p_sample=0)
@@ -264,11 +264,10 @@ def main():
     world_state = observer.observe()
     with LockRenderer():
         update_world(world, world_state)
-    wait_for_user()
 
-    pddlstream_problem = pdddlstream_from_problem(world)
-    plan = solve_pddlstream(args, pddlstream_problem)
-
+    problem = pdddlstream_from_problem(world, movable_base=False)
+    problem = problem[:-1] + (goal_formula,)
+    plan = solve_pddlstream(args, problem)
     wait_for_user()
     return
 

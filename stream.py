@@ -155,7 +155,7 @@ def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, m
                 return
             if ir_outputs is None:
                 continue
-            ik_outputs = ik_fn(*(inputs + ir_outputs))
+            ik_outputs = next(ik_fn(*(inputs + ir_outputs)), None)
             if ik_outputs is None:
                 continue
             successes += 1
@@ -247,6 +247,9 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
 
     def fn(name, pose, grasp, base_conf):
+        # TODO: check if within database convex hull
+        # TODO: check approach
+
         obj = world.get_body(name)
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
@@ -267,11 +270,11 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
         full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
         if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
             # print('Grasp IK failure', grasp_conf)
-            return None
+            return
         approach_path = plan_approach(world, approach_pose, obstacles=obstacles,
                                       attachments=[attachment], **kwargs)
         if approach_path is None:
-            return None
+            return
 
         aq = Conf(world.robot, world.arm_joints, world.initial_conf)
         cmd = Sequence(State(savers=[robot_saver, obj_saver]), commands=[
@@ -280,15 +283,8 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
             Attach(world, world.robot, world.tool_link, obj),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ])
-        return (aq, cmd,)
+        yield (aq, cmd,)
     return fn
-
-
-def get_fixed_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
-    def gen(name, pose, grasp, base_conf):
-        # TODO: check if within database convex hull
-        return iter([])
-    return gen
 
 def get_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn

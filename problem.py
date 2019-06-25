@@ -1,4 +1,6 @@
-from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, And, Equal, PDDLProblem
+from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, \
+    And, Equal, PDDLProblem
+from pddlstream.language.stream import DEBUG
 from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
@@ -8,7 +10,7 @@ from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_cfree_approach_angle_test, get_calibrate_gen, get_fixed_pick_gen, get_fixed_pull_gen
+    get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, get_fixed_pull_gen
 
 
 def existential_quantification(goal_literals):
@@ -25,7 +27,8 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
-def pdddlstream_from_problem(world, movable_base=True, noisy_base=False, **kwargs):
+def pdddlstream_from_problem(world, close_doors=False, return_home=False,
+                             movable_base=True, noisy_base=False, debug=False, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
@@ -64,9 +67,9 @@ def pdddlstream_from_problem(world, movable_base=True, noisy_base=False, **kwarg
     goal_literals = [
         #('Holding', goal_block),
         #('Cooked', goal_block),
-        ('AtBConf', initial_bq),
     ]
-
+    if return_home:
+        goal_literals.append(('AtBConf', initial_bq))
     for name in world.movable:
         # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(name)
@@ -94,7 +97,8 @@ def pdddlstream_from_problem(world, movable_base=True, noisy_base=False, **kwarg
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         init.append(('AtAngle', joint_name, initial_conf))
-        goal_literals.append(('DoorStatus', joint_name, CLOSED))
+        if close_doors:
+            goal_literals.append(('DoorStatus', joint_name, CLOSED))
         for conf in [initial_conf, open_conf, closed_conf]:
             init.append(('Angle', joint_name, conf))
 
@@ -124,7 +128,7 @@ def pdddlstream_from_problem(world, movable_base=True, noisy_base=False, **kwarg
         'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
 
-        'fixed-inverse-kinematics': from_gen_fn(get_fixed_pick_gen(world, **kwargs)),
+        'fixed-inverse-kinematics': from_gen_fn(get_pick_ik_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen(world, **kwargs)),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
@@ -136,6 +140,7 @@ def pdddlstream_from_problem(world, movable_base=True, noisy_base=False, **kwarg
         # 'MoveCost': move_cost_fn,
         'Distance': base_cost_fn,
     }
-    #stream_map = DEBUG
+    if debug:
+        stream_map = DEBUG
 
     return PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)

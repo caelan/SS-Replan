@@ -36,13 +36,13 @@
     :certified (and (AConf ?aq) (ATraj ?at)
                     (Kin ?o ?p ?g ?bq ?aq ?at))
   )
-  ;(:stream fixed-plan-pull ; TODO: check if ?j within range
-  ;  :inputs (?j ?a1 ?a2 ?bq)
-  ;  :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
-  ;  :outputs (?bq ?aq ?at)
-  ;  :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
-  ;                  (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
-  ;)
+  (:stream fixed-plan-pull ; TODO: check if ?j within range
+    :inputs (?j ?a1 ?a2 ?bq)
+    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
+    :outputs (?aq ?at)
+    :certified (and (AConf ?aq) (ATraj ?at)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+  )
 
   (:stream plan-base-motion
     :fluents (AtPose AtGrasp AtAngle)

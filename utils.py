@@ -498,7 +498,7 @@ SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
 UNDER_GRASP = 'under' # TODO: for franka_carter
 GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 
-def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
+def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, use_width=True, **kwargs):
     body = world.get_body(name)
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
@@ -524,8 +524,8 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
         for i, grasp_pose in enumerate(randomize(list(generator))):
             with BodySaver(world.robot):
                 grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
-            #if grasp_width is None:
-            #    continue
+            if use_width and (grasp_width is None):
+                continue
             pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose, Pose(point=post_direction))
             grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose, grasp_width)
             yield grasp
