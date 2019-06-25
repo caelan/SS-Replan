@@ -284,6 +284,12 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
     return fn
 
 
+def get_fixed_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
+    def gen(name, pose, grasp, base_conf):
+        # TODO: check if within database convex hull
+        return iter([])
+    return gen
+
 def get_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn
     ir_sampler = get_pick_ir_gen(world, max_attempts=1, **kwargs)
@@ -370,6 +376,11 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
     ])
     return (bq, aq, cmd,)
 
+def get_fixed_pull_gen(world, max_attempts=25, teleport=False, **kwargs):
+    def gen(joint_name, door_conf1, door_conf2, base_conf):
+        # TODO: check if within database convex hull
+        return iter([])
+    return gen
 
 def get_pull_gen(world, teleport=False, learned=True, **kwargs):
 

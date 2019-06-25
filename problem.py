@@ -8,7 +8,7 @@ from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_cfree_approach_angle_test, get_calibrate_gen
+    get_cfree_approach_angle_test, get_calibrate_gen, get_fixed_pick_gen, get_fixed_pull_gen
 
 
 def existential_quantification(goal_literals):
@@ -25,17 +25,17 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
-def pdddlstream_from_problem(world, noisy_base=False, **kwargs):
+def pdddlstream_from_problem(world, movable_base=True, noisy_base=False, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
         '@stove': 'stove',
     }
-    # TODO: operate on initi
 
     initial_bq = Conf(world.robot, world.base_joints)
     initial_aq = Conf(world.robot, world.arm_joints)
     init = [
+        ('InitBConf', initial_bq),
         ('BConf', initial_bq),
         ('AtBConf', initial_bq),
         ('AConf', initial_aq),
@@ -50,6 +50,8 @@ def pdddlstream_from_problem(world, noisy_base=False, **kwargs):
         Equal(('CookCost',), 1),
     ] + [('Type', name, 'stove') for name in STOVES] + \
            [('Status', status) for status in DOOR_STATUSES]
+    if movable_base:
+        init.append(('MovableBase',))
     if noisy_base:
         init.append(('NoisyBase',))
 
@@ -66,9 +68,15 @@ def pdddlstream_from_problem(world, noisy_base=False, **kwargs):
     ]
 
     for name in world.movable:
+        # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(name)
-        [surface] = [surface for surface in ALL_SURFACES
-                     if is_placed_on_aabb(body, compute_surface_aabb(world, surface))]
+        ALL_SURFACES = ['indigo_tmp']
+        supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
+            body, compute_surface_aabb(world, surface), above_epsilon=1e-2, below_epsilon=5e-2)]
+        if len(supporting) != 1:
+            print(name, supporting)
+            continue
+        [surface] = supporting
         pose = Pose(body, support=surface, init=True)
         init += [
             ('Graspable', name),
@@ -115,6 +123,9 @@ def pdddlstream_from_problem(world, noisy_base=False, **kwargs):
         'plan-pull': from_gen_fn(get_pull_gen(world, **kwargs)),
         'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
+
+        'fixed-inverse-kinematics': from_gen_fn(get_fixed_pick_gen(world, **kwargs)),
+        'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen(world, **kwargs)),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),

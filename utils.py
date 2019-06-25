@@ -9,10 +9,10 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
     get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
-    get_bodies, draw_base_limits, draw_pose, clone_body, \
+    get_bodies, draw_base_limits, draw_pose, clone_body, get_point, pose_from_tform, \
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     LockRenderer, get_body_name, stable_z, get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, create_obj
+    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, create_obj, remove_debug, remove_all_debug
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -42,6 +42,7 @@ BLOCK_SIZES = ['small', 'big']
 BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf')
 YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
+# TODO: ycb obj files have 6 vertex coordinates?
 
 #KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen.urdf')
 #KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_concave.urdf')
@@ -62,6 +63,16 @@ EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.ur
 #CARTER_BASE_LINK = 'carter_base_link'
 
 CAMERA_FRAME = '00_zed_left'
+CAMERA_POSE = ([4.95, -9.03, 2.03], [0.58246231, 0.72918614, 0.08003926, -0.35016988])
+
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
+CAMERA_CORRECTION = pose_from_tform(np.asarray(
+    [[0., 0., 1., 0.],
+     [-1., 0., 0., 0.],
+     [0., -1., 0., 0.],
+     [0., 0., 0., 1.]], dtype=np.float32))
+CAMERA_POSE = multiply(CAMERA_POSE, invert(CAMERA_CORRECTION))
+
 
 KITCHEN = 'kitchen'
 STOVES = ['range']
@@ -100,14 +111,20 @@ ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
 
 USE_TRACK_IK = True
 
-def load_ycb(ycb_type, **kwargs):
+def get_ycb_obj_path(ycb_type):
+    # TODO: simplify geometry
     path_from_type = {path.split('_', 1)[1]: path for path in os.listdir(YCB_PATH)}
     if ycb_type not in path_from_type:
         return None
     # texture_map.png textured.mtl textured.obj textured_simple.obj textured_simple.obj.mtl
-    path = os.path.join(YCB_PATH, path_from_type[ycb_type], 'textured_simple.obj')
+    return os.path.join(YCB_PATH, path_from_type[ycb_type], 'textured_simple.obj')
+
+def load_ycb(ycb_type, **kwargs):
+    # TODO: simply geometry
+    ycb_obj_path = get_ycb_obj_path(ycb_type)
+    assert ycb_obj_path is not None
     # TODO: set color (as average) or texture
-    return create_obj(path, **kwargs)
+    return create_obj(ycb_obj_path, color=None, **kwargs)
 
 def get_kitchen_parent(link_name):
     if link_name in LINK_SHAPE_FROM_JOINT:
@@ -309,7 +326,9 @@ class World(object):
             self.ros_core = None
         self.body_from_name = {}
         self.path_from_name = {}
-        self.custom_limits = compute_custom_base_limits(self)
+        self.custom_limits = {}
+        self.base_limits_handles = []
+        self.update_custom_limits()
     @property
     def base_joints(self):
         return joints_from_names(self.robot, BASE_JOINTS)
@@ -360,6 +379,23 @@ class World(object):
         conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
+    def get_world_aabb(self):
+        return aabb_union(get_aabb(body) for body in get_bodies() if body != self.floor)
+    def update_floor(self):
+        robot_point = np.array(get_point(self.robot))
+        z = stable_z(self.robot, self.floor)
+        set_point(self.floor, robot_point - np.array([0, 0, z]))
+    def update_custom_limits(self):
+        robot_extent = get_aabb_extent(get_aabb(self.robot))
+        min_extent = min(robot_extent[:2]) * np.ones(2) / 2
+        full_lower, full_upper = self.get_world_aabb()
+        base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
+        for handle in self.base_limits_handles:
+            remove_debug(handle)
+        z = get_point(self.floor)[2] + 1e-2
+        self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
+        self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)
+        return self.custom_limits
     def solve_inverse_kinematics(self, world_from_tool, use_track_ik=USE_TRACK_IK, **kwargs):
         if use_track_ik:
             assert self.ik_solver is not None
@@ -423,10 +459,10 @@ class World(object):
     def open_door(self, joint):
         set_joint_position(self.kitchen, joint, self.open_conf(joint))
     def add_body(self, name, path, **kwargs):
-        # TODO: support obj case
         assert name not in self.body_from_name
         self.path_from_name[name] = path
         self.body_from_name[name] = load_pybullet(path, **kwargs)
+        assert self.body_from_name[name] is not None
         return name
     def get_body(self, name):
         return self.body_from_name[name]
@@ -507,19 +543,6 @@ def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
             joint_from_name(robot, 'theta'): yaw_limit,
         })
     return custom_limits
-
-
-def compute_custom_base_limits(world):
-    robot_extent = get_aabb_extent(get_aabb(world.robot))
-    min_extent = min(robot_extent[:2])*np.ones(2) / 2
-
-    full_lower, full_upper = aabb_union(get_aabb(body) for body in get_bodies()
-                                        if body != world.floor)
-    base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
-    draw_base_limits(base_limits)
-    #wait_for_user()
-    return custom_limits_from_base_limits(world.robot, base_limits)
-
 
 def get_descendant_obstacles(kitchen, joint):
     return {(kitchen, frozenset([link]))

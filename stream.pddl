@@ -11,24 +11,43 @@
     :outputs (?g)
     :certified (Grasp ?o ?g)
   )
+
+  ; Movable base
   (:stream inverse-kinematics
     :inputs (?o ?p ?g)
-    :domain (and (Pose ?o ?p) (Grasp ?o ?g))
+    :domain (and (Pose ?o ?p) (Grasp ?o ?g) (MovableBase))
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
                     (Kin ?o ?p ?g ?bq ?aq ?at))
   )
   (:stream plan-pull
     :inputs (?j ?a1 ?a2)
-    :domain (and (Angle ?j ?a1) (Angle ?j ?a2))
+    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase))
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
                     (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
   )
+
+  ; Fixed base
+  (:stream fixed-inverse-kinematics ; TODO: check if ?p ?g in convex hull
+    :inputs (?o ?p ?g ?bq)
+    :domain (and (Pose ?o ?p) (Grasp ?o ?g) (InitBConf ?bq))
+    :outputs (?aq ?at)
+    :certified (and (AConf ?aq) (ATraj ?at)
+                    (Kin ?o ?p ?g ?bq ?aq ?at))
+  )
+  ;(:stream fixed-plan-pull ; TODO: check if ?j within range
+  ;  :inputs (?j ?a1 ?a2 ?bq)
+  ;  :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
+  ;  :outputs (?bq ?aq ?at)
+  ;  :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
+  ;                  (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+  ;)
+
   (:stream plan-base-motion
     :fluents (AtPose AtGrasp AtAngle)
     :inputs (?bq1 ?bq2)
-    :domain (and (BConf ?bq1) (BConf ?bq2))
+    :domain (and (BConf ?bq1) (BConf ?bq2) (MovableBase))
     :outputs (?bt)
     :certified (and (BTraj ?bt) (BaseMotion ?bq1 ?bq2 ?bt))
   )

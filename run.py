@@ -47,54 +47,7 @@ def commands_from_plan(world, plan):
 
 ################################################################################
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-algorithm', default='focused',
-                        help='Specifies the algorithm')
-    parser.add_argument('-cfree', action='store_true',
-                        help='When enabled, disables collision checking (for debugging).')
-    parser.add_argument('-optimal', action='store_true',
-                        help='Runs in an anytime mode')
-    #parser.add_argument('-problem', default='test_block',
-    #                    help='The name of the problem to solve.')
-    parser.add_argument('-seed', default=None,
-                        help='The random seed to use.')
-    parser.add_argument('-max_time', default=120, type=int,
-                        help='The max time')
-    parser.add_argument('-record', action='store_true',
-                        help='Records a video')
-    parser.add_argument('-teleport', action='store_true',
-                        help='Uses unit costs')
-    parser.add_argument('-unit', action='store_true',
-                        help='Uses unit costs')
-    parser.add_argument('-visualize', action='store_true',
-                        help='When enabled, visualizes planning rather than the world (for debugging).')
-    args = parser.parse_args()
-    #if args.seed is not None:
-    #    set_seed(args.seed)
-    np.set_printoptions(precision=3, suppress=True)
-
-    world = World(use_gui=True)
-    #for joint in world.kitchen_joints[:1]:
-    #    world.open_door(joint)
-    #    #world.close_door(joint)
-    world.open_gripper()
-
-    block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    world.add_body(block_name, get_block_path(block_name))
-    #test_grasps(world, block_name)
-
-    surface_name = random.choice(SURFACES) # SURFACES | CABINET_JOINTS
-    #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
-    print('Initial surface:', surface_name)
-    with WorldSaver():
-        placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
-        pose, = next(placement_gen(block_name, surface_name), (None,))
-    assert pose is not None
-    pose.assign()
-
-    pddlstream_problem = pdddlstream_from_problem(world, collisions=not args.cfree, teleport=args.teleport)
-
+def solve_pddlstream(args, pddlstream_problem):
     _, _, _, stream_map, init, goal = pddlstream_problem
     print('Init:', init)
     print('Goal:', goal)
@@ -112,7 +65,7 @@ def main():
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
         'test-cfree-traj-angle': StreamInfo(p_success=1e-1, negate=True),
         # 'test-cfree-traj-grasp-pose': StreamInfo(negate=True),
-        #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda q1, q2: BASE_CONSTANT),
+        # 'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda q1, q2: BASE_CONSTANT),
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
 
@@ -145,13 +98,67 @@ def main():
             raise ValueError(args.algorithm)
         saver.restore()
 
-    #print([(s.cost, s.time) for s in SOLUTIONS])
-    #print(SOLUTIONS)
+    # print([(s.cost, s.time) for s in SOLUTIONS])
+    # print(SOLUTIONS)
     print_solution(solution)
     plan, cost, evaluations = solution
     pr.disable()
     pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
+    return plan
 
+def create_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-algorithm', default='focused',
+                        help='Specifies the algorithm')
+    parser.add_argument('-cfree', action='store_true',
+                        help='When enabled, disables collision checking (for debugging).')
+    parser.add_argument('-optimal', action='store_true',
+                        help='Runs in an anytime mode')
+    #parser.add_argument('-problem', default='test_block',
+    #                    help='The name of the problem to solve.')
+    parser.add_argument('-seed', default=None,
+                        help='The random seed to use.')
+    parser.add_argument('-max_time', default=120, type=int,
+                        help='The max time')
+    parser.add_argument('-record', action='store_true',
+                        help='Records a video')
+    parser.add_argument('-teleport', action='store_true',
+                        help='Uses unit costs')
+    parser.add_argument('-unit', action='store_true',
+                        help='Uses unit costs')
+    parser.add_argument('-visualize', action='store_true',
+                        help='When enabled, visualizes planning rather than the world (for debugging).')
+    return parser.parse_args()
+
+    # TODO: get rid of funky orientations by dropping them from some height
+
+def main():
+    args = create_args()
+    #if args.seed is not None:
+    #    set_seed(args.seed)
+    np.set_printoptions(precision=3, suppress=True)
+
+    world = World(use_gui=True)
+    #for joint in world.kitchen_joints[:1]:
+    #    world.open_door(joint)
+    #    #world.close_door(joint)
+    world.open_gripper()
+
+    block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+    world.add_body(block_name, get_block_path(block_name))
+    #test_grasps(world, block_name)
+
+    surface_name = random.choice(SURFACES) # SURFACES | CABINET_JOINTS
+    #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
+    print('Initial surface:', surface_name)
+    with WorldSaver():
+        placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
+        pose, = next(placement_gen(block_name, surface_name), (None,))
+    assert pose is not None
+    pose.assign()
+
+    pddlstream_problem = pdddlstream_from_problem(world, collisions=not args.cfree, teleport=args.teleport)
+    plan = solve_pddlstream(args, pddlstream_problem)
     if plan is None:
         wait_for_user()
         world.destroy()
