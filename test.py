@@ -52,10 +52,12 @@ def dump_dict(obj):
 ################################################################################
 
 def open_gripper():
-    return kitchen_policies.OpenGripper(speed=0.1, duration=1., actuate=True, unsuppress=True, v_tol=0.1)
+    return kitchen_policies.OpenGripper(
+        speed=0.1, duration=1., actuate=True, unsuppress=True, v_tol=0.1)
 
 def close_gripper():
-    return kitchen_policies.CloseGripper(speed=0.1, actuate=True, duration=0.)
+    return kitchen_policies.CloseGripper(
+        speed=0.1, actuate=True, duration=0.)
 
 # go_config, wait_for_target_config
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/frame_commander.py
@@ -110,7 +112,8 @@ from pybullet_tools.utils import user_input, wait_for_user, HideOutput, get_samp
     set_joint_positions, joints_from_names, pose_from_tform, joint_from_name, \
     set_joint_position, set_pose, get_link_pose, link_from_name, LockRenderer, get_joint_names, \
     child_link_from_joint, multiply, invert, parent_link_from_joint, dump_body, get_joint_positions, \
-    get_pose, get_point, set_point, tform_from_pose, get_movable_joints, get_joint_position, get_joint_name
+    get_pose, get_point, set_point, tform_from_pose, get_movable_joints, \
+    get_joint_position, get_joint_name, set_camera_pose
 from pybullet_tools.pr2_utils import get_viewcone, draw_viewcone
 from utils import World, load_ycb, get_ycb_obj_path, CAMERA_POSE
 from run import solve_pddlstream, create_args, simulate_plan
@@ -310,8 +313,24 @@ def main():
     goals = [(h.format(o), v) for h, v in goal for o in objects]
     print(goals)
     goal_formula = goal_formula_from_goal(goals)
+    # TODO: fixed_base_suppressors
+
+    robot_entity = domain.get_robot()
+    #print(dump_dict(robot_entity))
+    franka = robot_entity.robot
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/lula_franka/franka.py
+    #print(dump_dict(franka))
+    gripper = franka.end_effector.gripper
+    gripper.open(speed=.2, actuate_gripper=True, wait=True)
+
+    #moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
+    #moveit.tracked_objs
+    #print(dump_dict(moveit))
+    #raw_input('awef')
 
     world = World(use_gui=True) # args.visualize)
+    set_camera_pose(camera_point=[-1, 0, 1])
+
     #observer = ros.RosObserver(domain, sigma=domain.sigma, p_sample=0)
     observer = trial_manager.observer
     #world_state = domain.root
@@ -334,8 +353,13 @@ def main():
     problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
                                        collisions=not args.cfree, teleport=args.teleport)
     problem = problem[:-1] + (goal_formula,)
-    plan = solve_pddlstream(args, problem)
-    simulate_plan(world, plan, args)
+    commands = solve_pddlstream(world, problem, args)
+    simulate_plan(world, commands, args)
+    if commands is None:
+        return
+    for command in commands:
+        world_state = observer.observe()
+        command.execute(domain, world_state)
     world.destroy()
     return
 

@@ -61,6 +61,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         init.append(('NoisyBase',))
 
     if fixed_base:
+        world.carry_conf = init_aq
         ALL_SURFACES[:] = ['indigo_tmp'] # TODO: hack for now
 
     goal_block = list(world.movable)[0]

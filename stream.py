@@ -23,6 +23,7 @@ from database import load_placements, get_surface_reference_pose, load_place_bas
 BASE_CONSTANT = 1
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = False # TODO: include self-collisions
+MAX_CONF_DISTANCE = 0.75
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
@@ -125,7 +126,6 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 ################################################################################
 
 def inverse_reachability(world, base_generator, obstacles=[], max_attempts=25, **kwargs):
-    aq = world.carry_conf
     lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, world.custom_limits)
     while True:
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
@@ -134,7 +134,7 @@ def inverse_reachability(world, base_generator, obstacles=[], max_attempts=25, *
             #pose.assign()
             bq = Conf(world.robot, world.base_joints, base_conf)
             bq.assign()
-            aq.assign()
+            world.carry_conf.assign()
             if any(pairwise_collision(world.robot, b) for b in obstacles): #  + [obj]
                 continue
             #print('IR attempts:', i)
@@ -201,6 +201,7 @@ DOOR_RESOLUTION = 0.025
 
 def plan_approach(world, approach_pose, obstacles=[], attachments=[],
                   teleport=False, switches_only=False, **kwargs):
+    distance_fn = get_distance_fn(world.robot, world.arm_joints)
     aq = world.carry_conf
     grasp_conf = get_joint_positions(world.robot, world.arm_joints)
     if switches_only:
@@ -212,6 +213,8 @@ def plan_approach(world, approach_pose, obstacles=[], attachments=[],
         # print('Approach IK failure', approach_conf)
         return None
     approach_conf = get_joint_positions(world.robot, world.arm_joints)
+    if MAX_CONF_DISTANCE < distance_fn(grasp_conf, approach_conf):
+        return None
     if teleport:
         return [aq.value, approach_conf, grasp_conf]
 
@@ -315,7 +318,7 @@ def get_handle_grasp(world, joint, pre_distance=0.1):
     raise RuntimeError()
 
 def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
-              randomize=True, collisions=True, teleport=False, max_distance=0.75, **kwargs):
+              randomize=True, collisions=True, teleport=False, **kwargs):
     handle_link, handle_grasp, handle_pregrasp = get_handle_grasp(world, door_joint)
     door_joints = [door_joint]
     obstacles = world.static_obstacles | get_descendant_obstacles(world.kitchen, door_joint)
@@ -345,9 +348,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
             return None
         arm_conf = get_joint_positions(world.robot, world.arm_joints)
         if arm_path and not teleport:
-            distance = distance_fn(arm_path[-1], arm_conf)
-            # print(distance)
-            if max_distance < distance:
+            if MAX_CONF_DISTANCE < distance_fn(arm_path[-1], arm_conf):
                 return None
         arm_path.append(arm_conf)
         # wait_for_user()
@@ -447,8 +448,7 @@ def get_motion_gen(world, collisions=True, teleport=False):
 
     def fn(bq1, bq2, fluents=[]):
         bq1.assign()
-        aq = world.carry_conf
-        aq.assign()
+        world.carry_conf.assign()
         initial_saver = BodySaver(world.robot)
         obstacles = set(world.static_obstacles)
         attachments = []
@@ -514,6 +514,7 @@ OPEN = 'open'
 CLOSED = 'closed'
 DOOR_STATUSES = [OPEN, CLOSED]
 JOINT_THRESHOLD = 1e-3
+# TODO: retrieve from entity
 
 def get_door_test(world):
     def test(joint_name, conf, status):

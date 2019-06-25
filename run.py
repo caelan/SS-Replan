@@ -27,28 +27,35 @@ from pddlstream.language.constants import print_solution
 from pddlstream.utils import INF
 from pddlstream.language.stream import StreamInfo
 
-
-def commands_from_plan(world, plan):
-    if plan is None:
-        return None
-    # TODO: propagate the state
-    commands = []
-    for action, params in plan:
-        if action in ['move_base', 'move_arm', 'pick', 'pull', 'calibrate']:
-            commands.extend(params[-1].commands)
-        elif action == 'place':
-            commands.extend(params[-1].reverse().commands)
-        elif action in ['cook']:
-            commands.append(Wait(world, steps=100))
-        else:
-            raise NotImplementedError(action)
-    return commands
-
+def create_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-algorithm', default='focused',
+                        help='Specifies the algorithm')
+    parser.add_argument('-cfree', action='store_true',
+                        help='When enabled, disables collision checking (for debugging).')
+    parser.add_argument('-optimal', action='store_true',
+                        help='Runs in an anytime mode')
+    #parser.add_argument('-problem', default='test_block',
+    #                    help='The name of the problem to solve.')
+    parser.add_argument('-seed', default=None,
+                        help='The random seed to use.')
+    parser.add_argument('-max_time', default=120, type=int,
+                        help='The max time')
+    parser.add_argument('-record', action='store_true',
+                        help='Records a video')
+    parser.add_argument('-teleport', action='store_true',
+                        help='Uses unit costs')
+    parser.add_argument('-unit', action='store_true',
+                        help='Uses unit costs')
+    parser.add_argument('-visualize', action='store_true',
+                        help='When enabled, visualizes planning rather than the world (for debugging).')
+    return parser.parse_args()
+    # TODO: get rid of funky orientations by dropping them from some height
 
 ################################################################################
 
-def solve_pddlstream(args, pddlstream_problem):
-    _, _, _, stream_map, init, goal = pddlstream_problem
+def solve_pddlstream(world, problem, args):
+    _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
     # print('Streams:', stream_map.keys())
@@ -82,7 +89,7 @@ def solve_pddlstream(args, pddlstream_problem):
             # TODO: option to only consider costs during local optimization
             # effort_weight = 0 if args.optimal else 1
             effort_weight = 1e-3 if args.optimal else 1
-            solution = solve_focused(pddlstream_problem, stream_info=stream_info,
+            solution = solve_focused(problem, stream_info=stream_info,
                                      planner=planner, max_planner_time=max_planner_time, debug=False,
                                      unit_costs=args.unit, success_cost=success_cost,
                                      max_time=args.max_time, verbose=True,
@@ -90,7 +97,7 @@ def solve_pddlstream(args, pddlstream_problem):
                                      # bind=True, max_skeletons=None,
                                      search_sample_ratio=search_sample_ratio)
         elif args.algorithm == 'incremental':
-            solution = solve_incremental(pddlstream_problem,
+            solution = solve_incremental(problem,
                                          planner=planner, max_planner_time=max_planner_time,
                                          unit_costs=args.unit, success_cost=success_cost,
                                          max_time=args.max_time, verbose=True)
@@ -104,14 +111,32 @@ def solve_pddlstream(args, pddlstream_problem):
     plan, cost, evaluations = solution
     pr.disable()
     pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
-    return plan
+    commands = commands_from_plan(world, plan)
+    return commands
 
-def simulate_plan(world, plan, args):
+################################################################################
+
+def commands_from_plan(world, plan):
     if plan is None:
+        return None
+    # TODO: propagate the state
+    commands = []
+    for action, params in plan:
+        if action in ['move_base', 'move_arm', 'pick', 'pull', 'calibrate']:
+            commands.extend(params[-1].commands)
+        elif action == 'place':
+            commands.extend(params[-1].reverse().commands)
+        elif action in ['cook']:
+            commands.append(Wait(world, steps=100))
+        else:
+            raise NotImplementedError(action)
+    return commands
+
+def simulate_plan(world, commands, args):
+    if commands is None:
         wait_for_user()
         return
     initial_state = State()
-    commands = commands_from_plan(world, plan)
     wait_for_user()
     time_step = None if args.teleport else 0.02
     if args.record:
@@ -121,31 +146,7 @@ def simulate_plan(world, plan, args):
         execute_plan(world, initial_state, commands, time_step=time_step)
     wait_for_user()
 
-def create_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-algorithm', default='focused',
-                        help='Specifies the algorithm')
-    parser.add_argument('-cfree', action='store_true',
-                        help='When enabled, disables collision checking (for debugging).')
-    parser.add_argument('-optimal', action='store_true',
-                        help='Runs in an anytime mode')
-    #parser.add_argument('-problem', default='test_block',
-    #                    help='The name of the problem to solve.')
-    parser.add_argument('-seed', default=None,
-                        help='The random seed to use.')
-    parser.add_argument('-max_time', default=120, type=int,
-                        help='The max time')
-    parser.add_argument('-record', action='store_true',
-                        help='Records a video')
-    parser.add_argument('-teleport', action='store_true',
-                        help='Uses unit costs')
-    parser.add_argument('-unit', action='store_true',
-                        help='Uses unit costs')
-    parser.add_argument('-visualize', action='store_true',
-                        help='When enabled, visualizes planning rather than the world (for debugging).')
-    return parser.parse_args()
-
-    # TODO: get rid of funky orientations by dropping them from some height
+################################################################################
 
 def main():
     args = create_args()
@@ -172,10 +173,10 @@ def main():
     assert pose is not None
     pose.assign()
 
-    pddlstream_problem = pdddlstream_from_problem(
+    problem = pdddlstream_from_problem(
         world, collisions=not args.cfree, teleport=args.teleport)
-    plan = solve_pddlstream(args, pddlstream_problem)
-    simulate_plan(world, plan, args)
+    commands = solve_pddlstream(world, problem, args)
+    simulate_plan(world, commands, args)
     world.destroy()
 
 if __name__ == '__main__':
