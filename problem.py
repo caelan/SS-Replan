@@ -31,6 +31,7 @@ def pdddlstream_from_problem(world, noisy_base=False, **kwargs):
     constant_map = {
         '@stove': 'stove',
     }
+    # TODO: operate on initi
 
     initial_bq = Conf(world.robot, world.base_joints)
     initial_aq = Conf(world.robot, world.arm_joints)

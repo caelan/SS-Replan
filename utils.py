@@ -12,7 +12,7 @@ from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, 
     get_bodies, draw_base_limits, draw_pose, clone_body, \
     set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     LockRenderer, get_body_name, stable_z, get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent
+    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, create_obj
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -99,6 +99,15 @@ DRAWER_JOINTS = [
 ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
 
 USE_TRACK_IK = True
+
+def load_ycb(ycb_type, **kwargs):
+    path_from_type = {path.split('_', 1)[1]: path for path in os.listdir(YCB_PATH)}
+    if ycb_type not in path_from_type:
+        return None
+    # texture_map.png textured.mtl textured.obj textured_simple.obj textured_simple.obj.mtl
+    path = os.path.join(YCB_PATH, path_from_type[ycb_type], 'textured_simple.obj')
+    # TODO: set color (as average) or texture
+    return create_obj(path, **kwargs)
 
 def get_kitchen_parent(link_name):
     if link_name in LINK_SHAPE_FROM_JOINT:
@@ -384,6 +393,9 @@ class World(object):
             for arm in ARMS:
                 joints = get_eve_arm_joints(self.robot, arm)[2:4]
                 set_joint_positions(self.robot, joints, -0.2*np.ones(len(joints)))
+    def set_gripper(self, value):
+        positions = value*np.ones(len(self.gripper_joints))
+        set_joint_positions(self.robot, self.gripper_joints, positions)
     def close_gripper(self):
         for joint in self.gripper_joints:
             set_joint_position(self.robot, joint, get_min_limit(self.robot, joint))
