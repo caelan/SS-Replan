@@ -19,6 +19,8 @@ import brain_ros.lula_policies as lula_policies
 import brain_ros.kitchen_policies as kitchen_policies
 import brain.status as status
 import brain_ros.ros_world_state as ros
+
+import brain_ros.kitchen_poses as kitchen_poses
 from brain_ros.sim_test_tools import TrialManager
 from brain.action import Policy
 
@@ -104,10 +106,11 @@ def close_gripper():
 
 ################################################################################
 
-from pybullet_tools.utils import user_input, wait_for_user, HideOutput, \
+from pybullet_tools.utils import user_input, wait_for_user, HideOutput, get_sample_fn, \
     set_joint_positions, joints_from_names, pose_from_tform, joint_from_name, \
-    set_joint_position, set_pose, get_link_pose, link_from_name, LockRenderer, \
-    child_link_from_joint, multiply, invert, parent_link_from_joint, dump_body, get_pose
+    set_joint_position, set_pose, get_link_pose, link_from_name, LockRenderer, get_joint_names, \
+    child_link_from_joint, multiply, invert, parent_link_from_joint, dump_body, get_joint_positions, \
+    get_pose, get_point, set_point, tform_from_pose, get_movable_joints, get_joint_position, get_joint_name
 from pybullet_tools.pr2_utils import get_viewcone, draw_viewcone
 from utils import World, load_ycb, get_ycb_obj_path, CAMERA_POSE
 from run import solve_pddlstream, create_args
@@ -115,10 +118,17 @@ from problem import pdddlstream_from_problem
 
 from pddlstream.language.constants import Not, And
 
-def update_world(world, world_state):
+def get_robot_reference_frame(domain):
+    entity = domain.root.entities[domain.robot]
+    _, reference_frame = entity.base_frame.split('/')  # 'measured/right_gripper'
+    return reference_frame
+
+def update_world(world, domain, world_state):
     #dump_dict(world_state)
     #print(world_state.get_frames())
+    # TODO: remove old bodies
 
+    print('Entities:', sorted(world_state.entities))
     for name, entity in world_state.entities.items():
         #dump_dict(entity)
         body = None
@@ -134,7 +144,7 @@ def update_world(world, world_state):
             set_joint_positions(body, arm_joints, entity.q)
             world.set_gripper(entity.gripper) # 'gripper_joint': 'panda_finger_joint1'
             _, reference_frame = entity.base_frame.split('/') # 'measured/right_gripper'
-            tool_link = link_from_name(body, reference_frame)
+            tool_link = link_from_name(body, get_robot_reference_frame(domain))
             tool_pose = get_link_pose(body, tool_link)
             base_link = child_link_from_joint(world.base_joints[-1])
             #base_link = parent_link_from_joint(body, world.arm_joints[0])
@@ -170,9 +180,51 @@ def update_world(world, world_state):
     world.update_custom_limits()
     draw_viewcone(CAMERA_POSE)
 
-def update_things():
-    # TODO: update the sim state
-    raise NotImplementedError()
+TEMPLATE = '%s_1'
+
+def update_isaac_sim(domain, sim_manager, world):
+    # RobotConfigModulator seems to just change the default config
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/robot_config_modulator.py
+    #sim_manager = trial_manager.sim
+    #ycb_objects = kitchen_poses.supported_ycb_objects
+
+    #sim_manager.pause()
+    for name, body in world.body_from_name.items():
+        full_name = TEMPLATE % name
+        sim_manager.set_pose(full_name, tform_from_pose(get_pose(body)), do_correction=False)
+        print(full_name)
+
+    for body in [world.kitchen]: #, world.robot]:
+        # TODO: set kitchen base pose
+        joints = get_movable_joints(body)
+        names = get_joint_names(body, joints)
+        positions = get_joint_positions(body, joints)
+        sim_manager.set_joints(names, positions)
+        print(names)
+        #for joint in get_movable_joints(body):
+        #    # Doesn't seem to fail if the kitchen joint doesn't exist
+        #    name = get_joint_name(body, joint)
+        #    value = get_joint_position(body, joint)
+        #     sim_manager.set_joints([name], [value])
+
+    config_modulator = domain.config_modulator
+    #robot_name = domain.robot # arm
+    robot_name = TEMPLATE % sim_manager.robot_name
+    #print(kitchen_poses.ycb_place_in_drawer_q) # 7 DOF
+    #config_modulator.send_config(get_joint_positions(world.robot, world.arm_joints)) # Arm joints
+    # TODO: config modulator doesn't seem to have a timeout
+    reference_link = link_from_name(world.robot, get_robot_reference_frame(domain))
+    robot_pose = get_link_pose(world.robot, reference_link)
+    sim_manager.set_pose(robot_name, tform_from_pose(robot_pose), do_correction=False)
+    print(robot_name)
+
+    #sim_manager.reset()
+    #sim_manager.wait_for_services()
+    #sim_manager.dr() # Domain randomization
+    #rospy.sleep(1.)
+    #for name in world.all_bodies:
+    #    sim_manager.set_pose(name, get_pose(body))
 
 def constraints_from_plan(plan):
     # TODO: use the task plan to constrain solution
@@ -242,30 +294,44 @@ def main():
     #with HideOutput():
     domain = kitchen_domain.KitchenDomain(sim=True, sigma=0, lula=True)
     #dump_dict(domain) # domain.view_tags
-    #dump_dict(domain.get_robot())
-    #print(domain.base_link)
     #dump_dict(domain.root)  # WorldState: actor, entities
     #print(domain.attachments)  # planner_interface | sigma
     #print(domain.entities)
     #print(domain.config_modulator) # sets the robot config
 
+    #print(domain.robot) # string
+    #print(domain.base_link) # string
+    #print(domain.get_robot()) # RobotArm
+
     #trial_args = parse.parse_kitchen_args()
     trial_args = create_trial_args()
-    manager = TrialManager(trial_args, domain)
-    objects, goal, plan = manager.get_task(task=task, reset=True) # Need to reset at the start
+    trial_manager = TrialManager(trial_args, domain)
+    objects, goal, plan = trial_manager.get_task(task=task, reset=True) # Need to reset at the start
     goals = [(h.format(o), v) for h, v in goal for o in objects]
     print(goals)
     goal_formula = goal_formula_from_goal(goals)
 
     world = World(use_gui=True) # args.visualize)
     #observer = ros.RosObserver(domain, sigma=domain.sigma, p_sample=0)
-    observer = manager.observer
+    observer = trial_manager.observer
     #world_state = domain.root
     world_state = observer.observe()
     with LockRenderer():
-        update_world(world, world_state)
+        update_world(world, domain, world_state)
 
-    problem = pdddlstream_from_problem(world, movable_base=False)
+    #for name in world.movable:
+    #    body = world.get_body(name)
+    #    set_point(body, get_point(body) + np.array([0, 0, 1]))
+    #for body in [world.robot, world.kitchen]:
+    #    joints = get_movable_joints(body)
+    #    sample_fn = get_sample_fn(body, joints)
+    #    set_joint_positions(body, joints, sample_fn())
+    #set_point(world.robot, get_point(world.robot) + np.array([0, 0, 1]))
+    #update_isaac_sim(domain, trial_manager.sim, world)
+    #wait_for_user()
+
+    # TODO: initial robot conf is in collision
+    problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True)
     problem = problem[:-1] + (goal_formula,)
     plan = solve_pddlstream(args, problem)
     wait_for_user()
@@ -276,12 +342,12 @@ def main():
     #move.execute(plan=JointTrajectory([]), required_orig_err=0.005, timeout=5.0, publish_display_trajectory=True)
     #domain.operators.clear()
 
-    #dump_dict(manager)
-    #dump_dict(manager.sim) # set_pose(), set_joints()
-    #dump_dict(manager.observer) # current_state, tf_listener, world
+    #dump_dict(trial_manager)
+    #dump_dict(trial_manager.sim) # set_pose(), set_joints()
+    #dump_dict(trial_manager.observer) # current_state, tf_listener, world
     #for name in sorted(domain.root.entities):
     #    dump_dict(domain.root.entities[name])
-    #world_state = manager.observer.observe()
+    #world_state = trial_manager.observer.observe()
     #dump_dict(world_state)
     #for name in sorted(world_state.entities):
     #    dump_dict(world_state.entities[name])
@@ -300,21 +366,21 @@ def main():
     #domain.update_logical(root)
     #domain.check(world_state, goal_conditions):
 
-    #res, tries = manager.test(goal, plan, ["arm", useful_objects[0]], task)
-    #manager.go_to_random_start(domain)
+    #res, tries = trial_manager.test(goal, plan, ["arm", useful_objects[0]], task)
+    #trial_manager.go_to_random_start(domain)
 
-    #manager.get_plan(goal, plan, plan_args)
-    #manager.do_random_trial(task="put away", reset=True)
+    #trial_manager.get_plan(goal, plan, plan_args)
+    #trial_manager.do_random_trial(task="put away", reset=True)
 
     #execute = PlanExecutionPolicy(goal=goal, plan=plan)
     #execute.enter(domain, world_state, *plan_args)
 
     #if args.iter <= 0:
     #    while not rospy.is_shutdown():
-    #        manager.do_random_trial(task="put away", reset=True)
+    #        trial_manager.do_random_trial(task="put away", reset=True)
     #else:
     #    for i in range(args.iter):
-    #        manager.do_random_trial(task="put away", reset=(i == 0))
+    #        trial_manager.do_random_trial(task="put away", reset=(i == 0))
 
 if __name__ == '__main__':
     #main()

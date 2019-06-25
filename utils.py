@@ -379,6 +379,8 @@ class World(object):
         conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
+    def all_bodies(self):
+        return self.movable | {self.robot, self.kitchen, self.floor}
     def get_world_aabb(self):
         return aabb_union(get_aabb(body) for body in get_bodies() if body != self.floor)
     def update_floor(self):

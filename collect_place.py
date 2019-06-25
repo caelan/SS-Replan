@@ -167,6 +167,7 @@ def main():
     }
     combinations = []
     for surface_name in surface_names:
+        # TODO: don't specify combinations. Let failure teach what works
         if surface_name in CABINET_JOINTS:
             grasp_types = [SIDE_GRASP]
         elif surface_name in DRAWER_JOINTS:

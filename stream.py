@@ -249,6 +249,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
     def fn(name, pose, grasp, base_conf):
         # TODO: check if within database convex hull
         # TODO: check approach
+        # TODO: flag to check if initially in collision
 
         obj = world.get_body(name)
         gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1

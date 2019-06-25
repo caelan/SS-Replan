@@ -28,21 +28,21 @@ def existential_quantification(goal_literals):
 ################################################################################
 
 def pdddlstream_from_problem(world, close_doors=False, return_home=False,
-                             movable_base=True, noisy_base=False, debug=False, **kwargs):
+                             movable_base=True, fixed_base=False,
+                             noisy_base=False, debug=False, **kwargs):
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
         '@stove': 'stove',
     }
 
-    initial_bq = Conf(world.robot, world.base_joints)
-    initial_aq = Conf(world.robot, world.arm_joints)
+    init_bq = Conf(world.robot, world.base_joints)
+    init_aq = Conf(world.robot, world.arm_joints)
     init = [
-        ('InitBConf', initial_bq),
-        ('BConf', initial_bq),
-        ('AtBConf', initial_bq),
-        ('AConf', initial_aq),
-        ('AtAConf', initial_aq),
+        ('BConf', init_bq),
+        ('AtBConf', init_bq),
+        ('AConf', init_aq),
+        ('AtAConf', init_aq),
         ('HandEmpty',),
         ('CanMove',),
 
@@ -55,6 +55,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
            [('Status', status) for status in DOOR_STATUSES]
     if movable_base:
         init.append(('MovableBase',))
+    if fixed_base:
+        init.append(('InitBConf', init_bq))
     if noisy_base:
         init.append(('NoisyBase',))
 
@@ -69,11 +71,11 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         #('Cooked', goal_block),
     ]
     if return_home:
-        goal_literals.append(('AtBConf', initial_bq))
+        goal_literals.append(('AtBConf', init_bq))
     for name in world.movable:
         # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(name)
-        ALL_SURFACES = ['indigo_tmp']
+        #ALL_SURFACES = ['indigo_tmp']
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
             body, compute_surface_aabb(world, surface), above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
