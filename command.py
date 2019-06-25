@@ -1,5 +1,6 @@
 from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input
 from utils import get_descendant_obstacles
+from issac import update_robot
 
 import time
 
@@ -39,7 +40,7 @@ class Command(object):
     def iterate(self, world, state):
         raise NotImplementedError()
 
-    def execute(self, domain, world_state):
+    def execute(self, domain, world_state, observer):
         raise NotImplementedError()
 
 class Sequence(object):
@@ -79,7 +80,7 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
 
-    def execute(self, domain, world_state): # TODO: actor
+    def execute(self, domain, world_state, observer): # TODO: actor
         robot_entity = domain.get_robot()
         if len(robot_entity.joints) != len(self.joints):
             # TODO: ensure same joint names
@@ -95,8 +96,12 @@ class Trajectory(Command):
         franka = robot_entity.robot
         for i, positions in enumerate(self.path):
             print('{}/{}'.format(i, len(self.path)))
-            franka.end_effector.go_config(positions, err_thresh=0.25,
-                wait_for_target=True, wait_time=1.0, verbose=True) # TODO: go_guided/go_long_range
+            timeout = 10.0 if i == len(positions)-1 else 2.0
+            franka.end_effector.go_config(positions, err_thresh=0.05,
+                wait_for_target=True, wait_time=timeout, verbose=True) # TODO: go_guided/go_long_range
+            update_robot(domain, observer.observe(), self.world)
+            #wait_for_duration(1e-3)
+            # TODO: attachments
         time.sleep(1.0)
         # TODO: return status
 
@@ -129,7 +134,8 @@ class DoorTrajectory(Command):
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
 
-    def execute(self, domain, world_state):
+    def execute(self, domain, world_state, observer):
+        raise NotImplementedError()
         robot_entity = domain.get_robot()
         franka = robot_entity.robot
         for positions in self.robot_path:
@@ -161,12 +167,13 @@ class Attach(Command):
             create_attachment(self.robot, self.link, self.body)
         yield
 
-    def execute(self, domain, world_state):
+    def execute(self, domain, world_state, observer):
         robot_entity = domain.get_robot()
         franka = robot_entity.robot
         gripper = franka.end_effector.gripper
         # TODO: attach_obj
         gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
+        update_robot(domain, observer.observe(), self.world)
         time.sleep(1.0)
 
     def __repr__(self):
@@ -191,11 +198,12 @@ class Detach(Command):
         del state.attachments[self.robot, self.link, self.body]
         yield
 
-    def execute(self, domain, world_state):
+    def execute(self, domain, world_state, observer):
         robot_entity = domain.get_robot()
         franka = robot_entity.robot
         gripper = franka.end_effector.gripper
         gripper.open(speed=.2, actuate_gripper=True, wait=True)
+        update_robot(domain, observer.observe(), self.world)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
