@@ -173,7 +173,7 @@ class Attach(Command):
         gripper = franka.end_effector.gripper
         # TODO: attach_obj
         gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
-        update_robot(domain, observer.observe(), self.world)
+        update_robot(self.world, domain, observer, observer.observe())
         time.sleep(1.0)
 
     def __repr__(self):

@@ -8,7 +8,6 @@ PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 import rospy
-import signal
 import traceback
 import numpy as np
 
@@ -16,9 +15,9 @@ import brain_ros.kitchen_domain as kitchen_domain
 import brain_ros.kitchen_policies as kitchen_policies
 from brain_ros.sim_test_tools import TrialManager
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, draw_pose, get_pose
 
-from issac import update_world
+from issac import update_world, kill_lula
 from utils import World
 from run import solve_pddlstream, create_args, simulate_plan
 from problem import pdddlstream_from_problem
@@ -27,18 +26,6 @@ from pddlstream.language.constants import Not, And
 
 #from moveit_msgs.msg import RobotTrajectory
 
-
-def kill_lula():
-    # Kill Lula
-    pid = os.getpid()
-    os.kill(pid, signal.SIGKILL)
-
-def dump_dict(obj):
-    print()
-    print(obj)
-    for i, key in enumerate(sorted(obj.__dict__)):
-        print(i, key, obj.__dict__[key])
-    print(dir(obj))
 
 # Simple loop to try reaching the goal. It uses the execution policy.
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/test_tools.py#L12
@@ -195,6 +182,8 @@ def main():
     goal_formula = goal_formula_from_goal(goals)
     # TODO: fixed_base_suppressors
 
+    #trial_manager.disable() # Disables collisions
+
     robot_entity = domain.get_robot()
     #print(dump_dict(robot_entity))
     franka = robot_entity.robot
@@ -202,6 +191,7 @@ def main():
     #print(dump_dict(franka))
     gripper = franka.end_effector.gripper
     gripper.open(speed=.2, actuate_gripper=True, wait=True)
+    trial_manager.set_camera(randomize=False)
 
     #moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
     #moveit.tracked_objs
@@ -216,7 +206,7 @@ def main():
     #world_state = domain.root
     world_state = observer.observe()
     with LockRenderer():
-        update_world(world, domain, world_state)
+        update_world(world, domain, observer, world_state)
 
     #for name in world.movable:
     #    body = world.get_body(name)

@@ -6,14 +6,20 @@ import yaml
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
-from pybullet_tools.utils import connect, HideOutput, load_pybullet, dump_body, set_point, Point, add_data_path, \
+from pybullet_tools.utils import connect, HideOutput, load_pybullet, set_point, Point, add_data_path, \
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
-    get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, \
-    get_bodies, draw_base_limits, draw_pose, clone_body, get_point, pose_from_tform, \
-    set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
+    get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, remove_body, remove_all_debug, \
+    get_bodies, draw_base_limits, draw_pose, clone_body, get_point, set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     LockRenderer, get_body_name, stable_z, get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
-    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, create_obj, remove_debug, remove_all_debug
+    get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, create_obj, remove_debug
+
+try:
+    import trac_ik_python
+    USE_TRACK_IK = True
+except ImportError:
+    USE_TRACK_IK = False
+print('Use Track IK:', USE_TRACK_IK)
 
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
@@ -56,24 +62,11 @@ BASE_JOINTS = ['x', 'y', 'theta']
 FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda_forearm_end_pt
 # +z: pointing, +y: left finger
 FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
-
 FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
 
 EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.urdf')
 
-#CARTER_BASE_LINK = 'carter_base_link'
-
-CAMERA_FRAME = '00_zed_left'
-CAMERA_POSE = ([4.95, -9.03, 2.03], [0.58246231, 0.72918614, 0.08003926, -0.35016988])
-
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
-CAMERA_CORRECTION = pose_from_tform(np.asarray(
-    [[0., 0., 1., 0.],
-     [-1., 0., 0., 0.],
-     [0., -1., 0., 0.],
-     [0., 0., 0., 1.]], dtype=np.float32))
-CAMERA_POSE = multiply(CAMERA_POSE, invert(CAMERA_CORRECTION))
-
+################################################################################
 
 KITCHEN = 'kitchen'
 STOVES = ['range']
@@ -110,7 +103,7 @@ DRAWER_JOINTS = [
 
 ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
 
-USE_TRACK_IK = True
+################################################################################
 
 def get_ycb_obj_path(ycb_type):
     # TODO: simplify geometry
@@ -302,19 +295,12 @@ class World(object):
         """
 
         set_point(self.kitchen, Point(z=1.35))
+        #draw_pose(get_pose(self.kitchen), length=1)
 
         if USE_TRACK_IK:
-            #import roslaunch
-            #import rospy
-            #self.ros_core = roslaunch.parent.ROSLaunchParent(
-            #    run_id='master',  roslaunch_files=[], is_core=True)
-            #self.ros_core.start()
-            #rospy.set_param('/robot_description', read(urdf_path))
             from trac_ik_python.trac_ik import IK # killall -9 rosmaster
             base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
             tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
-            #dump_body(self.robot)
-            #print(base_link, tip_link)
             # limit effort and velocities are required
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                                 timeout=0.005, epsilon=1e-5, solve_type="Speed",
@@ -471,10 +457,16 @@ class World(object):
     def get_body(self, name):
         return self.body_from_name[name]
     def remove_body(self, name):
-        raise NotImplementedError()
+        body = self.get_body(name)
+        remove_body(body)
+        del self.body_from_name[name]
     def get_name(self, name):
         inverse = {v: k for k, v in self.body_from_name.items()}
         return inverse.get(name, None)
+    def reset(self):
+        #remove_all_debug()
+        for name in list(self.body_from_name):
+            self.remove_body(name)
     def destroy(self):
         #if self.ros_core is not None:
         #    self.ros_core.shutdown()
