@@ -372,9 +372,8 @@ class World(object):
     def get_world_aabb(self):
         return aabb_union(get_aabb(body) for body in get_bodies() if body != self.floor)
     def update_floor(self):
-        robot_point = np.array(get_point(self.robot))
-        z = stable_z(self.robot, self.floor)
-        set_point(self.floor, robot_point - np.array([0, 0, z]))
+        z = stable_z(self.kitchen, self.floor)
+        set_point(self.floor, np.array(get_point(self.floor)) - np.array([0, 0, z]))
     def update_custom_limits(self):
         robot_extent = get_aabb_extent(get_aabb(self.robot))
         min_extent = min(robot_extent[:2]) * np.ones(2) / 2

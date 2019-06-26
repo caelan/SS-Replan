@@ -75,7 +75,7 @@ def get_door_obstacles(world, surface_name):
 
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=5e-3, **kwargs):
-
+    # TODO: remove fixed collisions with contained surfaces
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
         surface_names = SURFACES if surface_name is None else [surface_name]

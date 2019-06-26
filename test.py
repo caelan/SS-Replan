@@ -199,7 +199,7 @@ def main():
     #raw_input('awef')
 
     world = World(use_gui=True) # args.visualize)
-    set_camera_pose(camera_point=[-1, 0, 1])
+    set_camera_pose(camera_point=[1, -1, 2])
 
     #observer = ros.RosObserver(domain, sigma=domain.sigma, p_sample=0)
     observer = trial_manager.observer

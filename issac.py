@@ -2,10 +2,11 @@ import numpy as np
 import os
 import signal
 
-from pybullet_tools.pr2_utils import draw_viewcone
+from pybullet_tools.pr2_utils import draw_viewcone, get_detection_cone, get_viewcone
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     child_link_from_joint, multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
-    get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, BASE_LINK
+    get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
+    BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer
 from utils import get_ycb_obj_path
 
 ISSAC_REFERENCE_FRAME = 'base_link' # Robot base
@@ -82,6 +83,39 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
                       "Err:{}".format(target_frame, source_frame, e))
         return None
 
+def display_camera(observer):
+    from image_geometry import PinholeCameraModel
+    from sensor_msgs.msg import CameraInfo
+    import rospy
+
+    camera_infos = []
+    def callback(camera_info):
+        if camera_infos:
+            return
+        camera_infos.append(camera_info)
+        cam_model = PinholeCameraModel()
+        cam_model.fromCameraInfo(camera_info)
+        #cam_model.height, cam_model.width # TODO: also pass these parameters
+        camera_matrix = np.array(cam_model.projectionMatrix())[:3, :3]
+        #camera_matrix[:2, 2] *= 2
+        #print(camera_matrix)
+        #print(camera_info)
+        #camera_matrix = None
+
+        # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
+        camera_pose = lookup_pose(observer.tf_listener, ISAAC_CAMERA_FRAME)
+        cone_body = get_viewcone(camera_matrix=camera_matrix, color=apply_alpha(RED, 0.1))
+        set_pose(cone_body, camera_pose)
+        # draw_viewcone(camera_pose)
+        # /sim/left_color_camera/camera_info
+        # /sim/left_depth_camera/camera_info
+        # /sim/right_color_camera/camera_info
+        # TODO: would be cool to display the kinect2 as well
+
+    observer.camera_sub = rospy.Subscriber(
+        "/sim/{}_{}_camera/camera_info".format('left', 'color'),
+        CameraInfo, callback, queue_size=1) # right, depth
+
 def update_world(world, domain, observer, world_state):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
@@ -107,7 +141,9 @@ def update_world(world, domain, observer, world_state):
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
             world_from_entity = get_world_from_model(observer, entity, world.kitchen)
-            set_pose(world.kitchen, world_from_entity)
+            with LockRenderer():
+                set_pose(world.kitchen, world_from_entity)
+                world.update_floor()
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):
@@ -115,9 +151,8 @@ def update_world(world, domain, observer, world_state):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-    world.update_floor()
     world.update_custom_limits()
-    #draw_viewcone(CAMERA_POSE)
+    display_camera(observer)
 
 ################################################################################
 
