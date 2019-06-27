@@ -207,20 +207,19 @@ def main():
     with LockRenderer():
         update_world(world, domain, observer, world_state)
 
-    for name in world.movable:
-        body = world.get_body(name)
-        set_point(body, get_point(body) + np.array([0, 0, 1]))
-    kitchen_joints = get_movable_joints(world.kitchen)
-    set_joint_positions(world.kitchen, kitchen_joints, get_sample_fn(world.kitchen, kitchen_joints)())
-    robot_joints = world.arm_joints + world.gripper_joints
-    set_joint_positions(world.robot, robot_joints, get_sample_fn(world.robot, robot_joints)())
-    set_point(world.robot, get_point(world.robot) + np.array([0, 0, 1]))
-
-    sim_manager.pause()
-    update_isaac_sim(domain, observer, sim_manager, world)
-    wait_for_user()
-    sim_manager.pause()
-    return
+    #for name in world.movable:
+    #    body = world.get_body(name)
+    #    set_point(body, get_point(body) + np.array([0, 0, 1]))
+    #kitchen_joints = get_movable_joints(world.kitchen)
+    #set_joint_positions(world.kitchen, kitchen_joints, get_sample_fn(world.kitchen, kitchen_joints)())
+    #robot_joints = world.arm_joints + world.gripper_joints
+    #set_joint_positions(world.robot, robot_joints, get_sample_fn(world.robot, robot_joints)())
+    #set_point(world.robot, get_point(world.robot) + np.array([0, 0, 1]))
+    #sim_manager.pause()
+    #update_isaac_sim(domain, observer, sim_manager, world)
+    #wait_for_user()
+    #sim_manager.pause()
+    #return
 
     # TODO: initial robot base conf is in collision
     problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
@@ -234,9 +233,9 @@ def main():
     wait_for_user()
     saver.restore()
 
-    sim_manager.pause() # Careful! This actually does pause the system
-    rospy.sleep(1.)
-    sim_manager.pause() # The second invocation resumes
+    #sim_manager.pause() # Careful! This actually does pause the system
+    #rospy.sleep(1.) # Small sleep might be needed
+    #sim_manager.pause() # The second invocation resumes
 
     # Either work
     #moveit = MoveitBridge(group_name="panda_arm",

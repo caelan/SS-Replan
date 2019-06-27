@@ -92,29 +92,54 @@ class Trajectory(Command):
         # Only position, time_from_start, and velocity are used
         from moveit_msgs.msg import RobotTrajectory
         from trajectory_msgs.msg import JointTrajectoryPoint
+        from sensor_msgs.msg import JointState
         import rospy
+        joint_names = [get_joint_name(self.robot, joint).encode('ascii') #,'ignore')
+                                      for joint in self.joints]
+
         plan = RobotTrajectory()
         plan.joint_trajectory.header.frame_id = ISSAC_REFERENCE_FRAME
         plan.joint_trajectory.header.stamp = rospy.Time(0)
-        plan.joint_trajectory.joint_names = [get_joint_name(self.robot, joint).encode('ascii') #,'ignore')
-                                             for joint in self.joints]
-        speed = 0.1
+        plan.joint_trajectory.joint_names = joint_names
+        #speed = 0.1
         distance_fn = get_distance_fn(self.robot, self.joints)
-        distances = [0] + [distance_fn(*pair) for pair in zip(self.path[:-1], self.path[1:])]
-        time_from_starts = np.cumsum(distances) / speed
-        print(time_from_starts)
-        for i in range(1, len(self.path)):
-            point = JointTrajectoryPoint()
-            point.positions = list(self.path[i])
-            vector = np.array(self.path[i]) - np.array(self.path[i-1])
-            duration = (time_from_starts[i] - time_from_starts[i-1])
-            point.velocities = list(vector / duration)
-            point.accelerations = list(np.ones(len(self.joints)))
-            point.effort = list(np.ones(len(self.joints)))
-            point.time_from_start = rospy.Duration(time_from_starts[i])
-            plan.joint_trajectory.points.append(point)
-        moveit.execute(plan, required_orig_err=0.05, timeout=20.0,
-                       publish_display_trajectory=False)
+        #distances = [0] + [distance_fn(*pair) for pair in zip(self.path[:-1], self.path[1:])]
+        #time_from_starts = np.cumsum(distances) / speed
+        #print(time_from_starts)
+
+        #robot = domain.get_robot()
+        #for i in range(1, len(self.path)):
+        for target_conf in self.path:
+
+            #point = JointTrajectoryPoint()
+            #point.positions = list(self.path[i])
+            # Don't need velocities, accelerations, or efforts
+            #vector = np.array(self.path[i]) - np.array(self.path[i-1])
+            #duration = (time_from_starts[i] - time_from_starts[i-1])
+            #point.velocities = list(vector / duration)
+            #point.accelerations = list(np.ones(len(self.joints)))
+            #point.effort = list(np.ones(len(self.joints)))
+            #point.time_from_start = rospy.Duration(time_from_starts[i])
+            #plan.joint_trajectory.points.append(point)
+
+            joint_state = JointState(name=joint_names, position=list(target_conf))
+            ee_frame = moveit.forward_kinematics(joint_state.position)
+            moveit.visualizer.send(ee_frame)
+            moveit.joint_cmd_pub.publish(joint_state)
+            rate = rospy.Rate(1000)
+            start_time = rospy.Time.now()
+            while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < 2):
+                world_state = observer.observe()
+                robot_entity = world_state.entities[domain.robot]
+                error = distance_fn(target_conf, robot_entity.q)
+                if error < 0.01:
+                    break
+                rate.sleep()
+            else:
+                print('Failed to reach set point')
+
+        #moveit.execute(plan, required_orig_err=0.05, timeout=20.0,
+        #               publish_display_trajectory=True)
 
         #for name, entity in world_state.entities.items():
         #    if entity.controllable_object is not None:
@@ -197,6 +222,7 @@ class Attach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
+        # controllable_object is not needed for joint positions
         moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
         # TODO: attach_obj
         #robot_entity = domain.get_robot()
@@ -229,7 +255,7 @@ class Detach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        moveit.open_gripper(self, speed=0.1, sleep=0.2, wait=True)
+        moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
         #robot_entity = domain.get_robot()
         #franka = robot_entity.robot
         #gripper = franka.end_effector.gripper

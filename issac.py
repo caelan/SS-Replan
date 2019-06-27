@@ -24,6 +24,8 @@ def kill_lula():
     # Kill Lula
     pid = os.getpid()
     os.kill(pid, signal.SIGKILL)
+    # sim_manager.exit()
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
 
 def dump_dict(obj):
     print()
