@@ -6,12 +6,15 @@ from pybullet_tools.pr2_utils import draw_viewcone, get_detection_cone, get_view
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     child_link_from_joint, multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
-    BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer
+    BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body
 from utils import get_ycb_obj_path
 
 ISSAC_REFERENCE_FRAME = 'base_link' # Robot base
-ISSAC_WORLD_FRAME = 'world' # ue_world | world | walls | sektion
+UNREAL_WORLD_FRAME = 'ue_world'
+ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
 ISAAC_CAMERA_FRAME = '00_zed_left' # Prefix of 00 for movable objects and camera
+
+ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
 
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
@@ -37,6 +40,7 @@ def get_robot_reference_frame(domain):
     return reference_frame
 
 def get_world_from_model(observer, entity, body):
+    # TODO: be careful with how base joints are handled
     reference_frame = entity.current_root  # Likely ISSAC_REFERENCE_FRAME
     # world_from_reference = unit_pose()
     world_from_reference = lookup_pose(observer.tf_listener, source_frame=reference_frame)
@@ -158,46 +162,47 @@ def update_world(world, domain, observer, world_state):
 
 TEMPLATE = '%s_1'
 
-def update_isaac_sim(domain, sim_manager, world):
+def update_isaac_sim(domain, observer, sim_manager, world):
     # RobotConfigModulator seems to just change the default config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/robot_config_modulator.py
     #sim_manager = trial_manager.sim
     #ycb_objects = kitchen_poses.supported_ycb_objects
 
-    #sim_manager.pause()
+    unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
+                                    target_frame=UNREAL_WORLD_FRAME)
+
     for name, body in world.body_from_name.items():
         full_name = TEMPLATE % name
-        sim_manager.set_pose(full_name, tform_from_pose(get_pose(body)), do_correction=False)
-        print(full_name)
+        world_from_urdf = get_pose(body)
+        unreal_from_urdf = multiply(unreal_from_world, world_from_urdf)
+        sim_manager.set_pose(full_name, tform_from_pose(unreal_from_urdf), do_correction=False)
 
     for body in [world.kitchen]: #, world.robot]:
+        # TODO: doesn't seem to work for robots
         # TODO: set kitchen base pose
         joints = get_movable_joints(body)
+        #joints = world.arm_joints
+        # Doesn't seem to fail if the kitchen joint doesn't exist
         names = get_joint_names(body, joints)
         positions = get_joint_positions(body, joints)
         sim_manager.set_joints(names, positions)
         print(names)
-        #for joint in get_movable_joints(body):
-        #    # Doesn't seem to fail if the kitchen joint doesn't exist
-        #    name = get_joint_name(body, joint)
-        #    value = get_joint_position(body, joint)
-        #     sim_manager.set_joints([name], [value])
 
-    config_modulator = domain.config_modulator
-    #robot_name = domain.robot # arm
-    robot_name = TEMPLATE % sim_manager.robot_name
+    # Changes the default configuration
+    #config_modulator = domain.config_modulator
     #print(kitchen_poses.ycb_place_in_drawer_q) # 7 DOF
     #config_modulator.send_config(get_joint_positions(world.robot, world.arm_joints)) # Arm joints
-    # TODO: config modulator doesn't seem to have a timeout
-    reference_link = link_from_name(world.robot, get_robot_reference_frame(domain))
-    robot_pose = get_link_pose(world.robot, reference_link)
-    sim_manager.set_pose(robot_name, tform_from_pose(robot_pose), do_correction=False)
-    print(robot_name)
+
+    #robot_name = domain.robot # arm
+    robot_name = TEMPLATE % sim_manager.robot_name
+    carter_link = link_from_name(world.robot, ISSAC_CARTER_FRAME)
+    world_from_carter = get_link_pose(world.robot, carter_link)
+    unreal_from_carter = multiply(unreal_from_world, world_from_carter)
+    sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
 
     #sim_manager.reset()
     #sim_manager.wait_for_services()
     #sim_manager.dr() # Domain randomization
-    #rospy.sleep(1.)
     #for name in world.all_bodies:
     #    sim_manager.set_pose(name, get_pose(body))

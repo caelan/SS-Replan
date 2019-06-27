@@ -14,17 +14,17 @@ import numpy as np
 import brain_ros.kitchen_domain as kitchen_domain
 import brain_ros.kitchen_policies as kitchen_policies
 from brain_ros.sim_test_tools import TrialManager
+#from brain_ros.moveit import MoveitBridge
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, draw_pose, get_pose
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
+    wait_for_user, draw_pose, get_pose, set_point, get_point, get_movable_joints, set_joint_positions, get_sample_fn
 
-from issac import update_world, kill_lula
+from issac import update_world, kill_lula, update_isaac_sim
 from utils import World
 from run import solve_pddlstream, create_args, simulate_plan
 from problem import pdddlstream_from_problem
 
 from pddlstream.language.constants import Not, And
-
-#from moveit_msgs.msg import RobotTrajectory
 
 
 # Simple loop to try reaching the goal. It uses the execution policy.
@@ -160,9 +160,10 @@ def main():
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
 
+    lula = False
     rospy.init_node("test")
     #with HideOutput():
-    domain = kitchen_domain.KitchenDomain(sim=True, sigma=0, lula=True)
+    domain = kitchen_domain.KitchenDomain(sim=True, sigma=0, lula=lula)
     #dump_dict(domain) # domain.view_tags
     #dump_dict(domain.root)  # WorldState: actor, entities
     #print(domain.attachments)  # planner_interface | sigma
@@ -175,7 +176,8 @@ def main():
 
     #trial_args = parse.parse_kitchen_args()
     trial_args = create_trial_args()
-    trial_manager = TrialManager(trial_args, domain)
+    trial_manager = TrialManager(trial_args, domain, lula=lula)
+    sim_manager = trial_manager.sim
     objects, goal, plan = trial_manager.get_task(task=task, reset=True) # Need to reset at the start
     goals = [(h.format(o), v) for h, v in goal for o in objects]
     print(goals)
@@ -184,19 +186,16 @@ def main():
 
     #trial_manager.disable() # Disables collisions
 
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/launch/sim_franka.launch#L48
+
     robot_entity = domain.get_robot()
     #print(dump_dict(robot_entity))
     franka = robot_entity.robot
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/lula_franka/franka.py
     #print(dump_dict(franka))
-    gripper = franka.end_effector.gripper
-    gripper.open(speed=.2, actuate_gripper=True, wait=True)
+    #gripper = franka.end_effector.gripper
+    #gripper.open(speed=.2, actuate_gripper=True, wait=True)
     trial_manager.set_camera(randomize=False)
-
-    #moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    #moveit.tracked_objs
-    #print(dump_dict(moveit))
-    #raw_input('awef')
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[1, -1, 2])
@@ -208,30 +207,49 @@ def main():
     with LockRenderer():
         update_world(world, domain, observer, world_state)
 
-    #for name in world.movable:
-    #    body = world.get_body(name)
-    #    set_point(body, get_point(body) + np.array([0, 0, 1]))
-    #for body in [world.robot, world.kitchen]:
-    #    joints = get_movable_joints(body)
-    #    sample_fn = get_sample_fn(body, joints)
-    #    set_joint_positions(body, joints, sample_fn())
-    #set_point(world.robot, get_point(world.robot) + np.array([0, 0, 1]))
-    #update_isaac_sim(domain, trial_manager.sim, world)
-    #wait_for_user()
+    for name in world.movable:
+        body = world.get_body(name)
+        set_point(body, get_point(body) + np.array([0, 0, 1]))
+    kitchen_joints = get_movable_joints(world.kitchen)
+    set_joint_positions(world.kitchen, kitchen_joints, get_sample_fn(world.kitchen, kitchen_joints)())
+    robot_joints = world.arm_joints + world.gripper_joints
+    set_joint_positions(world.robot, robot_joints, get_sample_fn(world.robot, robot_joints)())
+    set_point(world.robot, get_point(world.robot) + np.array([0, 0, 1]))
 
-    # TODO: initial robot conf is in collision
+    sim_manager.pause()
+    update_isaac_sim(domain, observer, sim_manager, world)
+    wait_for_user()
+    sim_manager.pause()
+    return
+
+    # TODO: initial robot base conf is in collision
     problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
                                        collisions=not args.cfree, teleport=args.teleport)
     problem = problem[:-1] + (goal_formula,)
     saver = WorldSaver()
     commands = solve_pddlstream(world, problem, args)
-    simulate_plan(world, commands, args)
+    #simulate_plan(world, commands, args)
     if commands is None:
         return
+    wait_for_user()
     saver.restore()
+
+    sim_manager.pause() # Careful! This actually does pause the system
+    rospy.sleep(1.)
+    sim_manager.pause() # The second invocation resumes
+
+    # Either work
+    #moveit = MoveitBridge(group_name="panda_arm",
+    #    robot_interface=None, dilation=1., lula_world_objects=None, verbose=False, home_q=None)
+    moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
+    #moveit.tracked_objs
+    #moveit.use_lula = False
+    #moveit.dialation = 1.0
+    moveit.open_gripper()
+
     for command in commands:
-        world_state = observer.observe()
-        command.execute(domain, world_state, observer)
+        #world_state = observer.observe()
+        command.execute(domain, moveit, observer)
     world.destroy()
     return
 
@@ -279,6 +297,16 @@ def main():
     #else:
     #    for i in range(args.iter):
     #        trial_manager.do_random_trial(task="put away", reset=(i == 0))
+
+"""
+caelan@driodeka:~/Programs/srlstream$ rostopic list | grep -o -P '^.*(?=/feedback)'
+/execute_trajectory
+/move_group
+/pickup
+/place
+/robot_control_interactive_markers
+/world/interactive_control
+"""
 
 if __name__ == '__main__':
     #main()

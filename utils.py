@@ -329,8 +329,8 @@ class World(object):
     def gripper_joints(self):
         if self.robot_yaml is None:
             return []
-        return [joint_from_name(self.robot, rule['name'])
-                for rule in self.robot_yaml['cspace_to_urdf_rules']]
+        return tuple(joint_from_name(self.robot, rule['name'])
+                for rule in self.robot_yaml['cspace_to_urdf_rules'])
     @property
     def kitchen_joints(self):
         #return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])

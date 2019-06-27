@@ -1,9 +1,10 @@
-from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input
+from pybullet_tools.utils import set_joint_positions, create_attachment, get_joint_name, \
+    wait_for_duration, user_input, get_distance_fn
 from utils import get_descendant_obstacles
-from issac import update_robot
+from issac import update_robot, ISSAC_REFERENCE_FRAME
 
 import time
-
+import numpy as np
 
 class State(object):
     def __init__(self, savers=[], attachments={}):
@@ -80,28 +81,56 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
 
-    def execute(self, domain, world_state, observer): # TODO: actor
+    def execute(self, domain, moveit, observer): # TODO: actor
         robot_entity = domain.get_robot()
         if len(robot_entity.joints) != len(self.joints):
             # TODO: ensure same joint names
             # TODO: allow partial gripper closures
             return
-        for name, entity in world_state.entities.items():
-            if entity.controllable_object is not None:
-                #entity.controllable_object.unsuppress()
-                entity.controllable_object.suppress() # Propagate to parents?
-            # entity.set_detached()
-            #domain.attachments[actor] = goal
 
-        franka = robot_entity.robot
-        for i, positions in enumerate(self.path):
-            print('{}/{}'.format(i, len(self.path)))
-            timeout = 10.0 if i == len(positions)-1 else 2.0
-            franka.end_effector.go_config(positions, err_thresh=0.05,
-                wait_for_target=True, wait_time=timeout, verbose=True) # TODO: go_guided/go_long_range
-            update_robot(domain, observer.observe(), self.world)
-            #wait_for_duration(1e-3)
-            # TODO: attachments
+        # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
+        # Only position, time_from_start, and velocity are used
+        from moveit_msgs.msg import RobotTrajectory
+        from trajectory_msgs.msg import JointTrajectoryPoint
+        import rospy
+        plan = RobotTrajectory()
+        plan.joint_trajectory.header.frame_id = ISSAC_REFERENCE_FRAME
+        plan.joint_trajectory.header.stamp = rospy.Time(0)
+        plan.joint_trajectory.joint_names = [get_joint_name(self.robot, joint).encode('ascii') #,'ignore')
+                                             for joint in self.joints]
+        speed = 0.1
+        distance_fn = get_distance_fn(self.robot, self.joints)
+        distances = [0] + [distance_fn(*pair) for pair in zip(self.path[:-1], self.path[1:])]
+        time_from_starts = np.cumsum(distances) / speed
+        print(time_from_starts)
+        for i in range(1, len(self.path)):
+            point = JointTrajectoryPoint()
+            point.positions = list(self.path[i])
+            vector = np.array(self.path[i]) - np.array(self.path[i-1])
+            duration = (time_from_starts[i] - time_from_starts[i-1])
+            point.velocities = list(vector / duration)
+            point.accelerations = list(np.ones(len(self.joints)))
+            point.effort = list(np.ones(len(self.joints)))
+            point.time_from_start = rospy.Duration(time_from_starts[i])
+            plan.joint_trajectory.points.append(point)
+        moveit.execute(plan, required_orig_err=0.05, timeout=20.0,
+                       publish_display_trajectory=False)
+
+        #for name, entity in world_state.entities.items():
+        #    if entity.controllable_object is not None:
+        #        #entity.controllable_object.unsuppress()
+        #        entity.controllable_object.suppress() # Propagate to parents?
+        #    # entity.set_detached()
+        #    #domain.attachments[actor] = goal
+        #franka = robot_entity.robot
+        #for i, positions in enumerate(self.path):
+        #    print('{}/{}'.format(i, len(self.path)))
+        #    timeout = 10.0 if i == len(positions)-1 else 2.0
+        #    franka.end_effector.go_config(positions, err_thresh=0.05,
+        #        wait_for_target=True, wait_time=timeout, verbose=True) # TODO: go_guided/go_long_range
+        #    update_robot(self.world, domain, observer.observe())
+        #    #wait_for_duration(1e-3)
+        #    # TODO: attachments
         time.sleep(1.0)
         # TODO: return status
 
@@ -134,7 +163,7 @@ class DoorTrajectory(Command):
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
 
-    def execute(self, domain, world_state, observer):
+    def execute(self, domain, moveit, observer):
         raise NotImplementedError()
         robot_entity = domain.get_robot()
         franka = robot_entity.robot
@@ -167,14 +196,15 @@ class Attach(Command):
             create_attachment(self.robot, self.link, self.body)
         yield
 
-    def execute(self, domain, world_state, observer):
-        robot_entity = domain.get_robot()
-        franka = robot_entity.robot
-        gripper = franka.end_effector.gripper
+    def execute(self, domain, moveit, observer):
+        moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
         # TODO: attach_obj
-        gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
-        update_robot(self.world, domain, observer, observer.observe())
-        time.sleep(1.0)
+        #robot_entity = domain.get_robot()
+        #franka = robot_entity.robot
+        #gripper = franka.end_effector.gripper
+        #gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
+        #update_robot(self.world, domain, observer, observer.observe())
+        #time.sleep(1.0)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
@@ -198,12 +228,14 @@ class Detach(Command):
         del state.attachments[self.robot, self.link, self.body]
         yield
 
-    def execute(self, domain, world_state, observer):
-        robot_entity = domain.get_robot()
-        franka = robot_entity.robot
-        gripper = franka.end_effector.gripper
-        gripper.open(speed=.2, actuate_gripper=True, wait=True)
-        update_robot(domain, observer.observe(), self.world)
+    def execute(self, domain, moveit, observer):
+        moveit.open_gripper(self, speed=0.1, sleep=0.2, wait=True)
+        #robot_entity = domain.get_robot()
+        #franka = robot_entity.robot
+        #gripper = franka.end_effector.gripper
+        #gripper.open(speed=.2, actuate_gripper=True, wait=True)
+        #update_robot(self.world, domain, observer.observe())
+        #time.sleep(1.0)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
@@ -224,7 +256,7 @@ class Wait(Command):
         for _ in range(self.steps):
             yield
 
-    def execute(self, domain, world_state):
+    def execute(self, domain, moveit, observer):
         pass
 
     def __repr__(self):
