@@ -15,7 +15,8 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    SURFACES, DRAWER_JOINTS
+    SURFACES, DRAWER_JOINTS, joint_from_name
+from debug import dump_link_cross_sections
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
 from stream import get_stable_gen
@@ -159,12 +160,16 @@ def main():
     #    world.open_door(joint)
     #    #world.close_door(joint)
     world.open_gripper()
+    #dump_link_cross_sections(world, link_name='indigo_tmp')
+    #wait_for_user()
 
     block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     world.add_body(block_name, get_block_path(block_name))
     #test_grasps(world, block_name)
 
-    surface_name = random.choice(SURFACES) # SURFACES | CABINET_JOINTS
+    #surface_name = random.choice(DRAWER_JOINTS) # SURFACES | CABINET_JOINTS
+    surface_name = DRAWER_JOINTS[1]
+    world.open_door(joint_from_name(world.kitchen, surface_name))
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():

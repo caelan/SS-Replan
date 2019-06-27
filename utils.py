@@ -73,6 +73,9 @@ STOVES = ['range']
 COUNTERS = ['hitman_tmp', 'indigo_tmp']
 SURFACES = COUNTERS + STOVES
 
+SURFACE_BOTTOM = 'bottom'
+SURFACE_TOP = 'top'
+
 LINK_SHAPE_FROM_JOINT = {
     'baker_joint': ('sektion', 'Cube.bottom.004_Cube.028'),
     'chewie_door_left_joint': ('sektion', 'Cube.bottom.002_Cube.020'),
@@ -84,8 +87,8 @@ LINK_SHAPE_FROM_JOINT = {
     'hitman_drawer_top_joint': ('hitman_drawer_top', 'Cube_Cube.001'),
     'hitman_drawer_bottom_joint': ('hitman_drawer_bottom', 'Cube_Cube.001'),
 
-    #'indigo_door_left_joint': ('indigo_tmp', 'Sektion'), # TODO: extract out just the base
-    #'indigo_door_right_joint': ('indigo_tmp', 'Sektion'),
+    #'indigo_door_left_joint': ('indigo_tmp', SURFACE_BOTTOM),
+    #'indigo_door_right_joint': ('indigo_tmp', SURFACE_BOTTOM),
     'indigo_drawer_top_joint': ('indigo_drawer_top', 'Cube_Cube.001'),
     'indigo_drawer_bottom_joint': ('indigo_drawer_bottom', 'Cube_Cube.001'),
 }
@@ -96,7 +99,6 @@ CABINET_JOINTS = [
     #'indigo_door_left_joint', 'indigo_door_right_joint',
 ] # door
 
-# TODO: cannot actually do any drawers yet due to nonconvex hitman and indigo
 DRAWER_JOINTS = [
     'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
     'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',

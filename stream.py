@@ -8,14 +8,14 @@ from pybullet_tools.pr2_primitives import Pose, Conf
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
-    get_aabb, unit_point, Euler, quat_from_euler, get_collision_data, read_obj, \
+    get_aabb, unit_point, Euler, quat_from_euler, read_obj, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
-    draw_aabb, stable_z_on_aabb, \
+    stable_z_on_aabb, \
     is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, wait_for_user, set_color, spaced_colors, add_text, draw_mesh
+    get_distance_fn, get_unit_vector, unit_quat, get_collision_data
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
-    set_tool_pose, close_until_collision, get_descendant_obstacles
+    set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, SURFACE_BOTTOM
 from command import Sequence, Trajectory, Attach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
@@ -42,13 +42,18 @@ def compute_surface_aabb(world, surface_name):
     if surface_name in LINK_SHAPE_FROM_JOINT:
         link_name, shape_name = LINK_SHAPE_FROM_JOINT[surface_name]
     else:
-        link_name, shape_name = surface_name, None
+        link_name, shape_name = surface_name, SURFACE_TOP
     surface_link = link_from_name(world.kitchen, link_name)
     surface_pose = get_link_pose(world.kitchen, surface_link)
-    if shape_name is None:
+    if shape_name == SURFACE_TOP:
         surface_aabb = get_aabb(world.kitchen, surface_link)
+    elif shape_name == SURFACE_BOTTOM:
+        #data = sorted(get_collision_data(world.kitchen, surface_link),
+        #              key=lambda d: point_from_pose(get_data_pose(d))[2])[0]
+        raise NotImplementedError(surface_name)
     else:
-        [data] = get_collision_data(world.kitchen, surface_link)
+        [data] = filter(lambda d: d.filename != '',
+                        get_collision_data(world.kitchen, surface_link))
         local_pose = get_data_pose(data)
         meshes = read_obj(data.filename)
         #colors = spaced_colors(len(meshes))
@@ -176,7 +181,7 @@ def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, m
 ################################################################################
 
 def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
-
+    # TODO: vary based on surface (for drawers)
     def gen_fn(name, pose, grasp):
         assert pose.support is not None
         obj = world.get_body(name)

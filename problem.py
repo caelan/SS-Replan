@@ -66,11 +66,11 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     goal_block = list(world.movable)[0]
     goal_surface = CABINET_JOINTS[0]
     goal_on = {
-        goal_block: goal_surface,
+        #goal_block: goal_surface,
     }
 
     goal_literals = [
-        #('Holding', goal_block),
+        ('Holding', goal_block),
         #('Cooked', goal_block),
     ]
     if return_home:
