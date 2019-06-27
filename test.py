@@ -167,8 +167,8 @@ def main():
     #                    help='TBD')
     #args = parser.parse_args()
     #task = args.task
-    #task = TASKS[2]
-    task = TASKS[4]
+    task = TASKS[2]
+    #task = TASKS[4]
     args = create_args()
     #if args.seed is not None:
     #    set_seed(args.seed)

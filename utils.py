@@ -9,8 +9,8 @@ from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_unti
 from pybullet_tools.utils import connect, HideOutput, load_pybullet, set_point, Point, add_data_path, \
     joints_from_names, joint_from_name, set_joint_positions, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, disconnect, \
-    get_link_subtree, get_link_name, get_links, aabb_union, get_aabb, remove_body, remove_all_debug, \
-    get_bodies, draw_base_limits, draw_pose, clone_body, get_point, set_color, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
+    get_link_subtree, get_link_name, aabb_union, get_aabb, remove_body, get_bodies, draw_base_limits, draw_pose, clone_body, get_point, \
+    get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, get_links, \
     LockRenderer, get_body_name, stable_z, get_joint_limits, read, sub_inverse_kinematics, child_link_from_joint, parent_link_from_joint, \
     get_configuration, get_joint_positions, randomize, unit_point, get_aabb_extent, create_obj, remove_debug
 
@@ -205,24 +205,6 @@ def create_gripper(robot, visual=False):
                 set_color(gripper, np.zeros(4), link)
     return gripper
 
-
-"""
-hitman_tmp Sektion.001
-0 [-0.3659, -0.353204, -0.351749, -0.351666, -0.3469, -0.327754, -0.327671, -0.326216, 0.210606, 0.212061, 0.212144, 0.236056, 0.236139, 0.237594, 0.2441]
-1 [-0.762, -0.761979, -0.743113, -0.743018, -0.743, -0.019, -0.018958, -0.018887, 0.0, 7e-06]
-2 [-0.799, -0.78, -0.038, -0.037, -0.036]
-AABB(lower=array([-0.3659, -0.762 , -0.799 ]), upper=array([ 0.2441  ,  0.000007, -0.036   ]))
-"""
-
-
-Y1 = -0.762
-Y2 = 0.000007
-
-Z1 = -0.799
-Z2 = -0.78
-Z3 = -0.036
-
-
 ################################################################################
 
 EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
@@ -275,29 +257,7 @@ class World(object):
         #dump_body(self.kitchen)
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         #print(self.kitchen_yaml)
-
-        """
-        for joint in self.kitchen_joints:
-            self.open_door(joint)
-        link_name = 'hitman_tmp' # hitman_tmp
-        link = link_from_name(self.kitchen, link_name) # hitman_tmp
-        [data] = get_collision_data(self.kitchen, link)
-
-        meshes = read_obj(data.filename)
-        colors = spaced_colors(len(meshes))
-        link_pose = get_link_pose(self.kitchen, link)
-        for i, (name, mesh) in enumerate(meshes.items()):
-            print(link_name, name)
-            for k in range(3):
-                print(k, sorted({vertex[k]  for vertex in mesh.vertices}))
-            print(aabb_from_points(mesh.vertices))
-            local_pose = get_data_pose(data)
-            tformed_mesh = tform_mesh(multiply(link_pose, local_pose), mesh=mesh)
-            draw_mesh(tformed_mesh, color=colors[i])
-            wait_for_user()
-        """
-
-        set_point(self.kitchen, Point(z=1.35))
+        set_point(self.kitchen, Point(z=stable_z(self.kitchen, self.floor)))
         #draw_pose(get_pose(self.kitchen), length=1)
 
         if USE_TRACK_IK:

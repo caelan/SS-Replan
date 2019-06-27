@@ -2,7 +2,9 @@ import numpy as np
 
 from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, add_text, wait_for_user, remove_debug, \
     link_from_name, get_joints, get_sample_fn, set_joint_positions, sample_placement, set_pose, get_pose, draw_pose, \
-    BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision
+    BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision, get_link_descendants, \
+    set_color, get_collision_data, read_obj, spaced_colors, get_link_pose, aabb_from_points, get_data_pose, tform_mesh, \
+    multiply, draw_mesh
 from utils import get_grasps
 
 
@@ -132,3 +134,35 @@ def test_grasps(world, name):
         wait_for_user()
         for handle in handles:
             remove_debug(handle)
+
+################################################################################
+
+def create_box_geometry(dx, dy, dz):
+    lower, upper = zip(dx, dy, dz)
+    center = (np.array(upper) + np.array(lower)) / 2.
+    extent = (np.array(upper) - np.array(lower))
+    print('Center: {}'.format(center))
+    print('Extent: {}'.format(extent))
+    return center, extent
+
+
+def dump_link_cross_sections(world, link_name='hitman_tmp', digits=3):
+    #for joint in world.kitchen_joints:
+    #    world.open_door(joint)
+    link = link_from_name(world.kitchen, link_name)  # hitman_tmp
+    for descendant_link in get_link_descendants(world.kitchen, link):
+        set_color(world.kitchen, link=descendant_link, color=np.zeros(4))
+
+    [data] = get_collision_data(world.kitchen, link)
+    meshes = read_obj(data.filename)
+    colors = spaced_colors(len(meshes))
+    link_pose = get_link_pose(world.kitchen, link)
+    for i, (name, mesh) in enumerate(meshes.items()):
+        print(link_name, name)
+        for k in range(3):
+            print(k, sorted({round(vertex[k], digits) for vertex in mesh.vertices}))
+        print(aabb_from_points(mesh.vertices))
+        local_pose = get_data_pose(data)
+        tformed_mesh = tform_mesh(multiply(link_pose, local_pose), mesh=mesh)
+        draw_mesh(tformed_mesh, color=colors[i])
+        wait_for_user()

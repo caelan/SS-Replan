@@ -10,9 +10,9 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
     get_aabb, unit_point, Euler, quat_from_euler, get_collision_data, read_obj, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
-    stable_z_on_aabb, \
+    draw_aabb, stable_z_on_aabb, \
     is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, wait_for_user
+    get_distance_fn, get_unit_vector, unit_quat, wait_for_user, set_color, spaced_colors, add_text, draw_mesh
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles
@@ -51,15 +51,17 @@ def compute_surface_aabb(world, surface_name):
         [data] = get_collision_data(world.kitchen, surface_link)
         local_pose = get_data_pose(data)
         meshes = read_obj(data.filename)
-        # colors = spaced_colors(len(meshes))
-        # for i, (name, mesh) in enumerate(meshes.items()):
+        #colors = spaced_colors(len(meshes))
+        #set_color(world.kitchen, link=surface_link, color=np.zeros(4))
         mesh = meshes[shape_name]
+        #for i, (name, mesh) in enumerate(meshes.items()):
         mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=mesh)
         surface_aabb = aabb_from_points(mesh.vertices)
         #add_text(surface_name, position=surface_aabb[1])
         #draw_mesh(mesh, color=colors[i])
         #wait_for_user()
-    # draw_aabb(surface_aabb)
+    #draw_aabb(surface_aabb)
+    #wait_for_user()
     return surface_aabb
 
 
@@ -104,7 +106,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                     break
             p = Pose(body, body_pose, support=selected_name)
             p.assign()
-            if not is_placed_on_aabb(body, surface_aabb):
+            if not is_placed_on_aabb(body, surface_aabb): #, above_epsilon=z_offset+1e-3):
                 continue
             obstacles = world.static_obstacles | get_door_obstacles(world, selected_name)
             if not collisions:
