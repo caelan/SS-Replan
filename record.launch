@@ -1,0 +1,9 @@
+<launch>
+    <arg name="image" default="/camera/rgb/image_rect_color"/>
+    <arg name="nodename" default="recorder"/>
+    <arg name="filename" default="$(find lis_ltamp)/data/video.avi"/>
+
+    <node name="$(arg nodename)" pkg="image_view" type="video_recorder"
+        args = "image:=$(arg image) _filename:=$(arg filename)  _fps:=30  _max_depth_range:=0">
+    </node>
+</launch>
