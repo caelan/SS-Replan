@@ -15,6 +15,7 @@ import brain_ros.kitchen_domain as kitchen_domain
 import brain_ros.kitchen_policies as kitchen_policies
 from brain_ros.sim_test_tools import TrialManager
 #from brain_ros.moveit import MoveitBridge
+#from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, draw_pose, get_pose, set_point, get_point, get_movable_joints, set_joint_positions, get_sample_fn
@@ -207,6 +208,20 @@ def main():
     franka = robot_entity.robot
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/lula_franka/franka.py
     #print(dump_dict(franka))
+
+    # /home/caelan/Programs/srl_system/packages/isaac_bridge/scripts/fake_localization.py
+    # packages/isaac_bridge/scripts/fake_localization.py
+    # packages/isaac_bridge/src/isaac_bridge/publish_carter_pose_as_tf.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_policies.py#L105
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter_sim.py
+    #print(robot_entity.carter_interface, robot_entity.carter_pos, robot_entity.carter_vel)
+
+    #carter = Carter(goal_threshold_tra=0.15, goal_threshold_rot=np.radians(10.))
+    #carter.move_to_safe(goal)
+    #wait_for_user()
+
     #gripper = franka.end_effector.gripper
     #gripper.open(speed=.2, actuate_gripper=True, wait=True)
     trial_manager.set_camera(randomize=False)

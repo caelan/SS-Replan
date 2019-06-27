@@ -110,9 +110,15 @@ ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
 
 ################################################################################
 
+def ycb_type_from_file(path):
+    return path.split('_', 1)[-1]
+
+def get_ycb_types():
+    return sorted(map(ycb_type_from_file, os.listdir(YCB_PATH)))
+
 def get_ycb_obj_path(ycb_type):
     # TODO: simplify geometry
-    path_from_type = {path.split('_', 1)[1]: path for path in os.listdir(YCB_PATH)}
+    path_from_type = {ycb_type_from_file(path): path for path in os.listdir(YCB_PATH)}
     if ycb_type not in path_from_type:
         return None
     # texture_map.png textured.mtl textured.obj textured_simple.obj textured_simple.obj.mtl
@@ -439,7 +445,8 @@ class World(object):
 ################################################################################
 
 class Grasp(object):
-    def __init__(self, world, body_name, grasp_type, index, grasp_pose, pregrasp_pose, grasp_width):
+    def __init__(self, world, body_name, grasp_type, index, grasp_pose, pregrasp_pose,
+                 grasp_width=None):
         self.world = world
         self.body_name = body_name
         self.grasp_type = grasp_type
@@ -482,12 +489,15 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, use_width
             raise ValueError(grasp_type)
 
         for i, grasp_pose in enumerate(randomize(list(generator))):
-            with BodySaver(world.robot):
-                grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
-            if use_width and (grasp_width is None):
+            pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose,
+                                     Pose(point=post_direction))
+            grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose)
+            with BodySaver(body):
+                grasp.get_attachment().assign()
+                with BodySaver(world.robot):
+                    grasp.grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
+            if use_width and (grasp.grasp_width is None):
                 continue
-            pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose, Pose(point=post_direction))
-            grasp = Grasp(world, name, grasp_type, i, grasp_pose, pregrasp_pose, grasp_width)
             yield grasp
 
 ################################################################################

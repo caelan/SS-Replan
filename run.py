@@ -15,8 +15,8 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    SURFACES, DRAWER_JOINTS, joint_from_name
-from debug import dump_link_cross_sections
+    SURFACES, DRAWER_JOINTS, joint_from_name, get_ycb_obj_path
+from debug import dump_link_cross_sections, test_grasps
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
 from stream import get_stable_gen
@@ -163,9 +163,12 @@ def main():
     #dump_link_cross_sections(world, link_name='indigo_tmp')
     #wait_for_user()
 
-    block_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    world.add_body(block_name, get_block_path(block_name))
-    #test_grasps(world, block_name)
+    #entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+    #entity_path = get_block_path(entity_name)
+    entity_name = 'potted_meat_can'
+    entity_path = get_ycb_obj_path(entity_name)
+    world.add_body(entity_name, entity_path)
+    test_grasps(world, entity_name)
 
     #surface_name = random.choice(DRAWER_JOINTS) # SURFACES | CABINET_JOINTS
     surface_name = DRAWER_JOINTS[1]
@@ -174,7 +177,7 @@ def main():
     print('Initial surface:', surface_name)
     with WorldSaver():
         placement_gen = get_stable_gen(world, learned=False, pos_scale=1e-3, rot_scale=1e-2)
-        pose, = next(placement_gen(block_name, surface_name), (None,))
+        pose, = next(placement_gen(entity_name, surface_name), (None,))
     assert pose is not None
     pose.assign()
 
