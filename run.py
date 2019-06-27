@@ -15,7 +15,7 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    SURFACES
+    SURFACES, DRAWER_JOINTS
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
 from stream import get_stable_gen
@@ -168,13 +168,14 @@ def main():
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():
-        placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
+        placement_gen = get_stable_gen(world, learned=False, pos_scale=1e-3, rot_scale=1e-2)
         pose, = next(placement_gen(block_name, surface_name), (None,))
     assert pose is not None
     pose.assign()
 
     problem = pdddlstream_from_problem(
-        world, collisions=not args.cfree, teleport=args.teleport)
+        world, close_doors=True, return_home=True,
+        collisions=not args.cfree, teleport=args.teleport)
     commands = solve_pddlstream(world, problem, args)
     simulate_plan(world, commands, args)
     world.destroy()

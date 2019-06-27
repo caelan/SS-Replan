@@ -67,7 +67,8 @@ def get_door_obstacles(world, surface_name):
     if surface_name not in LINK_SHAPE_FROM_JOINT:
         return set() # Could just return the link I suppose
     joint = joint_from_name(world.kitchen, surface_name)
-    world.open_door(joint)
+    if joint in world.kitchen_joints:
+        world.open_door(joint)
     # Be careful to call this before each check
     return get_descendant_obstacles(world.kitchen, joint)
 

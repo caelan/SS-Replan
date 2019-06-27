@@ -95,11 +95,14 @@ CABINET_JOINTS = [
     'dagger_door_left_joint', 'dagger_door_right_joint',
     #'indigo_door_left_joint', 'indigo_door_right_joint',
 ] # door
+
 # TODO: cannot actually do any drawers yet due to nonconvex hitman and indigo
 DRAWER_JOINTS = [
-    #'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
-    #'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
+    'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
+    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
+
+MOVABLE_JOINTS = CABINET_JOINTS # + DRAWER_JOINTS
 
 ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
 
@@ -335,7 +338,7 @@ class World(object):
     def kitchen_joints(self):
         #return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
         return joints_from_names(self.kitchen, filter(
-            CABINET_JOINTS.__contains__, self.kitchen_yaml['cspace']))
+            MOVABLE_JOINTS.__contains__, self.kitchen_yaml['cspace']))
     @property
     def tool_link(self):
         return link_from_name(self.robot, get_tool_link(self.robot))

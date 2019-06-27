@@ -103,19 +103,28 @@ def constraints_from_plan(plan):
 def goal_formula_from_goal(goals):
     #regex = re.compile(r"(\w+)\((\)\n")
     # TODO: return initial literals as well
+    init = []
     goal_literals = []
     for head, value in goals:
-        predicate, args = head.strip(')').split('(')
-        obj = args
+        predicate, arguments = head.strip(')').split('(')
+        args = [arg.strip() for arg in arguments.split(',')]
         if predicate == 'on_counter':
+            obj, = args
             surface = 'indigo_tmp'
             atom = ('On', obj, surface)
         #elif predicate == '???':
         #    atom = ('Holding', obj)
+        elif predicate == 'in_drawer':
+            obj, drawer = args
+            surface = '{}_joint'.format(drawer)
+            init.append(('Stackable', obj, surface))
+            atom = ('On', obj, surface)
         else:
-            raise NotImplementedError(predicate)
+            print('Skipping {}={}'.format(head, value))
+            continue
+            #raise NotImplementedError(predicate)
         goal_literals.append(atom if value else Not(atom))
-    return And(*goal_literals)
+    return init, And(*goal_literals)
 
 def create_trial_args(**kwargs):
     args = lambda: None # Dummy class
@@ -143,7 +152,11 @@ def create_trial_args(**kwargs):
     # TODO: use setattr
     return args
 
-TASKS = ['open bottom', 'open top', 'pick spam', 'put away', 'put spam']
+TASKS = [
+    'open bottom', 'open top', 'pick spam',
+    'put away', # tomato_soup_can
+    'put spam',
+]
 
 
 def main():
@@ -154,7 +167,8 @@ def main():
     #                    help='TBD')
     #args = parser.parse_args()
     #task = args.task
-    task = TASKS[2]
+    #task = TASKS[2]
+    task = TASKS[4]
     args = create_args()
     #if args.seed is not None:
     #    set_seed(args.seed)
@@ -181,7 +195,7 @@ def main():
     objects, goal, plan = trial_manager.get_task(task=task, reset=True) # Need to reset at the start
     goals = [(h.format(o), v) for h, v in goal for o in objects]
     print(goals)
-    goal_formula = goal_formula_from_goal(goals)
+    additional_init, goal_formula = goal_formula_from_goal(goals)
     # TODO: fixed_base_suppressors
 
     #trial_manager.disable() # Disables collisions
@@ -224,13 +238,14 @@ def main():
     # TODO: initial robot base conf is in collision
     problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
                                        collisions=not args.cfree, teleport=args.teleport)
+    problem[-2].extend(additional_init)
     problem = problem[:-1] + (goal_formula,)
     saver = WorldSaver()
     commands = solve_pddlstream(world, problem, args)
-    #simulate_plan(world, commands, args)
+    simulate_plan(world, commands, args)
     if commands is None:
         return
-    wait_for_user()
+    #wait_for_user()
     saver.restore()
 
     #sim_manager.pause() # Careful! This actually does pause the system

@@ -62,7 +62,6 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
 
     if fixed_base:
         world.carry_conf = init_aq
-        ALL_SURFACES[:] = ['indigo_tmp'] # TODO: hack for now
 
     goal_block = list(world.movable)[0]
     goal_surface = CABINET_JOINTS[0]
