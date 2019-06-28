@@ -13,9 +13,13 @@ PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
 sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 
 
-from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver
+from pybullet_tools.pr2_utils import get_viewcone
+from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver, \
+    get_pose, RED, apply_alpha, set_pose, multiply, get_point, add_line, point_from_pose, \
+    ray_collision, batch_ray_collision, Ray, get_ray, create_box, approximate_as_prism, \
+    Pose, create_cylinder, create_sphere, step_simulation, enable_gravity, set_all_static
 from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    SURFACES, DRAWER_JOINTS, joint_from_name, get_ycb_obj_path
+    SURFACES, DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, remove_body
 from debug import dump_link_cross_sections, test_grasps
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
@@ -149,6 +153,28 @@ def simulate_plan(world, commands, args):
 
 ################################################################################
 
+KITCHEN_FROM_ZED_LEFT = (
+    (1.0600011348724365, 1.529999017715454, 0.5699998736381531),
+    (-0.10374931246042252, 0.9274755120277405, -0.19101102650165558, -0.30420398712158203))
+
+CAMERA_MATRIX = [[ 532.569,    0.,     320.,   ],
+                 [   0.,     532.569,  240.,   ],
+                 [   0.,       0.,       1.,   ]]
+
+def test_rays(zed_left_point, entity_body):
+    vector = get_ray(Ray(zed_left_point, get_point(entity_body)))
+    ray = Ray(zed_left_point, zed_left_point + 2*vector)
+
+    ray_result = ray_collision(ray)
+    print(ray_result)
+    if ray_result.objectUniqueId == -1:
+        hit_position = ray.end
+    else:
+        hit_position = ray_result.hit_position
+    add_line(ray.start, hit_position)
+    add_line(hit_position, ray.end, color=RED)
+    wait_for_user()
+
 def main():
     args = create_args()
     #if args.seed is not None:
@@ -163,12 +189,15 @@ def main():
     #dump_link_cross_sections(world, link_name='indigo_tmp')
     #wait_for_user()
 
-    #entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    #entity_path = get_block_path(entity_name)
-    entity_name = 'potted_meat_can'
-    entity_path = get_ycb_obj_path(entity_name)
+    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+    entity_path = get_block_path(entity_name)
+
+    #entity_name = 'potted_meat_can'
+    #entity_path = get_ycb_obj_path(entity_name)
+
     world.add_body(entity_name, entity_path)
-    test_grasps(world, entity_name)
+    #test_grasps(world, entity_name)
+    set_all_static()
 
     #surface_name = random.choice(DRAWER_JOINTS) # SURFACES | CABINET_JOINTS
     surface_name = DRAWER_JOINTS[1]
@@ -180,6 +209,12 @@ def main():
         pose, = next(placement_gen(entity_name, surface_name), (None,))
     assert pose is not None
     pose.assign()
+
+    # TODO: could intersect convex with half plane
+    world_from_zed_left = multiply(get_pose(world.kitchen), KITCHEN_FROM_ZED_LEFT)
+    cone_body = get_viewcone(camera_matrix=CAMERA_MATRIX, color=apply_alpha(RED, 0.1))
+    set_pose(cone_body, world_from_zed_left)
+    #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
 
     problem = pdddlstream_from_problem(
         world, close_doors=True, return_home=True,

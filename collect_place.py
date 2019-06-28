@@ -165,16 +165,8 @@ def main():
         TOP_GRASP: RED,
         SIDE_GRASP: BLUE,
     }
-    combinations = []
-    for surface_name in surface_names:
-        # TODO: don't specify combinations. Let failure teach what works
-        if surface_name in CABINET_JOINTS:
-            grasp_types = [SIDE_GRASP]
-        elif surface_name in DRAWER_JOINTS:
-            grasp_types = [TOP_GRASP]
-        else:
-            grasp_types = GRASP_TYPES
-        combinations.extend((surface_name, grasp_type) for grasp_type in grasp_types)
+    combinations = [(surface_name, grasp_type) for surface_name in surface_names
+                    for grasp_type in GRASP_TYPES]
     print('Combinations:', combinations)
     for surface_name, grasp_type in combinations:
         #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])

@@ -89,7 +89,7 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
                       "Err:{}".format(target_frame, source_frame, e))
         return None
 
-def display_camera(observer):
+def display_kinect(world, observer):
     from image_geometry import PinholeCameraModel
     from sensor_msgs.msg import CameraInfo
     import rospy
@@ -107,12 +107,16 @@ def display_camera(observer):
         #print(camera_matrix)
         #print(camera_info)
         #camera_matrix = None
+        #print(camera_matrix)
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
-        camera_pose = lookup_pose(observer.tf_listener, ISAAC_CAMERA_FRAME)
+        world_from_camera = lookup_pose(observer.tf_listener, ISAAC_CAMERA_FRAME)
         cone_body = get_viewcone(camera_matrix=camera_matrix, color=apply_alpha(RED, 0.1))
-        set_pose(cone_body, camera_pose)
-        # draw_viewcone(camera_pose)
+        set_pose(cone_body, world_from_camera)
+        #kitchen_from_camera = multiply(invert(get_pose(world.kitchen)), world_from_camera)
+        #print(kitchen_from_camera)
+
+        # draw_viewcone(world_from_camera)
         # /sim/left_color_camera/camera_info
         # /sim/left_depth_camera/camera_info
         # /sim/right_color_camera/camera_info
@@ -158,7 +162,7 @@ def update_world(world, domain, observer, world_state):
         else:
             raise NotImplementedError(entity.__class__)
     world.update_custom_limits()
-    display_camera(observer)
+    display_kinect(world, observer)
 
 ################################################################################
 
