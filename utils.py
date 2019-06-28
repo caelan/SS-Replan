@@ -104,6 +104,9 @@ DRAWER_JOINTS = [
     'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
 
+LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
+                'dagger_door_left_joint', 'dagger_door_right_joint']
+
 MOVABLE_JOINTS = CABINET_JOINTS + DRAWER_JOINTS
 
 ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
