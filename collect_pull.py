@@ -41,16 +41,17 @@ def collect_pull(world, joint_name, args):
     start_time = time.time()
     while (len(joint_from_base_list) < args.num_samples) and \
             (elapsed_time(start_time) < args.max_time):
-        result = next(pull_gen(joint_name, closed_conf, open_conf), None)
+        result = next(pull_gen(joint_name, open_conf, closed_conf), None)
         if result is None:
             print('Failure! | {} / {} [{:.3f}]'.format(
                 len(joint_from_base_list), args.num_samples, elapsed_time(start_time)))
             failures += 1
             continue
-        closed_conf.assign()
+        open_conf.assign()
         bq, aq, at = result
         bq.assign()
         aq.assign()
+        #next(at.commands[2].iterate(None, None))
         base_pose = get_link_pose(world.robot, base_link)
         #handle_pose = get_link_pose(world.robot, base_link)
         joint_from_base = multiply(invert(parent_pose), base_pose)
