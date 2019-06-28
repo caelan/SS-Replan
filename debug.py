@@ -4,7 +4,7 @@ from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, 
     link_from_name, get_joints, get_sample_fn, set_joint_positions, sample_placement, set_pose, get_pose, draw_pose, \
     BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision, get_link_descendants, \
     set_color, get_collision_data, read_obj, spaced_colors, get_link_pose, aabb_from_points, get_data_pose, tform_mesh, \
-    multiply, draw_mesh
+    multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray
 from utils import get_grasps
 
 
@@ -166,3 +166,14 @@ def dump_link_cross_sections(world, link_name='hitman_tmp', digits=3):
         tformed_mesh = tform_mesh(multiply(link_pose, local_pose), mesh=mesh)
         draw_mesh(tformed_mesh, color=colors[i])
         wait_for_user()
+
+################################################################################
+
+def test_rays(zed_left_point, entity_body):
+    vector = get_ray(Ray(zed_left_point, get_point(entity_body)))
+    ray = Ray(zed_left_point, zed_left_point + 2*vector)
+
+    ray_result = ray_collision(ray)
+    print(ray_result)
+    draw_ray(ray, ray_result)
+    wait_for_user()

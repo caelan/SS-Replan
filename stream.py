@@ -81,6 +81,18 @@ def get_door_obstacles(world, surface_name):
 
 ################################################################################
 
+def test_supported(world, body, surface_name, collisions=True):
+    surface_aabb = compute_surface_aabb(world, surface_name)
+    if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
+        return False
+    obstacles = world.static_obstacles | get_door_obstacles(world, surface_name)
+    if not collisions:
+        obstacles = set()
+    # print([get_link_name(obst[0], *obst[1]) for obst in obstacles
+    #       if pairwise_collision(body, obst)])
+    # wait_for_user()
+    return not any(pairwise_collision(body, obst) for obst in obstacles) # if obst not in {body, surface}):
+
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=5e-3, **kwargs):
     # TODO: remove fixed collisions with contained surfaces
@@ -111,16 +123,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                     break
             p = Pose(body, body_pose, support=selected_name)
             p.assign()
-            if not is_placed_on_aabb(body, surface_aabb): #, above_epsilon=z_offset+1e-3):
-                continue
-            obstacles = world.static_obstacles | get_door_obstacles(world, selected_name)
-            if not collisions:
-                obstacles = set()
-            #print([get_link_name(obst[0], *obst[1]) for obst in obstacles
-            #       if pairwise_collision(body, obst)])
-            #wait_for_user()
-            if not any(pairwise_collision(body, obst) for obst in obstacles):
-                       #if obst not in {body, surface}):
+            if test_supported(world, body, selected_name, collisions=collisions):
                 yield (p,)
     return gen
 
