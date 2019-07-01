@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, child_link_from_joint
 
-from utils import get_grasps, SURFACE_LINKS, iterate_approach_path, \
+from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
     SURFACE_BOTTOM, get_surface
 from command import Sequence, Trajectory, Attach, State, DoorTrajectory
@@ -51,12 +51,11 @@ def get_compute_pose_kin(world):
     return fn
 
 def get_compute_angle_kin(world):
-    def fn(j, a):
+    def fn(o, j, a):
         a.assign()
-        [joint] = a.joints
-        link = child_link_from_joint(joint)
+        link = link_from_name(world.kitchen, o)
         link_pose = get_link_pose(world.kitchen, link)
-        p = Pose(None, link_pose)
+        p = Pose((world.kitchen, link), link_pose, support=a)
         return (p,)
     return fn
 
@@ -121,16 +120,14 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
     # TODO: remove fixed collisions with contained surfaces
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
-        surface_names = SURFACE_LINKS if surface_name is None else [surface_name]
+        surface_aabb = compute_surface_aabb(world, surface_name)
+        learned_poses = load_placements(world, surface_name)
         while True:
-            selected_name = random.choice(surface_names)
-            surface_aabb = compute_surface_aabb(world, selected_name)
             if learned:
-                poses = load_placements(world, selected_name)
-                if not poses:
+                if not learned_poses:
                     break
-                surface_pose = get_surface_reference_pose(world.kitchen, selected_name)
-                body_pose = multiply(surface_pose, random.choice(poses))
+                surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
+                body_pose = multiply(surface_pose, random.choice(learned_poses))
                 [x, y, _] = point_from_pose(body_pose)
                 _, _, yaw = euler_from_quat(quat_from_pose(body_pose))
                 dx, dy = np.random.normal(scale=pos_scale, size=2)
@@ -144,9 +141,9 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=z_offset)
                 if body_pose is None:
                     break
-            p = Pose(body, body_pose, support=selected_name)
+            p = Pose(body, body_pose, support=surface_name)
             p.assign()
-            if test_supported(world, body, selected_name, collisions=collisions):
+            if test_supported(world, body, surface_name, collisions=collisions):
                 yield (p,)
     return gen
 

@@ -14,7 +14,7 @@ from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose
 from stream import get_stable_gen, compute_surface_aabb, test_supported
-from utils import SURFACE_LINKS
+from utils import OPEN_SURFACES
 
 KITCHEN_FROM_ZED_LEFT = (
     (1.0600011348724365, 1.529999017715454, 0.5699998736381531),
@@ -112,7 +112,7 @@ def compute_normalization(particles):
 
 def create_belief(world, entity_name, n=100):
     # TODO: halton seqeunce
-    surfaces = SURFACE_LINKS[1:2]
+    surfaces = OPEN_SURFACES[1:2]
     surface_dist = UniformDist(surfaces)
     particles = []
     handles = []

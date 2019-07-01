@@ -5,8 +5,10 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
-from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment
-from utils import STOVE_LINKS, GRASP_TYPES, ALL_SURFACES, CABINET_LINKS, DRAWER_LINKS, get_surface
+from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment, \
+    child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed
+from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
+    get_surface, COUNTERS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
@@ -54,7 +56,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         Equal(('PlaceCost',), 1),
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
-    ] + [('Type', name, 'stove') for name in STOVE_LINKS] + \
+    ] + [('Type', name, 'stove') for name in STOVES] + \
            [('Status', status) for status in DOOR_STATUSES]
     if movable_base:
         init.append(('MovableBase',))
@@ -67,8 +69,9 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         world.carry_conf = init_aq
 
     goal_block = list(world.movable)[0]
-    #goal_surface = CABINET_LINKS[0]
-    goal_surface = DRAWER_LINKS[0]
+    #goal_surface = CABINETS[0]
+    goal_surface = DRAWERS[0]
+    #goal_surface = COUNTERS[1]
     goal_on = {
         goal_block: goal_surface,
     }
@@ -79,34 +82,6 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     ]
     if return_home:
         goal_literals.append(('AtBConf', init_bq))
-    for name in world.movable:
-        # TODO: raise above surface and simulate to exploit physics
-        body = world.get_body(name)
-        supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
-            body, compute_surface_aabb(world, surface),
-            above_epsilon=1e-2, below_epsilon=5e-2)]
-        if len(supporting) != 1:
-            print(name, supporting)
-            raise RuntimeError()
-        [surface_name] = supporting
-        # TODO: extract out the joint
-        surface = get_surface(surface_name)
-        surface_link = link_from_name(world.kitchen, surface.link)
-        attachment = create_attachment(world.kitchen, surface_link, body)
-        world.initial_attachments[body] = attachment
-        pose = Pose(body, support=surface_name, init=True)
-        #pose = Pose(body, attachment.grasp_pose, support=joint_name, init=True)
-        init += [
-            ('Graspable', name),
-            ('Pose', name, pose),
-            ('Supported', name, pose, surface_name),
-            ('Stackable', name, None),
-            ('AtPose', name, pose),
-            #('RelPose', name, pose, joint_name),
-            #('AtRelPose', name, pose, joint_name),
-        ]
-    #for body, ty in problem.body_types:
-    #    init += [('Type', body, ty)]
 
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
@@ -118,6 +93,46 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             goal_literals.append(('DoorStatus', joint_name, CLOSED))
         for conf in [initial_conf, open_conf, closed_conf]:
             init.append(('Angle', joint_name, conf))
+
+    for surface_name in ALL_SURFACES:
+        surface = get_surface(surface_name)
+        surface_link = link_from_name(world.kitchen, surface.link)
+        parent_joint = parent_joint_from_link(surface_link)
+        if is_fixed(world.kitchen, parent_joint):
+            pose = Pose((world.kitchen, surface_link),
+                        get_link_pose(world.kitchen, surface_link), init=True)
+            init.extend([
+                ('WorldPose', surface_name, pose),
+                ('RelPose', surface_name, pose, 'world'),
+                ('AtRelPose', surface_name, pose, 'world'),
+            ])
+        else:
+            joint_name = get_joint_name(world.kitchen, parent_joint)
+            init.append(('Connected', surface_name, joint_name))
+
+    for name in world.movable:
+        # TODO: raise above surface and simulate to exploit physics
+        body = world.get_body(name)
+        supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
+            body, compute_surface_aabb(world, surface),
+            above_epsilon=1e-2, below_epsilon=5e-2)]
+        if len(supporting) != 1:
+            print(name, supporting)
+            raise RuntimeError()
+        [surface_name] = supporting
+        surface = get_surface(surface_name)
+        surface_link = link_from_name(world.kitchen, surface.link)
+        attachment = create_attachment(world.kitchen, surface_link, body)
+        world.initial_attachments[body] = attachment
+        # TODO: use the pose of the drawer that was computed above
+        pose = Pose(body, attachment.grasp_pose, support=surface_name, init=True)
+        init += [
+            ('Graspable', name),
+            ('RelPose', name, pose, surface_name),
+            ('AtRelPose', name, pose, surface_name),
+        ] + [('Stackable', name, counter) for counter in COUNTERS]
+    #for body, ty in problem.body_types:
+    #    init += [('Type', body, ty)]
 
     #if problem.goal_conf is not None:
     #    goal_conf = Conf(robot, get_group_joints(robot, 'base'), problem.goal_conf)
@@ -140,12 +155,12 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         'test-door': from_test(get_door_test(world)),
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
-        'inverse-kinematics': from_gen_fn(get_pick_gen(world, **kwargs)),
+        'plan-pick': from_gen_fn(get_pick_gen(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen(world, **kwargs)),
         'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
 
-        'fixed-inverse-kinematics': from_gen_fn(get_pick_ik_fn(world, **kwargs)),
+        'fixed-plan-pick': from_gen_fn(get_pick_ik_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen(world, **kwargs)),
 
         'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
@@ -153,9 +168,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
-        'test-cfree-approach-angle': from_test(get_cfree_approach_angle_test(world, **kwargs)),
         'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
-        'test-cfree-traj-angle': from_test(get_cfree_traj_angle_test(world, **kwargs)),
 
         # 'MoveCost': move_cost_fn,
         'Distance': base_cost_fn,

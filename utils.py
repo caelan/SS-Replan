@@ -65,20 +65,20 @@ EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.ur
 
 ################################################################################
 
-STOVE_LINKS = ['range']
-COUNTER_LINKS = ['hitman_tmp', 'indigo_tmp']
-SURFACE_LINKS = COUNTER_LINKS + STOVE_LINKS
+STOVES = ['range']
+COUNTERS = ['hitman_tmp', 'indigo_tmp']
+OPEN_SURFACES = COUNTERS + STOVES
 
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
 
-CABINET_LINKS = [
+CABINETS = [
     'baker', 'chewie_left', 'chewie_right',
     'dagger_left', 'dagger_right',
     #'indigo_tmp_bottom',
 ]
 
-DRAWER_LINKS = [
+DRAWERS = [
     'hitman_drawer_top', #'hitman_drawer_bottom',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
@@ -101,10 +101,11 @@ SURFACE_FROM_NAME = {
     'indigo_drawer_bottom': Surface('indigo_drawer_bottom', 'Cube_Cube.001', ['indigo_drawer_bottom_joint']),
 }
 
-ALL_SURFACES = SURFACE_LINKS + CABINET_LINKS + DRAWER_LINKS
+ALL_SURFACES = OPEN_SURFACES + CABINETS + DRAWERS
 
 CABINET_JOINTS = [
-    'baker_joint', 'chewie_door_left_joint', 'chewie_door_right_joint',
+    'baker_joint',
+    'chewie_door_left_joint', 'chewie_door_right_joint',
     'dagger_door_left_joint', 'dagger_door_right_joint',
     #'indigo_door_left_joint', 'indigo_door_right_joint',
 ] # door
