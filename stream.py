@@ -11,11 +11,11 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     get_aabb, unit_point, Euler, quat_from_euler, read_obj, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, unit_pose, \
-    child_link_from_joint
+    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, child_link_from_joint
 
-from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
-    set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, SURFACE_BOTTOM
+from utils import get_grasps, SURFACE_LINKS, iterate_approach_path, \
+    set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
+    SURFACE_BOTTOM, get_surface
 from command import Sequence, Trajectory, Attach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
@@ -37,14 +37,16 @@ def trajectory_cost_fn(t):
     return BASE_CONSTANT + distance / BASE_VELOCITY
 
 def get_compute_pose_kin(world):
-    def fn(o1, p1, rp, o2):
+    def fn(o1, rp, o2, p2):
         if o1 == o2:
             return None
-        if np.allclose(p1, unit_pose()): # Identity
-            return (rp,)
-        if np.allclose(rp, unit_pose()): # Identity
-            return (p1,)
-        p2 = multiply(p1, rp)
+        #if np.allclose(p2.value, unit_pose()):
+        #    return (rp,)
+        #if np.allclose(rp.value, unit_pose()):
+        #    return (p2,)
+        body = world.get_body(o1)
+        world_from_obj = multiply(p2.value, rp.value)
+        p2 = Pose(body, world_from_obj, support=o2)
         return (p2,)
     return fn
 
@@ -60,23 +62,16 @@ def get_compute_angle_kin(world):
 
 ################################################################################
 
-def get_surface_link(world, surface_name):
-    if surface_name in LINK_SHAPE_FROM_JOINT:
-        link_name, shape_name = LINK_SHAPE_FROM_JOINT[surface_name]
-    else:
-        link_name, shape_name = surface_name, SURFACE_TOP
-    surface_link = link_from_name(world.kitchen, link_name)
-    return surface_link, shape_name
-
-def compute_surface_aabb(world, surface_name):
-    surface_link, shape_name = get_surface_link(world, surface_name)
+def compute_surface_aabb(world, name):
+    surface_name, shape_name, _ = get_surface(name)
+    surface_link = link_from_name(world.kitchen, surface_name)
     surface_pose = get_link_pose(world.kitchen, surface_link)
     if shape_name == SURFACE_TOP:
         surface_aabb = get_aabb(world.kitchen, surface_link)
     elif shape_name == SURFACE_BOTTOM:
         #data = sorted(get_collision_data(world.kitchen, surface_link),
         #              key=lambda d: point_from_pose(get_data_pose(d))[2])[0]
-        raise NotImplementedError(surface_name)
+        raise NotImplementedError(shape_name)
     else:
         [data] = filter(lambda d: d.filename != '',
                         get_collision_data(world.kitchen, surface_link))
@@ -97,13 +92,15 @@ def compute_surface_aabb(world, surface_name):
 
 
 def get_door_obstacles(world, surface_name):
-    if surface_name not in LINK_SHAPE_FROM_JOINT:
-        return set() # Could just return the link I suppose
-    joint = joint_from_name(world.kitchen, surface_name)
-    if joint in world.kitchen_joints:
-        world.open_door(joint)
+    surface = get_surface(surface_name)
+    obstacles = set()
+    for joint_name in surface.joints:
+        joint = joint_from_name(world.kitchen, joint_name)
+        if joint in world.kitchen_joints:
+            world.open_door(joint)
+        obstacles.update(get_descendant_obstacles(world.kitchen, joint))
     # Be careful to call this before each check
-    return get_descendant_obstacles(world.kitchen, joint)
+    return obstacles
 
 ################################################################################
 
@@ -124,7 +121,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
     # TODO: remove fixed collisions with contained surfaces
     def gen(body_name, surface_name):
         body = world.get_body(body_name)
-        surface_names = SURFACES if surface_name is None else [surface_name]
+        surface_names = SURFACE_LINKS if surface_name is None else [surface_name]
         while True:
             selected_name = random.choice(surface_names)
             surface_aabb = compute_surface_aabb(world, selected_name)

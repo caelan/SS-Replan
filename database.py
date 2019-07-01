@@ -5,8 +5,8 @@ import random
 import numpy as np
 
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
-    euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names
-from utils import GRASP_TYPES, get_kitchen_parent, BASE_JOINTS, joint_from_name
+    euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint
+from utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
@@ -34,10 +34,9 @@ def get_date():
 ################################################################################
 
 def get_surface_reference_pose(kitchen, surface_name):
-    parent_name = get_kitchen_parent(surface_name)
-    parent_link = link_from_name(kitchen, parent_name)
-    return get_link_pose(kitchen, parent_link)
-
+    surface = get_surface(surface_name)
+    link = link_from_name(kitchen, surface.link)
+    return get_link_pose(kitchen, link)
 
 def load_place_database(robot_name, surface_name, grasp_type, field):
     filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
@@ -47,7 +46,6 @@ def load_place_database(robot_name, surface_name, grasp_type, field):
         return []
     data = read_json(path)
     return data[field]
-
 
 def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
     # TODO: could also annotate which grasp came with which placement
@@ -81,6 +79,11 @@ def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
 
 ################################################################################
 
+def get_joint_reference_pose(kitchen, surface_name):
+    joint = joint_from_name(kitchen, surface_name)
+    link = parent_link_from_joint(kitchen, joint)
+    return get_link_pose(kitchen, link)
+
 def load_pull_database(robot_name, joint_name):
     filename = PULL_IR_FILENAME.format(robot_name=robot_name, joint_name=joint_name)
     path = os.path.join(DATABASE_DIRECTORY, filename)
@@ -91,7 +94,7 @@ def load_pull_database(robot_name, joint_name):
 
 def load_pull_base_poses(world, joint_name):
     joint_from_base_list = load_pull_database(world.robot_name, joint_name)
-    parent_pose = get_surface_reference_pose(world.kitchen, joint_name)
+    parent_pose = get_joint_reference_pose(world.kitchen, joint_name)
     random.shuffle(joint_from_base_list)
     handles = []
     for joint_from_base in joint_from_base_list:

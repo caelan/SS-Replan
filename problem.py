@@ -6,12 +6,13 @@ from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
 from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment
-from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS, DRAWER_JOINTS
+from utils import STOVE_LINKS, GRASP_TYPES, ALL_SURFACES, CABINET_LINKS, DRAWER_LINKS, get_surface
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
     get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, \
-    get_fixed_pull_gen, get_surface_link, get_compute_angle_kin, get_compute_pose_kin
+    get_fixed_pull_gen, get_compute_angle_kin, get_compute_pose_kin, \
+    link_from_name, get_link_pose
 
 
 def existential_quantification(goal_literals):
@@ -53,7 +54,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         Equal(('PlaceCost',), 1),
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
-    ] + [('Type', name, 'stove') for name in STOVES] + \
+    ] + [('Type', name, 'stove') for name in STOVE_LINKS] + \
            [('Status', status) for status in DOOR_STATUSES]
     if movable_base:
         init.append(('MovableBase',))
@@ -66,8 +67,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         world.carry_conf = init_aq
 
     goal_block = list(world.movable)[0]
-    #goal_surface = CABINET_JOINTS[0]
-    goal_surface = DRAWER_JOINTS[0]
+    #goal_surface = CABINET_LINKS[0]
+    goal_surface = DRAWER_LINKS[0]
     goal_on = {
         goal_block: goal_surface,
     }
@@ -86,18 +87,24 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
             print(name, supporting)
-            continue
-        [surface] = supporting
-        surface_link, _ = get_surface_link(world, surface)
-        world.initial_attachments[body] = create_attachment(world.kitchen, surface_link, body)
-        pose = Pose(body, support=surface, init=True)
+            raise RuntimeError()
+        [surface_name] = supporting
+        # TODO: extract out the joint
+        surface = get_surface(surface_name)
+        surface_link = link_from_name(world.kitchen, surface.link)
+        attachment = create_attachment(world.kitchen, surface_link, body)
+        world.initial_attachments[body] = attachment
+        pose = Pose(body, support=surface_name, init=True)
+        #pose = Pose(body, attachment.grasp_pose, support=joint_name, init=True)
         init += [
             ('Graspable', name),
             ('Pose', name, pose),
-            ('Supported', name, pose, surface),
+            ('Supported', name, pose, surface_name),
             ('Stackable', name, None),
             ('AtPose', name, pose),
-        ] # + [('Stackable', name, surface) for surface in STOVES + [None]]
+            #('RelPose', name, pose, joint_name),
+            #('AtRelPose', name, pose, joint_name),
+        ]
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
 

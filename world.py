@@ -8,7 +8,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect
 from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
-    KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, MOVABLE_JOINTS, \
+    KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS
 
 
@@ -83,7 +83,7 @@ class World(object):
     def kitchen_joints(self):
         #return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
         return joints_from_names(self.kitchen, filter(
-            MOVABLE_JOINTS.__contains__, self.kitchen_yaml['cspace']))
+            ALL_JOINTS.__contains__, self.kitchen_yaml['cspace']))
     @property
     def tool_link(self):
         return link_from_name(self.robot, get_tool_link(self.robot))

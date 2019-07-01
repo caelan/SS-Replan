@@ -16,7 +16,7 @@ from utils import BASE_JOINTS
 from world import World
 from stream import get_pull_gen
 
-from database import DATABASE_DIRECTORY, get_date, get_surface_reference_pose, PULL_IR_FILENAME
+from database import DATABASE_DIRECTORY, get_date, get_joint_reference_pose, PULL_IR_FILENAME
 
 
 def collect_pull(world, joint_name, args):
@@ -24,7 +24,7 @@ def collect_pull(world, joint_name, args):
     #set_seed(args.seed)
 
     base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
-    parent_pose = get_surface_reference_pose(world.kitchen, joint_name)
+    parent_pose = get_joint_reference_pose(world.kitchen, joint_name)
 
     joint = joint_from_name(world.kitchen, joint_name)
     closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])

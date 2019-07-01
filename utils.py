@@ -4,6 +4,8 @@ import os
 import numpy as np
 import yaml
 
+from collections import namedtuple
+
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, \
@@ -63,30 +65,43 @@ EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.ur
 
 ################################################################################
 
-KITCHEN = 'kitchen'
-STOVES = ['range']
-COUNTERS = ['hitman_tmp', 'indigo_tmp']
-SURFACES = COUNTERS + STOVES
+STOVE_LINKS = ['range']
+COUNTER_LINKS = ['hitman_tmp', 'indigo_tmp']
+SURFACE_LINKS = COUNTER_LINKS + STOVE_LINKS
 
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
 
-LINK_SHAPE_FROM_JOINT = {
-    'baker_joint': ('sektion', 'Cube.bottom.004_Cube.028'),
-    'chewie_door_left_joint': ('sektion', 'Cube.bottom.002_Cube.020'),
-    'chewie_door_right_joint': ('sektion', 'Cube.bottom_Cube.000'),
+CABINET_LINKS = [
+    'baker', 'chewie_left', 'chewie_right',
+    'dagger_left', 'dagger_right',
+    #'indigo_tmp_bottom',
+]
 
-    'dagger_door_left_joint': ('dagger', 'Cube.bottom.008_Cube.044'),
-    'dagger_door_right_joint': ('dagger', 'Cube.bottom.012_Cube.060'),
+DRAWER_LINKS = [
+    'hitman_drawer_top', #'hitman_drawer_bottom',
+    'indigo_drawer_top', 'indigo_drawer_bottom',
+]
 
-    'hitman_drawer_top_joint': ('hitman_drawer_top', 'Cube_Cube.001'),
-    'hitman_drawer_bottom_joint': ('hitman_drawer_bottom', 'Cube_Cube.001'),
+Surface = namedtuple('Surface', ['link', 'shape', 'joints'])
 
-    #'indigo_door_left_joint': ('indigo_tmp', SURFACE_BOTTOM),
-    #'indigo_door_right_joint': ('indigo_tmp', SURFACE_BOTTOM),
-    'indigo_drawer_top_joint': ('indigo_drawer_top', 'Cube_Cube.001'),
-    'indigo_drawer_bottom_joint': ('indigo_drawer_bottom', 'Cube_Cube.001'),
+SURFACE_FROM_NAME = {
+    'baker': Surface('sektion', 'Cube.bottom.004_Cube.028', ['baker_joint']),
+    'chewie_left': Surface('sektion', 'Cube.bottom.002_Cube.020', ['chewie_door_left_joint']),
+    'chewie_right': Surface('sektion', 'Cube.bottom_Cube.000', ['chewie_door_right_joint']),
+
+    'dagger_left': Surface('dagger', 'Cube.bottom.008_Cube.044', ['dagger_door_left_joint']),
+    'dagger_right': Surface('dagger', 'Cube.bottom.012_Cube.060', ['dagger_door_right_joint']),
+
+    'hitman_drawer_top': Surface('hitman_drawer_top', 'Cube_Cube.001', ['hitman_drawer_top_joint']),
+    'hitman_drawer_bottom': Surface('hitman_drawer_bottom', 'Cube_Cube.001', ['hitman_drawer_bottom_joint']),
+
+    #'indigo_tmp_bottom': Surface('indigo_tmp', SURFACE_BOTTOM, ['indigo_door_left_joint', 'indigo_door_right_joint']),
+    'indigo_drawer_top': Surface('indigo_drawer_top', 'Cube_Cube.001', ['indigo_drawer_top_joint']),
+    'indigo_drawer_bottom': Surface('indigo_drawer_bottom', 'Cube_Cube.001', ['indigo_drawer_bottom_joint']),
 }
+
+ALL_SURFACES = SURFACE_LINKS + CABINET_LINKS + DRAWER_LINKS
 
 CABINET_JOINTS = [
     'baker_joint', 'chewie_door_left_joint', 'chewie_door_right_joint',
@@ -99,12 +114,10 @@ DRAWER_JOINTS = [
     'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
 
-LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
-                'dagger_door_left_joint', 'dagger_door_right_joint']
+#LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
+#                'dagger_door_left_joint', 'dagger_door_right_joint']
 
-MOVABLE_JOINTS = CABINET_JOINTS + DRAWER_JOINTS
-
-ALL_SURFACES = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
+ALL_JOINTS = CABINET_JOINTS + DRAWER_JOINTS
 
 ################################################################################
 
@@ -129,10 +142,10 @@ def load_ycb(ycb_type, **kwargs):
     # TODO: set color (as average) or texture
     return create_obj(ycb_obj_path, color=None, **kwargs)
 
-def get_kitchen_parent(link_name):
-    if link_name in LINK_SHAPE_FROM_JOINT:
-        return LINK_SHAPE_FROM_JOINT[link_name][0]
-    return link_name
+def get_surface(surface_name):
+    if surface_name in SURFACE_FROM_NAME:
+        return SURFACE_FROM_NAME[surface_name]
+    return Surface(surface_name, SURFACE_TOP, [])
 
 #CABINET_PATH = os.path.join(SRL_PATH, 'packages/sektion_cabinet_model/urdf/sektion_cabinet.urdf')
 # Could recursively find all *.urdf | *.sdf

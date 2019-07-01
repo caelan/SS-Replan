@@ -19,7 +19,7 @@ from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoS
 
 from observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
 from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTERS, LEFT_VISIBLE
+    DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTER_LINKS, DRAWER_LINKS
 from world import World
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
@@ -164,10 +164,10 @@ def main():
     world = World(use_gui=True)
     #for joint in world.kitchen_joints:
     #for name in LEFT_VISIBLE:
-    for name in ['hitman_drawer_top_joint']:
+    for name in DRAWER_JOINTS[:2]:
         joint = joint_from_name(world.kitchen, name)
-        #world.open_door(joint)
-        world.close_door(joint)
+        world.open_door(joint)
+        #world.close_door(joint)
     world.open_gripper()
     #dump_link_cross_sections(world, link_name='indigo_tmp')
     #wait_for_user()
@@ -182,7 +182,7 @@ def main():
     obstruction_path = get_ycb_obj_path(obstruction_name)
     world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
     obstraction_body = world.get_body(obstruction_name)
-    z = stable_z(obstraction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
+    z = stable_z(obstraction_body, world.kitchen, link_from_name(world.kitchen, COUNTER_LINKS[0]))
     set_pose(obstraction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
 
     #test_grasps(world, entity_name)
@@ -198,12 +198,11 @@ def main():
     #return
 
     #surface_name = random.choice(DRAWER_JOINTS) # SURFACES | CABINET_JOINTS
-    surface_name = DRAWER_JOINTS[1]
-    world.open_door(joint_from_name(world.kitchen, surface_name))
+    surface_name = DRAWER_LINKS[1]
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():
-        placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
+        placement_gen = get_stable_gen(world, learned=False, pos_scale=1e-3, rot_scale=1e-2)
         pose, = next(placement_gen(entity_name, surface_name), (None,))
     assert pose is not None
     pose.assign()
