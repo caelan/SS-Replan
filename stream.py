@@ -336,6 +336,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
     if not collisions:
         obstacles = set()
     # TODO: could allow handle collisions
+    # TODO: could push if the goal is to fully close
 
     bq.assign()
     world.open_gripper()

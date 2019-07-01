@@ -6,7 +6,7 @@ from itertools import islice
 
 from sklearn.neighbors import KernelDensity
 
-from examples.discrete_belief.dist import UniformDist, DDist, MixtureDist, gauss
+from examples.discrete_belief.dist import UniformDist, DDist, MixtureDist, gauss, GMU
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
 
 #from examples.discrete_belief.run import geometric_cost
@@ -56,6 +56,12 @@ Particle = namedtuple('Particle', ['sample', 'weight'])
 P_FALSE_POSITIVE = 0.0
 P_FALSE_NEGATIVE = 0.0
 
+# https://github.com/tlpmit/hpn
+# https://github.mit.edu/tlp/bhpn
+
+# TODO: how to factor visbility observation costs such that the appropriate actions are selected
+# i.e. what to move out of the way
+
 def are_visible(world, camera_pose):
     ray_names = []
     rays = []
@@ -68,6 +74,26 @@ def are_visible(world, camera_pose):
     ray_results = batch_ray_collision(rays)
     return {name for name, result in zip(ray_names, ray_results)
             if result.objectUniqueId == world.get_body(name)}
+
+def observe(world, camera_pose):
+    # TODO: randomize robot's pose
+    # Coarse pose estimation
+    visible = are_visible(world, camera_pose)
+    detections = {}
+    for name in world.movable:
+        body = world.get_body(name)
+        pose = get_pose(body)
+        if name in visible:
+            if P_FALSE_NEGATIVE <= random.random():
+                detections[name] = pose
+        else:
+            if P_FALSE_POSITIVE <= random.random():
+                pass
+            else:
+                pass # TODO: sample from poses on table
+                #detections[name] = pose
+    # Would need to use UKF to handle GMM
+    return detections
 
 def get_observation_fn(p_look_fp=0, p_look_fn=0):
     # Observation: True/False for detection & numeric pose
@@ -159,7 +185,7 @@ def compute_density(particles):
     # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
     return density
 
-def test(world, entity_name, camera_pose, n=100):
+def test_observation(world, entity_name, camera_pose, n=100):
     # TODO: could just make the belief
     particles = create_belief(world, entity_name)
     pose = random.choice(particles).sample

@@ -21,7 +21,7 @@ from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, draw_pose, get_pose, set_point, get_point, get_movable_joints, set_joint_positions, get_sample_fn
 
 from issac import update_world, kill_lula, update_isaac_sim
-from utils import World
+from world import World
 from run import solve_pddlstream, create_args, simulate_plan
 from problem import pdddlstream_from_problem
 

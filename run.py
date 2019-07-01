@@ -17,9 +17,10 @@ from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoS
     get_pose, RED, apply_alpha, set_pose, multiply, step_simulation, set_all_static, \
     Euler, Pose, Point, stable_z, link_from_name
 
-from observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
+from observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
+from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
     DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTERS, LEFT_VISIBLE
+from world import World
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
 from stream import get_stable_gen
@@ -160,10 +161,11 @@ def main():
 
     world = World(use_gui=True)
     #for joint in world.kitchen_joints:
-    for name in LEFT_VISIBLE:
+    #for name in LEFT_VISIBLE:
+    for name in ['hitman_drawer_top_joint']:
         joint = joint_from_name(world.kitchen, name)
-        world.open_door(joint)
-        #world.close_door(joint)
+        #world.open_door(joint)
+        world.close_door(joint)
     world.open_gripper()
     #dump_link_cross_sections(world, link_name='indigo_tmp')
     #wait_for_user()
@@ -190,10 +192,8 @@ def main():
     set_pose(cone_body, world_from_zed_left)
     step_simulation()
     #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
-
-    test(world, entity_name, world_from_zed_left)
-    return
-
+    #test_observation(world, entity_name, world_from_zed_left)
+    #return
 
     #surface_name = random.choice(DRAWER_JOINTS) # SURFACES | CABINET_JOINTS
     surface_name = DRAWER_JOINTS[1]

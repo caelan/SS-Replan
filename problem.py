@@ -70,7 +70,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     }
 
     goal_literals = [
-        ('Holding', goal_block),
+        #('Holding', goal_block),
         #('Cooked', goal_block),
     ]
     if return_home:
@@ -79,7 +79,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(name)
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
-            body, compute_surface_aabb(world, surface), above_epsilon=1e-2, below_epsilon=5e-2)]
+            body, compute_surface_aabb(world, surface),
+            above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
             print(name, supporting)
             continue

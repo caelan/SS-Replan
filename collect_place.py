@@ -14,8 +14,9 @@ from database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_date, load_place
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
     point_from_pose, RED, BLUE, LockRenderer, set_pose, child_link_from_joint
-from utils import World, get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
+from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name
+from world import World
 from stream import get_pick_gen, get_stable_gen, get_grasp_gen
 
 def visualize_database(tool_from_base_list):

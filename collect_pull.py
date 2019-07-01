@@ -12,7 +12,8 @@ sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, get_joint_name, joint_from_name, child_link_from_joint
-from utils import World, BASE_JOINTS
+from utils import BASE_JOINTS
+from world import World
 from stream import get_pull_gen
 
 from database import DATABASE_DIRECTORY, get_date, get_surface_reference_pose, PULL_IR_FILENAME
