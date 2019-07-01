@@ -1,6 +1,6 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @stove) ; @world @gripper
+  (:constants @world @stove) ; @world @gripper
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -46,6 +46,12 @@
     (UnsafeApproach ?o ?p ?g)
     (UnsafeATraj ?at)
     (UnsafeBTraj ?bt)
+
+    (RelPose ?o1 ?rp ?o2)
+    (AtRelPose ?o1 ?rp ?o2)
+    (AtWorldPose ?o ?p)
+    (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
+    (AngleKin ?j ?p ?a)
   )
   (:functions
     (Distance ?bq1 ?bq2)
@@ -140,6 +146,16 @@
     (exists (?a) (and (AngleWithin ?j ?a ?s)
                       (AtAngle ?j ?a)))
   )
+
+  ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
+  (:derived (AtWorldPose ?o1 ?p1) (or
+    (and (RelPose ?o1 ?p1 @world)
+         (AtRelPose ?o1 ?p1 @world))
+    (exists (?rp ?o2 ?p2) (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
+            (AtWorldPose ?o2 ?p2) (AtRelPose ?o1 ?rp ?o2)))
+    (exists (?a) (and (AngleKin ?o1 ?p1 ?a)
+            (AtAngle ?o1 ?a)))
+  ))
 
   (:derived (UnsafePose ?o ?p)
     (exists (?o2 ?p2) (and (Pose ?o ?p) (Pose ?o2 ?p2)

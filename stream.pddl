@@ -59,6 +59,19 @@
                     (CalibrateMotion ?bq ?aq ?at))
   )
 
+  (:stream compute-pose-kin
+    :inputs (?o1 ?rp ?o2 ?p2)
+    :domain (and (WorldPose ?o2 ?p2) (RelPose ?o1 ?rp ?o2))
+    :outputs (?p1)
+    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
+  )
+  (:stream compute-angle-kin
+    :inputs (?j ?a)
+    :domain (Angle ?j ?a)
+    :outputs (?p)
+    :certified (and (WorldPose ?j ?p) (AngleKin ?j ?p ?a))
+  )
+
   (:stream test-cfree-pose-pose
     :inputs (?o1 ?p1 ?o2 ?p2)
     :domain (and (Pose ?o1 ?p1) (Pose ?o2 ?p2))

@@ -10,7 +10,8 @@ from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS, DRAWER_JOIN
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, get_fixed_pull_gen, get_surface_link
+    get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, \
+    get_fixed_pull_gen, get_surface_link, get_compute_angle_kin, get_compute_pose_kin
 
 
 def existential_quantification(goal_literals):
@@ -33,6 +34,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
+        '@world': 'world',
         '@stove': 'stove',
     }
 
@@ -138,6 +140,9 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
 
         'fixed-inverse-kinematics': from_gen_fn(get_pick_ik_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen(world, **kwargs)),
+
+        'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
+        'compute-angle-kin': from_fn(get_compute_angle_kin(world)),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),

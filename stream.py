@@ -10,9 +10,9 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
     get_aabb, unit_point, Euler, quat_from_euler, read_obj, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
-    stable_z_on_aabb, \
-    is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, get_collision_data
+    stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
+    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, unit_pose, \
+    child_link_from_joint
 
 from utils import get_grasps, SURFACES, LINK_SHAPE_FROM_JOINT, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, SURFACE_BOTTOM
@@ -35,6 +35,28 @@ def base_cost_fn(q1, q2):
 def trajectory_cost_fn(t):
     distance = t.distance(distance_fn=lambda q1, q2: get_distance(q1[:2], q2[:2]))
     return BASE_CONSTANT + distance / BASE_VELOCITY
+
+def get_compute_pose_kin(world):
+    def fn(o1, p1, rp, o2):
+        if o1 == o2:
+            return None
+        if np.allclose(p1, unit_pose()): # Identity
+            return (rp,)
+        if np.allclose(rp, unit_pose()): # Identity
+            return (p1,)
+        p2 = multiply(p1, rp)
+        return (p2,)
+    return fn
+
+def get_compute_angle_kin(world):
+    def fn(j, a):
+        a.assign()
+        [joint] = a.joints
+        link = child_link_from_joint(joint)
+        link_pose = get_link_pose(world.kitchen, link)
+        p = Pose(None, link_pose)
+        return (p,)
+    return fn
 
 ################################################################################
 

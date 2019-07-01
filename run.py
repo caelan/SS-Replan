@@ -67,6 +67,8 @@ def solve_pddlstream(world, problem, args):
 
     stream_info = {
         # TODO: check if already on the stove
+        'compute-pose-kin': StreamInfo(eager=True),
+        'compute-angle-kin': StreamInfo(eager=True),
         'test-door': StreamInfo(eager=True),
         'inverse-kinematics': StreamInfo(),
         'plan-pull': StreamInfo(),
