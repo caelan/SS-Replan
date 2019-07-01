@@ -5,12 +5,12 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf, Pose
-from pybullet_tools.utils import get_joint_name, is_placed_on_aabb
-from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS
+from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment
+from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINET_JOINTS, DRAWER_JOINTS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, get_fixed_pull_gen
+    get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, get_fixed_pull_gen, get_surface_link
 
 
 def existential_quantification(goal_literals):
@@ -64,9 +64,10 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         world.carry_conf = init_aq
 
     goal_block = list(world.movable)[0]
-    goal_surface = CABINET_JOINTS[0]
+    #goal_surface = CABINET_JOINTS[0]
+    goal_surface = DRAWER_JOINTS[0]
     goal_on = {
-        #goal_block: goal_surface,
+        goal_block: goal_surface,
     }
 
     goal_literals = [
@@ -85,6 +86,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             print(name, supporting)
             continue
         [surface] = supporting
+        surface_link, _ = get_surface_link(world, surface)
+        world.initial_attachments[body] = create_attachment(world.kitchen, surface_link, body)
         pose = Pose(body, support=surface, init=True)
         init += [
             ('Graspable', name),

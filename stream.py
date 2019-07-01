@@ -38,12 +38,16 @@ def trajectory_cost_fn(t):
 
 ################################################################################
 
-def compute_surface_aabb(world, surface_name):
+def get_surface_link(world, surface_name):
     if surface_name in LINK_SHAPE_FROM_JOINT:
         link_name, shape_name = LINK_SHAPE_FROM_JOINT[surface_name]
     else:
         link_name, shape_name = surface_name, SURFACE_TOP
     surface_link = link_from_name(world.kitchen, link_name)
+    return surface_link, shape_name
+
+def compute_surface_aabb(world, surface_name):
+    surface_link, shape_name = get_surface_link(world, surface_name)
     surface_pose = get_link_pose(world.kitchen, surface_link)
     if shape_name == SURFACE_TOP:
         surface_aabb = get_aabb(world.kitchen, surface_link)

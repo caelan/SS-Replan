@@ -64,6 +64,7 @@ class World(object):
         self.base_limits_handles = []
         self.update_custom_limits()
         self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
+        self.initial_attachments = {}
     @property
     def base_joints(self):
         return joints_from_names(self.robot, BASE_JOINTS)

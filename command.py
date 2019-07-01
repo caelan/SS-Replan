@@ -217,8 +217,7 @@ class Attach(Command):
         return Detach(self.world, self.robot, self.link, self.body)
 
     def iterate(self, world, state):
-        state.attachments[self.robot, self.link, self.body] = \
-            create_attachment(self.robot, self.link, self.body)
+        state.attachments[self.body] = create_attachment(self.robot, self.link, self.body)
         yield
 
     def execute(self, domain, moveit, observer):
@@ -250,8 +249,8 @@ class Detach(Command):
         return Attach(self.world, self.robot, self.link, self.body)
 
     def iterate(self, world, state):
-        assert (self.robot, self.link, self.body) in state.attachments
-        del state.attachments[self.robot, self.link, self.body]
+        assert self.body in state.attachments
+        del state.attachments[self.body]
         yield
 
     def execute(self, domain, moveit, observer):

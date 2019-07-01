@@ -141,7 +141,7 @@ def simulate_plan(world, commands, args):
     if commands is None:
         wait_for_user()
         return
-    initial_state = State()
+    initial_state = State(savers=[WorldSaver()], attachments=dict(world.initial_attachments))
     wait_for_user()
     time_step = None if args.teleport else 0.02
     if args.record:
