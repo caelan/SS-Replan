@@ -31,7 +31,7 @@ from pddlstream.utils import INF
 from pddlstream.language.stream import StreamInfo
 from pddlstream.algorithms.constraints import PlanConstraints, WILD
 
-def create_args():
+def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('-algorithm', default='focused',
                         help='Specifies the algorithm')
@@ -41,19 +41,19 @@ def create_args():
                         help='Runs in an anytime mode')
     #parser.add_argument('-problem', default='test_block',
     #                    help='The name of the problem to solve.')
-    parser.add_argument('-seed', default=None,
-                        help='The random seed to use.')
     parser.add_argument('-max_time', default=120, type=int,
                         help='The max time')
     parser.add_argument('-record', action='store_true',
                         help='Records a video')
+    parser.add_argument('-seed', default=None,
+                        help='The random seed to use.')
     parser.add_argument('-teleport', action='store_true',
                         help='Uses unit costs')
     parser.add_argument('-unit', action='store_true',
                         help='Uses unit costs')
     parser.add_argument('-visualize', action='store_true',
                         help='When enabled, visualizes planning rather than the world (for debugging).')
-    return parser.parse_args()
+    return parser
     # TODO: get rid of funky orientations by dropping them from some height
 
 ################################################################################
@@ -166,7 +166,8 @@ def simulate_plan(world, commands, args):
 ################################################################################
 
 def main():
-    args = create_args()
+    parser = create_parser()
+    args = parser.parse_args()
     #if args.seed is not None:
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)

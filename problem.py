@@ -138,7 +138,9 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             body, compute_surface_aabb(world, surface),
             above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
-            raise RuntimeError(supporting)
+            print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
+            continue
+            #raise RuntimeError(obj_name, supporting)
         [surface_name] = supporting
         surface = get_surface(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
