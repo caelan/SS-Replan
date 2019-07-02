@@ -72,11 +72,11 @@
     :certified (and (WorldPose ?o ?p) (AngleKin ?o ?p ?j ?a))
   )
 
-  ;(:stream test-cfree-pose-pose
-  ;  :inputs (?o1 ?rp1 ?o2 ?rp2 ?s)
-  ;  :domain (and (AtRelPose ?o1 ?rp1 ?s) (AtRelPose ?o2 ?rp2 ?s))
-  ;  :certified (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s)
-  ;)
+  (:stream test-cfree-pose-pose
+    :inputs (?o1 ?rp1 ?o2 ?rp2 ?s)
+    :domain (and (RelPose ?o1 ?rp1 ?s) (RelPose ?o2 ?rp2 ?s))
+    :certified (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s)
+  )
   (:stream test-cfree-approach-pose
     :inputs (?o1 ?p1 ?g1 ?o2 ?p2)
     :domain (and (WorldPose ?o1 ?p1) (Grasp ?o1 ?g1) (WorldPose ?o2 ?p2))

@@ -156,11 +156,11 @@
             (AtAngle ?j ?a))) ; TODO: could compose arbitrary chains
   ))
 
-  ;(:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
-  ;  (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s)
-  ;                         (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
-  ;                         (AtRelPose ?o2 ?rp2 ?s)))
-  ;))
+  (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
+    (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s)
+                           (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
+                           (AtRelPose ?o2 ?rp2 ?s)))
+  ))
   ;(:derived (UnsafeApproach ?o1 ?p1 ?g) (and (WorldPose ?o1 ?p1) (Grasp ?o1 ?g)
   ;  (exists (?o2 ?p2) (and (WorldPose ?o2 ?p2)
   ;                         (not (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2))
