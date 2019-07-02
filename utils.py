@@ -18,6 +18,8 @@ except ImportError:
     USE_TRACK_IK = False
 print('Use Track IK:', USE_TRACK_IK)
 
+################################################################################
+
 SRL_PATH = '/home/caelan/Programs/srl_system'
 MODELS_PATH = './models'
 
@@ -28,6 +30,9 @@ BAXTER_PATH = os.path.join(SRL_PATH, 'packages/third_party/baxter_common/baxter_
 ALLEGRO = os.path.join(SRL_PATH, 'packages/third_party/allegro_driver/description/allegro.urdf')
 ABB_PATH = os.path.join(SRL_PATH, 'packages/third_party/abb_irb120_support/urdf/irb120_3_58.urdf') # irb120t_3_58.urdf
 LBR4_PATH = os.path.join(SRL_PATH, 'packages/third_party/ll4ma_robots_description/urdf/lbr4/lbr4_kdl.urdf') # right_push_stick_rig.urdf |
+
+################################################################################
+
 FRANKA_PATH = os.path.join(MODELS_PATH, 'lula_franka_gen.urdf')
 #FRANKA_PATH = os.path.join(SRL_PATH, 'packages/external/lula_franka/urdf/lula_franka_gen.urdf')
 # ./packages/third_party/franka_ros/franka_description
@@ -42,6 +47,15 @@ FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter.urdf')
 #CARTER_FRANKA_PATH = os.path.join(SRL_PATH, 'packages/third_party/carter_description/urdf/carter_franka.urdf')
 FRANKA_YAML = os.path.join(SRL_PATH, 'packages/external/lula_franka/config/robot_descriptor.yaml')
 
+BASE_JOINTS = ['x', 'y', 'theta']
+FRANKA_CARTER = 'franka_carter'
+FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda_forearm_end_pt
+# +z: pointing, +y: left finger
+FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
+FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
+
+################################################################################
+
 BLOCK_SIZES = ['small', 'big']
 BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf')
@@ -54,16 +68,6 @@ KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_
 #KITCHEN_PATH = '/home/caelan/Programs/robot_kitchen/model/robot_kitchen.sdf'
 #KITCHEN_PATH = os.path.join(SRL_PATH, 'packages/kitchen_description/urdf/kitchen_part_right_gen.urdf')
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
-
-BASE_JOINTS = ['x', 'y', 'theta']
-FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda_forearm_end_pt
-# +z: pointing, +y: left finger
-FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
-FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
-
-EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.urdf')
-
-################################################################################
 
 STOVES = ['range']
 COUNTERS = ['hitman_tmp', 'indigo_tmp']
@@ -121,6 +125,30 @@ DRAWER_JOINTS = [
 #                'dagger_door_left_joint', 'dagger_door_right_joint']
 
 ALL_JOINTS = CABINET_JOINTS + DRAWER_JOINTS
+
+################################################################################
+
+EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.urdf')
+
+EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
+#EVE_GRIPPER_LINK = '{a}_palm' # Technically the start
+
+#EVE_TOOL_LINK = 'qbhand_{arm}_palm_link'
+EVE_TOOL_LINK = 'qbhand_{arm}_tendon_virtual_link'
+
+EVE_HIP_JOINTS = ['j_hip_z', 'j_hip_x', 'j_hip_y']
+EVE_ANKLE_JOINTS = ['j_knee_y', 'j_ankle_y', 'j_ankle_x']
+EVE_WHEEL_JOINTS = ['j_{a}_wheel_y', 'j_{a}_wheel_y']
+EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
+                  'j_{a}_elbow_y', 'j_{a}_elbow_z', 'j_{a}_wrist_y', 'j_{a}_wrist_x'] # j_neck_y
+
+EVE = 'Eve'
+ARMS = ['left', 'right']
+DEFAULT_ARM = ARMS[0]
+
+def get_eve_arm_joints(robot, arm):
+    name = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
+    return joints_from_names(robot, name)
 
 ################################################################################
 
@@ -230,27 +258,38 @@ def create_gripper(robot, visual=False):
 
 ################################################################################
 
-EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
-#EVE_GRIPPER_LINK = '{a}_palm' # Technically the start
-
-#EVE_TOOL_LINK = 'qbhand_{arm}_palm_link'
-EVE_TOOL_LINK = 'qbhand_{arm}_tendon_virtual_link'
-
-EVE_HIP_JOINTS = ['j_hip_z', 'j_hip_x', 'j_hip_y']
-EVE_ANKLE_JOINTS = ['j_knee_y', 'j_ankle_y', 'j_ankle_x']
-EVE_WHEEL_JOINTS = ['j_{a}_wheel_y', 'j_{a}_wheel_y']
-EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
-                  'j_{a}_elbow_y', 'j_{a}_elbow_z', 'j_{a}_wrist_y', 'j_{a}_wrist_x'] # j_neck_y
-
-FRANKA_CARTER = 'franka_carter'
-EVE = 'Eve'
-ARMS = ['left', 'right']
-DEFAULT_ARM = ARMS[0]
-
-def get_eve_arm_joints(robot, arm):
-    name = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
-    return joints_from_names(robot, name)
-
+class RelPose(object):
+#class RelPose(Pose):
+    def __init__(self, body, link=BASE_LINK,
+                 reference_body=None, reference_link=BASE_LINK,
+                 confs=[], support=None, init=False):
+        self.body = body
+        self.link = link
+        self.reference_body = reference_body
+        self.reference_link = reference_link
+        # Could also perform recursively
+        self.confs = tuple(confs) # Attachment is treated as a conf
+        self.support = support
+        self.init = init
+        # TODO: method for automatically composing these
+    def assign(self):
+        for conf in self.confs: # Assumed to be totally ordered
+            conf.assign()
+    def get_world_from_reference(self):
+        if self.reference_body is None:
+            return unit_pose()
+        self.assign()
+        return get_link_pose(self.reference_body, self.reference_link)
+    def get_world_from_body(self):
+        self.assign()
+        return get_link_pose(self.body, self.link)
+    def get_reference_from_body(self):
+        return multiply(invert(self.get_world_from_reference()),
+                        self.get_world_from_body())
+    def __repr__(self):
+        if self.reference_body is None:
+            return 'wp{}'.format(id(self) % 1000)
+        return 'rp{}'.format(id(self) % 1000)
 
 ################################################################################
 

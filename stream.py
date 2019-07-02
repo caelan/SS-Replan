@@ -4,7 +4,7 @@ import numpy as np
 
 from itertools import islice
 
-from pybullet_tools.pr2_primitives import Pose, Conf
+from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
@@ -12,12 +12,11 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, \
-    child_link_from_joint, BASE_LINK, unit_pose, get_pose, create_attachment, \
-    wait_for_user
+    child_link_from_joint, create_attachment
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
-    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS
+    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
@@ -42,39 +41,6 @@ def trajectory_cost_fn(t):
 ################################################################################
 
 # TODO: more general forward kinematics
-
-class RelPose(object):
-#class RelPose(Pose):
-    def __init__(self, body, link=BASE_LINK,
-                 reference_body=None, reference_link=BASE_LINK,
-                 confs=[], support=None, init=False):
-        self.body = body
-        self.link = link
-        self.reference_body = reference_body
-        self.reference_link = reference_link
-        # Could also perform recursively
-        self.confs = tuple(confs) # Attachment is treated as a conf
-        self.support = support
-        self.init = init
-        # TODO: method for automatically composing these
-    def assign(self):
-        for conf in self.confs: # Assumed to be totally ordered
-            conf.assign()
-    def get_world_from_reference(self):
-        if self.reference_body is None:
-            return unit_pose()
-        self.assign()
-        return get_link_pose(self.reference_body, self.reference_link)
-    def get_world_from_body(self):
-        self.assign()
-        return get_link_pose(self.body, self.link)
-    def get_reference_from_body(self):
-        return multiply(invert(self.get_world_from_reference()),
-                        self.get_world_from_body())
-    def __repr__(self):
-        if self.reference_body is None:
-            return 'wp{}'.format(id(self) % 1000)
-        return 'rp{}'.format(id(self) % 1000)
 
 def get_compute_pose_kin(world):
     def fn(o1, rp, o2, p2):
@@ -333,7 +299,7 @@ def plan_gripper_path(world, grasp_width, teleport=False, **kwargs):
         return [open_conf, holding_conf]
     return [open_conf] + list(extend_fn(open_conf, holding_conf))
 
-def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
+def get_fixed_pick_fn(world, randomize=False, collisions=True, **kwargs):
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
 
     def fn(name, pose, grasp, base_conf):
@@ -388,7 +354,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
 def get_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn
     ir_sampler = get_pick_ir_gen(world, max_attempts=1, **kwargs)
-    ik_fn = get_pick_ik_fn(world, teleport=teleport, **kwargs)
+    ik_fn = get_fixed_pick_fn(world, teleport=teleport, **kwargs)
 
     def gen(*inputs):
         _, pose, _ = inputs
