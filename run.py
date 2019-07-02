@@ -176,7 +176,7 @@ def main():
     #for name in LEFT_VISIBLE:
     for name in DRAWER_JOINTS[1:2]:
         joint = joint_from_name(world.kitchen, name)
-        world.open_door(joint)
+        #world.open_door(joint)
         #world.close_door(joint)
     world.open_gripper()
     #dump_link_cross_sections(world, link_name='indigo_tmp')
@@ -218,7 +218,7 @@ def main():
     pose.assign()
 
     problem = pdddlstream_from_problem(
-        world, close_doors=False, return_home=True,
+        world, close_doors=True, return_home=True,
         collisions=not args.cfree, teleport=args.teleport)
     commands = solve_pddlstream(world, problem, args)
     simulate_plan(world, commands, args)

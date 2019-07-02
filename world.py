@@ -9,7 +9,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_joint_name, remove_body, disconnect
 from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
-    get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS
+    get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
 
 
 class World(object):
@@ -112,7 +112,7 @@ class World(object):
             #conf[3] -= np.pi / 2
             return conf
         conf = np.array(self.robot_yaml['default_q'])
-        conf[1] += np.pi / 4
+        #conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
     def all_bodies(self):
@@ -125,7 +125,8 @@ class World(object):
     def update_custom_limits(self):
         robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners
-        min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
+        #min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
+        min_extent = 0.0
         full_lower, full_upper = self.get_world_aabb()
         base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
         for handle in self.base_limits_handles:
@@ -181,7 +182,8 @@ class World(object):
             return get_max_limit(self.kitchen, joint)
         return get_min_limit(self.kitchen, joint)
     def open_conf(self, joint):
-        if 'left' in get_joint_name(self.kitchen, joint):
+        joint_name = get_joint_name(self.kitchen, joint)
+        if 'left' in joint_name:
             #print(get_joint_name(self.kitchen, joint), get_max_limit(self.kitchen, joint), get_min_limit(self.kitchen, joint))
             open_position = get_min_limit(self.kitchen, joint)
         else:
@@ -189,8 +191,11 @@ class World(object):
         #print(get_joint_name(self.kitchen, joint), get_min_limit(self.kitchen, joint), get_max_limit(self.kitchen, joint))
         # drawers: [0.0, 0.4]
         # doors: [0.0, 1.57]
-        if get_joint_name(self.kitchen, joint) in CABINET_JOINTS:
+        if joint_name in CABINET_JOINTS:
+            # TODO: could make fraction of max
             return (4*np.pi / 9) * open_position / abs(open_position)
+        if joint_name in DRAWER_JOINTS:
+            return 0.75 * open_position
         return open_position
     def close_door(self, joint):
         set_joint_position(self.kitchen, joint, self.closed_conf(joint))
