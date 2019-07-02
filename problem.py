@@ -78,11 +78,11 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     goal_surface = DRAWERS[1]
     #goal_surface = COUNTERS[0]
     goal_on = {
-        #goal_block: goal_surface,
+        goal_block: goal_surface,
     }
 
     goal_literals = [
-        ('Holding', goal_block),
+        #('Holding', goal_block),
         #('Cooked', goal_block),
     ]
     if return_home:
@@ -100,6 +100,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             pose, = compute_angle_kin(link_name, joint_name, conf)
             init.extend([
                 ('Angle', joint_name, conf),
+                ('Movable', link_name),
                 ('AngleKin', link_name, pose, joint_name, conf),
                 ('WorldPose', link_name, pose),
             ])
@@ -149,6 +150,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
 
         init += [
+            ('Movable', obj_name),
             ('Graspable', obj_name),
             ('RelPose', obj_name, rel_pose, surface_name),
             ('AtRelPose', obj_name, rel_pose, surface_name),
