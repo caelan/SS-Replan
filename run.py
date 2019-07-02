@@ -7,10 +7,8 @@ import pstats
 import os
 import numpy as np
 
-
-PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
-PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
-sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
+sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
+                for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver, \

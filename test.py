@@ -3,9 +3,8 @@
 import sys
 import os
 
-PDDLSTREAM_PATH = os.path.abspath(os.path.join(os.getcwd(), 'pddlstream'))
-PYBULLET_PATH = os.path.join(PDDLSTREAM_PATH, 'examples/pybullet/utils')
-sys.path.extend([PDDLSTREAM_PATH, PYBULLET_PATH])
+sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
+                for d in ['pddlstream', 'ss-pybullet'])
 
 import rospy
 import traceback
