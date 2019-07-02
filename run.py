@@ -90,7 +90,7 @@ def solve_pddlstream(world, problem, args, debug=False):
         ('move_base', [WILD, WILD, WILD]),
     ]
     constraints = PlanConstraints(skeletons=[skeleton], exact=True)
-    constraints = PlanConstraints()
+    #constraints = PlanConstraints()
 
     #success_cost = 0 if args.optimal else INF
     success_cost = INF
@@ -208,7 +208,7 @@ def main():
     #return
 
     #surface_name = random.choice(DRAWERS)
-    surface_name = COUNTERS[1] # COUNTERS | DRAWERS | SURFACES | CABINETS
+    surface_name = DRAWERS[1] # COUNTERS | DRAWERS | SURFACES | CABINETS
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():

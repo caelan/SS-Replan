@@ -14,7 +14,7 @@ from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
     get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, \
     get_fixed_pull_gen, get_compute_angle_kin, get_compute_pose_kin, \
-    link_from_name, get_link_pose, RelPose
+    link_from_name, get_link_pose, RelPose, wait_for_user
 
 
 def existential_quantification(goal_literals):
@@ -78,11 +78,11 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     goal_surface = DRAWERS[1]
     #goal_surface = COUNTERS[0]
     goal_on = {
-        goal_block: goal_surface,
+        #goal_block: goal_surface,
     }
 
     goal_literals = [
-        #('Holding', goal_block),
+        ('Holding', goal_block),
         #('Cooked', goal_block),
     ]
     if return_home:
@@ -98,13 +98,13 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         for conf in [init_conf, open_conf, closed_conf]:
             pose, = compute_angle_kin(link_name, joint_name, conf)
-            surface_poses[link_name] = pose
             init.extend([
                 ('Angle', joint_name, conf),
                 ('AngleKin', link_name, pose, joint_name, conf),
                 ('WorldPose', link_name, pose),
             ])
             if conf == init_conf:
+                surface_poses[link_name] = pose
                 init.extend([
                     ('AtAngle', joint_name, conf),
                     ('AtWorldPose', link_name, pose),

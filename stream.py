@@ -71,6 +71,8 @@ class RelPose(object):
         return multiply(invert(self.get_world_from_reference()),
                         self.get_world_from_body())
     def __repr__(self):
+        if self.reference_body is None:
+            return 'p{}'.format(id(self) % 1000)
         return 'rp{}'.format(id(self) % 1000)
 
 def get_compute_pose_kin(world):
