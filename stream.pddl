@@ -63,7 +63,8 @@
     :inputs (?o1 ?rp ?o2 ?p2)
     :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2))
     :outputs (?p1)
-    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
+    :certified (and (WorldPose ?o1 ?p1) ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation
+                    (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
   )
   ;(:stream compute-angle-kin
   ;  :inputs (?o ?j ?a)
