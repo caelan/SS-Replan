@@ -408,7 +408,42 @@ def get_handle_grasp(world, joint, pre_distance=0.1):
             return link, handle_grasp, handle_pregrasp
     raise RuntimeError()
 
-def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
+def compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=False):
+    if door_conf1 == door_conf2:
+        return None
+    door_joint = joint_from_name(world.kitchen, joint_name)
+    door_joints = [door_joint]
+    # TODO: could unify with grasp path
+    door_extend_fn = get_extend_fn(world.kitchen, door_joints, resolutions=[DOOR_RESOLUTION])
+    door_path = [door_conf1.values] + list(door_extend_fn(door_conf1.values, door_conf2.values))
+    if teleport:
+        door_path = [door_conf1.values, door_conf2.values]
+
+    # door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
+    handle_link, handle_grasp, handle_pregrasp = get_handle_grasp(world, door_joint)
+    handle_path = []
+    for door_conf in door_path:
+        set_joint_positions(world.kitchen, door_joints, door_conf)
+        # if any(pairwise_collision(door_obst, obst)
+        #       for door_obst, obst in product(door_obstacles, obstacles)):
+        #    return
+        handle_path.append(get_link_pose(world.kitchen, handle_link))
+        # Collide due to adjacency
+
+    tool_path = [multiply(handle_pose, invert(handle_grasp)) for handle_pose in handle_path]
+    for i, tool_pose in enumerate(tool_path):
+        set_joint_positions(world.kitchen, door_joints, door_path[i])
+        set_tool_pose(world, tool_pose)  # TODO: open gripper
+        # handles = draw_pose(handle_path[i], length=0.25)
+        # handles.extend(draw_aabb(get_aabb(world.kitchen, link=handle_link)))
+        # wait_for_user()
+        # for handle in handles:
+        #    remove_debug(handle)
+        if any(pairwise_collision(world.gripper, obst) for obst in obstacles):
+            return None
+    return door_path, handle_path, tool_path
+
+def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
               randomize=True, collisions=True, teleport=False, **kwargs):
     handle_link, handle_grasp, handle_pregrasp = get_handle_grasp(world, door_joint)
     door_joints = [door_joint]
@@ -417,8 +452,9 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
         obstacles = set()
     # TODO: could allow handle collisions
     # TODO: could push if the goal is to fully close
+    # TODO: check door/bq collisions
 
-    bq.assign()
+    base_conf.assign()
     world.open_gripper()
     #door_saver = BodySaver()
     robot_saver = BodySaver(world.robot)
@@ -470,57 +506,39 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
         Trajectory(world, world.robot, world.gripper_joints, reversed(finger_path)),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ])
-    return (bq, aq, cmd,)
+    return (base_conf, aq, cmd,)
 
-def get_fixed_pull_gen(world, max_attempts=25, teleport=False, **kwargs):
+################################################################################
+
+def get_fixed_pull_gen(world, collisions=True, teleport=False, **kwargs):
+    obstacles = world.static_obstacles
+    if not collisions:
+        obstacles = set()
+
     def gen(joint_name, door_conf1, door_conf2, base_conf):
         # TODO: check if within database convex hull
-        return iter([])
+        door_joint = joint_from_name(world.kitchen, joint_name)
+        result = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
+        if result is None:
+            return
+        door_path, handle_path, tool_path = result
+        return plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
+                         collisions=collisions, teleport=teleport, **kwargs)
     return gen
 
 def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs):
     # TODO: could condition pick/place into cabinet on the joint angle
+    obstacles = world.static_obstacles
+    if not collisions:
+        obstacles = set()
 
     def gen(joint_name, door_conf1, door_conf2):
-        if door_conf1 == door_conf2:
-            return
         door_joint = joint_from_name(world.kitchen, joint_name)
-        door_joints = [door_joint]
-        # TODO: could unify with grasp path
-        door_extend_fn = get_extend_fn(world.kitchen, door_joints, resolutions=[DOOR_RESOLUTION])
-        door_path = [door_conf1.values] + list(door_extend_fn(door_conf1.values, door_conf2.values))
-        if teleport:
-            door_path = [door_conf1.values, door_conf2.values]
-
-        #door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
-        handle_link, handle_grasp, handle_pregrasp = get_handle_grasp(world, door_joint)
-        handle_path = []
-        for door_conf in door_path:
-            set_joint_positions(world.kitchen, door_joints, door_conf)
-            #if any(pairwise_collision(door_obst, obst)
-            #       for door_obst, obst in product(door_obstacles, obstacles)):
-            #    return
-            handle_path.append(get_link_pose(world.kitchen, handle_link))
-            # Collide due to adjacency
-
-        obstacles = world.static_obstacles
-        if not collisions:
-            obstacles = set()
-
-        tool_path = [multiply(handle_pose, invert(handle_grasp)) for handle_pose in handle_path]
-        for i, tool_pose in enumerate(tool_path):
-            set_joint_positions(world.kitchen, door_joints, door_path[i])
-            set_tool_pose(world, tool_pose) # TODO: open gripper
-            #handles = draw_pose(handle_path[i], length=0.25)
-            #handles.extend(draw_aabb(get_aabb(world.kitchen, link=handle_link)))
-            #wait_for_user()
-            #for handle in handles:
-            #    remove_debug(handle)
-            if any(pairwise_collision(world.gripper, obst) for obst in obstacles):
-                return
-
-        index = int(len(tool_path)/2)
-        #index = 0
+        result = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
+        if result is None:
+            return
+        door_path, handle_path, tool_path = result
+        index = int(len(tool_path)/2) # index = 0
         target_pose = tool_path[index]
         if learned:
             base_generator = load_pull_base_poses(world, joint_name)
@@ -528,12 +546,12 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs)
             base_generator = uniform_pose_generator(world.robot, target_pose)
 
         for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles):
-            # TODO: check door/bq collisions
             if ir_outputs is None: # break instead?
                 yield None
                 continue
             bq, = ir_outputs
-            ik_outputs = plan_pull(world, door_joint, door_path, handle_path, tool_path, bq, **kwargs)
+            ik_outputs = plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
+                                   collisions=collisions, teleport=teleport, **kwargs)
             if ik_outputs is None:
                 continue
             yield ik_outputs

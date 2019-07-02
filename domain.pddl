@@ -78,6 +78,17 @@
   ;  :effect (and (AtAConf ?a ?q2)
   ;               (not (AtAConf ?a ?q1)))
   ;)
+
+  ;(:action open_gripper
+  ;  :parameters ()
+  ;  :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
+  ;                     (AtBConf ?bq1) (CanMove) (Calibrated))
+  ;  :effect (and (AtBConf ?bq2)
+  ;               (not (AtBConf ?bq1)) (not (CanMove))
+  ;               (when (NoisyBase) (not (Calibrated)))
+  ;               (increase (total-cost) (Distance ?bq1 ?bq2)))
+  ;)
+
   (:action calibrate
     :parameters (?bq ?aq ?at)
     :precondition (and (CalibrateMotion ?bq ?aq ?at)
