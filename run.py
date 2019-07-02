@@ -29,6 +29,7 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.constants import print_solution
 from pddlstream.utils import INF
 from pddlstream.language.stream import StreamInfo
+from pddlstream.algorithms.constraints import PlanConstraints, WILD
 
 def create_args():
     parser = argparse.ArgumentParser()
@@ -65,18 +66,31 @@ def solve_pddlstream(world, problem, args, debug=False):
 
     stream_info = {
         # TODO: check if already on the stove
-        'compute-pose-kin': StreamInfo(eager=True),
-        'compute-angle-kin': StreamInfo(eager=True),
+        'compute-pose-kin': StreamInfo(p_success=0.5, eager=True),
+        'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
         'test-door': StreamInfo(p_success=0, eager=True),
         'plan-pick': StreamInfo(),
         'plan-pull': StreamInfo(),
-        'plan-base-motion': StreamInfo(overhead=1e1),
+        'plan-base-motion': StreamInfo(overhead=1e2),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
         # 'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda q1, q2: BASE_CONSTANT),
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
+
+    skeleton = [
+        ('calibrate', [WILD, WILD, WILD]),
+        ('move_base', [WILD, WILD, WILD]),
+        ('pull', ['indigo_drawer_top_joint', WILD, WILD,
+                  'indigo_drawer_top', WILD, WILD, WILD, WILD, WILD  ]),
+        ('move_base', [WILD, WILD, WILD]),
+        ('pick', ['big_red_block0', WILD, WILD, WILD,
+                  'indigo_drawer_top', WILD, WILD, WILD, WILD]),
+        ('move_base', [WILD, WILD, WILD]),
+    ]
+    constraints = PlanConstraints(skeletons=[skeleton], exact=True)
+    constraints = PlanConstraints()
 
     #success_cost = 0 if args.optimal else INF
     success_cost = INF
@@ -92,7 +106,7 @@ def solve_pddlstream(world, problem, args, debug=False):
             # TODO: option to only consider costs during local optimization
             # effort_weight = 0 if args.optimal else 1
             effort_weight = 1e-3 if args.optimal else 1
-            solution = solve_focused(problem, stream_info=stream_info,
+            solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
                                      planner=planner, max_planner_time=max_planner_time,
                                      unit_costs=args.unit, success_cost=success_cost,
                                      max_time=args.max_time, verbose=True, debug=debug,
@@ -100,7 +114,7 @@ def solve_pddlstream(world, problem, args, debug=False):
                                      # bind=True, max_skeletons=None,
                                      search_sample_ratio=search_sample_ratio)
         elif args.algorithm == 'incremental':
-            solution = solve_incremental(problem,
+            solution = solve_incremental(problem, constraints=constraints,
                                          planner=planner, max_planner_time=max_planner_time,
                                          unit_costs=args.unit, success_cost=success_cost,
                                          max_time=args.max_time, verbose=True, debug=debug)

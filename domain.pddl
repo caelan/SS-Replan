@@ -127,6 +127,12 @@
                  (not (AtAngle ?j ?a1))
                  (AtWorldPose ?o ?p2)
                  (not (AtWorldPose ?o ?p1))
+                 (forall (?o3 ?p3 ?rp3) (when (and (PoseKin ?o3 ?p3 ?rp3 ?o ?p1)
+                                                   (AtRelPose ?o3 ?rp3 ?o))
+                                              (not (AtWorldPose ?o3 ?p3))))
+                 (forall (?o4 ?p4 ?rp4) (when (and (PoseKin ?o4 ?p4 ?rp4 ?o ?p2)
+                                                   (AtRelPose ?o4 ?rp4 ?o))
+                                              (AtWorldPose ?o4 ?p4)))
                  (increase (total-cost) (PullCost)))
   )
 

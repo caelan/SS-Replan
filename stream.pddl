@@ -45,7 +45,7 @@
   )
 
   (:stream plan-base-motion
-    :fluents (AtGrasp AtAngle) ; AtWorldPose
+    :fluents (AtWorldPose AtGrasp AtAngle) ; AtWorldPose
     :inputs (?bq1 ?bq2)
     :domain (and (BConf ?bq1) (BConf ?bq2) (MovableBase))
     :outputs (?bt)

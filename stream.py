@@ -8,7 +8,7 @@ from pybullet_tools.pr2_primitives import Pose, Conf
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
-    get_aabb, unit_point, Euler, quat_from_euler, read_obj, set_pose, \
+    get_aabb, unit_point, Euler, quat_from_euler, read_obj, set_pose, has_link, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, \
@@ -16,7 +16,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
-    SURFACE_BOTTOM, get_surface
+    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
@@ -540,10 +540,16 @@ def get_motion_gen(world, collisions=True, teleport=False):
                 j, a = args
                 a.assign()
                 obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
-            elif predicate == 'AtPose'.lower():
+            elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
                 b, p = args
                 p.assign()
-                obstacles.add(world.get_body(b))
+                if b in world.movable:
+                    obstacles.add(world.get_body(b))
+                elif has_link(world.kitchen, b):
+                    link = link_from_name(world.kitchen, b)
+                    obstacles.update(get_descendant_obstacles(world.kitchen, link))
+                else:
+                    assert b in SURFACE_FROM_NAME
             elif predicate == 'AtGrasp'.lower():
                 b, g = args
                 attachments.append(g.get_attachment())
