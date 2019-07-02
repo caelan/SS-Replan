@@ -9,7 +9,7 @@ from collections import namedtuple
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, \
-    LockRenderer, get_body_name, randomize, unit_point, create_obj
+    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK
 
 try:
     import trac_ik_python
@@ -324,6 +324,6 @@ def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
         })
     return custom_limits
 
-def get_descendant_obstacles(kitchen, joint):
+def get_descendant_obstacles(kitchen, link=BASE_LINK):
     return {(kitchen, frozenset([link]))
-            for link in get_link_subtree(kitchen, joint)}
+            for link in get_link_subtree(kitchen, link)}

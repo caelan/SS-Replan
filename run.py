@@ -59,7 +59,7 @@ def create_args():
 
 ################################################################################
 
-def solve_pddlstream(world, problem, args):
+def solve_pddlstream(world, problem, args, debug=False):
     _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
@@ -69,7 +69,7 @@ def solve_pddlstream(world, problem, args):
         # TODO: check if already on the stove
         'compute-pose-kin': StreamInfo(eager=True),
         'compute-angle-kin': StreamInfo(eager=True),
-        'test-door': StreamInfo(eager=True),
+        'test-door': StreamInfo(p_success=0, eager=True),
         'plan-pick': StreamInfo(),
         'plan-pull': StreamInfo(),
         'plan-base-motion': StreamInfo(overhead=1e1),
@@ -95,9 +95,9 @@ def solve_pddlstream(world, problem, args):
             # effort_weight = 0 if args.optimal else 1
             effort_weight = 1e-3 if args.optimal else 1
             solution = solve_focused(problem, stream_info=stream_info,
-                                     planner=planner, max_planner_time=max_planner_time, debug=False,
+                                     planner=planner, max_planner_time=max_planner_time,
                                      unit_costs=args.unit, success_cost=success_cost,
-                                     max_time=args.max_time, verbose=True,
+                                     max_time=args.max_time, verbose=True, debug=debug,
                                      unit_efforts=True, effort_weight=effort_weight,
                                      # bind=True, max_skeletons=None,
                                      search_sample_ratio=search_sample_ratio)
@@ -105,7 +105,7 @@ def solve_pddlstream(world, problem, args):
             solution = solve_incremental(problem,
                                          planner=planner, max_planner_time=max_planner_time,
                                          unit_costs=args.unit, success_cost=success_cost,
-                                         max_time=args.max_time, verbose=True)
+                                         max_time=args.max_time, verbose=True, debug=debug)
         else:
             raise ValueError(args.algorithm)
         saver.restore()
@@ -115,7 +115,7 @@ def solve_pddlstream(world, problem, args):
     print_solution(solution)
     plan, cost, evaluations = solution
     pr.disable()
-    pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
+    pstats.Stats(pr).sort_stats('cumtime').print_stats(25)  # cumtime | tottime
     commands = commands_from_plan(world, plan)
     return commands
 
@@ -176,12 +176,12 @@ def main():
     #entity_path = get_ycb_obj_path(entity_name)
     world.add_body(entity_name, entity_path)
 
-    obstruction_name = 'cracker_box'
-    obstruction_path = get_ycb_obj_path(obstruction_name)
-    world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
-    obstruction_body = world.get_body(obstruction_name)
-    z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
+    #obstruction_name = 'cracker_box'
+    #obstruction_path = get_ycb_obj_path(obstruction_name)
+    #world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
+    #obstruction_body = world.get_body(obstruction_name)
+    #z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
+    #set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
 
     #test_grasps(world, entity_name)
     set_all_static()
