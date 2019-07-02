@@ -324,6 +324,6 @@ def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
         })
     return custom_limits
 
-def get_descendant_obstacles(kitchen, link=BASE_LINK):
-    return {(kitchen, frozenset([link]))
-            for link in get_link_subtree(kitchen, link)}
+def get_descendant_obstacles(body, link=BASE_LINK):
+    return {(body, frozenset([link]))
+            for link in get_link_subtree(body, link)}

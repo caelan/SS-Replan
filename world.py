@@ -124,7 +124,8 @@ class World(object):
         set_point(self.floor, np.array(get_point(self.floor)) - np.array([0, 0, z]))
     def update_custom_limits(self):
         robot_extent = get_aabb_extent(get_aabb(self.robot))
-        min_extent = min(robot_extent[:2]) * np.ones(2) / 2
+        # Scaling by 0.5 to prevent getting caught in corners
+        min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
         full_lower, full_upper = self.get_world_aabb()
         base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
         for handle in self.base_limits_handles:

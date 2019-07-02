@@ -7,10 +7,10 @@ import time
 import numpy as np
 
 class State(object):
-    def __init__(self, savers=[], attachments={}):
+    def __init__(self, savers=[], attachments=[]):
         # a part of the state separate from pybullet
         self.savers = tuple(savers)
-        self.attachments = dict(attachments)
+        self.attachments = {attachment.child: attachment for attachment in attachments}
     @property
     def bodies(self):
         return {saver.body for saver in self.savers} | set(self.attachments)

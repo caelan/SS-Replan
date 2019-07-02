@@ -153,7 +153,7 @@ def simulate_plan(world, commands, args):
     if commands is None:
         wait_for_user()
         return
-    initial_state = State(savers=[WorldSaver()], attachments=dict(world.initial_attachments))
+    initial_state = State(savers=[WorldSaver()], attachments=world.initial_attachments.values())
     wait_for_user()
     time_step = None if args.teleport else 0.02
     if args.record:
@@ -208,7 +208,7 @@ def main():
     #return
 
     #surface_name = random.choice(DRAWERS)
-    surface_name = COUNTERS[1] # COUNTERS | DRAWERS | SURFACES | CABINETS
+    surface_name = COUNTERS[0] # COUNTERS | DRAWERS | SURFACES | CABINETS
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():
@@ -218,7 +218,7 @@ def main():
     pose.assign()
 
     problem = pdddlstream_from_problem(
-        world, close_doors=True, return_home=True,
+        world, close_doors=False, return_home=True,
         collisions=not args.cfree, teleport=args.teleport)
     commands = solve_pddlstream(world, problem, args)
     simulate_plan(world, commands, args)

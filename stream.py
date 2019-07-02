@@ -12,11 +12,12 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, \
-    child_link_from_joint, BASE_LINK, unit_pose, get_pose, create_attachment, wait_for_user
+    child_link_from_joint, BASE_LINK, unit_pose, get_pose, create_attachment, \
+    wait_for_user
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
-    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME
+    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
@@ -129,18 +130,20 @@ def compute_surface_aabb(world, name):
 
 ################################################################################
 
-# def get_door_obstacles(world, surface_name):
-#     surface = get_surface(surface_name)
-#     obstacles = set()
-#     for joint_name in surface.joints:
-#         joint = joint_from_name(world.kitchen, joint_name)
-#         if joint in world.kitchen_joints:
-#             world.open_door(joint)
-#         obstacles.update(get_descendant_obstacles(world.kitchen, joint))
-#     # Be careful to call this before each check
-#     return obstacles
+def get_surface_obstacles(world, surface_name):
+    surface = get_surface(surface_name)
+    obstacles = set()
+    for joint_name in surface.joints:
+        joint = joint_from_name(world.kitchen, joint_name)
+        if joint_name in CABINET_JOINTS:
+            # TODO: remove this mechanic in the future
+            world.open_door(joint)
+        link = child_link_from_joint(joint)
+        obstacles.update(get_descendant_obstacles(world.kitchen, link))
+    # Be careful to call this before each check
+    return obstacles
 
-def get_obstacles(world, link_name):
+def get_link_obstacles(world, link_name):
     if link_name in world.movable:
         return {world.get_body(link_name)}
     elif has_link(world.kitchen, link_name):
@@ -155,16 +158,10 @@ def test_supported(world, body, surface_name, collisions=True):
     surface_aabb = compute_surface_aabb(world, surface_name)
     if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
         return False
-    #surface = get_surface(surface_name)
-    #surface_link = link_from_name(world.kitchen, surface_name)
-    # TODO: don't check collisions with the cabinet doors
-    obstacles = world.static_obstacles # | get_descendant_obstacles(world.kitchen, surface_link)
+    obstacles = world.static_obstacles | get_surface_obstacles(world, surface_name)
     if not collisions:
         obstacles = set()
-    # print([get_link_name(obst[0], *obst[1]) for obst in obstacles
-    #       if pairwise_collision(body, obst)])
-    # wait_for_user()
-    return not any(pairwise_collision(body, obst) for obst in obstacles) # if obst not in {body, surface}):
+    return not any(pairwise_collision(body, obst) for obst in obstacles)
 
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=5e-3, **kwargs):
@@ -265,7 +262,8 @@ def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
     def gen_fn(name, pose, grasp):
         assert pose.support is not None
         obj = world.get_body(name)
-        obstacles = world.static_obstacles # | get_door_obstacles(world, pose.support)
+        pose.assign() # May set the drawer confs as well
+        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
         if not collisions:
             obstacles = set()
         for _ in iterate_approach_path(world, pose, grasp, body=obj):
@@ -343,16 +341,16 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
         # TODO: check approach
         # TODO: flag to check if initially in collision
 
-        obj = world.get_body(name)
+        obj_body = world.get_body(name)
         world_from_body = pose.get_world_from_body()
         gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
-        attachment = grasp.get_attachment()
+        gripper_attachment = grasp.get_attachment()
 
         surface = get_surface(pose.support)
         surface_link = link_from_name(world.kitchen, surface.link)
         finger_path = plan_gripper_path(world, grasp.grasp_width, **kwargs)
-        obstacles = world.static_obstacles # | get_door_obstacles(world, pose.support) # | {obj}
+        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support) # | {obj_body}
         if not collisions:
             obstacles = set()
 
@@ -360,7 +358,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
         base_conf.assign()
         world.open_gripper()
         robot_saver = BodySaver(world.robot)
-        obj_saver = BodySaver(obj)
+        obj_saver = BodySaver(obj_body)
 
         aq = world.carry_conf
         if randomize:
@@ -372,15 +370,16 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
             # print('Grasp IK failure', grasp_conf)
             return
         approach_path = plan_approach(world, approach_pose, obstacles=obstacles,
-                                      attachments=[attachment], **kwargs)
+                                      attachments=[gripper_attachment], **kwargs)
         if approach_path is None:
             return
 
-        cmd = Sequence(State(savers=[robot_saver, obj_saver]), commands=[
+        surface_attachment = create_attachment(world.kitchen, surface_link, obj_body)
+        cmd = Sequence(State(savers=[robot_saver, obj_saver], attachments=[surface_attachment]), commands=[
             Trajectory(world, world.robot, world.arm_joints, approach_path),
             Trajectory(world, world.robot, world.gripper_joints, finger_path),
-            Detach(world, world.kitchen, surface_link, obj),
-            Attach(world, world.robot, world.tool_link, obj),
+            Detach(world, world.kitchen, surface_link, obj_body),
+            Attach(world, world.robot, world.tool_link, obj_body),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ])
         yield (aq, cmd,)
@@ -561,7 +560,7 @@ def get_motion_gen(world, collisions=True, teleport=False):
             elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
                 b, p = args
                 p.assign()
-                obstacles.update(get_obstacles(world, b))
+                obstacles.update(get_link_obstacles(world, b))
             elif predicate == 'AtGrasp'.lower():
                 b, g = args
                 attachments.append(g.get_attachment())
@@ -648,7 +647,7 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
             return True
         body = world.get_body(o1)
         p2.assign()
-        obstacles = get_obstacles(world, o2) # - at.bodies
+        obstacles = get_link_obstacles(world, o2) # - {body}
         for _ in iterate_approach_path(world, p1, g1, body=body):
             if any(pairwise_collision(part, obst) for part in
                    [world.gripper, body] for obst in obstacles):
@@ -680,7 +679,7 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
             return True
         # TODO: do per individual trajectory
         p.assign()
-        obstacles = get_obstacles(world, o)  - at.bodies
+        obstacles = get_link_obstacles(world, o) - at.bodies
         state = copy.copy(at.context)
         return check_collision_free(world, state, at, obstacles)
     return test
