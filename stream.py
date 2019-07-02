@@ -8,15 +8,16 @@ from pybullet_tools.pr2_primitives import Pose, Conf
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_max_limit, \
     get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
-    get_aabb, unit_point, Euler, quat_from_euler, read_obj, \
+    get_aabb, unit_point, Euler, quat_from_euler, read_obj, set_pose, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, child_link_from_joint
+    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, \
+    child_link_from_joint, BASE_LINK, unit_pose, get_pose, create_attachment, wait_for_user
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
     SURFACE_BOTTOM, get_surface
-from command import Sequence, Trajectory, Attach, State, DoorTrajectory
+from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
 
@@ -27,14 +28,50 @@ MAX_CONF_DISTANCE = 0.75
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
+################################################################################
+
 def base_cost_fn(q1, q2):
     distance = get_distance(q1.values[:2], q2.values[:2])
     return BASE_CONSTANT + distance / BASE_VELOCITY
 
-
 def trajectory_cost_fn(t):
     distance = t.distance(distance_fn=lambda q1, q2: get_distance(q1[:2], q2[:2]))
     return BASE_CONSTANT + distance / BASE_VELOCITY
+
+################################################################################
+
+# TODO: more general forward kinematics
+
+class RelPose(object):
+#class RelPose(Pose):
+    def __init__(self, body, link=BASE_LINK,
+                 reference_body=None, reference_link=BASE_LINK,
+                 confs=[], support=None, init=False):
+        self.body = body
+        self.link = link
+        self.reference_body = reference_body
+        self.reference_link = reference_link
+        # Could also perform recursively
+        self.confs = tuple(confs) # Attachment is treated as a conf
+        self.support = support
+        self.init = init
+        # TODO: method for automatically composing these
+    def assign(self):
+        for conf in self.confs: # Assumed to be totally ordered
+            conf.assign()
+    def get_world_from_reference(self):
+        if self.reference_body is None:
+            return unit_pose()
+        self.assign()
+        return get_link_pose(self.reference_body, self.reference_link)
+    def get_world_from_body(self):
+        self.assign()
+        return get_link_pose(self.body, self.link)
+    def get_reference_from_body(self):
+        return multiply(invert(self.get_world_from_reference()),
+                        self.get_world_from_body())
+    def __repr__(self):
+        return 'rp{}'.format(id(self) % 1000)
 
 def get_compute_pose_kin(world):
     def fn(o1, rp, o2, p2):
@@ -44,18 +81,17 @@ def get_compute_pose_kin(world):
         #    return (rp,)
         #if np.allclose(rp.value, unit_pose()):
         #    return (p2,)
+        # TODO: assert that the links align?
         body = world.get_body(o1)
-        world_from_obj = multiply(p2.value, rp.value)
-        p2 = Pose(body, world_from_obj, support=o2)
-        return (p2,)
+        p1 = RelPose(body, reference_body=p2.reference_body, reference_link=p2.reference_link,
+                     support=rp.support, confs=(p2.confs + rp.confs), init=(rp.init and p2.init))
+        return (p1,)
     return fn
 
 def get_compute_angle_kin(world):
-    def fn(o, j, a):
-        a.assign()
-        link = link_from_name(world.kitchen, o)
-        link_pose = get_link_pose(world.kitchen, link)
-        p = Pose((world.kitchen, link), link_pose, support=a)
+    def fn(s, j, a):
+        link = link_from_name(world.kitchen, s)
+        p = RelPose(world.kitchen, link, confs=[a], init=a.init)
         return (p,)
     return fn
 
@@ -89,17 +125,16 @@ def compute_surface_aabb(world, name):
     #wait_for_user()
     return surface_aabb
 
-
-def get_door_obstacles(world, surface_name):
-    surface = get_surface(surface_name)
-    obstacles = set()
-    for joint_name in surface.joints:
-        joint = joint_from_name(world.kitchen, joint_name)
-        if joint in world.kitchen_joints:
-            world.open_door(joint)
-        obstacles.update(get_descendant_obstacles(world.kitchen, joint))
-    # Be careful to call this before each check
-    return obstacles
+# def get_door_obstacles(world, surface_name):
+#     surface = get_surface(surface_name)
+#     obstacles = set()
+#     for joint_name in surface.joints:
+#         joint = joint_from_name(world.kitchen, joint_name)
+#         if joint in world.kitchen_joints:
+#             world.open_door(joint)
+#         obstacles.update(get_descendant_obstacles(world.kitchen, joint))
+#     # Be careful to call this before each check
+#     return obstacles
 
 ################################################################################
 
@@ -107,7 +142,7 @@ def test_supported(world, body, surface_name, collisions=True):
     surface_aabb = compute_surface_aabb(world, surface_name)
     if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
         return False
-    obstacles = world.static_obstacles | get_door_obstacles(world, surface_name)
+    obstacles = world.static_obstacles # | get_door_obstacles(world, surface_name)
     if not collisions:
         obstacles = set()
     # print([get_link_name(obst[0], *obst[1]) for obst in obstacles
@@ -118,32 +153,36 @@ def test_supported(world, body, surface_name, collisions=True):
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=5e-3, **kwargs):
     # TODO: remove fixed collisions with contained surfaces
-    def gen(body_name, surface_name):
-        body = world.get_body(body_name)
+    def gen(obj_name, surface_name):
+        obj_body = world.get_body(obj_name)
         surface_aabb = compute_surface_aabb(world, surface_name)
         learned_poses = load_placements(world, surface_name)
         while True:
             if learned:
                 if not learned_poses:
                     break
-                surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
-                body_pose = multiply(surface_pose, random.choice(learned_poses))
-                [x, y, _] = point_from_pose(body_pose)
-                _, _, yaw = euler_from_quat(quat_from_pose(body_pose))
+                surface_pose_world = get_surface_reference_pose(world.kitchen, surface_name)
+                sampled_pose_surface = multiply(surface_pose_world, random.choice(learned_poses))
+                [x, y, _] = point_from_pose(sampled_pose_surface)
+                _, _, yaw = euler_from_quat(quat_from_pose(sampled_pose_surface))
                 dx, dy = np.random.normal(scale=pos_scale, size=2)
-                z = stable_z_on_aabb(body, surface_aabb)
+                z = stable_z_on_aabb(obj_body, surface_aabb)
                 theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
                 #yaw = np.random.uniform(*CIRCULAR_LIMITS)
                 quat = quat_from_euler(Euler(yaw=theta))
-                body_pose = (x+dx, y+dy, z+z_offset), quat
+                body_pose_world = (x+dx, y+dy, z+z_offset), quat
                 # TODO: project onto the surface
             else:
-                body_pose = sample_placement_on_aabb(body, surface_aabb, epsilon=z_offset)
-                if body_pose is None:
-                    break
-            p = Pose(body, body_pose, support=surface_name)
-            p.assign()
-            if test_supported(world, body, surface_name, collisions=collisions):
+                body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
+            if body_pose_world is None:
+                break
+            set_pose(obj_body, body_pose_world)
+            if test_supported(world, obj_body, surface_name, collisions=collisions):
+                surface = get_surface(surface_name)
+                surface_link = link_from_name(world.kitchen, surface.link)
+                attachment = create_attachment(world.kitchen, surface_link, obj_body)
+                p = RelPose(obj_body, reference_body=world.kitchen,
+                            reference_link=surface_link, support=surface_name, confs=[attachment])
                 yield (p,)
     return gen
 
@@ -157,7 +196,8 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 ################################################################################
 
 def inverse_reachability(world, base_generator, obstacles=[], max_attempts=25, **kwargs):
-    lower_limits, upper_limits = get_custom_limits(world.robot, world.base_joints, world.custom_limits)
+    lower_limits, upper_limits = get_custom_limits(
+        world.robot, world.base_joints, world.custom_limits)
     while True:
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
             if not all_between(lower_limits, base_conf, upper_limits):
@@ -174,7 +214,8 @@ def inverse_reachability(world, base_generator, obstacles=[], max_attempts=25, *
         else:
             yield None
 
-def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, max_failures=0, **kwargs):
+def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25,
+                  max_successes=1, max_failures=0, **kwargs):
     successes = 0
     failures = 0
     ir_generator = ir_sampler(*inputs)
@@ -184,7 +225,7 @@ def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25, max_successes=1, m
                 ir_outputs = next(ir_generator)
             except StopIteration:
                 return
-            if ir_outputs is None:
+            if ir_outputs is None: # break instead?
                 continue
             ik_outputs = next(ik_fn(*(inputs + ir_outputs)), None)
             if ik_outputs is None:
@@ -208,7 +249,7 @@ def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
     def gen_fn(name, pose, grasp):
         assert pose.support is not None
         obj = world.get_body(name)
-        obstacles = world.static_obstacles | get_door_obstacles(world, pose.support)
+        obstacles = world.static_obstacles # | get_door_obstacles(world, pose.support)
         if not collisions:
             obstacles = set()
         for _ in iterate_approach_path(world, pose, grasp, body=obj):
@@ -217,7 +258,7 @@ def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
                 return iter([])
 
         # TODO: check collisions with obj at pose
-        gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
+        gripper_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
             base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
         else:
@@ -236,7 +277,7 @@ def plan_approach(world, approach_pose, obstacles=[], attachments=[],
     aq = world.carry_conf
     grasp_conf = get_joint_positions(world.robot, world.arm_joints)
     if switches_only:
-        return [aq.value, grasp_conf]
+        return [aq.values, grasp_conf]
 
     full_approach_conf = world.solve_inverse_kinematics(approach_pose)
     if (full_approach_conf is None) or \
@@ -244,10 +285,10 @@ def plan_approach(world, approach_pose, obstacles=[], attachments=[],
         # print('Approach IK failure', approach_conf)
         return None
     approach_conf = get_joint_positions(world.robot, world.arm_joints)
+    if teleport:
+        return [aq.values, approach_conf, grasp_conf]
     if MAX_CONF_DISTANCE < distance_fn(grasp_conf, approach_conf):
         return None
-    if teleport:
-        return [aq.value, approach_conf, grasp_conf]
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
     grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
@@ -287,12 +328,15 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
         # TODO: flag to check if initially in collision
 
         obj = world.get_body(name)
-        gripper_pose = multiply(pose.value, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
+        world_from_body = pose.get_world_from_body()
+        gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
+        approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
         attachment = grasp.get_attachment()
 
+        surface = get_surface(pose.support)
+        surface_link = link_from_name(world.kitchen, surface.link)
         finger_path = plan_gripper_path(world, grasp.grasp_width, **kwargs)
-        obstacles = world.static_obstacles | get_door_obstacles(world, pose.support) # | {obj}
+        obstacles = world.static_obstacles # | get_door_obstacles(world, pose.support) # | {obj}
         if not collisions:
             obstacles = set()
 
@@ -319,6 +363,7 @@ def get_pick_ik_fn(world, randomize=False, collisions=True, **kwargs):
         cmd = Sequence(State(savers=[robot_saver, obj_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, approach_path),
             Trajectory(world, world.robot, world.gripper_joints, finger_path),
+            Detach(world, world.kitchen, surface_link, obj),
             Attach(world, world.robot, world.tool_link, obj),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ])
@@ -418,7 +463,7 @@ def get_fixed_pull_gen(world, max_attempts=25, teleport=False, **kwargs):
         return iter([])
     return gen
 
-def get_pull_gen(world, teleport=False, learned=True, **kwargs):
+def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs):
 
     def gen(joint_name, door_conf1, door_conf2):
         if door_conf1 == door_conf2:
@@ -462,10 +507,14 @@ def get_pull_gen(world, teleport=False, learned=True, **kwargs):
         else:
             base_generator = uniform_pose_generator(world.robot, target_pose)
 
-        for ir_outputs in inverse_reachability(world, base_generator, obstacles=world.static_obstacles):
+        obstacles = world.static_obstacles
+        if not collisions:
+            obstacles = set()
+        for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles):
             # TODO: check door/bq collisions
-            if ir_outputs is None:
+            if ir_outputs is None: # break instead?
                 yield None
+                continue
             bq, = ir_outputs
             ik_outputs = plan_pull(world, door_joint, door_path, handle_path, tool_path, bq, **kwargs)
             if ik_outputs is None:

@@ -75,7 +75,6 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         (pose,) = next(stable_gen)
         if pose is None:
             break
-        #pose = Pose(world.get_body(object_name), ([2, 0, 1.15], unit_quat()))
         (grasp,) = random.choice(grasps)
         with LockRenderer(lock=True):
             result = next(ik_ir_gen(object_name, pose, grasp), None)

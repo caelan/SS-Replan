@@ -103,6 +103,8 @@ SURFACE_FROM_NAME = {
 
 ALL_SURFACES = OPEN_SURFACES + CABINETS + DRAWERS
 
+################################################################################
+
 CABINET_JOINTS = [
     'baker_joint',
     'chewie_door_left_joint', 'chewie_door_right_joint',
@@ -190,8 +192,9 @@ def set_tool_pose(world, tool_pose):
     set_pose(world.gripper, multiply(tool_pose, tool_from_root, root_from_urdf))
 
 def iterate_approach_path(world, pose, grasp, body=None):
-    grasp_pose = multiply(pose.value, invert(grasp.grasp_pose))
-    approach_pose = multiply(pose.value, invert(grasp.pregrasp_pose))
+    world_from_body = pose.get_world_from_body()
+    grasp_pose = multiply(world_from_body, invert(grasp.grasp_pose))
+    approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
     for tool_pose in interpolate_poses(grasp_pose, approach_pose):
         set_tool_pose(world, tool_pose)
         if body is not None:

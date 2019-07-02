@@ -4,7 +4,7 @@ from pddlstream.language.stream import DEBUG
 from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
-from pybullet_tools.pr2_primitives import Conf, Pose
+from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment, \
     child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed
 from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
@@ -14,7 +14,7 @@ from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
     get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, \
     get_fixed_pull_gen, get_compute_angle_kin, get_compute_pose_kin, \
-    link_from_name, get_link_pose
+    link_from_name, get_link_pose, RelPose
 
 
 def existential_quantification(goal_literals):
@@ -38,6 +38,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
     constant_map = {
         '@world': 'world',
+        '@gripper': 'gripper',
         '@stove': 'stove',
     }
 
@@ -56,7 +57,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         Equal(('PlaceCost',), 1),
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
-    ] + [('Type', name, 'stove') for name in STOVES] + \
+    ] + [('Type', obj_name, 'stove') for obj_name in STOVES] + \
            [('Status', status) for status in DOOR_STATUSES]
     if movable_base:
         init.append(('MovableBase',))
@@ -70,8 +71,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
 
     goal_block = list(world.movable)[0]
     #goal_surface = CABINETS[0]
-    goal_surface = DRAWERS[0]
-    #goal_surface = COUNTERS[1]
+    goal_surface = DRAWERS[1]
+    #goal_surface = COUNTERS[0]
     goal_on = {
         goal_block: goal_surface,
     }
@@ -85,52 +86,50 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
 
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
-        initial_conf = Conf(world.kitchen, [joint])
-        open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
-        closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
-        init.append(('AtAngle', joint_name, initial_conf))
+        init_conf = Conf(world.kitchen, [joint], init=True)
+        init.append(('AtAngle', joint_name, init_conf))
         if close_doors:
             goal_literals.append(('DoorStatus', joint_name, CLOSED))
-        for conf in [initial_conf, open_conf, closed_conf]:
+        open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
+        closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
+        for conf in [init_conf, open_conf, closed_conf]:
             init.append(('Angle', joint_name, conf))
 
     for surface_name in ALL_SURFACES:
         surface = get_surface(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
         parent_joint = parent_joint_from_link(surface_link)
-        if is_fixed(world.kitchen, parent_joint):
-            pose = Pose((world.kitchen, surface_link),
-                        get_link_pose(world.kitchen, surface_link), init=True)
-            init.extend([
+        joint_name = get_joint_name(world.kitchen, parent_joint)
+        if parent_joint in world.kitchen_joints:
+           init.append(('Connected', surface_name, joint_name))
+        else:
+            pose = RelPose(world.kitchen, surface_link, init=True)
+            init += [
                 ('WorldPose', surface_name, pose),
                 ('RelPose', surface_name, pose, 'world'),
                 ('AtRelPose', surface_name, pose, 'world'),
-            ])
-        else:
-            joint_name = get_joint_name(world.kitchen, parent_joint)
-            init.append(('Connected', surface_name, joint_name))
+            ]
 
-    for name in world.movable:
+    for obj_name in world.movable:
         # TODO: raise above surface and simulate to exploit physics
-        body = world.get_body(name)
+        body = world.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
             body, compute_surface_aabb(world, surface),
             above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
-            print(name, supporting)
-            raise RuntimeError()
+            raise RuntimeError(supporting)
         [surface_name] = supporting
         surface = get_surface(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
         attachment = create_attachment(world.kitchen, surface_link, body)
-        world.initial_attachments[body] = attachment
-        # TODO: use the pose of the drawer that was computed above
-        pose = Pose(body, attachment.grasp_pose, support=surface_name, init=True)
+        world.initial_attachments[body] = attachment # TODO: init state instead
+        pose = RelPose(body, reference_body=world.kitchen, reference_link=surface_link,
+                       confs=[attachment], support=surface_name, init=True)
         init += [
-            ('Graspable', name),
-            ('RelPose', name, pose, surface_name),
-            ('AtRelPose', name, pose, surface_name),
-        ] + [('Stackable', name, counter) for counter in COUNTERS]
+            ('Graspable', obj_name),
+            ('RelPose', obj_name, pose, surface_name),
+            ('AtRelPose', obj_name, pose, surface_name),
+        ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
 

@@ -19,7 +19,7 @@ from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoS
 
 from observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
 from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTERS, DRAWERS
+    DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTERS, DRAWERS, CABINETS
 from world import World
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
@@ -80,8 +80,9 @@ def solve_pddlstream(world, problem, args):
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
 
-    success_cost = 0 if args.optimal else INF
-    planner = 'ff-astar' if args.optimal else 'ff-wastar1'
+    #success_cost = 0 if args.optimal else INF
+    success_cost = INF
+    planner = 'max-astar' if args.optimal else 'ff-wastar1'
     search_sample_ratio = 2
     max_planner_time = 10
 
@@ -161,10 +162,10 @@ def main():
     world = World(use_gui=True)
     #for joint in world.kitchen_joints:
     #for name in LEFT_VISIBLE:
-    for name in DRAWER_JOINTS[:2]:
+    for name in DRAWER_JOINTS[1:2]:
         joint = joint_from_name(world.kitchen, name)
-        #world.open_door(joint)
-        world.close_door(joint)
+        world.open_door(joint)
+        #world.close_door(joint)
     world.open_gripper()
     #dump_link_cross_sections(world, link_name='indigo_tmp')
     #wait_for_user()
@@ -178,9 +179,9 @@ def main():
     obstruction_name = 'cracker_box'
     obstruction_path = get_ycb_obj_path(obstruction_name)
     world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
-    obstraction_body = world.get_body(obstruction_name)
-    z = stable_z(obstraction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(obstraction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
+    obstruction_body = world.get_body(obstruction_name)
+    z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
+    set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
 
     #test_grasps(world, entity_name)
     set_all_static()
@@ -194,8 +195,8 @@ def main():
     #test_observation(world, entity_name, world_from_zed_left)
     #return
 
-    #surface_name = random.choice(DRAWER_JOINTS) # SURFACES | CABINET_JOINTS
-    surface_name = COUNTERS[1] # COUNTER_LINKS |
+    #surface_name = random.choice(DRAWERS)
+    surface_name = COUNTERS[1] # COUNTERS | DRAWERS | SURFACES | CABINETS
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
     with WorldSaver():

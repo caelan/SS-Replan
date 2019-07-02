@@ -1,6 +1,6 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @world @stove) ; @gripper
+  (:constants @world @gripper @stove)
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -119,7 +119,7 @@
                        (AtAngle ?j ?a1) (HandEmpty)
                        (AtBConf ?bq) (Calibrated); (AtAConf ?aq)
                        ; TODO: ensure the final conf is safe
-                       (not (UnsafeATraj ?at))
+                       ;(not (UnsafeATraj ?at))
                   )
     :effect (and (AtAngle ?j ?a2) (CanMove)
                  (not (AtAngle ?j ?a1))
