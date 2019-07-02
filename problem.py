@@ -11,8 +11,8 @@ from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
     get_surface, COUNTERS
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
     get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
-    get_cfree_traj_pose_test, get_cfree_traj_angle_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_cfree_approach_angle_test, get_calibrate_gen, get_pick_ik_fn, \
+    get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
+    get_calibrate_gen, get_pick_ik_fn, \
     get_fixed_pull_gen, get_compute_angle_kin, get_compute_pose_kin, \
     link_from_name, get_link_pose, RelPose, wait_for_user
 
@@ -193,7 +193,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         'compute-pose-kin': from_fn(compute_pose_kin),
         'compute-angle-kin': from_fn(compute_angle_kin),
 
-        'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
+        'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
         'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
 

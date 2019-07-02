@@ -72,7 +72,7 @@ class RelPose(object):
                         self.get_world_from_body())
     def __repr__(self):
         if self.reference_body is None:
-            return 'p{}'.format(id(self) % 1000)
+            return 'wp{}'.format(id(self) % 1000)
         return 'rp{}'.format(id(self) % 1000)
 
 def get_compute_pose_kin(world):
@@ -127,6 +127,8 @@ def compute_surface_aabb(world, name):
     #wait_for_user()
     return surface_aabb
 
+################################################################################
+
 # def get_door_obstacles(world, surface_name):
 #     surface = get_surface(surface_name)
 #     obstacles = set()
@@ -138,13 +140,25 @@ def compute_surface_aabb(world, name):
 #     # Be careful to call this before each check
 #     return obstacles
 
+def get_obstacles(world, link_name):
+    if link_name in world.movable:
+        return {world.get_body(link_name)}
+    elif has_link(world.kitchen, link_name):
+        link = link_from_name(world.kitchen, link_name)
+        return get_descendant_obstacles(world.kitchen, link)
+    assert link_name in SURFACE_FROM_NAME
+    return set()
+
 ################################################################################
 
 def test_supported(world, body, surface_name, collisions=True):
     surface_aabb = compute_surface_aabb(world, surface_name)
     if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
         return False
-    obstacles = world.static_obstacles # | get_door_obstacles(world, surface_name)
+    #surface = get_surface(surface_name)
+    #surface_link = link_from_name(world.kitchen, surface_name)
+    # TODO: don't check collisions with the cabinet doors
+    obstacles = world.static_obstacles # | get_descendant_obstacles(world.kitchen, surface_link)
     if not collisions:
         obstacles = set()
     # print([get_link_name(obst[0], *obst[1]) for obst in obstacles
@@ -466,6 +480,7 @@ def get_fixed_pull_gen(world, max_attempts=25, teleport=False, **kwargs):
     return gen
 
 def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs):
+    # TODO: could condition pick/place into cabinet on the joint angle
 
     def gen(joint_name, door_conf1, door_conf2):
         if door_conf1 == door_conf2:
@@ -539,19 +554,14 @@ def get_motion_gen(world, collisions=True, teleport=False):
         for fluent in fluents:
             predicate, args = fluent[0], fluent[1:]
             if predicate == 'AtAngle'.lower():
-                j, a = args
-                a.assign()
-                obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
+                raise RuntimeError()
+                #j, a = args
+                #a.assign()
+                #obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
             elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
                 b, p = args
                 p.assign()
-                if b in world.movable:
-                    obstacles.add(world.get_body(b))
-                elif has_link(world.kitchen, b):
-                    link = link_from_name(world.kitchen, b)
-                    obstacles.update(get_descendant_obstacles(world.kitchen, link))
-                else:
-                    assert b in SURFACE_FROM_NAME
+                obstacles.update(get_obstacles(world, b))
             elif predicate == 'AtGrasp'.lower():
                 b, g = args
                 attachments.append(g.get_attachment())
@@ -581,6 +591,8 @@ def get_motion_gen(world, collisions=True, teleport=False):
         ])
         return (cmd,)
     return fn
+
+################################################################################
 
 def get_calibrate_gen(world, collisions=True, teleport=False):
 
@@ -621,13 +633,13 @@ def get_door_test(world):
 
 ################################################################################
 
-def get_cfree_pose_pose_test(collisions=True, **kwargs):
-    def test(o1, p1, o2, p2):
+def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
+    def test(o1, rp1, o2, rp2, s):
         if not collisions or (o1 == o2):
             return True
-        p1.assign()
-        p2.assign()
-        return not pairwise_collision(p1.body, p2.body)
+        rp1.assign()
+        rp2.assign()
+        return not pairwise_collision(world.get_body(o1), world.get_body(o2))
     return test
 
 def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
@@ -635,24 +647,11 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
         if not collisions or (o1 == o2):
             return True
         body = world.get_body(o1)
-        obst = world.get_body(o2)
         p2.assign()
-        for _ in iterate_approach_path(world, p1, g1, body=world.get_body(o1)):
-            if pairwise_collision(world.gripper, obst) or pairwise_collision(body, obst):
-                return False
-        return True
-    return test
-
-def get_cfree_approach_angle_test(world, collisions=True, **kwargs):
-    def test(o1, p1, g1, j, a):
-        if not collisions:
-            return True
-        body = world.get_body(o1)
-        joint = joint_from_name(world.kitchen, j)
-        obstacles = get_descendant_obstacles(world.kitchen, joint) # - at.bodies
-        a.assign()
+        obstacles = get_obstacles(world, o2) # - at.bodies
         for _ in iterate_approach_path(world, p1, g1, body=body):
-            if any(pairwise_collision(part, obst) for part in [world.gripper, body] for obst in obstacles):
+            if any(pairwise_collision(part, obst) for part in
+                   [world.gripper, body] for obst in obstacles):
                 return False
         return True
     return test
@@ -676,22 +675,12 @@ def check_collision_free(world, state, sequence, obstacles):
     return True
 
 def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
-    def test(at, o2, p2):
+    def test(at, o, p):
         if not collisions:
             return True
-        obstacles = {world.get_body(o2)} - at.bodies
+        # TODO: do per individual trajectory
+        p.assign()
+        obstacles = get_obstacles(world, o)  - at.bodies
         state = copy.copy(at.context)
-        p2.assign()
-        return check_collision_free(world, state, at, obstacles)
-    return test
-
-def get_cfree_traj_angle_test(world, collisions=True, **kwargs):
-    def test(at, j, a):
-        if not collisions:
-            return True
-        joint = joint_from_name(world.kitchen, j)
-        obstacles = get_descendant_obstacles(world.kitchen, joint) - at.bodies
-        state = copy.copy(at.context)
-        a.assign()
         return check_collision_free(world, state, at, obstacles)
     return test
