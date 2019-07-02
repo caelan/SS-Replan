@@ -45,7 +45,7 @@
   )
 
   (:stream plan-base-motion
-    :fluents (AtWorldPose AtGrasp AtAngle)
+    :fluents (AtGrasp AtAngle) ; AtWorldPose
     :inputs (?bq1 ?bq2)
     :domain (and (BConf ?bq1) (BConf ?bq2) (MovableBase))
     :outputs (?bt)
@@ -65,12 +65,12 @@
     :outputs (?p1)
     :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
   )
-  (:stream compute-angle-kin
-    :inputs (?o ?j ?a)
-    :domain (and (Connected ?o ?j) (Angle ?j ?a))
-    :outputs (?p)
-    :certified (and (WorldPose ?o ?p) (AngleKin ?o ?p ?j ?a))
-  )
+  ;(:stream compute-angle-kin
+  ;  :inputs (?o ?j ?a)
+  ;  :domain (and (Connected ?o ?j) (Angle ?j ?a))
+  ;  :outputs (?p)
+  ;  :certified (and (WorldPose ?o ?p) (AngleKin ?o ?p ?j ?a))
+  ;)
 
   (:stream test-cfree-pose-pose
     :inputs (?o1 ?rp1 ?o2 ?rp2 ?s)

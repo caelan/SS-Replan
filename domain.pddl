@@ -97,7 +97,7 @@
                        (not (UnsafeATraj ?at))
                   )
     :effect (and (AtGrasp ?o1 ?g) (CanMove)
-                 (not (AtRelPose ?o1 ?rp ?o2)) (not (HandEmpty))
+                 (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?p1)) (not (HandEmpty))
                  (increase (total-cost) (PickCost)))
   )
   (:action place
@@ -109,20 +109,24 @@
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
                   )
-    :effect (and (AtRelPose ?o1 ?rp ?o2) (HandEmpty) (CanMove)
+    :effect (and (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty) (CanMove)
                  (not (AtGrasp ?o1 ?g))
                  (increase (total-cost) (PlaceCost)))
   )
   (:action pull
-    :parameters (?j ?a1 ?a2 ?bq ?aq ?at)
+    :parameters (?j ?a1 ?a2 ?o ?p1 ?p2 ?bq ?aq ?at)
     :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq ?at)
+                       (AngleKin ?o ?p1 ?j ?a1) (AngleKin ?o ?p2 ?j ?a2)
                        (AtAngle ?j ?a1) (HandEmpty)
+                       (AtWorldPose ?o ?p1)
                        (AtBConf ?bq) (Calibrated); (AtAConf ?aq)
                        ; TODO: ensure the final conf is safe
                        (not (UnsafeATraj ?at))
                   )
     :effect (and (AtAngle ?j ?a2) (CanMove)
                  (not (AtAngle ?j ?a1))
+                 (AtWorldPose ?o ?p2)
+                 (not (AtWorldPose ?o ?p1))
                  (increase (total-cost) (PullCost)))
   )
 
@@ -147,14 +151,14 @@
   )
 
   ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
-  (:derived (AtWorldPose ?o1 ?p1) (or
-    (and (RelPose ?o1 ?p1 @world)
-         (AtRelPose ?o1 ?p1 @world))
-    (exists (?rp ?o2 ?p2) (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
-            (AtWorldPose ?o2 ?p2) (AtRelPose ?o1 ?rp ?o2)))
-    (exists (?j ?a) (and (AngleKin ?o1 ?p1 ?j ?a)
-            (AtAngle ?j ?a))) ; TODO: could compose arbitrary chains
-  ))
+  ;(:derived (AtWorldPose ?o1 ?p1) (or
+  ;  (and (RelPose ?o1 ?p1 @world)
+  ;       (AtRelPose ?o1 ?p1 @world))
+  ;  (exists (?rp ?o2 ?p2) (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
+  ;          (AtWorldPose ?o2 ?p2) (AtRelPose ?o1 ?rp ?o2)))
+  ;  (exists (?j ?a) (and (AngleKin ?o1 ?p1 ?j ?a)
+  ;          (AtAngle ?j ?a))) ; TODO: could compose arbitrary chains
+  ;))
 
   (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
     (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s)

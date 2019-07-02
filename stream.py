@@ -89,8 +89,8 @@ def get_compute_pose_kin(world):
     return fn
 
 def get_compute_angle_kin(world):
-    def fn(s, j, a):
-        link = link_from_name(world.kitchen, s)
+    def fn(o, j, a):
+        link = link_from_name(world.kitchen, o) # link not surface
         p = RelPose(world.kitchen, link, confs=[a], init=a.init)
         return (p,)
     return fn
@@ -487,6 +487,10 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs)
             handle_path.append(get_link_pose(world.kitchen, handle_link))
             # Collide due to adjacency
 
+        obstacles = world.static_obstacles
+        if not collisions:
+            obstacles = set()
+
         tool_path = [multiply(handle_pose, invert(handle_grasp)) for handle_pose in handle_path]
         for i, tool_pose in enumerate(tool_path):
             set_joint_positions(world.kitchen, door_joints, door_path[i])
@@ -496,7 +500,7 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs)
             #wait_for_user()
             #for handle in handles:
             #    remove_debug(handle)
-            if any(pairwise_collision(world.gripper, obst) for obst in world.static_obstacles):
+            if any(pairwise_collision(world.gripper, obst) for obst in obstacles):
                 return
 
         index = int(len(tool_path)/2)
@@ -507,9 +511,6 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs)
         else:
             base_generator = uniform_pose_generator(world.robot, target_pose)
 
-        obstacles = world.static_obstacles
-        if not collisions:
-            obstacles = set()
         for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles):
             # TODO: check door/bq collisions
             if ir_outputs is None: # break instead?

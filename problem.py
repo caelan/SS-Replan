@@ -69,6 +69,10 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     if fixed_base:
         world.carry_conf = init_aq
 
+
+    compute_pose_kin = get_compute_pose_kin(world)
+    compute_angle_kin = get_compute_angle_kin(world)
+
     goal_block = list(world.movable)[0]
     #goal_surface = CABINETS[0]
     goal_surface = DRAWERS[1]
@@ -84,30 +88,46 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     if return_home:
         goal_literals.append(('AtBConf', init_bq))
 
+    surface_poses = {}
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
+        link = child_link_from_joint(joint)
+        link_name = get_link_name(world.kitchen, link) # Relies on the fact that drawers have identical surface and link names
         init_conf = Conf(world.kitchen, [joint], init=True)
-        init.append(('AtAngle', joint_name, init_conf))
-        if close_doors:
-            goal_literals.append(('DoorStatus', joint_name, CLOSED))
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         for conf in [init_conf, open_conf, closed_conf]:
-            init.append(('Angle', joint_name, conf))
+            pose, = compute_angle_kin(link_name, joint_name, conf)
+            surface_poses[link_name] = pose
+            init.extend([
+                ('Angle', joint_name, conf),
+                ('AngleKin', link_name, pose, joint_name, conf),
+                ('WorldPose', link_name, pose),
+            ])
+            if conf == init_conf:
+                init.extend([
+                    ('AtAngle', joint_name, conf),
+                    ('AtWorldPose', link_name, pose),
+                ])
+        if close_doors:
+            goal_literals.append(('DoorStatus', joint_name, CLOSED))
 
     for surface_name in ALL_SURFACES:
         surface = get_surface(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
         parent_joint = parent_joint_from_link(surface_link)
-        joint_name = get_joint_name(world.kitchen, parent_joint)
         if parent_joint in world.kitchen_joints:
-           init.append(('Connected', surface_name, joint_name))
+            assert surface_name in surface_poses
+            #joint_name = get_joint_name(world.kitchen, parent_joint)
+            #init.append(('Connected', surface_name, joint_name))
         else:
             pose = RelPose(world.kitchen, surface_link, init=True)
+            surface_poses[surface_name] = pose
             init += [
+                #('RelPose', surface_name, pose, 'world'),
                 ('WorldPose', surface_name, pose),
-                ('RelPose', surface_name, pose, 'world'),
-                ('AtRelPose', surface_name, pose, 'world'),
+                #('AtRelPose', surface_name, pose, 'world'),
+                ('AtWorldPose', surface_name, pose),
             ]
 
     for obj_name in world.movable:
@@ -123,12 +143,18 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         surface_link = link_from_name(world.kitchen, surface.link)
         attachment = create_attachment(world.kitchen, surface_link, body)
         world.initial_attachments[body] = attachment # TODO: init state instead
-        pose = RelPose(body, reference_body=world.kitchen, reference_link=surface_link,
+        rel_pose = RelPose(body, reference_body=world.kitchen, reference_link=surface_link,
                        confs=[attachment], support=surface_name, init=True)
+        surface_pose = surface_poses[surface_name]
+        world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
+
         init += [
             ('Graspable', obj_name),
-            ('RelPose', obj_name, pose, surface_name),
-            ('AtRelPose', obj_name, pose, surface_name),
+            ('RelPose', obj_name, rel_pose, surface_name),
+            ('AtRelPose', obj_name, rel_pose, surface_name),
+            ('WorldPose', obj_name, world_pose),
+            ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
+            ('AtWorldPose', obj_name, world_pose),
         ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
@@ -162,8 +188,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         'fixed-plan-pick': from_gen_fn(get_pick_ik_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen(world, **kwargs)),
 
-        'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
-        'compute-angle-kin': from_fn(get_compute_angle_kin(world)),
+        'compute-pose-kin': from_fn(compute_pose_kin),
+        'compute-angle-kin': from_fn(compute_angle_kin),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(**kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
