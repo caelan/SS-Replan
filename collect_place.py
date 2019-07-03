@@ -16,7 +16,7 @@ from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
 from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name
 from world import World
-from stream import get_pick_gen, get_stable_gen, get_grasp_gen
+from stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
 
 def visualize_database(tool_from_base_list):
     #tool_from_base_list
@@ -53,9 +53,9 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
-    ik_ir_gen = get_pick_gen(world, collisions=not args.cfree, teleport=args.teleport,
-                             learned=False, max_attempts=args.attempts,
-                             max_successes=1, max_failures=0)
+    ik_ir_gen = get_pick_gen_fn(world, collisions=not args.cfree, teleport=args.teleport,
+                                learned=False, max_attempts=args.attempts,
+                                max_successes=1, max_failures=0)
 
     stable_gen = stable_gen_fn(object_name, surface_name)
     grasps = list(grasp_gen_fn(object_name))

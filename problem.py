@@ -9,11 +9,11 @@ from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attac
     child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed, link_from_name, get_link_pose, wait_for_user
 from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
     get_surface, COUNTERS, RelPose
-from stream import get_stable_gen, get_grasp_gen, get_pick_gen, \
-    get_motion_gen, base_cost_fn, get_pull_gen, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
+from stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
+    get_motion_gen, base_cost_fn, get_pull_gen_fn, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
-    get_calibrate_gen, get_fixed_pick_fn, \
-    get_fixed_pull_gen, get_compute_angle_kin, get_compute_pose_kin
+    get_calibrate_gen, get_fixed_pick_gen_fn, \
+    get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin
 
 
 def existential_quantification(goal_literals):
@@ -183,13 +183,13 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         'test-door': from_test(get_door_test(world)),
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
-        'plan-pick': from_gen_fn(get_pick_gen(world, **kwargs)),
-        'plan-pull': from_gen_fn(get_pull_gen(world, **kwargs)),
+        'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
+        'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
         'plan-base-motion': from_fn(get_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
 
-        'fixed-plan-pick': from_gen_fn(get_fixed_pick_fn(world, **kwargs)),
-        'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen(world, **kwargs)),
+        'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
+        'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
 
         'compute-pose-kin': from_fn(compute_pose_kin),
         'compute-angle-kin': from_fn(compute_angle_kin),

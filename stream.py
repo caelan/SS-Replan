@@ -223,7 +223,7 @@ def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25,
 
 ################################################################################
 
-def get_pick_ir_gen(world, collisions=True, learned=True, **kwargs):
+def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
     # TODO: vary based on surface (for drawers)
     def gen_fn(name, pose, grasp):
         assert pose.support is not None
@@ -299,10 +299,10 @@ def plan_gripper_path(world, grasp_width, teleport=False, **kwargs):
         return [open_conf, holding_conf]
     return [open_conf] + list(extend_fn(open_conf, holding_conf))
 
-def get_fixed_pick_fn(world, randomize=False, collisions=True, **kwargs):
+def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
 
-    def fn(name, pose, grasp, base_conf):
+    def gen(name, pose, grasp, base_conf):
         # TODO: check if within database convex hull
         # TODO: check approach
         # TODO: flag to check if initially in collision
@@ -349,12 +349,12 @@ def get_fixed_pick_fn(world, randomize=False, collisions=True, **kwargs):
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ])
         yield (aq, cmd,)
-    return fn
+    return gen
 
-def get_pick_gen(world, max_attempts=25, teleport=False, **kwargs):
+def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn
-    ir_sampler = get_pick_ir_gen(world, max_attempts=1, **kwargs)
-    ik_fn = get_fixed_pick_fn(world, teleport=teleport, **kwargs)
+    ir_sampler = get_pick_ir_gen_fn(world, max_attempts=1, **kwargs)
+    ik_fn = get_fixed_pick_gen_fn(world, teleport=teleport, **kwargs)
 
     def gen(*inputs):
         _, pose, _ = inputs
@@ -439,11 +439,11 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         # TODO: only check moving links
         if (full_arm_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
             # print('Approach IK failure', approach_conf)
-            return None
+            return
         arm_conf = get_joint_positions(world.robot, world.arm_joints)
         if arm_path and not teleport:
             if MAX_CONF_DISTANCE < distance_fn(arm_path[-1], arm_conf):
-                return None
+                return
         arm_path.append(arm_conf)
         # wait_for_user()
 
@@ -455,7 +455,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         approach_path = plan_approach(world, tool_pose, obstacles=obstacles,
                                       teleport=teleport, **kwargs)
         if approach_path is None:
-            return None
+            return
         approach_paths.append(approach_path)
 
     set_joint_positions(world.kitchen, door_joints, door_path[0])
@@ -472,11 +472,11 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         Trajectory(world, world.robot, world.gripper_joints, reversed(finger_path)),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ])
-    return (base_conf, aq, cmd,)
+    yield (aq, cmd,)
 
 ################################################################################
 
-def get_fixed_pull_gen(world, collisions=True, teleport=False, **kwargs):
+def get_fixed_pull_gen_fn(world, collisions=True, teleport=False, **kwargs):
     obstacles = world.static_obstacles
     if not collisions:
         obstacles = set()
@@ -492,7 +492,7 @@ def get_fixed_pull_gen(world, collisions=True, teleport=False, **kwargs):
                          collisions=collisions, teleport=teleport, **kwargs)
     return gen
 
-def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs):
+def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwargs):
     # TODO: could condition pick/place into cabinet on the joint angle
     obstacles = world.static_obstacles
     if not collisions:
@@ -515,12 +515,12 @@ def get_pull_gen(world, collisions=True, teleport=False, learned=True, **kwargs)
             if ir_outputs is None: # break instead?
                 yield None
                 continue
-            bq, = ir_outputs
-            ik_outputs = plan_pull(world, door_joint, door_path, handle_path, tool_path, bq,
-                                   collisions=collisions, teleport=teleport, **kwargs)
+            base_conf, = ir_outputs
+            ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
+                                        collisions=collisions, teleport=teleport, **kwargs), None)
             if ik_outputs is None:
                 continue
-            yield ik_outputs
+            yield ir_outputs + ik_outputs
     return gen
 
 ################################################################################

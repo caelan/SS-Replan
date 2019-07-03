@@ -13,7 +13,7 @@ from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, get_joint_name, joint_from_name, child_link_from_joint
 from utils import BASE_JOINTS
 from world import World
-from stream import get_pull_gen
+from stream import get_pull_gen_fn
 
 from database import DATABASE_DIRECTORY, get_date, get_joint_reference_pose, PULL_IR_FILENAME
 
@@ -29,7 +29,7 @@ def collect_pull(world, joint_name, args):
     closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
     open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
 
-    pull_gen = get_pull_gen(world, collisions=not args.cfree, teleport=args.teleport, learned=False)
+    pull_gen = get_pull_gen_fn(world, collisions=not args.cfree, teleport=args.teleport, learned=False)
                             #learned=False, max_attempts=args.attempts, max_successes=1, max_failures=0)
     #handle_link, handle_grasp, _ = get_handle_grasp(world, joint)
 

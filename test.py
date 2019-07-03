@@ -48,10 +48,12 @@ def goal_formula_from_goal(goals):
         #    atom = None
         elif predicate == 'cabinet_is_open':
             cabinet, = args
-            atom = ('DoorStatus', cabinet, 'open')
+            joint_name = '{}_joint'.format(cabinet)
+            atom = ('DoorStatus', joint_name, 'open')
         elif predicate == 'cabinet_is_closed':
             cabinet, = args
-            atom = ('DoorStatus', cabinet, 'closed')
+            joint_name = '{}_joint'.format(cabinet)
+            atom = ('DoorStatus', joint_name, 'closed')
         elif predicate == 'in_drawer':
             obj, drawer = args
             surface = '{}_joint'.format(drawer)
