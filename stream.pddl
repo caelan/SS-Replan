@@ -16,32 +16,32 @@
   (:stream plan-pick
     :inputs (?o ?p ?g)
     :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (MovableBase))
-    :outputs (?bq ?aq ?at)
-    :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
-                    (Pick ?o ?p ?g ?bq ?aq ?at))
+    :outputs (?bq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at) ; (AConf ?aq)
+                    (Pick ?o ?p ?g ?bq ?at))
   )
   (:stream plan-pull
     :inputs (?j ?a1 ?a2)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase))
-    :outputs (?bq ?aq ?at)
-    :certified (and (BConf ?bq) (AConf ?aq) (ATraj ?at)
-                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+    :outputs (?bq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at) ; (AConf ?aq)
+                    (Pull ?j ?a1 ?a2 ?bq ?at))
   )
 
   ; Fixed base
   (:stream fixed-plan-pick ; TODO: check if ?p ?g in convex hull
     :inputs (?o ?p ?g ?bq)
     :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (InitBConf ?bq))
-    :outputs (?aq ?at)
-    :certified (and (AConf ?aq) (ATraj ?at)
-                    (Pick ?o ?p ?g ?bq ?aq ?at))
+    :outputs (?at)
+    :certified (and (ATraj ?at) ; (AConf ?aq)
+                    (Pick ?o ?p ?g ?bq ?at))
   )
   (:stream fixed-plan-pull ; TODO: check if ?j within range
     :inputs (?j ?a1 ?a2 ?bq)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
-    :outputs (?aq ?at)
-    :certified (and (AConf ?aq) (ATraj ?at)
-                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+    :outputs (?at)
+    :certified (and (ATraj ?at) ; (AConf ?aq)
+                    (Pull ?j ?a1 ?a2 ?bq ?at))
   )
 
   (:stream plan-base-motion
@@ -63,9 +63,9 @@
   (:stream plan-calibrate-motion
     :inputs (?bq)
     :domain (BConf ?bq)
-    :outputs (?aq ?at)
-    :certified (and (AConf ?aq) (ATraj ?at)
-                    (CalibrateMotion ?bq ?aq ?at))
+    :outputs (?at)
+    :certified (and (ATraj ?at) ; (AConf ?aq)
+                    (CalibrateMotion ?bq ?at))
   )
 
   (:stream compute-pose-kin

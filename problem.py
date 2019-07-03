@@ -53,7 +53,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         ('AConf', init_aq),
         ('AtAConf', init_aq),
         ('HandEmpty',),
-        ('CanMove',), # TODO: could always remove this
+        ('CanMoveBase',), # TODO: could always remove this
+        ('CanMoveArm',),
         ('AConf', world.carry_conf),
 
         Equal(('CalibrateCost',), 1),

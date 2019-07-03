@@ -349,7 +349,8 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
             Attach(world, world.robot, world.tool_link, obj_body),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ])
-        yield (aq, cmd,)
+        #yield (aq, cmd,)
+        yield (cmd,)
     return gen
 
 def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
@@ -475,7 +476,8 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         Trajectory(world, world.robot, world.gripper_joints, reversed(finger_path)),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ])
-    yield (aq, cmd,)
+    #yield (aq, cmd,)
+    yield (cmd,)
 
 ################################################################################
 
@@ -582,6 +584,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
 
 def get_arm_motion_gen(world, collisions=True, teleport=False):
     def fn(aq1, aq2, fluents=[]):
+        # TODO: condition on a base conf?
         if teleport:
             path = [aq1.values, aq2.values]
         else:
@@ -607,7 +610,8 @@ def get_calibrate_gen(world, collisions=True, teleport=False):
             #Trajectory(world, world.robot, world.arm_joints, approach_path),
             # TODO: calibrate command
         ])
-        return (aq, cmd,)
+        #return (aq, cmd,)
+        return (cmd,)
     return fn
 
 ################################################################################
