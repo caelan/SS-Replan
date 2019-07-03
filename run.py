@@ -22,6 +22,7 @@ from world import World
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
 from stream import get_stable_gen
+from debug import dump_link_cross_sections
 
 #from examples.pybullet.pr2.run import post_process
 from pddlstream.algorithms.incremental import solve_incremental
@@ -181,7 +182,7 @@ def main():
         #world.open_door(joint)
         #world.close_door(joint)
     world.open_gripper()
-    #dump_link_cross_sections(world, link_name='indigo_tmp')
+    #dump_link_cross_sections(world, link_name='indigo_drawer_top')
     #wait_for_user()
 
     entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)

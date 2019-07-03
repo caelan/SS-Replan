@@ -4,7 +4,7 @@ from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, 
     link_from_name, get_joints, get_sample_fn, set_joint_positions, sample_placement, set_pose, get_pose, draw_pose, \
     BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision, get_link_descendants, \
     set_color, get_collision_data, read_obj, spaced_colors, get_link_pose, aabb_from_points, get_data_pose, tform_mesh, \
-    multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray
+    multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree
 from utils import get_grasps
 
 
@@ -147,10 +147,10 @@ def create_box_geometry(dx, dy, dz):
 
 
 def dump_link_cross_sections(world, link_name='hitman_tmp', digits=3):
-    #for joint in world.kitchen_joints:
-    #    world.open_door(joint)
+    for joint in world.kitchen_joints:
+        world.open_door(joint)
     link = link_from_name(world.kitchen, link_name)  # hitman_tmp
-    for descendant_link in get_link_descendants(world.kitchen, link):
+    for descendant_link in get_link_descendants(world.kitchen, link): # get_link_subtree | get_link_descendants
         set_color(world.kitchen, link=descendant_link, color=np.zeros(4))
 
     [data] = get_collision_data(world.kitchen, link)

@@ -6,17 +6,27 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_bodies, \
     get_point, get_aabb_extent, remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
-    get_joint_name, remove_body, disconnect
+    get_joint_name, remove_body, disconnect, wait_for_user, get_all_links, get_center_extent, get_pose, \
+    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent
 from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
 
+#KITCHEN1 = 'models/kitchen_description/urdf/kitchen_part_right_gen_stl.urdf'
+#KITCHEN2 = 'models/kitchen_description/urdf/kitchen_part_right_gen_obj.urdf'
+#mesh1 = read_obj('models/kitchen_description/meshes/obj/drawer_blender.obj', decompose=False)
+#aabb1 = aabb_from_points(mesh1.vertices)
+#mesh2 = read_obj('models/kitchen_description/meshes/obj/drawer_stl.obj', decompose=False)
+#aabb2 = aabb_from_points(mesh2.vertices)
+#print(get_aabb_center(aabb2) - get_aabb_center(aabb1), get_aabb_extent(aabb2) - get_aabb_extent(aabb1))
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.client = connect(use_gui=use_gui)
         add_data_path()
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
+        draw_pose(Pose(point=Point(z=1e-2)), length=3)
+
         self.robot_name = robot_name
         if self.robot_name == FRANKA_CARTER:
             urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
@@ -24,22 +34,32 @@ class World(object):
             urdf_path, yaml_path = EVE_PATH, None
         else:
             raise ValueError(self.robot_name)
+        self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
         #dump_body(self.robot)
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
         #draw_aabb(get_aabb(self.robot))
-        self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
         #print(self.robot_yaml)
         self.set_initial_conf()
         self.gripper = create_gripper(self.robot)
         #dump_body(self.gripper)
 
-        with HideOutput(enable=True):
-            self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
-        draw_pose(Pose(point=Point(z=1e-2)), length=3)
-        #dump_body(self.kitchen)
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
+        with HideOutput(enable=False):
+            self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
+        # kitchen2 = load_pybullet(KITCHEN2, fixed_base=True)
+        # for joint in self.kitchen_joints:
+        #     set_joint_position(self.kitchen, joint, self.open_conf(joint))
+        #     set_joint_position(kitchen2, joint, self.open_conf(joint))
+        # wait_for_user()
+        # for link in get_all_links(self.kitchen):
+        #     center1, extent1 = get_center_extent(self.kitchen, link=link)
+        #     center2, extent2 = get_center_extent(kitchen2, link=link)
+        #     print(get_link_name(self.kitchen, link), center2 - center1, extent2 - extent1)
+        # wait_for_user()
+
+        #dump_body(self.kitchen)
         #print(self.kitchen_yaml)
         set_point(self.kitchen, Point(z=stable_z(self.kitchen, self.floor)))
         #draw_pose(get_pose(self.kitchen), length=1)

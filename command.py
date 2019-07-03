@@ -1,6 +1,7 @@
 from execution import joint_state_control, open_gripper, close_gripper
-from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input
+from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input, wait_for_user
 from utils import get_descendant_obstacles
+from issac import update_robot
 
 import time
 
@@ -120,6 +121,8 @@ class DoorTrajectory(Command):
             yield
 
     def execute(self, domain, moveit, observer):
+        #update_robot(self.world, domain, observer, observer.observe())
+        #wait_for_user()
         close_gripper(moveit, effort=1000)
         time.sleep(1.0)
         #joints = self.robot_joints + self.world.gripper_joints

@@ -62,11 +62,10 @@ BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_
 YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 # TODO: ycb obj files have 6 vertex coordinates?
 
-#KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen.urdf')
-#KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_concave.urdf')
-KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_obj.urdf')
 #KITCHEN_PATH = '/home/caelan/Programs/robot_kitchen/model/robot_kitchen.sdf'
-#KITCHEN_PATH = os.path.join(SRL_PATH, 'packages/kitchen_description/urdf/kitchen_part_right_gen.urdf')
+#KITCHEN_PATH = os.path.join(SRL_PATH, 'packages/kitchen_description/urdf/kitchen_part_right_gen_stl.urdf')
+#KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_obj.urdf')
+KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_convex.urdf')
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
 
 STOVES = ['range']
@@ -101,8 +100,10 @@ SURFACE_FROM_NAME = {
     'hitman_drawer_bottom': Surface('hitman_drawer_bottom', 'Cube_Cube.001', ['hitman_drawer_bottom_joint']),
 
     #'indigo_tmp_bottom': Surface('indigo_tmp', SURFACE_BOTTOM, ['indigo_door_left_joint', 'indigo_door_right_joint']),
-    'indigo_drawer_top': Surface('indigo_drawer_top', 'Cube_Cube.001', ['indigo_drawer_top_joint']),
-    'indigo_drawer_bottom': Surface('indigo_drawer_bottom', 'Cube_Cube.001', ['indigo_drawer_bottom_joint']),
+    #'indigo_drawer_top': Surface('indigo_drawer_top', 'Cube_Cube.001', ['indigo_drawer_top_joint']),
+    #'indigo_drawer_bottom': Surface('indigo_drawer_bottom', 'Cube_Cube.001', ['indigo_drawer_bottom_joint']),
+    'indigo_drawer_top': Surface('indigo_drawer_top', SURFACE_BOTTOM, ['indigo_drawer_top_joint']),
+    'indigo_drawer_bottom': Surface('indigo_drawer_bottom', SURFACE_BOTTOM, ['indigo_drawer_bottom_joint']),
 }
 
 ALL_SURFACES = OPEN_SURFACES + CABINETS + DRAWERS
