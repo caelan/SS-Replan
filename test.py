@@ -165,7 +165,7 @@ def main():
         simulate_plan(world, commands, args)
     else:
         wait_for_user()
-    if commands is None:
+    if (commands is None) or args.teleport:
         return
     #wait_for_user()
     saver.restore()
