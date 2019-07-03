@@ -534,7 +534,13 @@ def parse_fluents(world, fluents, obstacles):
     attachments = []
     for fluent in fluents:
         predicate, args = fluent[0], fluent[1:]
-        if predicate == 'AtAngle'.lower():
+        if predicate == 'AtBConf'.lower():
+            bq, = args
+            bq.assign()
+        elif predicate == 'AtAConf'.lower():
+            aq, = args
+            aq.assign()
+        elif predicate == 'AtAngle'.lower():
             raise RuntimeError()
             # j, a = args
             # a.assign()
@@ -557,11 +563,12 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
     def fn(bq1, bq2, fluents=[]):
         bq1.assign()
         world.carry_conf.assign()
-        initial_saver = BodySaver(world.robot)
         obstacles = set(world.static_obstacles)
         attachments = parse_fluents(world, fluents, obstacles)
+        # TODO: could condition on arm conf
         if not collisions:
             obstacles = set()
+        initial_saver = BodySaver(world.robot)
         if teleport:
             path = [bq1.values, bq2.values]
         else:
@@ -570,7 +577,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
                                             self_collisions=False,
                                             restarts=4, iterations=75, smooth=100)
             if path is None:
-                print('Failed motion plan!')
+                print('Failed to find a base motion plan!')
                 #for bq in [bq1, bq2]:
                 #    bq.assign()
                 #    wait_for_user()
@@ -583,13 +590,28 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
     return fn
 
 def get_arm_motion_gen(world, collisions=True, teleport=False):
+    resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
+
     def fn(aq1, aq2, fluents=[]):
-        # TODO: condition on a base conf?
+        # TODO: condition explicitly on a base conf?
+        aq1.assign()
+        obstacles = set(world.static_obstacles)
+        attachments = parse_fluents(world, fluents, obstacles)
+        if not collisions:
+            obstacles = set()
+        initial_saver = BodySaver(world.robot)
         if teleport:
             path = [aq1.values, aq2.values]
         else:
-            raise NotImplementedError()
-        cmd = Sequence(State(savers=[]), commands=[
+            path = plan_joint_motion(world.robot, aq2.joints, aq2.values,
+                                     attachments=attachments,
+                                     obstacles=obstacles, self_collisions=SELF_COLLISIONS,
+                                     custom_limits=world.custom_limits, resolutions=resolutions,
+                                     restarts=2, iterations=25, smooth=25)
+            if path is None:
+                print('Failed to find an arm motion plan!')
+                return None
+        cmd = Sequence(State(savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
         ])
         return (cmd,)

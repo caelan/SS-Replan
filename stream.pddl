@@ -53,7 +53,7 @@
                     (BaseMotion ?bq1 ?bq2 ?bt))
   )
   (:stream plan-arm-motion
-    ; :fluents (AtWorldPose AtGrasp) ; AtAngle
+    :fluents (AtBConf AtWorldPose AtGrasp) ; AtAngle
     :inputs (?aq1 ?aq2)
     :domain (and (AConf ?aq1) (AConf ?aq2))
     :outputs (?at)

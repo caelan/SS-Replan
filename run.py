@@ -72,6 +72,7 @@ def solve_pddlstream(world, problem, args, debug=False):
         'plan-pick': StreamInfo(),
         'plan-pull': StreamInfo(),
         'plan-base-motion': StreamInfo(overhead=1e2),
+        'plan-arm-motion': StreamInfo(overhead=1e2),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
