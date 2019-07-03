@@ -1,4 +1,4 @@
-from execution import joint_state_control
+from execution import joint_state_control, open_gripper, close_gripper
 from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input
 from utils import get_descendant_obstacles
 
@@ -120,16 +120,11 @@ class DoorTrajectory(Command):
             yield
 
     def execute(self, domain, moveit, observer):
-        #robot_entity = domain.get_robot()
-        #franka = robot_entity.robot
-        #for positions in self.robot_path:
-        #    franka.end_effector.go_config(positions)
-        # TODO: only sleep is used by close_gripper and open_gripper...
-        #moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
+        close_gripper(moveit, effort=100)
         time.sleep(1.0)
         status = joint_state_control(self.robot, self.robot_joints, self.robot_path, domain, moveit, observer)
         time.sleep(1.0)
-        moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
+        open_gripper(moveit)
         time.sleep(1.0)
         return status
 
@@ -159,15 +154,7 @@ class Attach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        # controllable_object is not needed for joint positions
-        moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
-        # TODO: attach_obj
-        #robot_entity = domain.get_robot()
-        #franka = robot_entity.robot
-        #gripper = franka.end_effector.gripper
-        #gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
-        #update_robot(self.world, domain, observer, observer.observe())
-        #time.sleep(1.0)
+        return close_gripper(moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
@@ -192,13 +179,7 @@ class Detach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
-        #robot_entity = domain.get_robot()
-        #franka = robot_entity.robot
-        #gripper = franka.end_effector.gripper
-        #gripper.open(speed=.2, actuate_gripper=True, wait=True)
-        #update_robot(self.world, domain, observer.observe())
-        #time.sleep(1.0)
+        return open_gripper(moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))

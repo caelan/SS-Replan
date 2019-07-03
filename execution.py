@@ -9,6 +9,7 @@ def get_joint_names(body, joints):
 
 def joint_state_control(robot, joints, path, domain, moveit, observer,
                         threshold=0.01, timeout=2.0):
+    # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
     from sensor_msgs.msg import JointState
     import rospy
     joint_names = get_joint_names(robot, joints)
@@ -81,3 +82,44 @@ def lula_control(world, path, domain, observer, world_state):
        update_robot(world, domain, observer, observer.observe())
        #wait_for_duration(1e-3)
        # TODO: attachments
+
+################################################################################s
+
+def open_gripper(moveit, effort=None, sleep=0.2):
+    # robot_entity = domain.get_robot()
+    # franka = robot_entity.robot
+    # gripper = franka.end_effector.gripper
+    # gripper.open(speed=.2, actuate_gripper=True, wait=True)
+    # update_robot(self.world, domain, observer.observe())
+    # time.sleep(1.0)
+    #moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
+    from sensor_msgs.msg import JointState
+    import rospy
+    joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.open_positions)
+    if effort is not None:
+        joint_state.effort = [effort] * len(moveit.gripper.joints)
+    moveit.joint_cmd_pub.publish(joint_state)
+    if 0. < sleep:
+        rospy.sleep(sleep)
+    return None
+
+def close_gripper(moveit, effort=None, sleep=0.2):
+    # controllable_object is not needed for joint positions
+    # TODO: attach_obj
+    # robot_entity = domain.get_robot()
+    # franka = robot_entity.robot
+    # gripper = franka.end_effector.gripper
+    # gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
+    # update_robot(self.world, domain, observer, observer.observe())
+    # time.sleep(1.0)
+    # TODO: only sleep is used by close_gripper and open_gripper...
+    #moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
+    from sensor_msgs.msg import JointState
+    import rospy
+    joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.closed_positions)
+    if effort is not None:
+        joint_state.effort = [effort] * len(moveit.gripper.joints)
+    moveit.joint_cmd_pub.publish(joint_state)
+    if 0. < sleep:
+        rospy.sleep(sleep)
+    return None
