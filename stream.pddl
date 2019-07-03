@@ -49,7 +49,16 @@
     :inputs (?bq1 ?bq2)
     :domain (and (BConf ?bq1) (BConf ?bq2) (MovableBase))
     :outputs (?bt)
-    :certified (and (BTraj ?bt) (BaseMotion ?bq1 ?bq2 ?bt))
+    :certified (and ; (BTraj ?bt)
+                    (BaseMotion ?bq1 ?bq2 ?bt))
+  )
+  (:stream plan-arm-motion
+    ; :fluents (AtWorldPose AtGrasp) ; AtAngle
+    :inputs (?aq1 ?aq2)
+    :domain (and (AConf ?aq1) (AConf ?aq2))
+    :outputs (?at)
+    :certified (and ; (ATraj ?bt)
+                    (ArmMotion ?aq1 ?aq2 ?at))
   )
   (:stream plan-calibrate-motion
     :inputs (?bq)

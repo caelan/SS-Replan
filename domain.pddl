@@ -1,6 +1,6 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @world @gripper @stove)
+  (:constants @world @gripper @stove @rest)
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -63,21 +63,21 @@
   (:action move_base
     :parameters (?bq1 ?bq2 ?bt)
     :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
-                       (AtBConf ?bq1) (CanMove) (Calibrated)
-                   )
+                       (AtBConf ?bq1) (AtAConf @rest)
+                       (CanMove) (Calibrated))
     :effect (and (AtBConf ?bq2)
                  (not (AtBConf ?bq1)) (not (CanMove))
                  (when (NoisyBase) (not (Calibrated)))
                  (increase (total-cost) (Distance ?bq1 ?bq2)))
                  ; (increase (total-cost) (MoveCost ?bt)))
   )
-  ;(:action move_arm
-  ;  :parameters (?q1 ?q2 ?t)
-  ;  :precondition (and (ArmMotion ?a ?q1 ?t ?q2)
-  ;                     (AtAConf ?a ?q1))
-  ;  :effect (and (AtAConf ?a ?q2)
-  ;               (not (AtAConf ?a ?q1)))
-  ;)
+  (:action move_arm
+    :parameters (?aq1 ?aq2 ?at)
+    :precondition (and (ArmMotion ?aq1 ?aq2 ?at)
+                       (AtAConf ?aq1))
+    :effect (and (AtAConf ?aq2)
+                 (not (AtAConf ?aq1)))
+  )
 
   ;(:action open_gripper
   ;  :parameters ()

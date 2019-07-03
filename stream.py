@@ -528,7 +528,28 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
 
 ################################################################################
 
-def get_motion_gen(world, collisions=True, teleport=False):
+def parse_fluents(world, fluents, obstacles):
+    attachments = []
+    for fluent in fluents:
+        predicate, args = fluent[0], fluent[1:]
+        if predicate == 'AtAngle'.lower():
+            raise RuntimeError()
+            # j, a = args
+            # a.assign()
+            # obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
+        elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
+            b, p = args
+            p.assign()
+            obstacles.update(get_link_obstacles(world, b))
+        elif predicate == 'AtGrasp'.lower():
+            b, g = args
+            attachments.append(g.get_attachment())
+            attachments[-1].assign()
+        else:
+            raise NotImplementedError(predicate)
+    return attachments
+
+def get_base_motion_fn(world, collisions=True, teleport=False):
     # TODO: ensure only forward drive?
 
     def fn(bq1, bq2, fluents=[]):
@@ -536,26 +557,7 @@ def get_motion_gen(world, collisions=True, teleport=False):
         world.carry_conf.assign()
         initial_saver = BodySaver(world.robot)
         obstacles = set(world.static_obstacles)
-        attachments = []
-        for fluent in fluents:
-            predicate, args = fluent[0], fluent[1:]
-            if predicate == 'AtAngle'.lower():
-                raise RuntimeError()
-                #j, a = args
-                #a.assign()
-                #obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
-            elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
-                b, p = args
-                p.assign()
-                obstacles.update(get_link_obstacles(world, b))
-            elif predicate == 'AtGrasp'.lower():
-                b, g = args
-                attachments.append(g.get_attachment())
-                attachments[-1].assign()
-            else:
-                raise NotImplementedError(predicate)
-        # TODO: need to collision check with doors otherwise collision
-
+        attachments = parse_fluents(world, fluents, obstacles)
         if not collisions:
             obstacles = set()
         if teleport:
@@ -574,6 +576,18 @@ def get_motion_gen(world, collisions=True, teleport=False):
         # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.base_joints, path),
+        ])
+        return (cmd,)
+    return fn
+
+def get_arm_motion_gen(world, collisions=True, teleport=False):
+    def fn(aq1, aq2, fluents=[]):
+        if teleport:
+            path = [aq1.values, aq2.values]
+        else:
+            raise NotImplementedError()
+        cmd = Sequence(State(savers=[]), commands=[
+            Trajectory(world, world.robot, world.arm_joints, path),
         ])
         return (cmd,)
     return fn

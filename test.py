@@ -103,6 +103,8 @@ TASKS = [
 
 def main():
     parser = create_parser()
+    parser.add_argument('-fixed', action='store_true',
+                        help='TBD')
     parser.add_argument('-lula', action='store_true',
                         help='TBD')
     parser.add_argument('-problem', default=TASKS[2], choices=TASKS,
