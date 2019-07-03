@@ -253,6 +253,7 @@ DOOR_RESOLUTION = 0.025
 
 def plan_approach(world, approach_pose, obstacles=[], attachments=[],
                   teleport=False, switches_only=False, **kwargs):
+    # TODO: use velocities in the distance function
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
     aq = world.carry_conf
     grasp_conf = get_joint_positions(world.robot, world.arm_joints)
@@ -274,7 +275,7 @@ def plan_approach(world, approach_pose, obstacles=[], attachments=[],
     grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
                                           attachments=attachments,
                                           obstacles=obstacles, self_collisions=SELF_COLLISIONS,
-                                          custom_limits=world.custom_limits, resolutions=resolutions / 2.)
+                                          custom_limits=world.custom_limits, resolutions=resolutions / 4.)
     if grasp_path is None:
         print('Grasp path failure')
         return None
@@ -365,7 +366,8 @@ def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
 
 def get_handle_grasp(world, joint, pre_distance=0.1):
     pre_direction = pre_distance * get_unit_vector([0, 0, 1])
-    half_extent = 0.375*FINGER_EXTENT[2]
+    #half_extent = 0.375*FINGER_EXTENT[2]
+    half_extent = 0.25*FINGER_EXTENT[2]
 
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):

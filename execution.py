@@ -9,34 +9,35 @@ def get_joint_names(body, joints):
             for joint in joints]
 
 def joint_state_control(robot, joints, path, domain, moveit, observer,
-                        threshold=0.01, timeout=2.0):
+                        threshold=0.01, timeout=1.0):
     # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
     from sensor_msgs.msg import JointState
     import rospy
-    max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
-    max_forces = np.array([get_max_force(robot, joint) for joint in joints])
+    #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
+    #max_forces = np.array([get_max_force(robot, joint) for joint in joints])
     joint_names = get_joint_names(robot, joints)
     distance_fn = get_distance_fn(robot, joints)
-    difference_fn = get_difference_fn(robot, joints)
+    #difference_fn = get_difference_fn(robot, joints)
     for target_conf in path:
-        rate = rospy.Rate(1000)
+        velocity = None
+        #velocity = list(0.25 * np.array(max_velocities))
+        joint_state = JointState(name=joint_names, position=list(target_conf), velocity=velocity)
+        moveit.joint_cmd_pub.publish(joint_state)
+        #rate = rospy.Rate(1000)
         start_time = rospy.Time.now()
         while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < timeout):
             world_state = observer.observe()
             robot_entity = world_state.entities[domain.robot]
-            difference = difference_fn(target_conf, robot_entity.q)
+            #difference = difference_fn(target_conf, robot_entity.q)
             if distance_fn(target_conf, robot_entity.q) < threshold:
                 break
-            #velocity = None
-            velocity = list(0.25*np.array(max_velocities))
-            joint_state = JointState(name=joint_names, position=list(target_conf), velocity=velocity)
             # ee_frame = moveit.forward_kinematics(joint_state.position)
             # moveit.visualizer.send(ee_frame)
-            moveit.joint_cmd_pub.publish(joint_state)
-            rate.sleep()
+            #rate.sleep()
         else:
             print('Failed to reach set point')
+    # TODO: send zero velocity command?
     # moveit.execute(plan, required_orig_err=0.05, timeout=20.0,
     #               publish_display_trajectory=True)
     # TODO: return status
