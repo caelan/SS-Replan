@@ -13,7 +13,9 @@ import numpy as np
 import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, get_max_velocity, get_max_force, wait_for_user
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
+    get_max_velocity, get_max_force, wait_for_user, get_camera, dump_body, link_from_name, \
+    point_from_pose, get_yaw, get_pitch, get_link_pose, draw_pose, multiply, invert
 
 from issac import update_world, kill_lula
 from world import World
@@ -154,6 +156,10 @@ def main():
     with LockRenderer():
         update_world(world, domain, observer, world_state)
 
+    #cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
+    #drawer_link = link_from_name(world.kitchen, 'indigo_drawer_top')
+    #draw_pose(multiply(get_link_pose(world.kitchen, drawer_link), (cage_handle_from_drawer)))
+
     # TODO: initial robot base conf is in collision
     problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
                                        collisions=not args.cfree, teleport=args.teleport)
@@ -175,6 +181,7 @@ def main():
     #rospy.sleep(1.) # Small sleep might be needed
     #sim_manager.pause() # The second invocation resumes
 
+    # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
     for command in commands:
         command.execute(domain, moveit, observer)
     world.destroy()

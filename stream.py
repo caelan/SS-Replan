@@ -11,8 +11,9 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     get_aabb, unit_point, Euler, quat_from_euler, read_obj, set_pose, has_link, \
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, \
-    child_link_from_joint, create_attachment, Point
+    get_distance_fn, get_unit_vector, unit_quat, get_collision_data, apply_affine, \
+    child_link_from_joint, create_attachment, Point, get_data_extents, AABB, get_aabb_vertices, \
+    draw_aabb, wait_for_user
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
@@ -73,19 +74,21 @@ def compute_surface_aabb(world, name):
     if shape_name == SURFACE_TOP:
         surface_aabb = get_aabb(world.kitchen, surface_link)
     elif shape_name == SURFACE_BOTTOM:
-        #data = sorted(get_collision_data(world.kitchen, surface_link),
-        #              key=lambda d: point_from_pose(get_data_pose(d))[2])[0]
-        raise NotImplementedError(shape_name)
+        data = sorted(get_collision_data(world.kitchen, surface_link),
+                      key=lambda d: point_from_pose(get_data_pose(d))[2])[0]
+        extent = np.array(get_data_extents(data))
+        aabb = AABB(-extent/2., +extent/2.)
+        vertices = apply_affine(multiply(surface_pose, get_data_pose(data)), get_aabb_vertices(aabb))
+        surface_aabb = aabb_from_points(vertices)
     else:
         [data] = filter(lambda d: d.filename != '',
                         get_collision_data(world.kitchen, surface_link))
-        local_pose = get_data_pose(data)
         meshes = read_obj(data.filename)
         #colors = spaced_colors(len(meshes))
         #set_color(world.kitchen, link=surface_link, color=np.zeros(4))
         mesh = meshes[shape_name]
         #for i, (name, mesh) in enumerate(meshes.items()):
-        mesh = tform_mesh(multiply(surface_pose, local_pose), mesh=mesh)
+        mesh = tform_mesh(multiply(surface_pose, get_data_pose(data)), mesh=mesh)
         surface_aabb = aabb_from_points(mesh.vertices)
         #add_text(surface_name, position=surface_aabb[1])
         #draw_mesh(mesh, color=colors[i])

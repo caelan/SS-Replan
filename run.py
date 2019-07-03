@@ -219,6 +219,7 @@ def main():
         pose, = next(placement_gen(entity_name, surface_name), (None,))
     assert pose is not None
     pose.assign()
+    #wait_for_user()
 
     problem = pdddlstream_from_problem(
         world, close_doors=True, return_home=True,
