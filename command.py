@@ -120,7 +120,7 @@ class DoorTrajectory(Command):
             yield
 
     def execute(self, domain, moveit, observer):
-        close_gripper(moveit, effort=100)
+        close_gripper(moveit, effort=1000)
         time.sleep(1.0)
         status = joint_state_control(self.robot, self.robot_joints, self.robot_path, domain, moveit, observer)
         time.sleep(1.0)

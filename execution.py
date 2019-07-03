@@ -1,7 +1,8 @@
 import numpy as np
 
 from issac import update_robot, ISSAC_REFERENCE_FRAME
-from pybullet_tools.utils import get_distance_fn, get_joint_name
+from pybullet_tools.utils import get_distance_fn, get_joint_name, \
+    get_max_velocity, get_max_force, get_difference_fn
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
@@ -10,23 +11,29 @@ def get_joint_names(body, joints):
 def joint_state_control(robot, joints, path, domain, moveit, observer,
                         threshold=0.01, timeout=2.0):
     # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
+    # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
     from sensor_msgs.msg import JointState
     import rospy
+    max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
+    max_forces = np.array([get_max_force(robot, joint) for joint in joints])
     joint_names = get_joint_names(robot, joints)
     distance_fn = get_distance_fn(robot, joints)
+    difference_fn = get_difference_fn(robot, joints)
     for target_conf in path:
-        joint_state = JointState(name=joint_names, position=list(target_conf))
-        ee_frame = moveit.forward_kinematics(joint_state.position)
-        moveit.visualizer.send(ee_frame)
-        moveit.joint_cmd_pub.publish(joint_state)
         rate = rospy.Rate(1000)
         start_time = rospy.Time.now()
         while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < timeout):
             world_state = observer.observe()
             robot_entity = world_state.entities[domain.robot]
-            error = distance_fn(target_conf, robot_entity.q)
-            if error < threshold:
+            difference = difference_fn(target_conf, robot_entity.q)
+            if distance_fn(target_conf, robot_entity.q) < threshold:
                 break
+            #velocity = None
+            velocity = list(0.25*np.array(max_velocities))
+            joint_state = JointState(name=joint_names, position=list(target_conf), velocity=velocity)
+            # ee_frame = moveit.forward_kinematics(joint_state.position)
+            # moveit.visualizer.send(ee_frame)
+            moveit.joint_cmd_pub.publish(joint_state)
             rate.sleep()
         else:
             print('Failed to reach set point')
@@ -85,6 +92,9 @@ def lula_control(world, path, domain, observer, world_state):
 
 ################################################################################s
 
+FINGER_EFFORT_LIMIT = 20
+FINGER_VELOCITY_LIMIT = 0.2
+
 def open_gripper(moveit, effort=None, sleep=0.2):
     # robot_entity = domain.get_robot()
     # franka = robot_entity.robot
@@ -97,6 +107,7 @@ def open_gripper(moveit, effort=None, sleep=0.2):
     import rospy
     joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.open_positions)
     if effort is not None:
+        effort = min(effort, FINGER_EFFORT_LIMIT)
         joint_state.effort = [effort] * len(moveit.gripper.joints)
     moveit.joint_cmd_pub.publish(joint_state)
     if 0. < sleep:
@@ -118,6 +129,7 @@ def close_gripper(moveit, effort=None, sleep=0.2):
     import rospy
     joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.closed_positions)
     if effort is not None:
+        effort = min(effort, FINGER_EFFORT_LIMIT)
         joint_state.effort = [effort] * len(moveit.gripper.joints)
     moveit.joint_cmd_pub.publish(joint_state)
     if 0. < sleep:

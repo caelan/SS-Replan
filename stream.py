@@ -12,11 +12,11 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     tform_mesh, point_from_pose, aabb_from_points, get_data_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, \
-    child_link_from_joint, create_attachment
+    child_link_from_joint, create_attachment, Point
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
-    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose
+    SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
 
@@ -365,11 +365,12 @@ def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
 
 def get_handle_grasp(world, joint, pre_distance=0.1):
     pre_direction = pre_distance * get_unit_vector([0, 0, 1])
+    half_extent = 0.375*FINGER_EXTENT[2]
 
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
             # TODO: can adjust the position and orientation on the handle
-            handle_grasp = (unit_point(), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2)))
+            handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2)))
             handle_pregrasp = multiply((pre_direction, unit_quat()), handle_grasp)
             return link, handle_grasp, handle_pregrasp
     raise RuntimeError()

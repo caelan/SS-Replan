@@ -13,12 +13,13 @@ import numpy as np
 import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, get_max_velocity, get_max_force, wait_for_user
 
 from issac import update_world, kill_lula
 from world import World
 from run import solve_pddlstream, create_parser, simulate_plan
 from problem import pdddlstream_from_problem
+from execution import open_gripper
 
 from pddlstream.language.constants import Not, And
 
@@ -106,6 +107,8 @@ def main():
                         help='TBD')
     parser.add_argument('-problem', default=TASKS[2], choices=TASKS,
                         help='TBD')
+    parser.add_argument('-watch', action='store_true',
+                        help='TBD')
     args = parser.parse_args()
     task = args.problem.replace('_', ' ')
     #if args.seed is not None:
@@ -133,10 +136,16 @@ def main():
     # TODO: why can't I use this earlier?
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
+    open_gripper(moveit)
     #world_state = observer.observe() # domain.root
 
     world = World(use_gui=True) # args.visualize)
+    #print([get_max_velocity(world.robot, joint) for joint in world.arm_joints])
+    #print([get_max_force(world.robot, joint) for joint in world.arm_joints])
+    #print([get_max_velocity(world.robot, joint) for joint in world.gripper_joints])
+    #print([get_max_force(world.robot, joint) for joint in world.gripper_joints])
+    #return
+
     set_camera_pose(camera_point=[1, -1, 2])
 
     world_state = observer.observe() # domain.root
@@ -150,7 +159,10 @@ def main():
     problem = problem[:-1] + (goal_formula,)
     saver = WorldSaver()
     commands = solve_pddlstream(world, problem, args)
-    simulate_plan(world, commands, args)
+    if args.watch:
+        simulate_plan(world, commands, args)
+    else:
+        wait_for_user()
     if commands is None:
         return
     #wait_for_user()
