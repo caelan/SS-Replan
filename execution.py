@@ -2,7 +2,7 @@ import numpy as np
 
 from issac import update_robot, ISSAC_REFERENCE_FRAME
 from pybullet_tools.utils import get_distance_fn, get_joint_name, \
-    get_max_velocity, get_max_force, get_difference_fn
+    get_max_velocity, get_max_force, get_difference_fn, joint_from_name, INF
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
@@ -93,10 +93,10 @@ def lula_control(world, path, domain, observer, world_state):
 
 ################################################################################s
 
-FINGER_EFFORT_LIMIT = 20
-FINGER_VELOCITY_LIMIT = 0.2
+#FINGER_EFFORT_LIMIT = 20
+#FINGER_VELOCITY_LIMIT = 0.2
 
-def open_gripper(moveit, effort=None, sleep=0.2):
+def open_gripper(robot, moveit, effort=20, sleep=1.0):
     # robot_entity = domain.get_robot()
     # franka = robot_entity.robot
     # gripper = franka.end_effector.gripper
@@ -108,14 +108,16 @@ def open_gripper(moveit, effort=None, sleep=0.2):
     import rospy
     joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.open_positions)
     if effort is not None:
-        effort = min(effort, FINGER_EFFORT_LIMIT)
+        gripper_joint = joint_from_name(robot, moveit.gripper.joints[0])
+        max_effort = get_max_force(robot, gripper_joint)
+        effort = max(0, min(effort, max_effort))
         joint_state.effort = [effort] * len(moveit.gripper.joints)
     moveit.joint_cmd_pub.publish(joint_state)
     if 0. < sleep:
         rospy.sleep(sleep)
     return None
 
-def close_gripper(moveit, effort=None, sleep=0.2):
+def close_gripper(robot, moveit, effort=20, sleep=1.0):
     # controllable_object is not needed for joint positions
     # TODO: attach_obj
     # robot_entity = domain.get_robot()
@@ -130,7 +132,9 @@ def close_gripper(moveit, effort=None, sleep=0.2):
     import rospy
     joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.closed_positions)
     if effort is not None:
-        effort = min(effort, FINGER_EFFORT_LIMIT)
+        gripper_joint = joint_from_name(robot, moveit.gripper.joints[0])
+        max_effort = get_max_force(robot, gripper_joint)
+        effort = max(0, min(effort, max_effort))
         joint_state.effort = [effort] * len(moveit.gripper.joints)
     moveit.joint_cmd_pub.publish(joint_state)
     if 0. < sleep:

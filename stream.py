@@ -255,8 +255,7 @@ GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
 
 def plan_approach(world, approach_pose, attachments=[],
-                  obstacles=set(), approach_obstacles=set(),
-                  teleport=False, switches_only=False, **kwargs):
+                  obstacles=set(), teleport=False, switches_only=False, **kwargs):
     # TODO: use velocities in the distance function
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
     aq = world.carry_conf
@@ -287,7 +286,7 @@ def plan_approach(world, approach_pose, attachments=[],
     # TODO: plan one with attachment placed and one held
     approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
                                       attachments=attachments,
-                                      obstacles=obstacles | approach_obstacles, self_collisions=SELF_COLLISIONS,
+                                      obstacles=obstacles, self_collisions=SELF_COLLISIONS,
                                       custom_limits=world.custom_limits, resolutions=resolutions,
                                       restarts=2, iterations=25, smooth=25)
     if approach_path is None:
@@ -371,9 +370,9 @@ def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
 
 def get_handle_grasp(world, joint, pre_distance=0.1):
     pre_direction = pre_distance * get_unit_vector([0, 0, 1])
-    #half_extent = 0.375*FINGER_EXTENT[2]
-    #half_extent = 0.25*FINGER_EXTENT[2]
-    half_extent = 1.25*FINGER_EXTENT[2]
+    #half_extent = 1.0*FINGER_EXTENT[2] # Collides
+    half_extent = 1.1*FINGER_EXTENT[2]
+    # TODO: can flip the grasp as well
 
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
@@ -437,7 +436,9 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     else:
         aq.assign()
 
-    obstacles = world.static_obstacles if collisions else set()
+    obstacles = world.static_obstacles | get_descendant_obstacles(world.kitchen, door_joint)
+    if not collisions:
+        obstacles = set()
     arm_path = []
     for i, tool_pose in enumerate(tool_path):
         set_joint_positions(world.kitchen, [door_joint], door_path[i])
@@ -453,14 +454,12 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         arm_path.append(arm_conf)
         # wait_for_user()
 
-    approach_obstacles = get_descendant_obstacles(world.kitchen, door_joint) if collisions else set()
     approach_paths = []
     for index in [0, -1]:
         set_joint_positions(world.kitchen, [door_joint], door_path[index])
         set_joint_positions(world.robot, world.arm_joints, arm_path[index])
         tool_pose = multiply(handle_path[index], invert(handle_pregrasp))
-        approach_path = plan_approach(world, tool_pose, obstacles=obstacles,
-                                      approach_obstacles=approach_obstacles, teleport=teleport, **kwargs)
+        approach_path = plan_approach(world, tool_pose, obstacles=obstacles, teleport=teleport, **kwargs)
         if approach_path is None:
             return
         approach_paths.append(approach_path)
@@ -484,7 +483,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
 
 ################################################################################
 
-def get_fixed_pull_gen_fn(world, collisions=True, teleport=False, **kwargs):
+def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, **kwargs):
     obstacles = world.static_obstacles
     if not collisions:
         obstacles = set()
@@ -492,12 +491,16 @@ def get_fixed_pull_gen_fn(world, collisions=True, teleport=False, **kwargs):
     def gen(joint_name, door_conf1, door_conf2, base_conf):
         # TODO: check if within database convex hull
         door_joint = joint_from_name(world.kitchen, joint_name)
-        result = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
-        if result is None:
+        door_outputs = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
+        if door_outputs is None:
             return
-        door_path, handle_path, tool_path = result
-        return plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
-                         collisions=collisions, teleport=teleport, **kwargs)
+        door_path, handle_path, tool_path = door_outputs
+        for i in range(max_attempts):
+            ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
+                              randomize=(i!=0), collisions=collisions, teleport=teleport, **kwargs), None)
+            if ik_outputs is not None:
+                yield ik_outputs
+                break
     return gen
 
 def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwargs):

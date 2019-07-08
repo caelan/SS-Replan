@@ -123,15 +123,13 @@ class DoorTrajectory(Command):
     def execute(self, domain, moveit, observer):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
-        close_gripper(moveit, effort=1000)
-        time.sleep(1.0)
+        close_gripper(self.robot, moveit, effort=1000)
         #joints = self.robot_joints + self.world.gripper_joints
         #path = [list(conf) + list(moveit.gripper.closed_positions) for conf in self.robot_path]
         #status = joint_state_control(self.robot, joints, path, domain, moveit, observer)
         status = joint_state_control(self.robot, self.robot_joints, self.robot_path, domain, moveit, observer)
         time.sleep(1.0)
-        open_gripper(moveit)
-        time.sleep(1.0)
+        open_gripper(self.robot, moveit)
         return status
 
     def __repr__(self):
@@ -160,7 +158,8 @@ class Attach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        return close_gripper(moveit)
+        if self.world.robot == self.robot:
+            return close_gripper(self.robot, moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
@@ -185,7 +184,8 @@ class Detach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        return open_gripper(moveit)
+        if self.world.robot == self.robot:
+            return open_gripper(self.robot, moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))

@@ -58,8 +58,8 @@ def goal_formula_from_goal(goals):
             joint_name = '{}_joint'.format(cabinet)
             atom = ('DoorStatus', joint_name, 'closed')
         elif predicate == 'in_drawer':
-            obj, drawer = args
-            surface = '{}_joint'.format(drawer)
+            obj, surface = args
+            # TODO: ensure that it actually is a surface?
             init.append(('Stackable', obj, surface))
             atom = ('On', obj, surface)
         else:
@@ -140,7 +140,6 @@ def main():
     # TODO: why can't I use this earlier?
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    open_gripper(moveit)
     #world_state = observer.observe() # domain.root
 
     world = World(use_gui=True) # args.visualize)
@@ -151,6 +150,7 @@ def main():
     #return
 
     set_camera_pose(camera_point=[1, -1, 2])
+    open_gripper(world.robot, moveit)
 
     world_state = observer.observe() # domain.root
     with LockRenderer():
@@ -167,7 +167,7 @@ def main():
     problem = problem[:-1] + (goal_formula,)
     saver = WorldSaver()
     commands = solve_pddlstream(world, problem, args)
-    if args.watch:
+    if args.watch or args.record:
         simulate_plan(world, commands, args)
     else:
         wait_for_user()

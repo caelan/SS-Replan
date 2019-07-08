@@ -35,7 +35,7 @@ class World(object):
         else:
             raise ValueError(self.robot_name)
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
-        with HideOutput(enable=True):
+        with HideOutput(enable=False):
             self.robot = load_pybullet(urdf_path)
         #dump_body(self.robot)
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
