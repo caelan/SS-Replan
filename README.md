@@ -13,7 +13,7 @@ STRIPStream planning for SRL's Franka Panda Robot in a kitchen environment.
 * `git pull --recurse-submodules`
 * `./run_pybullet.py`
 
-[<img src="https://img.youtube.com/vi/3HJrkgIGK7c/0.jpg" height="200">](https://drive.google.com/open?id=103NSqEeumZxFLbyrzAt6fxBiuz18_zTD)
+[<img src="images/stow_block.png" height="200">](https://drive.google.com/open?id=103NSqEeumZxFLbyrzAt6fxBiuz18_zTD)
 
 # IsaacSim Examples
 
@@ -25,7 +25,7 @@ In a separate terminal, run the STRIPStream planner:
 * `git pull --recurse-submodules`
 * `./run_isaac.py`
 
-[<img src="https://img.youtube.com/vi/3HJrkgIGK7c/0.jpg" height="200">](https://drive.google.com/open?id=1N6W_KZQOpNY2ZjIRtQURV_Chsnx3P75K)
+[<img src="images/put_spam.png" height="200">](https://drive.google.com/open?id=1N6W_KZQOpNY2ZjIRtQURV_Chsnx3P75K)
 
 # Resources
 
