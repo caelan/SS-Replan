@@ -1,5 +1,7 @@
 STRIPStream planning for SRL's Franka Panda Robot in a kitchen environment.
 
+[Project Proposal](https://drive.google.com/open?id=1GZHmCP3a8Ep1Ib5smqvwoA5bST6i2PTVMxszGUbQKQg)
+
 # Installation
 
 * `sudo apt install cmake g++ make python`
