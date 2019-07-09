@@ -11,7 +11,7 @@ STRIPStream planning for SRL's Franka Panda Robot in a kitchen environment.
 # PyBullet Examples
 
 * `git pull --recurse-submodules`
-* `./run.py`
+* `./run_pybullet.py`
 
 # IsaacSim Examples
 
@@ -21,7 +21,7 @@ Launch IsaacSim:
 
 In a separate terminal, run the STRIPStream planner:
 * `git pull --recurse-submodules`
-* `./test.py`
+* `./run_isaac.py`
 
 # Resources
 
@@ -49,4 +49,3 @@ Common robotics primitives are implemented using PyBullet.
 # Resources
 
 Please email Caelan Garrett at <cgarrett@nvidia.com> for installation and usage help.
-
