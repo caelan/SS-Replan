@@ -20,7 +20,7 @@ from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
 
 from issac import update_world, kill_lula, update_isaac_sim
 from world import World
-from run import solve_pddlstream, create_parser, simulate_plan
+from run_pybullet import solve_pddlstream, create_parser, simulate_plan
 from problem import pdddlstream_from_problem
 from execution import open_gripper, control_base
 
