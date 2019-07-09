@@ -15,6 +15,7 @@ from stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_calibrate_gen, get_fixed_pick_gen_fn, \
     get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen
 
+import numpy as np
 
 def existential_quantification(goal_literals):
     # TODO: merge with pddlstream-experiments
@@ -79,7 +80,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     goal_surface = DRAWERS[1]
     #goal_surface = COUNTERS[0]
     goal_on = {
-        goal_block: goal_surface,
+        #goal_block: goal_surface,
     }
 
     goal_literals = [
@@ -87,7 +88,10 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         #('Cooked', goal_block),
     ]
     if return_home:
-        goal_literals.append(('AtBConf', init_bq))
+        goal_bq = Conf(world.robot, world.base_joints,  np.array(init_bq.values) + np.array([0, -1, 0]))
+        #goal_bq = init_bq
+        init.append(('BConf', goal_bq))
+        goal_literals.append(('AtBConf', goal_bq))
 
     surface_poses = {}
     for joint in world.kitchen_joints:

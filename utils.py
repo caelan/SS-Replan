@@ -48,6 +48,8 @@ FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter.urdf')
 FRANKA_YAML = os.path.join(SRL_PATH, 'packages/external/lula_franka/config/robot_descriptor.yaml')
 
 BASE_JOINTS = ['x', 'y', 'theta']
+WHEEL_JOINTS = ['left_wheel', 'right_wheel']
+
 FRANKA_CARTER = 'franka_carter'
 FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda_forearm_end_pt
 # +z: pointing, +y: left finger

@@ -7,7 +7,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_point, get_aabb_extent, remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, wait_for_user, get_all_links, get_center_extent, get_pose, \
-    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent
+    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent, dump_body
 from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
@@ -38,6 +38,10 @@ class World(object):
         with HideOutput(enable=False):
             self.robot = load_pybullet(urdf_path)
         #dump_body(self.robot)
+        #chassis_pose = get_link_pose(self.robot, link_from_name(self.robot, 'chassis_link'))
+        #wheel_pose = get_link_pose(self.robot,  link_from_name(self.robot, 'left_wheel_link'))
+        #wait_for_user()
+
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
         #draw_aabb(get_aabb(self.robot))
         #print(self.robot_yaml)

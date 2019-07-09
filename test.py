@@ -15,13 +15,14 @@ from brain_ros.sim_test_tools import TrialManager
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     get_max_velocity, get_max_force, wait_for_user, get_camera, dump_body, link_from_name, \
-    point_from_pose, get_yaw, get_pitch, get_link_pose, draw_pose, multiply, invert
+    point_from_pose, get_yaw, get_pitch, get_link_pose, draw_pose, multiply, \
+    invert, set_joint_positions, set_base_values
 
-from issac import update_world, kill_lula
+from issac import update_world, kill_lula, update_isaac_sim
 from world import World
 from run import solve_pddlstream, create_parser, simulate_plan
 from problem import pdddlstream_from_problem
-from execution import open_gripper
+from execution import open_gripper, control_base
 
 from pddlstream.language.constants import Not, And
 
@@ -95,10 +96,13 @@ def create_trial_args(**kwargs):
     # TODO: use setattr
     return args
 
+NONE = 'none'
+
 TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
     'put_away', # tomato_soup_can
     'put_spam',
+    NONE,
 ]
 
 ################################################################################
@@ -127,13 +131,15 @@ def main():
     trial_args = create_trial_args()
     trial_manager = TrialManager(trial_args, domain, lula=args.lula)
     observer = trial_manager.observer
+    sim_manager = trial_manager.sim
     trial_manager.set_camera(randomize=False)
 
     # Need to reset at the start
-    objects, goal, plan = trial_manager.get_task(task=task, reset=True)
-    goals = [(h.format(o), v) for h, v in goal for o in objects]
-    print(goals)
-    additional_init, goal_formula = goal_formula_from_goal(goals)
+    if task != NONE:
+        objects, goal, plan = trial_manager.get_task(task=task, reset=True)
+        goals = [(h.format(o), v) for h, v in goal for o in objects]
+        print('Goals:', goals)
+        additional_init, goal_formula = goal_formula_from_goal(goals)
     # TODO: fixed_base_suppressors
     #trial_manager.disable() # Disables collisions
 
@@ -155,6 +161,18 @@ def main():
     world_state = observer.observe() # domain.root
     with LockRenderer():
         update_world(world, domain, observer, world_state)
+        #base_positions = [1.0, 0, np.pi]
+        #set_base_values(world.robot, base_positions)
+        #world.set_initial_conf()
+        update_isaac_sim(domain, observer, sim_manager, world)
+    wait_for_user()
+
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/scripts/set_base_joint_states.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter.py
+    #goal_values = [1.5, -1, np.pi]
+    #control_base(goal_values, moveit, observer)
+    if task == NONE:
+        return
 
     #cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
     #drawer_link = link_from_name(world.kitchen, 'indigo_drawer_top')
@@ -176,7 +194,6 @@ def main():
     #wait_for_user()
     saver.restore()
 
-    #sim_manager = trial_manager.sim
     #sim_manager.pause() # Careful! This actually does pause the system
     #rospy.sleep(1.) # Small sleep might be needed
     #sim_manager.pause() # The second invocation resumes

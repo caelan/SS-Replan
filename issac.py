@@ -9,12 +9,13 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body
 from utils import get_ycb_obj_path
 
+ISSAC_PREFIX = '00_'
 ISSAC_REFERENCE_FRAME = 'base_link' # Robot base
 UNREAL_WORLD_FRAME = 'ue_world'
 ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
-ISAAC_CAMERA_FRAME = '00_zed_left' # Prefix of 00 for movable objects and camera
-
+ISAAC_CAMERA_FRAME = ISSAC_PREFIX + 'zed_left' # Prefix of 00 for movable objects and camera
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
+CONTROL_TOPIC = '/sim/desired_joint_states'
 
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
@@ -64,7 +65,7 @@ def get_world_from_model(observer, entity, body):
 def update_robot(world, domain, observer, world_state):
     entity = world_state.entities[domain.robot]
     # Update joint positions
-    set_joint_positions(world.robot, world.base_joints, entity.carter_pos)
+    set_joint_positions(world.robot, world.base_joints, entity.carter_pos) # Should be 0
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
@@ -193,7 +194,7 @@ def update_isaac_sim(domain, observer, sim_manager, world):
         names = get_joint_names(body, joints)
         positions = get_joint_positions(body, joints)
         sim_manager.set_joints(names, positions)
-        print(names)
+        print('Kitchen joints:', names)
 
     # Changes the default configuration
     #config_modulator = domain.config_modulator
