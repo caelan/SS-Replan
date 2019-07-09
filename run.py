@@ -32,10 +32,12 @@ from pddlstream.utils import INF
 from pddlstream.language.stream import StreamInfo
 from pddlstream.algorithms.constraints import PlanConstraints, WILD
 
+VIDEO_FILENAME = 'video.mp4'
+
 def create_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-algorithm', default='focused',
-                        help='Specifies the algorithm')
+    parser.add_argument('-algorithm', default='focused', choices=['incremental', 'focused'],
+                        help='Specifies the planning algorithm that should be used')
     parser.add_argument('-cfree', action='store_true',
                         help='When enabled, disables collision checking (for debugging).')
     parser.add_argument('-optimal', action='store_true',
@@ -43,17 +45,18 @@ def create_parser():
     #parser.add_argument('-problem', default='test_block',
     #                    help='The name of the problem to solve.')
     parser.add_argument('-max_time', default=120, type=int,
-                        help='The max time')
+                        help='The max computation time')
     parser.add_argument('-record', action='store_true',
-                        help='Records a video')
+                        help='When enabled, records and saves a video ({})'.format(VIDEO_FILENAME))
     parser.add_argument('-seed', default=None,
                         help='The random seed to use.')
     parser.add_argument('-teleport', action='store_true',
-                        help='Uses unit costs')
+                        help='When enabled, motion planning is skipped')
     parser.add_argument('-unit', action='store_true',
-                        help='Uses unit costs')
+                        help='When enabled, uses unit costs')
     parser.add_argument('-visualize', action='store_true',
-                        help='When enabled, visualizes planning rather than the world (for debugging).')
+                        help='When enabled, visualizes the planning world '
+                             'rather than the simulated world (for debugging).')
     return parser
     # TODO: get rid of funky orientations by dropping them from some height
 
@@ -63,7 +66,7 @@ def solve_pddlstream(world, problem, args, debug=False):
     _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
-    # print('Streams:', stream_map.keys())
+    print('Streams:', stream_map.keys())
 
     stream_info = {
         # TODO: check if already on the stove
@@ -81,22 +84,21 @@ def solve_pddlstream(world, problem, args, debug=False):
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
 
-    skeleton = [
-        ('calibrate', [WILD, WILD, WILD]),
-        ('move_base', [WILD, WILD, WILD]),
-        ('pull', ['indigo_drawer_top_joint', WILD, WILD,
-                  'indigo_drawer_top', WILD, WILD, WILD, WILD, WILD  ]),
-        ('move_base', [WILD, WILD, WILD]),
-        ('pick', ['big_red_block0', WILD, WILD, WILD,
-                  'indigo_drawer_top', WILD, WILD, WILD, WILD]),
-        ('move_base', [WILD, WILD, WILD]),
-    ]
+    # skeleton = [
+    #     ('calibrate', [WILD, WILD, WILD]),
+    #     ('move_base', [WILD, WILD, WILD]),
+    #     ('pull', ['indigo_drawer_top_joint', WILD, WILD,
+    #               'indigo_drawer_top', WILD, WILD, WILD, WILD, WILD  ]),
+    #     ('move_base', [WILD, WILD, WILD]),
+    #     ('pick', ['big_red_block0', WILD, WILD, WILD,
+    #               'indigo_drawer_top', WILD, WILD, WILD, WILD]),
+    #     ('move_base', [WILD, WILD, WILD]),
+    # ]
     #constraints = PlanConstraints(skeletons=[skeleton], exact=True)
     constraints = PlanConstraints()
 
-    #success_cost = 0 if args.optimal else INF
-    success_cost = INF
-    planner = 'max-astar' if args.optimal else 'ff-wastar1'
+    success_cost = 0 if args.optimal else INF
+    planner = 'max-astar' if args.optimal else 'ff-astar'
     search_sample_ratio = 2
     max_planner_time = 10
 
@@ -129,7 +131,7 @@ def solve_pddlstream(world, problem, args, debug=False):
     print_solution(solution)
     plan, cost, evaluations = solution
     pr.disable()
-    pstats.Stats(pr).sort_stats('cumtime').print_stats(25)  # cumtime | tottime
+    pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
     commands = commands_from_plan(world, plan)
     return commands
 
@@ -159,7 +161,7 @@ def simulate_plan(world, commands, args):
     wait_for_user()
     time_step = None if args.teleport else 0.02
     if args.record:
-        with VideoSaver('video.mp4'):
+        with VideoSaver(VIDEO_FILENAME):
             execute_plan(world, initial_state, commands, time_step=time_step)
     else:
         execute_plan(world, initial_state, commands, time_step=time_step)

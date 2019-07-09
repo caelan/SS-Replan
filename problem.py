@@ -80,7 +80,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     goal_surface = DRAWERS[1]
     #goal_surface = COUNTERS[0]
     goal_on = {
-        #goal_block: goal_surface,
+        goal_block: goal_surface,
     }
 
     goal_literals = [
@@ -88,8 +88,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         #('Cooked', goal_block),
     ]
     if return_home:
-        goal_bq = Conf(world.robot, world.base_joints,  np.array(init_bq.values) + np.array([0, -1, 0]))
-        #goal_bq = init_bq
+        #goal_bq = Conf(world.robot, world.base_joints,  np.array(init_bq.values) + np.array([0, -1, 0]))
+        goal_bq = init_bq
         init.append(('BConf', goal_bq))
         goal_literals.append(('AtBConf', goal_bq))
 

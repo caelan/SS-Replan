@@ -26,6 +26,17 @@ from execution import open_gripper, control_base
 
 from pddlstream.language.constants import Not, And
 
+NONE = 'none'
+
+TASKS = [
+    'open_bottom', 'open_top', 'pick_spam',
+    'put_away', # tomato_soup_can
+    'put_spam',
+    NONE,
+]
+
+################################################################################
+
 def constraints_from_plan(plan):
     # TODO: use the task plan to constrain solution
     raise NotImplementedError()
@@ -70,6 +81,8 @@ def goal_formula_from_goal(goals):
         goal_literals.append(atom if value else Not(atom))
     return init, And(*goal_literals)
 
+################################################################################
+
 def create_trial_args(**kwargs):
     args = lambda: None # Dummy class
     args.side = 'right'
@@ -96,27 +109,18 @@ def create_trial_args(**kwargs):
     # TODO: use setattr
     return args
 
-NONE = 'none'
-
-TASKS = [
-    'open_bottom', 'open_top', 'pick_spam',
-    'put_away', # tomato_soup_can
-    'put_spam',
-    NONE,
-]
-
 ################################################################################
 
 def main():
     parser = create_parser()
-    parser.add_argument('-fixed', action='store_true',
-                        help='TBD')
+    #parser.add_argument('-fixed', action='store_true',
+    #                    help="When enabled, fixes the robot's base")
     parser.add_argument('-lula', action='store_true',
-                        help='TBD')
+                        help='When enabled, uses LULA instead of JointState control')
     parser.add_argument('-problem', default=TASKS[2], choices=TASKS,
-                        help='TBD')
+                        help='The name of the task')
     parser.add_argument('-watch', action='store_true',
-                        help='TBD')
+                        help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
     task = args.problem.replace('_', ' ')
     #if args.seed is not None:
@@ -149,12 +153,6 @@ def main():
     #world_state = observer.observe() # domain.root
 
     world = World(use_gui=True) # args.visualize)
-    #print([get_max_velocity(world.robot, joint) for joint in world.arm_joints])
-    #print([get_max_force(world.robot, joint) for joint in world.arm_joints])
-    #print([get_max_velocity(world.robot, joint) for joint in world.gripper_joints])
-    #print([get_max_force(world.robot, joint) for joint in world.gripper_joints])
-    #return
-
     set_camera_pose(camera_point=[1, -1, 2])
     open_gripper(world.robot, moveit)
 
@@ -167,8 +165,6 @@ def main():
         update_isaac_sim(domain, observer, sim_manager, world)
     wait_for_user()
 
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/scripts/set_base_joint_states.py
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter.py
     #goal_values = [1.5, -1, np.pi]
     #control_base(goal_values, moveit, observer)
     if task == NONE:

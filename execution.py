@@ -115,7 +115,8 @@ def control_base(goal_values, moveit, observer, timeout=INF):
 
     #dump_body(world.robot)
     # https://github.mit.edu/caelan/base-trajectory-action/blob/master/src/base_trajectory.cpp
-
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/scripts/set_base_joint_states.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter.py
     linear_threshold = 0.04
     angular_threshold = np.pi / 64
 
