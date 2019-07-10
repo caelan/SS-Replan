@@ -541,12 +541,9 @@ def parse_fluents(world, fluents, obstacles):
     attachments = []
     for fluent in fluents:
         predicate, args = fluent[0], fluent[1:]
-        if predicate == 'AtBConf'.lower():
-            bq, = args
-            bq.assign()
-        elif predicate == 'AtAConf'.lower():
-            aq, = args
-            aq.assign()
+        if predicate in {p.lower() for p in ['AtBConf', 'AtAConf', 'AtGConf']}:
+            q, = args
+            q.assign()
         elif predicate == 'AtAngle'.lower():
             raise RuntimeError()
             # j, a = args
@@ -569,7 +566,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
 
     def fn(bq1, bq2, fluents=[]):
         bq1.assign()
-        world.carry_conf.assign()
+        #world.carry_conf.assign()
         obstacles = set(world.static_obstacles)
         attachments = parse_fluents(world, fluents, obstacles)
         # TODO: could condition on arm conf
@@ -595,6 +592,8 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
         ], name='base')
         return (cmd,)
     return fn
+
+################################################################################
 
 def get_arm_motion_gen(world, collisions=True, teleport=False):
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
