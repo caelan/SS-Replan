@@ -263,11 +263,11 @@ def create_gripper(robot, visual=False):
 
 class RelPose(object):
 #class RelPose(Pose):
-    def __init__(self, body, link=BASE_LINK,
+    def __init__(self, body, #link=BASE_LINK,
                  reference_body=None, reference_link=BASE_LINK,
                  confs=[], support=None, init=False):
         self.body = body
-        self.link = link
+        #self.link = link
         self.reference_body = reference_body
         self.reference_link = reference_link
         # Could also perform recursively
@@ -285,7 +285,7 @@ class RelPose(object):
         return get_link_pose(self.reference_body, self.reference_link)
     def get_world_from_body(self):
         self.assign()
-        return get_link_pose(self.body, self.link)
+        return get_link_pose(self.body, BASE_LINK)
     def get_reference_from_body(self):
         return multiply(invert(self.get_world_from_reference()),
                         self.get_world_from_body())
