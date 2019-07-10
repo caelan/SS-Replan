@@ -12,7 +12,7 @@ from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
     get_surface, COUNTERS, RelPose
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
-    get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
+    get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, \
     get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen
 
@@ -48,9 +48,12 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         '@world': 'world',
         '@gripper': 'gripper',
         '@stove': 'stove',
+
         '@rest_aq': world.carry_conf,
         '@open_gq': world.open_gq,
         '@closed_gq': world.closed_gq,
+        '@open': OPEN,
+        '@closed': CLOSED,
     }
 
     init = [
@@ -146,6 +149,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
                 ('WorldPose', surface_name, pose),
                 #('AtRelPose', surface_name, pose, 'world'),
                 ('AtWorldPose', surface_name, pose),
+                ('Counter', surface_name, pose),
             ]
 
     for obj_name in world.movable:

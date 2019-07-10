@@ -204,7 +204,7 @@ def main():
     #for name in LEFT_VISIBLE:
     for name in DRAWER_JOINTS[1:2]:
         joint = joint_from_name(world.kitchen, name)
-        world.open_door(joint)
+        #world.open_door(joint)
         #world.close_door(joint)
     #dump_link_cross_sections(world, link_name='indigo_drawer_top')
     #wait_for_user()

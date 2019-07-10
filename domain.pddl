@@ -1,6 +1,6 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @world @gripper @stove
+  (:constants @world @gripper @stove @open @closed
               @rest_aq @open_gq @closed_gq)
   (:predicates
     (Stackable ?o ?r)
@@ -8,6 +8,7 @@
     (Type ?t ?b)
     (NoisyBase)
     (Movable ?o)
+    (Counter ?o ?p)
 
     (GConf ?gq)
     (Angle ?j ?a)
@@ -26,12 +27,14 @@
     (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
     (CFreeTrajPose ?t ?o2 ?p2)
 
-    (AtAngle ?j ?q)
-    (AtGrasp ?o ?g)
     (HandEmpty)
     (AtBConf ?bq)
     (AtAConf ?aq)
     (AtGConf ?gq)
+    (AtRelPose ?o1 ?rp ?o2)
+    (AtWorldPose ?o ?p)
+    (AtGrasp ?o ?g)
+    (AtAngle ?j ?q)
 
     (CanMoveBase)
     (CanMoveArm)
@@ -45,18 +48,17 @@
 
     (On ?o1 ?o2)
     (Holding ?o)
+    (Accessible ?o ?p)
     (UnsafeRelPose ?o ?rp ?s)
     (UnsafeApproach ?o ?p ?g)
     (UnsafeATraj ?at)
     (UnsafeBTraj ?bt)
 
     (RelPose ?o1 ?rp ?o2)
-    (AtRelPose ?o1 ?rp ?o2)
     (WorldPose ?o ?p)
-    (AtWorldPose ?o ?p)
     (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
-    (AngleKin ?o ?p ?j ?a)
     (Connected ?o ?j)
+    (AngleKin ?o ?p ?j ?a)
   )
   (:functions
     (Distance ?bq1 ?bq2)
@@ -112,6 +114,7 @@
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                        (AtBConf ?bq) (Calibrated)
                        (AtAConf @rest_aq) (AtGConf @open_gq)
+                       (Accessible ?o2 ?p2)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
                   )
@@ -125,6 +128,7 @@
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
                        (AtBConf ?bq) (Calibrated)
                        (AtAConf @rest_aq) ; (AtGConf @closed_gq)
+                       (Accessible ?o2 ?p2)
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
@@ -175,6 +179,11 @@
   (:derived (DoorStatus ?j ?s)
     (exists (?a) (and (AngleWithin ?j ?a ?s)
                       (AtAngle ?j ?a)))
+  )
+  (:derived (Accessible ?o ?p) (or
+    (Counter ?o ?p)
+    (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
+                         (AtAngle ?j ?a))))
   )
 
   ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
