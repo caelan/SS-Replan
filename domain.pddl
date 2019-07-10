@@ -1,6 +1,7 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @world @gripper @stove @rest)
+  (:constants @world @gripper @stove
+              @rest_aconf @open_gconf @closed_gconf)
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -8,12 +9,14 @@
     (NoisyBase)
     (Movable ?o)
 
+    (GConf ?gq)
     (Angle ?j ?a)
     (Grasp ?o ?g)
     (Pick ?o ?p ?g ?bq ?at)
     (Pull ?j ?q1 ?q2 ?bq ?at)
     (BaseMotion ?bq1 ?bq2 ?bt)
     (ArmMotion ?aq1 ?aq2 ?at)
+    (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?at)
     (BTraj ?bt)
     (ATraj ?at)
@@ -28,8 +31,11 @@
     (HandEmpty)
     (AtBConf ?bq)
     (AtAConf ?aq)
+    (AtGConf ?gq)
+
     (CanMoveBase)
     (CanMoveArm)
+    (CanMoveGripper)
     (Cooked ?o)
     (Calibrated)
 
@@ -64,7 +70,8 @@
   (:action move_base
     :parameters (?bq1 ?bq2 ?bt)
     :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
-                       (AtBConf ?bq1) (AtAConf @rest)
+                       (AtBConf ?bq1)
+                       (AtAConf @rest_aconf)
                        (CanMoveBase) (Calibrated))
     :effect (and (AtBConf ?bq2)
                  (not (AtBConf ?bq1)) (not (CanMoveBase))
@@ -79,21 +86,19 @@
     :effect (and (AtAConf ?aq2)
                  (not (AtAConf ?aq1)) (not (CanMoveArm)))
   )
-
-  ;(:action open_gripper
-  ;  :parameters ()
-  ;  :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
-  ;                     (AtBConf ?bq1) (CanMoveBase) (Calibrated))
-  ;  :effect (and (AtBConf ?bq2)
-  ;               (not (AtBConf ?bq1)) (not (CanMoveBase))
-  ;               (when (NoisyBase) (not (Calibrated)))
-  ;               (increase (total-cost) (Distance ?bq1 ?bq2)))
-  ;)
+  (:action move_gripper
+    :parameters (?gq1 ?gq2 ?gt)
+    :precondition (and (GripperMotion ?gq1 ?gq2 ?gt)
+                       (AtGConf ?gq1) (CanMoveGripper))
+    :effect (and (AtGConf ?gq2)
+                 (not (AtGConf ?gq1)) (not (CanMoveGripper)))
+  )
 
   (:action calibrate
     :parameters (?bq ?at)
     :precondition (and (CalibrateMotion ?bq ?at)
-                       (AtBConf ?bq) (AtAConf @rest) ; (AtAConf ?aq)
+                       (AtBConf ?bq)
+                       (AtAConf @rest_aconf) ; (AtAConf ?aq)
                        (not (Calibrated))
                        ; TODO: visibility constraints
                    )
@@ -105,7 +110,8 @@
     :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?at)
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
-                       (AtBConf ?bq) (Calibrated) (AtAConf @rest) ; (AtAConf ?aq)
+                       (AtBConf ?bq) (Calibrated)
+                       (AtAConf @rest_aconf) (AtGConf @open_gconf)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
                   )
@@ -117,7 +123,8 @@
     :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?at)
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
-                       (AtBConf ?bq) (Calibrated) (AtAConf @rest) ; (AtAConf ?aq)
+                       (AtBConf ?bq) (Calibrated)
+                       (AtAConf @rest_aconf) ; (AtGConf @closed_gconf)
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
@@ -132,7 +139,8 @@
                        (AngleKin ?o ?p1 ?j ?a1) (AngleKin ?o ?p2 ?j ?a2)
                        (AtAngle ?j ?a1) (HandEmpty)
                        (AtWorldPose ?o ?p1)
-                       (AtBConf ?bq) (Calibrated) (AtAConf @rest) ; (AtAConf ?aq)
+                       (AtBConf ?bq) (Calibrated)
+                       (AtAConf @rest_aconf) (AtGConf @open_gconf)
                        ; TODO: ensure the final conf is safe
                        (not (UnsafeATraj ?at))
                   )

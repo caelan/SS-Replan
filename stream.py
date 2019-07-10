@@ -623,6 +623,21 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
         return (cmd,)
     return fn
 
+def get_gripper_motion_gen(world, collisions=True, teleport=False):
+    resolutions = GRIPPER_RESOLUTION * np.ones(len(world.gripper_joints))
+
+    def fn(gq1, gq2):
+        if teleport:
+            path = [gq1.values, gq2.values]
+        else:
+            extend_fn = get_extend_fn(gq2.body, gq2.joints, resolutions=resolutions)
+            path = [gq1.values] + list(extend_fn(gq1.values, gq2.values))
+        cmd = Sequence(State(), commands=[
+            Trajectory(world, gq2.body, gq2.joints, path),
+        ])
+        return (cmd,)
+    return fn
+
 ################################################################################
 
 def get_calibrate_gen(world, collisions=True, teleport=False):

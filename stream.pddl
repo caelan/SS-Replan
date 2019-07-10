@@ -60,6 +60,12 @@
     :certified (and ; (ATraj ?bt)
                     (ArmMotion ?aq1 ?aq2 ?at))
   )
+  (:stream plan-gripper-motion
+    :inputs (?gq1 ?gq2)
+    :domain (and (GConf ?gq1) (GConf ?gq2))
+    :outputs (?gt)
+    :certified (GripperMotion ?gq1 ?gq2 ?gt)
+  )
   (:stream plan-calibrate-motion
     :inputs (?bq)
     :domain (BConf ?bq)

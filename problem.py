@@ -6,14 +6,15 @@ from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment, \
-    child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed, link_from_name, get_link_pose, wait_for_user
+    child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed, link_from_name, \
+    get_link_pose, wait_for_user, get_min_limits, get_max_limits
 from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
     get_surface, COUNTERS, RelPose
 from stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, \
     get_calibrate_gen, get_fixed_pick_gen_fn, \
-    get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen
+    get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen
 
 import numpy as np
 
@@ -39,13 +40,20 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
 
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
+    init_gq = Conf(world.robot, world.gripper_joints)
     if init_carry:
         world.carry_conf = init_aq
+
+    open_gq = Conf(world.robot, world.gripper_joints, get_max_limits(world.robot, world.gripper_joints))
+    closed_gq = Conf(world.robot, world.gripper_joints, get_max_limits(world.robot, world.gripper_joints))
+
     constant_map = {
         '@world': 'world',
         '@gripper': 'gripper',
         '@stove': 'stove',
-        '@rest': world.carry_conf,
+        '@rest_aconf': world.carry_conf,
+        '@open_gconf': open_gq,
+        '@closed_gconf': closed_gq,
     }
 
     init = [
@@ -53,10 +61,17 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         ('AtBConf', init_bq),
         ('AConf', init_aq),
         ('AtAConf', init_aq),
+        ('GConf', init_gq),
+        ('AtGConf', init_gq),
         ('HandEmpty',),
-        ('CanMoveBase',), # TODO: could always remove this
-        ('CanMoveArm',),
+
         ('AConf', world.carry_conf),
+        ('GConf', open_gq),
+        ('GConf', closed_gq),
+
+        ('CanMoveBase',),  # TODO: could always remove this
+        ('CanMoveArm',),
+        ('CanMoveGripper',),
 
         Equal(('CalibrateCost',), 1),
         Equal(('PickCost',), 1),
@@ -191,8 +206,10 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
+
         'plan-base-motion': from_fn(get_base_motion_fn(world, **kwargs)),
         'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
+        'plan-gripper-motion': from_fn(get_gripper_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
 
         'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
