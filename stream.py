@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, apply_affine, \
     child_link_from_joint, create_attachment, Point, get_data_extents, AABB, get_aabb_vertices, \
-    draw_aabb, wait_for_user
+    draw_aabb, wait_for_user, set_configuration, dump_body
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
@@ -397,10 +397,11 @@ def compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, tele
         handle_path.append(get_link_pose(world.kitchen, handle_link))
         # Collide due to adjacency
 
+    set_configuration(world.gripper, world.open_gq.values)
     tool_path = [multiply(handle_pose, invert(handle_grasp)) for handle_pose in handle_path]
     for i, tool_pose in enumerate(tool_path):
         set_joint_positions(world.kitchen, door_joints, door_path[i])
-        set_tool_pose(world, tool_pose)  # TODO: open gripper
+        set_tool_pose(world, tool_pose)
         # handles = draw_pose(handle_path[i], length=0.25)
         # handles.extend(draw_aabb(get_aabb(world.kitchen, link=handle_link)))
         # wait_for_user()
@@ -413,25 +414,27 @@ def compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, tele
 def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
               randomize=True, collisions=True, teleport=False, **kwargs):
     handle_link, handle_grasp, handle_pregrasp = get_handle_grasp(world, door_joint)
-    # TODO: could allow handle collisions
-    # TODO: could push if the goal is to fully close
-    # TODO: check door/bq collisions
+    # TODO: could push if the goal is to be fully closed
+
+    door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) if collisions else set()
+    obstacles = (world.static_obstacles | door_obstacles) if collisions else set()
 
     base_conf.assign()
     world.open_gripper()
+    aq = world.carry_conf
+    aq.assign()
     #door_saver = BodySaver()
     robot_saver = BodySaver(world.robot)
-    sample_fn = get_sample_fn(world.robot, world.arm_joints)
+
+    for door_conf in [door_path[0], door_path[-1]]:
+        set_joint_positions(world.kitchen, [door_joint], door_conf)
+        if any(pairwise_collision(world.robot, b) for b in obstacles):
+            return
+
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
-    aq = world.carry_conf
+    sample_fn = get_sample_fn(world.robot, world.arm_joints)
     if randomize:
         set_joint_positions(world.robot, world.arm_joints, sample_fn())
-    else:
-        aq.assign()
-
-    obstacles = world.static_obstacles | get_descendant_obstacles(world.kitchen, door_joint)
-    if not collisions:
-        obstacles = set()
     arm_path = []
     for i, tool_pose in enumerate(tool_path):
         set_joint_positions(world.kitchen, [door_joint], door_path[i])
@@ -459,8 +462,6 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
 
     set_joint_positions(world.kitchen, [door_joint], door_path[0])
     set_joint_positions(world.robot, world.arm_joints, arm_path[0])
-
-
     grasp_width = close_until_collision(world.robot, world.gripper_joints,
                                         bodies=[(world.kitchen, [handle_link])])
     gripper_motion_fn = get_gripper_motion_gen(world, collisions=collisions, **kwargs)
@@ -493,8 +494,9 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
             return
         door_path, handle_path, tool_path = door_outputs
         for i in range(max_attempts):
+            randomize = i != 0
             ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
-                              randomize=(i!=0), collisions=collisions, teleport=teleport, **kwargs), None)
+                              randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
             if ik_outputs is not None:
                 yield ik_outputs
                 break
@@ -524,8 +526,9 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
                 yield None
                 continue
             base_conf, = ir_outputs
+            randomize = random.random() < 0.5
             ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
-                                        collisions=collisions, teleport=teleport, **kwargs), None)
+                                        randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
             if ik_outputs is None:
                 continue
             yield ir_outputs + ik_outputs

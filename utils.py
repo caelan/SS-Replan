@@ -10,7 +10,7 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, \
-    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK
+    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants
 
 try:
     import trac_ik_python
@@ -252,7 +252,7 @@ def get_tool_link(robot):
 
 def create_gripper(robot, visual=False):
     #dump_body(robot)
-    links = get_link_subtree(robot, link_from_name(robot, get_gripper_link(robot)))
+    links = get_link_descendants(robot, link_from_name(robot, get_gripper_link(robot))) # get_link_subtree
     with LockRenderer():
         gripper = clone_body(robot, links=links, visual=False, collision=True)  # TODO: joint limits
         if not visual:

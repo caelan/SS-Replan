@@ -201,11 +201,9 @@ class World(object):
         positions = value*np.ones(len(self.gripper_joints))
         set_joint_positions(self.robot, self.gripper_joints, positions)
     def close_gripper(self):
-        for joint in self.gripper_joints:
-            set_joint_position(self.robot, joint, get_min_limit(self.robot, joint))
+        self.closed_gq.assign()
     def open_gripper(self):
-        for joint in self.gripper_joints:
-            set_joint_position(self.robot, joint, get_max_limit(self.robot, joint))
+        self.open_gq.assign()
     def closed_conf(self, joint):
         if 'left' in get_joint_name(self.kitchen, joint):
             return get_max_limit(self.kitchen, joint)
