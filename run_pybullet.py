@@ -99,7 +99,7 @@ def solve_pddlstream(world, problem, args, debug=False):
 
     success_cost = 0 if args.optimal else INF
     planner = 'max-astar' if args.optimal else 'ff-astar'
-    search_sample_ratio = 2
+    search_sample_ratio = 1 # TODO: could try decreasing
     max_planner_time = 10
 
     pr = cProfile.Profile()

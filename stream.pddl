@@ -1,4 +1,10 @@
 (define (stream nvidia-tamp)
+  (:rule
+    :inputs (?o ?g ?gty ?o2)
+    :domain (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty))
+    :certified (AdmitsGrasp ?o ?g ?o2)
+  )
+
   (:stream sample-pose
     :inputs (?o ?r)
     :domain (Stackable ?o ?r)
@@ -6,10 +12,10 @@
     :certified (RelPose ?o ?rp ?r)
   )
   (:stream sample-grasp
-    :inputs (?o)
-    :domain (Graspable ?o)
+    :inputs (?o ?gty)
+    :domain (and (Graspable ?o) (GraspType ?gty))
     :outputs (?g)
-    :certified (Grasp ?o ?g)
+    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty))
   )
 
   ; Movable base

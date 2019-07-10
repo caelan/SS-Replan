@@ -45,9 +45,10 @@ class Command(object):
         raise NotImplementedError()
 
 class Sequence(object):
-    def __init__(self, context, commands=[]):
+    def __init__(self, context, commands=[], name=None):
         self.context = context
         self.commands = tuple(commands)
+        self.name = self.__class__.__name__.lower() if name is None else name
     @property
     def bodies(self):
         bodies = set(self.context.bodies)
@@ -55,10 +56,10 @@ class Sequence(object):
             bodies.update(command.bodies)
         return bodies
     def reverse(self):
-        return Sequence(self.context, [command.reverse() for command in reversed(self.commands)])
+        return Sequence(self.context, [command.reverse() for command in reversed(self.commands)], name=self.name)
     def __repr__(self):
         #return '[{}]'.format('->'.join(map(repr, self.commands)))
-        return '{}({})'.format(self.__class__.__name__, len(self.commands))
+        return '{}({})'.format(self.name, len(self.commands))
 
 ################################################################################
 

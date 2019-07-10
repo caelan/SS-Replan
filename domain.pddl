@@ -59,6 +59,7 @@
     (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
     (Connected ?o ?j)
     (AngleKin ?o ?p ?j ?a)
+    (AdmitsGrasp ?o1 ?g ?o2)
   )
   (:functions
     (Distance ?bq1 ?bq2)
@@ -114,7 +115,7 @@
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                        (AtBConf ?bq) (Calibrated)
                        (AtAConf @rest_aq) (AtGConf @open_gq)
-                       (Accessible ?o2 ?p2)
+                       (Accessible ?o2 ?p2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
                   )
@@ -128,7 +129,7 @@
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
                        (AtBConf ?bq) (Calibrated)
                        (AtAConf @rest_aq) ; (AtGConf @closed_gq)
-                       (Accessible ?o2 ?p2)
+                       (Accessible ?o2 ?p2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
@@ -185,6 +186,9 @@
     (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
                          (AtAngle ?j ?a))))
   )
+  ;(:derived (AdmitsGrasp ?o ?g ?o2) ; Static fact
+  ;  (exists (?gty) (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty)))
+  ;)
 
   ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
   ;(:derived (AtWorldPose ?o1 ?p1) (or

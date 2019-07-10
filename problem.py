@@ -15,6 +15,7 @@ from stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, \
     get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen
+from database import has_place_database
 
 import numpy as np
 
@@ -79,7 +80,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
     ] + [('Type', obj_name, 'stove') for obj_name in STOVES] + \
-           [('Status', status) for status in DOOR_STATUSES]
+           [('Status', status) for status in DOOR_STATUSES] + \
+           [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
     if movable_base:
         init.append(('MovableBase',))
     if fixed_base:
@@ -151,6 +153,9 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
                 ('AtWorldPose', surface_name, pose),
                 ('Counter', surface_name, pose),
             ]
+        for grasp_type in GRASP_TYPES:
+            if has_place_database(world.robot_name, surface_name, grasp_type):
+                init.append(('AdmitsGraspType', surface_name, grasp_type))
 
     for obj_name in world.movable:
         # TODO: raise above surface and simulate to exploit physics
@@ -204,7 +209,7 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     stream_map = {
         'test-door': from_test(get_door_test(world)),
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
-        'sample-grasp': from_gen_fn(get_grasp_gen(world, grasp_types=GRASP_TYPES)),
+        'sample-grasp': from_gen_fn(get_grasp_gen(world)),
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
 

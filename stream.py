@@ -19,7 +19,8 @@ from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
     SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT
 from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
-from database import load_placements, get_surface_reference_pose, load_place_base_poses, load_pull_base_poses
+from database import load_placements, get_surface_reference_pose, load_place_base_poses, \
+    load_pull_base_poses
 
 
 BASE_CONSTANT = 1
@@ -174,8 +175,8 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
 
 
 def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport=False,
-    def gen(name):
-        for grasp in get_grasps(world, name, **kwargs):
+    def gen(name, grasp_type):
+        for grasp in get_grasps(world, name, grasp_types=[grasp_type], **kwargs):
             yield (grasp,)
     return gen
 
@@ -344,7 +345,7 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
             Detach(world, world.kitchen, surface_link, obj_body),
             Attach(world, world.robot, world.tool_link, obj_body),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
-        ])
+        ], name='pick')
         #yield (aq, cmd,)
         yield (cmd,)
     return gen
@@ -475,7 +476,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
                        world.kitchen, [door_joint], door_path),
         finger_cmd.commands[0].reverse(),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
-    ])
+    ], name='pull')
     #yield (aq, cmd,)
     yield (cmd,)
 
@@ -591,7 +592,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
         # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.base_joints, path),
-        ])
+        ], name='base')
         return (cmd,)
     return fn
 
@@ -619,7 +620,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                 return None
         cmd = Sequence(State(savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
-        ])
+        ], name='arm')
         return (cmd,)
     return fn
 
@@ -634,7 +635,7 @@ def get_gripper_motion_gen(world, collisions=True, teleport=False):
             path = [gq1.values] + list(extend_fn(gq1.values, gq2.values))
         cmd = Sequence(State(), commands=[
             Trajectory(world, gq2.body, gq2.joints, path),
-        ])
+        ], name='gripper')
         return (cmd,)
     return fn
 
@@ -652,7 +653,7 @@ def get_calibrate_gen(world, collisions=True, teleport=False):
         cmd = Sequence(State(savers=[robot_saver]), commands=[
             #Trajectory(world, world.robot, world.arm_joints, approach_path),
             # TODO: calibrate command
-        ])
+        ], name='calibrate')
         #return (aq, cmd,)
         return (cmd,)
     return fn
@@ -705,6 +706,8 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
 
 ################################################################################
 
+# TODO: check reachability of approach
+
 def check_collision_free(world, state, sequence, obstacles):
     if not obstacles:
         return True
@@ -726,6 +729,7 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
         if not collisions:
             return True
         # TODO: do per individual trajectory
+        # TODO: don't check collisions if p is supported by something on at
         p.assign()
         obstacles = get_link_obstacles(world, o) - at.bodies
         state = copy.copy(at.context)

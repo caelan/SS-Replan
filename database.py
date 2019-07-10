@@ -38,12 +38,16 @@ def get_surface_reference_pose(kitchen, surface_name):
     link = link_from_name(kitchen, surface.link)
     return get_link_pose(kitchen, link)
 
+def has_place_database(robot_name, surface_name, grasp_type):
+    path = os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
+        robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type))
+    return os.path.exists(path)
+
 def load_place_database(robot_name, surface_name, grasp_type, field):
-    filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
-                                        grasp_type=grasp_type)
-    path = os.path.join(DATABASE_DIRECTORY, filename)
-    if not os.path.exists(path):
+    if not has_place_database(robot_name, surface_name, grasp_type):
         return []
+    path = os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
+        robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type))
     data = read_json(path)
     return data[field]
 
