@@ -143,7 +143,7 @@ def commands_from_plan(world, plan):
     # TODO: propagate the state
     commands = []
     for action, params in plan:
-        if action in ['move_base', 'move_arm', 'pick', 'pull', 'calibrate']:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'calibrate']:
             commands.extend(params[-1].commands)
         elif action == 'place':
             commands.extend(params[-1].reverse().commands)

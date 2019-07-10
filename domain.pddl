@@ -1,7 +1,7 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
   (:constants @world @gripper @stove
-              @rest_aconf @open_gconf @closed_gconf)
+              @rest_aq @open_gq @closed_gq)
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -71,7 +71,7 @@
     :parameters (?bq1 ?bq2 ?bt)
     :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
                        (AtBConf ?bq1)
-                       (AtAConf @rest_aconf)
+                       (AtAConf @rest_aq)
                        (CanMoveBase) (Calibrated))
     :effect (and (AtBConf ?bq2)
                  (not (AtBConf ?bq1)) (not (CanMoveBase))
@@ -98,7 +98,7 @@
     :parameters (?bq ?at)
     :precondition (and (CalibrateMotion ?bq ?at)
                        (AtBConf ?bq)
-                       (AtAConf @rest_aconf) ; (AtAConf ?aq)
+                       (AtAConf @rest_aq) ; (AtAConf ?aq)
                        (not (Calibrated))
                        ; TODO: visibility constraints
                    )
@@ -111,7 +111,7 @@
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                        (AtBConf ?bq) (Calibrated)
-                       (AtAConf @rest_aconf) (AtGConf @open_gconf)
+                       (AtAConf @rest_aq) (AtGConf @open_gq)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
                   )
@@ -124,7 +124,7 @@
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
                        (AtBConf ?bq) (Calibrated)
-                       (AtAConf @rest_aconf) ; (AtGConf @closed_gconf)
+                       (AtAConf @rest_aq) ; (AtGConf @closed_gq)
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
@@ -140,7 +140,7 @@
                        (AtAngle ?j ?a1) (HandEmpty)
                        (AtWorldPose ?o ?p1)
                        (AtBConf ?bq) (Calibrated)
-                       (AtAConf @rest_aconf) (AtGConf @open_gconf)
+                       (AtAConf @rest_aq) (AtGConf @open_gq)
                        ; TODO: ensure the final conf is safe
                        (not (UnsafeATraj ?at))
                   )

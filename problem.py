@@ -44,16 +44,13 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     if init_carry:
         world.carry_conf = init_aq
 
-    open_gq = Conf(world.robot, world.gripper_joints, get_max_limits(world.robot, world.gripper_joints))
-    closed_gq = Conf(world.robot, world.gripper_joints, get_max_limits(world.robot, world.gripper_joints))
-
     constant_map = {
         '@world': 'world',
         '@gripper': 'gripper',
         '@stove': 'stove',
-        '@rest_aconf': world.carry_conf,
-        '@open_gconf': open_gq,
-        '@closed_gconf': closed_gq,
+        '@rest_aq': world.carry_conf,
+        '@open_gq': world.open_gq,
+        '@closed_gq': world.closed_gq,
     }
 
     init = [
@@ -66,8 +63,8 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         ('HandEmpty',),
 
         ('AConf', world.carry_conf),
-        ('GConf', open_gq),
-        ('GConf', closed_gq),
+        ('GConf', world.open_gq),
+        ('GConf', world.closed_gq),
 
         ('CanMoveBase',),  # TODO: could always remove this
         ('CanMoveArm',),

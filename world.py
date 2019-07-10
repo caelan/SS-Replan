@@ -7,7 +7,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_point, get_aabb_extent, remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, wait_for_user, get_all_links, get_center_extent, get_pose, \
-    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent, dump_body
+    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent, dump_body, get_min_limits, get_max_limits
 from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
@@ -87,8 +87,13 @@ class World(object):
         self.custom_limits = {}
         self.base_limits_handles = []
         self.update_custom_limits()
-        self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
         self.initial_attachments = {}
+
+        self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
+        self.open_gq = Conf(self.robot, self.gripper_joints,
+                            get_max_limits(self.robot, self.gripper_joints))
+        self.closed_gq = Conf(self.robot, self.gripper_joints,
+                              get_min_limits(self.robot, self.gripper_joints))
     @property
     def base_joints(self):
         return joints_from_names(self.robot, BASE_JOINTS)
