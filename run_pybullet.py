@@ -13,7 +13,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver, \
     get_pose, RED, apply_alpha, set_pose, multiply, step_simulation, set_all_static, \
-    Euler, Pose, Point, stable_z, link_from_name
+    Euler, Pose, Point, stable_z, link_from_name, point_from_pose
 
 from observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
 from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
@@ -22,7 +22,7 @@ from world import World
 from problem import pdddlstream_from_problem
 from command import State, Wait, execute_plan
 from stream import get_stable_gen
-from debug import dump_link_cross_sections
+from debug import dump_link_cross_sections, test_rays
 
 #from examples.pybullet.pr2.run import post_process
 from pddlstream.algorithms.incremental import solve_incremental
@@ -169,7 +169,30 @@ def simulate_plan(world, commands, args):
 
 ################################################################################
 
+def add_block(world):
+    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+    entity_path = get_block_path(entity_name)
+    #entity_name = 'potted_meat_can'
+    #entity_path = get_ycb_obj_path(entity_name)
+    world.add_body(entity_name, entity_path)
+    entity_body = world.get_body(entity_name)
+    z = stable_z(entity_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
+    set_pose(entity_body, Pose(Point(0.1, 1.15, z), Euler()))
+    return entity_name
+
+def add_box(world):
+    obstruction_name = 'cracker_box'
+    obstruction_path = get_ycb_obj_path(obstruction_name)
+    world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
+    obstruction_body = world.get_body(obstruction_name)
+    z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
+    set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
+    return obstruction_name
+
+################################################################################
+
 def main():
+    # TODO: handle relative poses for drawers
     parser = create_parser()
     args = parser.parse_args()
     #if args.seed is not None:
@@ -187,19 +210,8 @@ def main():
     #dump_link_cross_sections(world, link_name='indigo_drawer_top')
     #wait_for_user()
 
-    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    entity_path = get_block_path(entity_name)
-    #entity_name = 'potted_meat_can'
-    #entity_path = get_ycb_obj_path(entity_name)
-    world.add_body(entity_name, entity_path)
-
-    #obstruction_name = 'cracker_box'
-    #obstruction_path = get_ycb_obj_path(obstruction_name)
-    #world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
-    #obstruction_body = world.get_body(obstruction_name)
-    #z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    #set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
-
+    entity_name = add_block(world)
+    #obstruction_name = add_box(world)
     #test_grasps(world, entity_name)
     set_all_static()
 
@@ -208,6 +220,7 @@ def main():
     cone_body = get_viewcone(depth=DEPTH, camera_matrix=CAMERA_MATRIX, color=apply_alpha(RED, 0.1))
     set_pose(cone_body, world_from_zed_left)
     step_simulation()
+
     #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
     #test_observation(world, entity_name, world_from_zed_left)
     #return
