@@ -9,7 +9,7 @@ from sklearn.neighbors import KernelDensity
 
 from examples.discrete_belief.dist import UniformDist, DDist, MixtureDist, GaussianDistribution, \
     gauss, GMU, MultivariateGaussianDistribution, ProductGaussianDistribution, \
-    ProductDistribution, CUniformDist, DeltaDist
+    ProductDistribution, CUniformDist, DeltaDist, bayesEvidence, JDist
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
 
 #from examples.discrete_belief.run import geometric_cost
@@ -17,7 +17,7 @@ from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, remove_all_debug
+    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN
 from stream import get_stable_gen, compute_surface_aabb, test_supported
 from utils import OPEN_SURFACES
 
@@ -32,32 +32,14 @@ DEPTH = 5.0
 Particle = namedtuple('Particle', ['sample', 'weight'])
 
 P_FALSE_POSITIVE = 0.0
-P_FALSE_NEGATIVE = 0.1
-POSITION_VARIANCE = math.pow(0.01, 2)
-ORIENTATION_VARIANCE = math.pow(np.pi / 8, 2)
-
-# Negative observations are easy. Just apply observation model
-# Positive observations will give rise to a pose that is likely not within the samples
-# Density estimation to recover the belief at a point
-# https://scikit-learn.org/stable/modules/density.html
-# https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html#scipy.stats.gaussian_kde
-
-# Discrete belief over surfaces. Particle filter for each surface
-# Alternatively, just annotate poses with surfaces
-
-# elements = [1.1, 2.2, 3.3]
-# probabilities = [0.2, 0.5, 0.3]
-# np.random.choice(elements, size=10, replace=True, p=probabilities)
-# random.choice(elements, k=10, weights=probabilities)
+P_FALSE_NEGATIVE = 0.0 # 0.1
+POSITION_STD = 0.01
+ORIENTATION_STD = np.pi / 8
 
 # Prior on the number of false detections to ensure correlated
 
-#from sklearn.mixture import GaussianMixture
-# pip2 install -U --no-deps scikit-learn=0.20
-
 # TODO: could do open world or closed world
 # For open world, can sum independent probabilities
-
 
 # For a point, observation types
 # outside cone, visible, occluded
@@ -66,8 +48,10 @@ ORIENTATION_VARIANCE = math.pow(np.pi / 8, 2)
 # https://github.com/tlpmit/hpn
 # https://github.mit.edu/tlp/bhpn
 
-# TODO: how to factor visbility observation costs such that the appropriate actions are selected
+# TODO: how to factor visibility observation costs such that the appropriate actions are selected
 # i.e. what to move out of the way
+
+################################################################################
 
 def are_visible(world, camera_pose):
     ray_names = []
@@ -82,47 +66,6 @@ def are_visible(world, camera_pose):
     return {name for name, result in zip(ray_names, ray_results)
             if result.objectUniqueId == world.get_body(name)}
 
-def observe(world, camera_pose):
-    # TODO: randomize robot's pose
-    # Coarse pose estimation
-    visible = are_visible(world, camera_pose)
-    detections = {}
-    for name in world.movable:
-        body = world.get_body(name)
-        pose = get_pose(body)
-        if name in visible:
-            if P_FALSE_NEGATIVE <= random.random():
-                detections[name] = pose
-        else:
-            if P_FALSE_POSITIVE <= random.random():
-                pass
-            else:
-                pass # TODO: sample from poses on table
-                #detections[name] = pose
-    # Would need to use UKF to handle GMM
-    return detections
-
-def get_observation_fn(p_look_fp=0, p_look_fn=0):
-    # Observation: True/False for detection & numeric pose
-    # use distance to z
-    # TODO: clip probabilities so doesn't become zero
-    def fn(is_visible, is_pose):
-        # P(obs | s1=loc1, a=control_loc)
-        #return MixtureDist()
-        # TODO: nearby objects that might cause misdetections
-        # Dealing with the types is challenging
-        # Could always assign zero probability density to wrong type
-
-        return ProductDistribution([
-            GaussianDistribution(gmean=0, variance=POSITION_VARIANCE),
-            GaussianDistribution(gmean=0, variance=POSITION_VARIANCE),
-            CUniformDist(-np.pi, +np.pi)
-        ])
-        #if is_visible and is_pose:
-        #    return DDist({True: 1 - p_look_fn, False: p_look_fn})
-        #return DDist({True: p_look_fp, False: 1 - p_look_fp})
-    return fn
-
 def compute_normalization(particles):
     return sum(particle.weight for particle in particles)
 
@@ -131,12 +74,11 @@ def create_belief(world, entity_name, surface_dist, n=100):
     particles = []
     handles = []
     placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
-    # TODO: could just make the belief
 
     with BodySaver(world.get_body(entity_name)):
         while len(particles) < n:
             surface_name = surface_dist.draw()
-            print(len(particles), surface_name)
+            #print(len(particles), surface_name)
             rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
             if rel_pose is None:
                 continue
@@ -149,6 +91,8 @@ def create_belief(world, entity_name, surface_dist, n=100):
             #wait_for_user()
             handles.extend(draw_point(point, color=RED))
     return particles
+
+################################################################################
 
 def compute_detectable(particles, camera_pose):
     ray_indices = set()
@@ -175,7 +119,38 @@ def compute_visible(particles, camera_pose, draw=True):
                        if result.objectUniqueId == -1}
     return visible_indices
 
-def pose_generator(world, entity_name, surface_name, density):
+################################################################################
+
+def compute_density(particles, std=0.01):
+    weighted_points = [Particle(point_from_pose(particle.sample.value)[:2], particle.weight)
+                       for particle in particles]
+    points, weights = zip(*weighted_points)
+    # from sklearn.mixture import GaussianMixture
+    # pip2 install -U --no-deps scikit-learn=0.20
+
+    # TODO: compute area of each surface and use to estimate the total area and the samples to cover the space
+
+    # https://scikit-learn.org/stable/modules/density.html
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html#scipy.stats.gaussian_kde
+    # https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.DistanceMetric.html#sklearn.neighbors.DistanceMetric
+    #KernelDensity kernel
+    # ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
+    #KDTree.valid_metrics
+    #['chebyshev', 'euclidean', 'cityblock', 'manhattan', 'infinity', 'minkowski', 'p', 'l2', 'l1']
+    #BallTree.valid_metrics
+    #['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
+    # 'braycurtis', 'russellrao', 'cityblock', 'manhattan', 'infinity', 'jaccard', 'seuclidean', 'sokalsneath',
+    # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
+
+    density = KernelDensity(bandwidth=std, algorithm='auto',
+                            kernel='gaussian', metric="wminkowski", atol=0, rtol=0,
+                            breadth_first=True, leaf_size=40, metric_params={'p': 2, 'w': np.ones(2)})
+    density.fit(X=points, sample_weight=weights)
+    # from scipy.stats.kde import gaussian_kde
+    # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
+    return density
+
+def density_generator(world, entity_name, surface_name, density):
     entity_body = world.get_body(entity_name)
     surface_aabb = compute_surface_aabb(world, surface_name)
     z = stable_z_on_aabb(entity_body, surface_aabb)
@@ -195,38 +170,26 @@ def pose_generator(world, entity_name, surface_name, density):
             handles.extend(draw_point(point, color=RED))
             yield pose
 
-def compute_density(particles):
-    weighted_points = [Particle(point_from_pose(particle.sample.value)[:2], particle.weight)
-                       for particle in particles]
-    points, weights = zip(*weighted_points)
+################################################################################
 
-    # https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.DistanceMetric.html#sklearn.neighbors.DistanceMetric
-    #KDTree.valid_metrics
-    #['chebyshev', 'euclidean', 'cityblock', 'manhattan', 'infinity', 'minkowski', 'p', 'l2', 'l1']
-    #BallTree.valid_metrics
-    #['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
-    # 'braycurtis', 'russellrao', 'cityblock', 'manhattan', 'infinity', 'jaccard', 'seuclidean', 'sokalsneath',
-    # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
-
-    std = 0.05  # meters
-    density = KernelDensity(bandwidth=std, algorithm='auto',
-                            kernel='gaussian', metric="euclidean", atol=0, rtol=0,
-                            breadth_first=True, leaf_size=40, metric_params=None)
-    density.fit(X=points, sample_weight=weights)
-    # from scipy.stats.kde import gaussian_kde
-    # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
-    return density
-
-def observe_stuff(world, camera_pose):
+def observe_scene(world, camera_pose):
+    # Could use an UKF to propagate a GMM
     visible_entities = are_visible(world, camera_pose)
     observations = {}
+    # TODO: randomize robot's pose
     # TODO: false positives
     # TODO: difference probabilities based on whether in viewcone or not
+    # TODO: sample from poses on table
+    assert P_FALSE_POSITIVE == 0
     for visible_name in visible_entities:
+        if random.random() < P_FALSE_NEGATIVE:
+            continue
         body = world.get_body(visible_name)
         pose = get_pose(body)
-        dx, dy = np.random.multivariate_normal(mean=np.zeros(2), cov=POSITION_VARIANCE*np.eye(2))
-        dyaw, = np.random.multivariate_normal(mean=np.zeros(1), cov=ORIENTATION_VARIANCE*np.eye(1))
+        dx, dy = np.random.multivariate_normal(
+            mean=np.zeros(2), cov=math.pow(POSITION_STD, 2)*np.eye(2))
+        dyaw, = np.random.multivariate_normal(
+            mean=np.zeros(1), cov=math.pow(ORIENTATION_STD, 2)*np.eye(1))
         noise_pose = Pose(Point(x=dx, y=dy), Euler(yaw=dyaw))
         observed_pose = multiply(pose, noise_pose)
         observations.setdefault(visible_name, []).append(observed_pose)
@@ -234,7 +197,9 @@ def observe_stuff(world, camera_pose):
         #set_pose(body, observed_pose)
     return observations
 
-def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
+################################################################################
+
+def get_detection_fn(poses, visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
 
     def fn(index):
         # P(detect | s in visible)
@@ -244,15 +209,19 @@ def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
         return DDist({True: p_fp, False: 1 - p_fp})
     return fn
 
-def get_registration_fn(poses, visible, pos_var=POSITION_VARIANCE):
+def get_registration_fn(poses, visible, pos_std=POSITION_STD):
+    # use distance to z for placing on difference surfaces
+    # TODO: clip probabilities so doesn't become zero
+    # TODO: nearby objects that might cause misdetections
 
     def fn(index, detection):
         # P(obs point | state detect)
         if detection:
-            x, y, _ = point_from_pose(poses[index])
+            # TODO: proportional weight in the event that no normalization
+            x, y, _ = point_from_pose(poses[index].value)
             return ProductDistribution([
-                GaussianDistribution(gmean=x, variance=pos_var),
-                GaussianDistribution(gmean=y, variance=pos_var),
+                GaussianDistribution(gmean=x, stdev=pos_std),
+                GaussianDistribution(gmean=y, stdev=pos_std),
                 CUniformDist(-np.pi, +np.pi),
             ])
             # Could also mix with uniform over the space
@@ -261,23 +230,34 @@ def get_registration_fn(poses, visible, pos_var=POSITION_VARIANCE):
             return DeltaDist(None)
     return fn
 
+################################################################################
+
 def test_observation(world, entity_name, camera_pose, n=100):
     surface_dist = UniformDist(OPEN_SURFACES[1:2])
     with LockRenderer():
         particles = create_belief(world, entity_name, surface_dist)
     #pose = random.choice(particles).sample
+    # np.random.choice(elements, size=10, replace=True, p=probabilities)
+    # random.choice(elements, k=10, weights=probabilities)
     #pose.assign()
 
     # TODO: really want a piecewise distribution or something
     # The two observations do mimic how the examples are generated though
 
     poses = [particle.sample for particle in particles]
-    dist = DDist({i: particles[i].weight for i in range(len(poses))}).normalize()
-    detections = observe_stuff(world, camera_pose)
-    has_detection = entity_name in detections
-    pose_estimate = detections.get(entity_name, [None])[0]
-    # TODO: each pose itself is hashable
+    samples_from_surface = {}
+    for index, pose in enumerate(poses):
+        samples_from_surface.setdefault(pose.support, set()).add(index)
 
+
+    dist = DDist({i: particles[i].weight for i in range(len(poses))}).normalize()
+    detections = observe_scene(world, camera_pose)
+    has_detection = entity_name in detections
+    pose_estimate = None
+    if entity_name in detections:
+        pose_estimate = base_values_from_pose(detections[entity_name][0])
+    # TODO: each pose itself is hashable
+    print(has_detection, pose_estimate)
     #dist.conditionOnVar(index=1, has_detection=True)
 
     field_of_view_indices = compute_detectable(particles, camera_pose)
@@ -287,32 +267,36 @@ def test_observation(world, entity_name, camera_pose, n=100):
     #obs_fn = get_observation_fn(surface)
     wait_for_user()
 
-    dist.obsUpdate(get_detection_fn(visible_indices), has_detection)
+    detection_fn = get_detection_fn(poses, visible_indices)
+    registration_fn = get_registration_fn(poses, visible_indices)
+    #dist.obsUpdate(detection_fn, has_detection)
+    dist.obsUpdates([detection_fn, registration_fn], [has_detection, pose_estimate])
+    #dist = bayesEvidence(dist, detection_fn, has_detection) # projects out b and computes joint
+    #joint_dist = JDist(dist, detection_fn, registration_fn)
     print(dist)
 
     remove_all_debug()
-    handles = []
-    for index in dist.support():
-        # TODO: draw weights using color, length, or thickness
-        point = point_from_pose(poses[index].value)
-        handles.extend(draw_point(point, color=RED, width=1))
+
+    with LockRenderer():
+        handles = []
+        z_offset = Point(z=0.1)
+        for index in dist.support():
+            # TODO: draw weights using color, length, or thickness
+            point = point_from_pose(poses[index].value)
+            color = GREEN if index == dist.mode() else RED
+            handles.extend(draw_point(point + z_offset, color=color, width=1))
     wait_for_user()
 
-
-    samples_from_surface = {}
-    for particle in particles:
-        samples_from_surface.setdefault(particle.sample.support, []).append(particle)
-
-
-    norm_constant = compute_normalization(particles)
+    remove_all_debug()
+    #norm_constant = compute_normalization(particles)
     for surface_name in samples_from_surface:
-        surface_particles = samples_from_surface[surface_name]
-        weight = compute_normalization(surface_particles)
-        print(surface_name, weight / norm_constant)
-        density = compute_density(particles)
-        predictions = list(islice(pose_generator(
+        #surface_particles = samples_from_surface[surface_name]
+        #print(surface_name, compute_normalization(surface_particles) / norm_constant)
+        surface_indices = samples_from_surface[surface_name] & set(dist.support())
+        surface_particles = [Particle(poses[index], dist.prob(index)) for index in surface_indices]
+        density = compute_density(surface_particles)
+        predictions = list(islice(density_generator(
             world, entity_name, surface_name, density), n))
         wait_for_user()
 
-    wait_for_user()
     return particles

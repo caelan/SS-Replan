@@ -35,7 +35,7 @@ class World(object):
         else:
             raise ValueError(self.robot_name)
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
-        with HideOutput(enable=False):
+        with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
         #dump_body(self.robot)
         #chassis_pose = get_link_pose(self.robot, link_from_name(self.robot, 'chassis_link'))
@@ -50,7 +50,7 @@ class World(object):
         #dump_body(self.gripper)
 
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
-        with HideOutput(enable=False):
+        with HideOutput(enable=True):
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
         # kitchen2 = load_pybullet(KITCHEN2, fixed_base=True)
         # for joint in self.kitchen_joints:
