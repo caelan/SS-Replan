@@ -21,7 +21,10 @@ print('Use Track IK:', USE_TRACK_IK)
 
 ################################################################################
 
-SRL_PATH = '/home/caelan/Programs/srl_system'
+SRL_VAR = 'SRL_PROJECT_DIR'
+if SRL_VAR not in os.environ:
+    raise RuntimeError('Please install srl_system and set the {} environment variable'.format(SRL_VAR))
+SRL_PATH = os.environ[SRL_VAR]
 MODELS_PATH = './models'
 
 YUMI_PATH = os.path.join(SRL_PATH, 'packages/external/abb_yumi_model/yumi_description/urdf/yumi_lula.urdf')
