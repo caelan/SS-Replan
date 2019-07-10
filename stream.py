@@ -25,7 +25,7 @@ from database import load_placements, get_surface_reference_pose, load_place_bas
 
 BASE_CONSTANT = 1
 BASE_VELOCITY = 0.25
-SELF_COLLISIONS = False # TODO: include self-collisions
+SELF_COLLISIONS = True # TODO: include self-collisions
 MAX_CONF_DISTANCE = 0.75
 
 ARM_RESOLUTION = 0.05
@@ -264,6 +264,7 @@ def plan_approach(world, approach_pose, attachments=[],
     if switches_only:
         return [aq.values, grasp_conf]
 
+    # TODO: could extract out collision function
     full_approach_conf = world.solve_inverse_kinematics(approach_pose)
     if (full_approach_conf is None) or \
             any(pairwise_collision(world.robot, b) for b in obstacles): # TODO: | {obj}
@@ -277,8 +278,9 @@ def plan_approach(world, approach_pose, attachments=[],
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
     grasp_path = plan_direct_joint_motion(world.robot, world.arm_joints, grasp_conf,
-                                          attachments=attachments,
-                                          obstacles=obstacles, self_collisions=SELF_COLLISIONS,
+                                          attachments=attachments, obstacles=obstacles,
+                                          self_collisions=SELF_COLLISIONS,
+                                          disabled_collisions=world.disabled_collisions,
                                           custom_limits=world.custom_limits, resolutions=resolutions / 4.)
     if grasp_path is None:
         print('Grasp path failure')
@@ -287,7 +289,9 @@ def plan_approach(world, approach_pose, attachments=[],
     # TODO: plan one with attachment placed and one held
     approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
                                       attachments=attachments,
-                                      obstacles=obstacles, self_collisions=SELF_COLLISIONS,
+                                      obstacles=obstacles,
+                                      self_collisions=SELF_COLLISIONS,
+                                      disabled_collisions=world.disabled_collisions,
                                       custom_limits=world.custom_limits, resolutions=resolutions,
                                       restarts=2, iterations=25, smooth=25)
     if approach_path is None:
@@ -561,12 +565,13 @@ def parse_fluents(world, fluents, obstacles):
             raise NotImplementedError(predicate)
     return attachments
 
-def get_base_motion_fn(world, collisions=True, teleport=False):
+def get_base_motion_fn(world, collisions=True, teleport=False,
+                       restarts=4, iterations=75, smooth=100):
     # TODO: ensure only forward drive?
 
     def fn(bq1, bq2, fluents=[]):
         bq1.assign()
-        #world.carry_conf.assign()
+        world.carry_conf.assign()
         obstacles = set(world.static_obstacles)
         attachments = parse_fluents(world, fluents, obstacles)
         # TODO: could condition on arm conf
@@ -579,7 +584,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
             path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=attachments,
                                             obstacles=obstacles, custom_limits=world.custom_limits,
                                             self_collisions=False,
-                                            restarts=4, iterations=75, smooth=100)
+                                            restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
                 print('Failed to find a base motion plan!')
                 #for bq in [bq1, bq2]:
@@ -592,6 +597,15 @@ def get_base_motion_fn(world, collisions=True, teleport=False):
         ], name='base')
         return (cmd,)
     return fn
+
+def get_reachability_test(world, **kwargs):
+    base_motion_fn = get_base_motion_fn(world, restarts=2, iterations=50, smooth=0, **kwargs)
+    bq0 = Conf(world.robot, world.base_joints)
+
+    def test(bq):
+        outputs = base_motion_fn(bq0, bq, fluents=[])
+        return outputs is not None
+    return test
 
 ################################################################################
 
@@ -610,8 +624,9 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
             path = [aq1.values, aq2.values]
         else:
             path = plan_joint_motion(world.robot, aq2.joints, aq2.values,
-                                     attachments=attachments,
-                                     obstacles=obstacles, self_collisions=SELF_COLLISIONS,
+                                     attachments=attachments, obstacles=obstacles,
+                                     self_collisions=SELF_COLLISIONS,
+                                     disabled_collisions=world.disabled_collisions,
                                      custom_limits=world.custom_limits, resolutions=resolutions,
                                      restarts=2, iterations=25, smooth=25)
             if path is None:

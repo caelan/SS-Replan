@@ -20,6 +20,10 @@ from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH,
 #aabb2 = aabb_from_points(mesh2.vertices)
 #print(get_aabb_center(aabb2) - get_aabb_center(aabb1), get_aabb_extent(aabb2) - get_aabb_extent(aabb1))
 
+DISABLED_COLLISIONS = {
+    ('panda_link1', 'chassis_link'),
+}
+
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.client = connect(use_gui=use_gui)
@@ -88,6 +92,8 @@ class World(object):
         self.base_limits_handles = []
         self.update_custom_limits()
         self.initial_attachments = {}
+        self.disabled_collisions = {tuple(link_from_name(self.robot, link) for link in pair)
+                                    for pair in DISABLED_COLLISIONS}
 
         self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
         self.open_gq = Conf(self.robot, self.gripper_joints,
