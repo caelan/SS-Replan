@@ -27,6 +27,10 @@ BASE_VELOCITY = 0.25
 SELF_COLLISIONS = False # TODO: include self-collisions
 MAX_CONF_DISTANCE = 0.75
 
+ARM_RESOLUTION = 0.05
+GRIPPER_RESOLUTION = 0.01
+DOOR_RESOLUTION = 0.025
+
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
 ################################################################################
@@ -250,10 +254,6 @@ def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
         return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
     return gen_fn
 
-ARM_RESOLUTION = 0.05
-GRIPPER_RESOLUTION = 0.01
-DOOR_RESOLUTION = 0.025
-
 def plan_approach(world, approach_pose, attachments=[],
                   obstacles=set(), teleport=False, switches_only=False, **kwargs):
     # TODO: use velocities in the distance function
@@ -294,17 +294,9 @@ def plan_approach(world, approach_pose, attachments=[],
         return None
     return approach_path + grasp_path
 
-def plan_gripper_path(world, grasp_width, teleport=False, **kwargs):
-    open_conf = [get_max_limit(world.robot, joint) for joint in world.gripper_joints]
-    extend_fn = get_extend_fn(world.robot, world.gripper_joints,
-                              resolutions=GRIPPER_RESOLUTION*np.ones(len(world.gripper_joints)))
-    holding_conf = [grasp_width] * len(world.gripper_joints)
-    if teleport:
-        return [open_conf, holding_conf]
-    return [open_conf] + list(extend_fn(open_conf, holding_conf))
-
 def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
+    gripper_motion_fn = get_gripper_motion_gen(world, collisions=collisions, **kwargs)
 
     def gen(name, pose, grasp, base_conf):
         # TODO: check if within database convex hull
@@ -319,7 +311,8 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
 
         surface = get_surface(pose.support)
         surface_link = link_from_name(world.kitchen, surface.link)
-        finger_path = plan_gripper_path(world, grasp.grasp_width, **kwargs)
+
+        finger_cmd, = gripper_motion_fn(world.open_gq, grasp.get_gripper_conf())
         obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support) # | {obj_body}
         if not collisions:
             obstacles = set()
@@ -347,7 +340,7 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
         surface_attachment = create_attachment(world.kitchen, surface_link, obj_body)
         cmd = Sequence(State(savers=[robot_saver, obj_saver], attachments=[surface_attachment]), commands=[
             Trajectory(world, world.robot, world.arm_joints, approach_path),
-            Trajectory(world, world.robot, world.gripper_joints, finger_path),
+            finger_cmd.commands[0],
             Detach(world, world.kitchen, surface_link, obj_body),
             Attach(world, world.robot, world.tool_link, obj_body),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
@@ -466,16 +459,20 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
 
     set_joint_positions(world.kitchen, [door_joint], door_path[0])
     set_joint_positions(world.robot, world.arm_joints, arm_path[0])
+
+
     grasp_width = close_until_collision(world.robot, world.gripper_joints,
                                         bodies=[(world.kitchen, [handle_link])])
-    finger_path = plan_gripper_path(world, grasp_width, teleport=teleport)
+    gripper_motion_fn = get_gripper_motion_gen(world, collisions=collisions, **kwargs)
+    gripper_conf = Conf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
+    finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
     cmd = Sequence(State(savers=[robot_saver]), commands=[
         Trajectory(world, world.robot, world.arm_joints, approach_paths[0]),
-        Trajectory(world, world.robot, world.gripper_joints, finger_path),
+        finger_cmd.commands[0],
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
                        world.kitchen, [door_joint], door_path),
-        Trajectory(world, world.robot, world.gripper_joints, reversed(finger_path)),
+        finger_cmd.commands[0].reverse(),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ])
     #yield (aq, cmd,)

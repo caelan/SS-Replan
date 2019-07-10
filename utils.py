@@ -6,6 +6,7 @@ import yaml
 
 from collections import namedtuple
 
+from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, \
@@ -309,6 +310,9 @@ class Grasp(object):
     def get_attachment(self):
         return Attachment(self.world.robot, self.world.tool_link,
                           self.grasp_pose, self.world.get_body(self.body_name))
+    def get_gripper_conf(self):
+        conf = [self.grasp_width] * len(self.world.gripper_joints)
+        return Conf(self.world.robot, self.world.gripper_joints, conf)
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
