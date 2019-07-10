@@ -14,7 +14,7 @@ from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
     point_from_pose, RED, BLUE, LockRenderer, set_pose, child_link_from_joint
 from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
-    SIDE_GRASP, BASE_JOINTS, joint_from_name
+    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES
 from world import World
 from stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
 
@@ -52,13 +52,13 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     parent_pose = get_surface_reference_pose(world.kitchen, surface_name)
 
     stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
-    grasp_gen_fn = get_grasp_gen(world, grasp_types=[grasp_type])
+    grasp_gen_fn = get_grasp_gen(world)
     ik_ir_gen = get_pick_gen_fn(world, collisions=not args.cfree, teleport=args.teleport,
                                 learned=False, max_attempts=args.attempts,
                                 max_successes=1, max_failures=0)
 
     stable_gen = stable_gen_fn(object_name, surface_name)
-    grasps = list(grasp_gen_fn(object_name))
+    grasps = list(grasp_gen_fn(object_name, grasp_type))
 
     robot_name = get_body_name(world.robot)
     print(SEPARATOR)
@@ -71,26 +71,26 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     failures = 0
     while (len(tool_from_base_list) < args.num_samples) and \
             (elapsed_time(start_time) < args.max_time): #and (failures <= max_failures):
-        (pose,) = next(stable_gen)
-        if pose is None:
+        (rel_pose,) = next(stable_gen)
+        if rel_pose is None:
             break
         (grasp,) = random.choice(grasps)
         with LockRenderer(lock=True):
-            result = next(ik_ir_gen(object_name, pose, grasp), None)
+            result = next(ik_ir_gen(object_name, rel_pose, grasp), None)
         if result is None:
             print('Failure! | {} / {} [{:.3f}]'.format(
                 len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
             failures += 1
             continue
-        bq, aq, at = result
-        pose.assign()
+        bq, at = result
+        rel_pose.assign()
         bq.assign()
-        aq.assign()
+        world.carry_conf.assign()
         base_pose = get_link_pose(world.robot, base_link)
-        tool_pose = multiply(pose.value, invert(grasp.grasp_pose))
+        tool_pose = multiply(rel_pose.get_world_from_body(), invert(grasp.grasp_pose))
         tool_from_base = multiply(invert(tool_pose), base_pose)
         tool_from_base_list.append(tool_from_base)
-        surface_from_object = multiply(invert(parent_pose), pose.value)
+        surface_from_object = multiply(invert(parent_pose), rel_pose.get_world_from_body())
         surface_from_object_list.append(surface_from_object)
         print('Success! | {} / {} [{:.3f}]'.format(
             len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
@@ -149,7 +149,7 @@ def main():
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    surface_names = CABINET_JOINTS
+    surface_names = ALL_SURFACES
     #surface_names = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
     #surface_names = CABINET_JOINTS + SURFACES + DRAWER_JOINTS
 

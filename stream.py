@@ -638,7 +638,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
         return (cmd,)
     return fn
 
-def get_gripper_motion_gen(world, collisions=True, teleport=False):
+def get_gripper_motion_gen(world, teleport=False, **kwargs):
     resolutions = GRIPPER_RESOLUTION * np.ones(len(world.gripper_joints))
 
     def fn(gq1, gq2):
