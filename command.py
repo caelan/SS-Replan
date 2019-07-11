@@ -1,6 +1,6 @@
 from execution import joint_state_control, open_gripper, close_gripper
-from pybullet_tools.utils import set_joint_positions, create_attachment, wait_for_duration, user_input, wait_for_user
-from utils import get_descendant_obstacles
+from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
+    wait_for_duration, user_input, wait_for_user, flatten_links
 from issac import update_robot
 
 import time
@@ -13,7 +13,8 @@ class State(object):
         self.attachments = {attachment.child: attachment for attachment in attachments}
     @property
     def bodies(self):
-        return {saver.body for saver in self.savers} | set(self.attachments)
+        raise NotImplementedError()
+        #return {saver.body for saver in self.savers} | set(self.attachments)
     def derive(self):
         for attachment in self.attachments.values():
             # Derived values
@@ -72,7 +73,8 @@ class Trajectory(Command):
 
     @property
     def bodies(self):
-        return {self.robot}
+        # TODO: decompose into dependents and moving?
+        return flatten_links(self.robot, get_moving_links(self.robot, self.joints))
 
     def reverse(self):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
@@ -109,7 +111,8 @@ class DoorTrajectory(Command):
 
     @property
     def bodies(self):
-        return {self.robot} | get_descendant_obstacles(self.world.kitchen, self.door_joints[0])
+        return flatten_links(self.robot, get_moving_links(self.robot, self.robot_joints)) | \
+               flatten_links(self.world.kitchen, get_moving_links(self.world.kitchen, self.door_joints))
 
     def reverse(self):
         return self.__class__(self.world, self.robot, self.robot_joints, self.robot_path[::-1],
@@ -149,7 +152,8 @@ class Attach(Command):
 
     @property
     def bodies(self):
-        return {self.robot, self.body}
+        return set()
+        #return {self.robot, self.body}
 
     def reverse(self):
         return Detach(self.world, self.robot, self.link, self.body)
@@ -174,7 +178,8 @@ class Detach(Command):
 
     @property
     def bodies(self):
-        return {self.robot, self.body}
+        return set()
+        #return {self.robot, self.body}
 
     def reverse(self):
         return Attach(self.world, self.robot, self.link, self.body)
@@ -198,7 +203,7 @@ class Wait(Command):
 
     @property
     def bodies(self):
-        return {}
+        return set()
 
     def reverse(self):
         return self

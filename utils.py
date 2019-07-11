@@ -10,7 +10,7 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, \
-    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants
+    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links
 
 try:
     import trac_ik_python
@@ -279,6 +279,14 @@ class RelPose(object):
         self.support = support
         self.init = init
         # TODO: method for automatically composing these
+    @property
+    def bodies(self):
+        bodies = set() # (self.body, None)
+        #if self.reference_body is not None:
+        #    bodies.update({self.reference_body, frozenset(get_link_subtree(self.body, self.reference_link))})
+        for conf in self.confs:
+            bodies.update(conf.bodies)
+        return bodies
     def assign(self):
         for conf in self.confs: # Assumed to be totally ordered
             conf.assign()
@@ -354,7 +362,8 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, use_width
             with BodySaver(body):
                 grasp.get_attachment().assign()
                 with BodySaver(world.robot):
-                    grasp.grasp_width = close_until_collision(world.robot, world.gripper_joints, bodies=[body])
+                    grasp.grasp_width = close_until_collision(
+                        world.robot, world.gripper_joints, bodies=[body])
             if use_width and (grasp.grasp_width is None):
                 continue
             yield grasp
@@ -374,5 +383,6 @@ def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
     return custom_limits
 
 def get_descendant_obstacles(body, link=BASE_LINK):
+    # TODO: deprecate?
     return {(body, frozenset([link]))
             for link in get_link_subtree(body, link)}

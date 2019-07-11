@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, get_collision_data, apply_affine, \
     child_link_from_joint, create_attachment, Point, get_data_extents, AABB, get_aabb_vertices, \
-    draw_aabb, wait_for_user, set_configuration, dump_body
+    draw_aabb, wait_for_user, set_configuration, dump_body, flatten_links
 
 from utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
@@ -113,16 +113,16 @@ def get_surface_obstacles(world, surface_name):
             # TODO: remove this mechanic in the future
             world.open_door(joint)
         link = child_link_from_joint(joint)
-        obstacles.update(get_descendant_obstacles(world.kitchen, link))
+        obstacles.update(get_descendant_obstacles(world.kitchen, link)) # subtree?
     # Be careful to call this before each check
     return obstacles
 
 def get_link_obstacles(world, link_name):
     if link_name in world.movable:
-        return {world.get_body(link_name)}
+        return flatten_links(world.get_body(link_name))
     elif has_link(world.kitchen, link_name):
         link = link_from_name(world.kitchen, link_name)
-        return get_descendant_obstacles(world.kitchen, link)
+        return flatten_links(world.kitchen, get_link_subtree(world.kitchen, link)) # subtree?
     assert link_name in SURFACE_FROM_NAME
     return set()
 
@@ -706,11 +706,14 @@ def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
 
 def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
     def test(o1, p1, g1, o2, p2):
+        # o1 will always be a movable object
         if not collisions or (o1 == o2):
             return True
         body = world.get_body(o1)
         p2.assign()
         obstacles = get_link_obstacles(world, o2) # - {body}
+        if not obstacles:
+            return True
         for _ in iterate_approach_path(world, p1, g1, body=body):
             if any(pairwise_collision(part, obst) for part in
                    [world.gripper, body] for obst in obstacles):
@@ -720,32 +723,25 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
 
 ################################################################################
 
-# TODO: check reachability of approach
-
-def check_collision_free(world, state, sequence, obstacles):
-    if not obstacles:
-        return True
-    # TODO: check door collisions
-    state.assign()
-    for command in sequence.commands:
-        for _ in command.iterate(world, state):
-            state.derive()
-            for attachment in state.attachments.values():
-                if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
-                    return False
-            if any(pairwise_collision(world.robot, obst) for obst in obstacles):
-                return False
-    # TODO: just check collisions with moving links
-    return True
-
 def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
     def test(at, o, p):
         if not collisions:
             return True
-        # TODO: do per individual trajectory
-        # TODO: don't check collisions if p is supported by something on at
+        # TODO: check door collisions
+        # TODO: still need to check static links at least once
         p.assign()
-        obstacles = get_link_obstacles(world, o) - at.bodies
         state = copy.copy(at.context)
-        return check_collision_free(world, state, at, obstacles)
+        state.assign()
+        for command in at.commands:
+            obstacles = get_link_obstacles(world, o) - command.bodies - p.bodies # Doesn't include o at p
+            for _ in command.iterate(world, state):
+                state.derive()
+                for attachment in state.attachments.values():
+                    if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
+                        return False
+                # TODO: just check collisions with moving links
+                if any(pairwise_collision(world.robot, obst) for obst in obstacles):
+                    wait_for_user()
+                    return False
+        return True
     return test
