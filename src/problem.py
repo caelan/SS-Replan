@@ -76,10 +76,14 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
         ('GConf', world.open_gq),
         ('GConf', world.closed_gq),
 
+        ('Calibrated',),
+
         ('CanMoveBase',),  # TODO: could always remove this
         ('CanMoveArm',),
         ('CanMoveGripper',),
 
+        Equal(('MoveArmCost',), 1),
+        Equal(('MoveGripperCost',), 1),
         Equal(('CalibrateCost',), 1),
         Equal(('PickCost',), 1),
         Equal(('PlaceCost',), 1),

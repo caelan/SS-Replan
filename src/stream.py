@@ -318,8 +318,7 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
             Attach(world, world.robot, world.tool_link, obj_body),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ], name='pick')
-        #yield (aq, cmd,)
-        yield (cmd,)
+        yield (aq, cmd,)
     return gen
 
 def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
@@ -449,8 +448,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         finger_cmd.commands[0].reverse(),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ], name='pull')
-    #yield (aq, cmd,)
-    yield (cmd,)
+    yield (aq, cmd,)
 
 ################################################################################
 

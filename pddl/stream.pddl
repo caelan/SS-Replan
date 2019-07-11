@@ -22,32 +22,34 @@
   (:stream plan-pick
     :inputs (?o ?p ?g)
     :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (MovableBase))
-    :outputs (?bq ?at)
-    :certified (and (BConf ?bq) (ATraj ?at) (AConf ?bq @rest_aq) ; (AConf ?aq)
-                    (Pick ?o ?p ?g ?bq ?at))
+    :outputs (?bq ?aq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at)
+                    (AConf ?bq @rest_aq) (AConf ?bq ?aq)
+                    (Pick ?o ?p ?g ?bq ?aq ?at))
   )
   (:stream plan-pull
     :inputs (?j ?a1 ?a2)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase))
-    :outputs (?bq ?at)
-    :certified (and (BConf ?bq) (ATraj ?at) (AConf ?bq @rest_aq) ; (AConf ?aq)
-                    (Pull ?j ?a1 ?a2 ?bq ?at))
+    :outputs (?bq ?aq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at)
+                    (AConf ?bq @rest_aq) (AConf ?bq ?aq)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
   )
 
   ; Fixed base
   (:stream fixed-plan-pick ; TODO: check if ?p ?g in convex hull
     :inputs (?o ?p ?g ?bq)
     :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (InitBConf ?bq))
-    :outputs (?at)
-    :certified (and (ATraj ?at) ; (AConf ?aq)
-                    (Pick ?o ?p ?g ?bq ?at))
+    :outputs (?aq ?at)
+    :certified (and (ATraj ?at) (AConf ?bq ?aq)
+                    (Pick ?o ?p ?g ?bq ?aq ?at))
   )
   (:stream fixed-plan-pull ; TODO: check if ?j within range
     :inputs (?j ?a1 ?a2 ?bq)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
-    :outputs (?at)
-    :certified (and (ATraj ?at) ; (AConf ?aq)
-                    (Pull ?j ?a1 ?a2 ?bq ?at))
+    :outputs (?aq ?at)
+    :certified (and (ATraj ?at) (AConf ?bq ?aq)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
   )
 
   (:stream plan-base-motion
@@ -72,13 +74,13 @@
     :outputs (?gt)
     :certified (GripperMotion ?gq1 ?gq2 ?gt)
   )
-  (:stream plan-calibrate-motion
-    :inputs (?bq)
-    :domain (BConf ?bq)
-    :outputs (?at)
-    :certified (and (ATraj ?at) ; (AConf ?aq)
-                    (CalibrateMotion ?bq ?at))
-  )
+  ;(:stream plan-calibrate-motion
+  ;  :inputs (?bq)
+  ;  :domain (BConf ?bq)
+  ;  :outputs (?at)
+  ;  :certified (and (ATraj ?at) ; (AConf ?aq)
+  ;                  (CalibrateMotion ?bq ?at))
+  ;)
 
   (:stream compute-pose-kin
     :inputs (?o1 ?rp ?o2 ?p2)
