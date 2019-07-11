@@ -36,8 +36,8 @@ def existential_quantification(goal_literals):
 def pdddlstream_from_problem(world, close_doors=False, return_home=False,
                              movable_base=True, fixed_base=False,
                              init_carry=False, noisy_base=False, debug=False, **kwargs):
-    domain_pddl = read(get_file_path(__file__, 'domain.pddl'))
-    stream_pddl = read(get_file_path(__file__, 'stream.pddl'))
+    domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
+    stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
 
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)

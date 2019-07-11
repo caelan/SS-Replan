@@ -15,11 +15,11 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     child_link_from_joint, create_attachment, Point, get_data_extents, AABB, get_aabb_vertices, \
     draw_aabb, wait_for_user, set_configuration, dump_body, flatten_links
 
-from utils import get_grasps, iterate_approach_path, \
+from src.utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, SURFACE_TOP, \
     SURFACE_BOTTOM, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT
-from command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
-from database import load_placements, get_surface_reference_pose, load_place_base_poses, \
+from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
+from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses
 
 
@@ -741,7 +741,6 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
                         return False
                 # TODO: just check collisions with moving links
                 if any(pairwise_collision(world.robot, obst) for obst in obstacles):
-                    wait_for_user()
                     return False
         return True
     return test

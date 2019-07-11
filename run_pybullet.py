@@ -15,14 +15,14 @@ from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoS
     get_pose, RED, apply_alpha, set_pose, multiply, step_simulation, set_all_static, \
     Euler, Pose, Point, stable_z, link_from_name, point_from_pose
 
-from observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
-from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
+from src.observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
+from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
     DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTERS, DRAWERS, CABINETS
-from world import World
-from problem import pdddlstream_from_problem
-from command import State, Wait, execute_plan
-from stream import get_stable_gen
-from debug import dump_link_cross_sections, test_rays
+from src.world import World
+from src.problem import pdddlstream_from_problem
+from src.command import State, Wait, execute_plan
+from src.stream import get_stable_gen
+#from src.debug import dump_link_cross_sections, test_rays
 
 #from examples.pybullet.pr2.run import post_process
 from pddlstream.algorithms.incremental import solve_incremental
