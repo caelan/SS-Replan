@@ -107,10 +107,10 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
                      [('Cooked', name) for name in task.goal_cooked]
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
-    if task.goal_init_conf:
-        goal_bq = init_bq
-        init.append(('BConf', goal_bq))
-        goal_literals.append(('AtBConf', goal_bq))
+    if task.return_init_bq:
+        goal_literals.append(('AtBConf', init_bq))
+    if task.return_init_aq:
+        goal_literals.append(('AtAConf', init_aq))
 
     surface_poses = {}
     for joint in world.kitchen_joints:

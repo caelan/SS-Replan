@@ -11,14 +11,16 @@ from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, get_y
 class Task(object):
     def __init__(self, world,  skeletons=[],
                  movable_base=True, fixed_base=False, noisy_base=False,
-                 goal_init_conf=False, goal_hand_empty=False, goal_holding=[],
+                 return_init_bq=True, return_init_aq=True,
+                 goal_hand_empty=False, goal_holding=[],
                  goal_on={}, goal_closed=[], goal_cooked=[]):
         self.world = world
         self.skeletons = list(skeletons)
         self.movable_base = movable_base
         self.fixed_base = fixed_base
         self.noisy_base = noisy_base
-        self.goal_init_conf = goal_init_conf
+        self.return_init_bq = return_init_bq
+        self.return_init_aq = return_init_aq
         self.goal_hand_empty = goal_hand_empty
         self.goal_holding = set(goal_holding)
         self.goal_on = dict(goal_on)
@@ -89,7 +91,7 @@ def stow_block(world):
     pose.assign()
     #wait_for_user()
 
-    return Task(world, goal_init_conf=True, goal_hand_empty=True,
+    return Task(world, goal_hand_empty=True,
                 goal_on={entity_name: 'indigo_drawer_top'},
                 goal_closed=ALL_JOINTS)
 
