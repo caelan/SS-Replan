@@ -30,24 +30,25 @@ class Task(object):
 
 ################################################################################
 
-def add_block(world):
-    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+def add_block(world, x=0.1, y=1.15, yaw=0, idx=0):
+    # TODO: automatically produce a unique name
+    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], idx)
     entity_path = get_block_path(entity_name)
     #entity_name = 'potted_meat_can'
     #entity_path = get_ycb_obj_path(entity_name)
     world.add_body(entity_name, entity_path)
     entity_body = world.get_body(entity_name)
     z = stable_z(entity_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(entity_body, Pose(Point(0.1, 1.15, z), Euler()))
+    set_pose(entity_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
     return entity_name
 
-def add_box(world):
-    obstruction_name = 'cracker_box'
+def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
+    obstruction_name = 'cracker_box{}'.format(idx)
     obstruction_path = get_ycb_obj_path(obstruction_name)
     world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
     obstruction_body = world.get_body(obstruction_name)
     z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
+    set_pose(obstruction_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
     return obstruction_name
 
 def add_kinect(world):
@@ -70,7 +71,8 @@ def stow_block(world):
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
     # wait_for_user()
 
-    entity_name = add_block(world)
+    entity_name = add_block(world, idx=0)
+    entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
     # obstruction_name = add_box(world)
     # test_grasps(world, entity_name)
     set_all_static()
