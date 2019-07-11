@@ -10,18 +10,12 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.pr2_utils import get_viewcone
-from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver, \
-    get_pose, RED, apply_alpha, set_pose, multiply, step_simulation, set_all_static, \
-    Euler, Pose, Point, stable_z, link_from_name, point_from_pose
+from pybullet_tools.utils import wait_for_user, LockRenderer, WorldSaver, VideoSaver
 
-from src.observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, DEPTH, test_observation
-from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, \
-    DRAWER_JOINTS, joint_from_name, get_ycb_obj_path, COUNTERS, DRAWERS, CABINETS
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.command import State, Wait, execute_plan
-from src.stream import get_stable_gen
+from src.task import stow_block
 #from src.debug import dump_link_cross_sections, test_rays
 
 #from examples.pybullet.pr2.run import post_process
@@ -30,7 +24,7 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.constants import print_solution
 from pddlstream.utils import INF
 from pddlstream.language.stream import StreamInfo
-from pddlstream.algorithms.constraints import PlanConstraints, WILD
+from pddlstream.algorithms.constraints import PlanConstraints
 
 VIDEO_FILENAME = 'video.mp4'
 
@@ -169,28 +163,6 @@ def simulate_plan(world, commands, args):
 
 ################################################################################
 
-def add_block(world):
-    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    entity_path = get_block_path(entity_name)
-    #entity_name = 'potted_meat_can'
-    #entity_path = get_ycb_obj_path(entity_name)
-    world.add_body(entity_name, entity_path)
-    entity_body = world.get_body(entity_name)
-    z = stable_z(entity_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(entity_body, Pose(Point(0.1, 1.15, z), Euler()))
-    return entity_name
-
-def add_box(world):
-    obstruction_name = 'cracker_box'
-    obstruction_path = get_ycb_obj_path(obstruction_name)
-    world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
-    obstruction_body = world.get_body(obstruction_name)
-    z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(obstruction_body, Pose(Point(0.2, 1.2, z), Euler(yaw=np.pi/4)))
-    return obstruction_name
-
-################################################################################
-
 def main():
     # TODO: handle relative poses for drawers
     parser = create_parser()
@@ -198,45 +170,14 @@ def main():
     #if args.seed is not None:
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
-
     world = World(use_gui=True)
-    #for joint in world.kitchen_joints:
-    #for name in LEFT_VISIBLE:
-    for name in DRAWER_JOINTS[1:2]:
-        joint = joint_from_name(world.kitchen, name)
-        #world.open_door(joint)
-        #world.close_door(joint)
-    #dump_link_cross_sections(world, link_name='indigo_drawer_top')
-    #wait_for_user()
-
-    entity_name = add_block(world)
-    #obstruction_name = add_box(world)
-    #test_grasps(world, entity_name)
-    set_all_static()
-
-    # TODO: could intersect convex with half plane
-    world_from_zed_left = multiply(get_pose(world.kitchen), KITCHEN_FROM_ZED_LEFT)
-    cone_body = get_viewcone(depth=DEPTH, camera_matrix=CAMERA_MATRIX, color=apply_alpha(RED, 0.1))
-    set_pose(cone_body, world_from_zed_left)
-    step_simulation()
 
     #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
     #test_observation(world, entity_name, world_from_zed_left)
     #return
 
-    #surface_name = random.choice(DRAWERS)
-    surface_name = COUNTERS[0] # COUNTERS | DRAWERS | SURFACES | CABINETS
-    #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
-    print('Initial surface:', surface_name)
-    with WorldSaver():
-        placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
-        pose, = next(placement_gen(entity_name, surface_name), (None,))
-    assert pose is not None
-    pose.assign()
-    #wait_for_user()
-
-    problem = pdddlstream_from_problem(
-        world, close_doors=True, return_home=True,
+    task = stow_block(world)
+    problem = pdddlstream_from_problem(task,
         collisions=not args.cfree, teleport=args.teleport)
     commands = solve_pddlstream(world, problem, args)
     simulate_plan(world, commands, args)

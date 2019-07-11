@@ -105,9 +105,9 @@ def get_supporting(world, obj_name):
     [surface_name] = supporting
     return surface_name
 
-def pdddlstream_from_problem(world, close_doors=False, return_home=False,
-                             movable_base=True, fixed_base=False,
-                             init_carry=False, noisy_base=False, debug=False, **kwargs):
+def pdddlstream_from_problem(task, debug=False, **kwargs):
+    print(task)
+    world = task.world
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
     stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
 
@@ -118,8 +118,6 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
     init_gq = Conf(world.robot, world.gripper_joints)
-    if init_carry:
-        world.carry_conf = init_aq
 
     constant_map = {
         '@world': 'world',
@@ -155,32 +153,29 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         Equal(('PlaceCost',), 1),
         Equal(('PullCost',), 1),
         Equal(('CookCost',), 1),
-    ] + [('Type', obj_name, 'stove') for obj_name in STOVES] + \
-           [('Status', status) for status in DOOR_STATUSES] + \
-           [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
-    if movable_base:
+    ]
+    init += [('Type', obj_name, 'stove') for obj_name in STOVES] + \
+            [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
+            [('Status', status) for status in DOOR_STATUSES] + \
+            [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
+    if task.movable_base:
         init.append(('MovableBase',))
-    if fixed_base:
+    if task.fixed_base:
         init.append(('InitBConf', init_bq))
-    if noisy_base:
+    if task.noisy_base:
         init.append(('NoisyBase',))
 
     compute_pose_kin = get_compute_pose_kin(world)
     compute_angle_kin = get_compute_angle_kin(world)
 
-    goal_block = list(world.movable)[0]
-    #goal_surface = CABINETS[0]
-    goal_surface = DRAWERS[1]
-    #goal_surface = COUNTERS[0]
-    goal_on = {
-        goal_block: goal_surface,
-    }
-
-    goal_literals = [
-        #('Holding', goal_block),
-        #('Cooked', goal_block),
-    ]
-    if return_home:
+    goal_literals = []
+    goal_literals += [('Holding', name) for name in task.goal_holding] + \
+                     [('On', name, surface) for name, surface in task.goal_on.items()] + \
+                     [('DoorStatus', joint_name, CLOSED) for joint_name in task.goal_closed] + \
+                     [('Cooked', name) for name in task.goal_cooked]
+    if task.goal_hand_empty:
+        goal_literals.append(('HandEmpty',))
+    if task.goal_init_conf:
         goal_bq = init_bq
         init.append(('BConf', goal_bq))
         goal_literals.append(('AtBConf', goal_bq))
@@ -207,8 +202,6 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
                     ('AtAngle', joint_name, conf),
                     ('AtWorldPose', link_name, pose),
                 ])
-        if close_doors:
-            goal_literals.append(('DoorStatus', joint_name, CLOSED))
 
     for surface_name in ALL_SURFACES:
         surface = get_surface(surface_name)
@@ -264,23 +257,11 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
             ('AtWorldPose', obj_name, world_pose),
         ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
+
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
-
-    #if problem.goal_conf is not None:
-    #    goal_conf = Conf(robot, get_group_joints(robot, 'base'), problem.goal_conf)
-    #    init += [('BConf', goal_conf)]
-    #    goal_literals += [('AtBConf', goal_conf)]
-
     #bodies_from_type = get_bodies_from_type(problem)
-    for ty, s in goal_on.items():
-        #bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
-        #init += [('Stackable', b, s) for b in bodies]
-        init += [('Stackable', ty, s)]
-        goal_literals += [('On', ty, s)]
-    #goal_literals += [('Holding', a, b) for a, b in problem.goal_holding] + \
-    #                 [('Cleaned', b) for b in problem.goal_cleaned] + \
-    #                 [('Cooked', b) for b in problem.goal_cooked]
+    #bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
 
     goal_formula = existential_quantification(goal_literals)
 
