@@ -23,6 +23,7 @@ from src.world import World
 from run_pybullet import solve_pddlstream, create_parser, simulate_plan
 from src.problem import pdddlstream_from_problem
 from src.execution import open_gripper, control_base
+from src.task import Task
 
 from pddlstream.language.constants import Not, And
 
@@ -37,15 +38,14 @@ TASKS = [
 
 ################################################################################
 
-def constraints_from_plan(plan):
-    # TODO: use the task plan to constrain solution
-    raise NotImplementedError()
-
-def goal_formula_from_goal(world, goals):
+def goal_formula_from_goal(world, goals, plan):
     #regex = re.compile(r"(\w+)\((\)\n")
     # TODO: return initial literals as well
+    task = Task(world, movable_base=False, fixed_base=True)
     init = []
     goal_literals = []
+    # TODO: use the task plan to constrain solution
+    # TODO: include these within task instead
     for head, value in goals:
         predicate, arguments = head.strip(')').split('(')
         args = [arg.strip() for arg in arguments.split(',')]
@@ -75,7 +75,7 @@ def goal_formula_from_goal(world, goals):
         else:
             raise NotImplementedError(predicate)
         goal_literals.append(atom if value else Not(atom))
-    return init, And(*goal_literals)
+    return task, init, And(*goal_literals)
 
 ################################################################################
 
@@ -136,7 +136,7 @@ def main():
 
     # Need to reset at the start
     if task != NONE:
-        objects, goal, _ = trial_manager.get_task(task=task, reset=True)
+        objects, goal, plan = trial_manager.get_task(task=task, reset=True)
 
     # TODO: why can't I use this earlier?
     robot_entity = domain.get_robot()
@@ -149,7 +149,7 @@ def main():
     if task != NONE:
         goals = [(h.format(o), v) for h, v in goal for o in objects]
         print('Goals:', goals)
-        additional_init, goal_formula = goal_formula_from_goal(world, goals)
+        task, additional_init, goal_formula = goal_formula_from_goal(world, goals, plan)
     # TODO: fixed_base_suppressors
     #trial_manager.disable() # Disables collisions
 
@@ -172,10 +172,9 @@ def main():
     #draw_pose(multiply(get_link_pose(world.kitchen, drawer_link), (cage_handle_from_drawer)))
 
     # TODO: initial robot base conf is in collision
-    problem = pdddlstream_from_problem(world, movable_base=False, fixed_base=True,
-                                       collisions=not args.cfree, teleport=args.teleport)
+    problem = pdddlstream_from_problem(task, collisions=not args.cfree, teleport=args.teleport)
     problem[-2].extend(additional_init)
-    problem = problem[:-1] + (goal_formula,)
+    problem = problem[:-1] + (And(problem[-1], goal_formula),)
     saver = WorldSaver()
     commands = solve_pddlstream(world, problem, args)
     if args.watch or args.record:

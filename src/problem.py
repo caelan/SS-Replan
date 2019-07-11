@@ -9,7 +9,7 @@ from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attac
     child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed, link_from_name, \
     get_link_pose, wait_for_user, get_min_limits, get_max_limits, spaced_colors, draw_point, \
     Point, LockRenderer, add_segments, convex_hull, add_text, convex_centroid, get_pose, \
-    multiply, point_from_pose, RED
+    multiply, point_from_pose, RED, get_point
 
 import numpy as np
 
@@ -37,19 +37,20 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
-def visualize_base_confs(name, base_confs, floor_z=0.005, **kwargs):
+def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
     print(name, len(base_confs))
     handles = []
     if not base_confs:
         return handles
+    z = get_point(world.floor)[2] + floor_z
     base_points = [base_conf[:2] for base_conf in base_confs]
     # for x, y in base_points:
     #    handles.extend(draw_point(Point(x, y, z), color=color))
     hull = convex_hull(base_points)
-    vertices = [Point(x, y, floor_z) for x, y, in hull.vertices]
+    vertices = [Point(x, y, z) for x, y, in hull.vertices]
     handles.extend(add_segments(vertices, closed=True, **kwargs))
     cx, cy = convex_centroid(hull.vertices)
-    centroid = [cx, cy, floor_z]
+    centroid = [cx, cy, z]
     # draw_point(centroid, color=color)
     handles.append(add_text(name, position=centroid, **kwargs))
     return handles
@@ -58,11 +59,11 @@ def visualize_base_confs(name, base_confs, floor_z=0.005, **kwargs):
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 
-def add_markers(world, ):
+def add_markers(world):
     handles = []
     for joint_name, color in zip(ALL_JOINTS, spaced_colors(len(ALL_JOINTS))):
         base_confs = list(load_pull_base_poses(world, joint_name))
-        handles.extend(visualize_base_confs(joint_name, base_confs, color=color))
+        handles.extend(visualize_base_confs(world, joint_name, base_confs, color=color))
 
     for surface_name in ALL_SURFACES:
         surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
@@ -91,7 +92,7 @@ def add_markers(world, ):
             for grasp in get_grasps(world, name, grasp_types=[grasp_type]):
                 tool_pose = multiply(pose, invert(grasp.grasp_pose))
                 base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
-            handles.extend(visualize_base_confs(grasp_type, base_confs, color=color))
+            handles.extend(visualize_base_confs(world, grasp_type, base_confs, color=color))
     return handles
 
 def get_supporting(world, obj_name):

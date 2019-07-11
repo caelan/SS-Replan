@@ -120,6 +120,7 @@ def control_base(goal_values, moveit, observer, timeout=INF):
     linear_threshold = 0.04
     angular_threshold = np.pi / 64
 
+    # TODO: open-loop odometry (use wheel encoders)
     # TODO: ensure that we are rotating about the correct axis (i.e. base_joints aligned with axis)
 
     # linear/angular

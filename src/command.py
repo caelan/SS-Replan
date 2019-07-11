@@ -89,7 +89,7 @@ class Trajectory(Command):
         # TODO: ensure the same joint names
         # TODO: allow partial gripper closures
         status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
-        time.sleep(1.0)
+        #time.sleep(1.0)
         return status
 
     def __repr__(self):
@@ -130,7 +130,7 @@ class DoorTrajectory(Command):
         #path = [list(conf) + list(moveit.gripper.closed_positions) for conf in self.robot_path]
         #status = joint_state_control(self.robot, joints, path, domain, moveit, observer)
         status = joint_state_control(self.robot, self.robot_joints, self.robot_path, domain, moveit, observer)
-        time.sleep(1.0)
+        #time.sleep(1.0)
         open_gripper(self.robot, moveit)
         return status
 

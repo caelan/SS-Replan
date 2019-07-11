@@ -175,6 +175,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
 
 
 def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport=False,
+    # TODO: produce carry arm confs here
     def gen(name, grasp_type):
         for grasp in get_grasps(world, name, grasp_types=[grasp_type], **kwargs):
             yield (grasp,)
