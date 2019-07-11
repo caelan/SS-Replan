@@ -9,39 +9,14 @@ import time
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_date, load_placements, get_surface_reference_pose, SEPARATOR
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
-    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, draw_point, \
-    point_from_pose, RED, BLUE, LockRenderer, set_pose, child_link_from_joint
-from utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, CABINET_JOINTS, DRAWER_JOINTS, TOP_GRASP, \
+    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, RED, BLUE, LockRenderer, child_link_from_joint
+from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES
-from world import World
-from stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
+from src.world import World
+from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
+from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_date, get_surface_reference_pose, SEPARATOR
 
-def visualize_database(tool_from_base_list):
-    #tool_from_base_list
-    handles = []
-    if not has_gui():
-        return handles
-    for gripper_from_base in tool_from_base_list:
-        # TODO: move away from the environment
-        handles.extend(draw_point(point_from_pose(gripper_from_base), color=RED))
-    wait_for_user()
-    return handles
-
-
-def draw_picks(world, object_name, surface_name, grasp_type, **kwargs):
-    surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
-    handles = []
-    for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
-        object_pose = multiply(surface_pose, surface_from_object)
-        handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
-        set_pose(world.get_body(object_name), object_pose)
-        #wait_for_user()
-    wait_for_user()
-    return handles
-
-################################################################################
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()

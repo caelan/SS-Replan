@@ -11,11 +11,10 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, get_joint_name, joint_from_name, child_link_from_joint
-from utils import BASE_JOINTS
-from world import World
-from stream import get_pull_gen_fn
-
-from database import DATABASE_DIRECTORY, get_date, get_joint_reference_pose, PULL_IR_FILENAME
+from src.utils import BASE_JOINTS
+from src.world import World
+from src.stream import get_pull_gen_fn
+from src.database import DATABASE_DIRECTORY, get_date, get_joint_reference_pose, PULL_IR_FILENAME
 
 
 def collect_pull(world, joint_name, args):

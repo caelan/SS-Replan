@@ -5,7 +5,7 @@ from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, 
     BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision, get_link_descendants, \
     set_color, get_collision_data, read_obj, spaced_colors, get_link_pose, aabb_from_points, get_data_pose, tform_mesh, \
     multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree
-from utils import get_grasps
+from src.utils import get_grasps
 
 
 # Top row: from left right

@@ -7,17 +7,17 @@ from pddlstream.utils import read, get_file_path
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment, \
     child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed, link_from_name, \
-    get_link_pose, wait_for_user, get_min_limits, get_max_limits
-from utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
-    get_surface, COUNTERS, RelPose
-from stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
+    get_link_pose, wait_for_user, get_min_limits, get_max_limits, spaced_colors, draw_point, \
+    Point, LockRenderer, add_segments, convex_hull, add_text, convex_centroid, get_pose
+
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
+    get_surface, COUNTERS, RelPose, ALL_JOINTS
+from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, \
     get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen
-from database import has_place_database
-
-import numpy as np
+from src.database import has_place_database, load_pull_base_poses, draw_picks
 
 def existential_quantification(goal_literals):
     # TODO: merge with pddlstream-experiments
@@ -33,11 +33,44 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
+# https://github.mit.edu/caelan/stripstream/blob/master/scripts/openrave/run_belief_online.py
+# https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
+# https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
+
+def add_markers(world, z=0.005):
+    handles = []
+    for joint, color in zip(world.kitchen_joints, spaced_colors(len(world.kitchen_joints))): # ALL_JOINTS
+        joint_name = get_joint_name(world.kitchen, joint)
+        base_confs = list(load_pull_base_poses(world, joint_name))
+        print(joint_name, len(base_confs), color)
+        base_points = [base_conf[:2] for base_conf in base_confs]
+        #for x, y in base_points:
+        #    handles.extend(draw_point(Point(x, y, z), color=color))
+        hull = convex_hull(base_points)
+        vertices = [Point(x, y, z) for x, y, in hull.vertices]
+        handles.extend(add_segments(vertices, color=color, closed=True))
+        cx, cy = convex_centroid(hull.vertices)
+        centroid = [cx, cy, z]
+        #draw_point(centroid, color=color)
+        handles.append(add_text(joint_name, position=centroid, color=color))
+
+    for surface in ALL_SURFACES:
+        for grasp_type in GRASP_TYPES:
+           handles.extend(draw_picks(world, surface, grasp_type))
+
+    #for name in world.movable:
+    #    body = world.get_body(name)
+    #    pose = get_pose(body)
+
 def pdddlstream_from_problem(world, close_doors=False, return_home=False,
                              movable_base=True, fixed_base=False,
                              init_carry=False, noisy_base=False, debug=False, **kwargs):
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
     stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
+
+    with LockRenderer():
+        add_markers(world)
+    #wait_for_user()
 
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
@@ -105,7 +138,6 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
         #('Cooked', goal_block),
     ]
     if return_home:
-        #goal_bq = Conf(world.robot, world.base_joints,  np.array(init_bq.values) + np.array([0, -1, 0]))
         goal_bq = init_bq
         init.append(('BConf', goal_bq))
         goal_literals.append(('AtBConf', goal_bq))

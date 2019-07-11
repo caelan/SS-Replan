@@ -119,7 +119,7 @@ ALL_SURFACES = OPEN_SURFACES + CABINETS + DRAWERS
 CABINET_JOINTS = [
     'baker_joint',
     'chewie_door_left_joint', 'chewie_door_right_joint',
-    'dagger_door_left_joint', 'dagger_door_right_joint',
+    'dagger_door_left_joint', #'dagger_door_right_joint',
     #'indigo_door_left_joint', 'indigo_door_right_joint',
 ] # door
 

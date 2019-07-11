@@ -1,12 +1,12 @@
 import datetime
 import os
 import random
-
 import numpy as np
 
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
-    euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint
-from utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name
+    euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint, has_gui, \
+    point_from_pose, RED
+from src.utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
@@ -108,3 +108,29 @@ def load_pull_base_poses(world, joint_name):
         #handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))
         yield base_values
     #wait_for_user()
+
+################################################################################
+
+def visualize_database(tool_from_base_list):
+    #tool_from_base_list
+    handles = []
+    if not has_gui():
+        return handles
+    for gripper_from_base in tool_from_base_list:
+        # TODO: move away from the environment
+        handles.extend(draw_point(point_from_pose(gripper_from_base), color=RED))
+    wait_for_user()
+    return handles
+
+
+def draw_picks(world, surface_name, grasp_type, **kwargs): # object_name=None,
+    surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
+    handles = []
+    for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
+        object_pose = multiply(surface_pose, surface_from_object)
+        handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
+        #if object_name is not None:
+        #set_pose(world.get_body(object_name), object_pose)
+        #wait_for_user()
+    #wait_for_user()
+    return handles

@@ -7,8 +7,9 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_point, get_aabb_extent, remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, wait_for_user, get_all_links, get_center_extent, get_pose, \
-    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent, dump_body, get_min_limits, get_max_limits
-from utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
+    read_obj, aabb_from_points, get_aabb_center, get_aabb_extent, dump_body, get_min_limits, \
+    get_max_limits, add_body_name
+from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
 
@@ -239,6 +240,7 @@ class World(object):
         self.path_from_name[name] = path
         self.body_from_name[name] = load_pybullet(path, **kwargs)
         assert self.body_from_name[name] is not None
+        add_body_name(self.body_from_name[name], name)
         return name
     def get_body(self, name):
         return self.body_from_name[name]

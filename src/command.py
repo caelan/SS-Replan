@@ -1,7 +1,7 @@
-from execution import joint_state_control, open_gripper, close_gripper
+from src.execution import joint_state_control, open_gripper, close_gripper
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links
-from issac import update_robot
+from src.issac import update_robot
 
 import time
 

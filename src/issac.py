@@ -7,7 +7,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     child_link_from_joint, multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
     BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body
-from utils import get_ycb_obj_path
+from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_'
 ISSAC_REFERENCE_FRAME = 'base_link' # Robot base
