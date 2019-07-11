@@ -15,7 +15,7 @@
     (Grasp ?o ?g)
     (Pick ?o ?p ?g ?bq ?aq ?at)
     (Pull ?j ?q1 ?q2 ?bq ?aq ?at)
-    (BaseMotion ?bq1 ?bq2 ?bt)
+    (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?at)
@@ -73,9 +73,9 @@
   )
 
   (:action move_base
-    :parameters (?bq1 ?bq2 ?bt) ; TODO: could condition base movements on arm configuration
-    :precondition (and (BaseMotion ?bq1 ?bq2 ?bt)
-                       (AtBConf ?bq1) (AtAConf @rest_aq)
+    :parameters (?bq1 ?bq2 ?aq ?bt)
+    :precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
+                       (AtBConf ?bq1) (AtAConf ?aq)
                        (CanMoveBase)
                        (Calibrated))
     :effect (and (AtBConf ?bq2)

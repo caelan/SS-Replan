@@ -458,6 +458,8 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
         obstacles = set()
 
     def gen(joint_name, door_conf1, door_conf2, base_conf):
+        if door_conf1 == door_conf2:
+            return
         # TODO: check if within database convex hull
         door_joint = joint_from_name(world.kitchen, joint_name)
         door_outputs = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
@@ -480,6 +482,8 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
         obstacles = set()
 
     def gen(joint_name, door_conf1, door_conf2):
+        if door_conf1 == door_conf2:
+            return
         door_joint = joint_from_name(world.kitchen, joint_name)
         result = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
         if result is None:
@@ -535,12 +539,13 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
     # TODO: ensure only forward drive?
 
-    def fn(bq1, bq2, fluents=[]):
+    def fn(bq1, bq2, aq, fluents=[]):
+        if bq1 == bq2:
+            return None
         bq1.assign()
-        world.carry_conf.assign()
+        aq.assign()
         obstacles = set(world.static_obstacles)
         attachments = parse_fluents(world, fluents, obstacles)
-        # TODO: could condition on arm conf
         if not collisions:
             obstacles = set()
         initial_saver = BodySaver(world.robot)
@@ -579,6 +584,8 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
 
     def fn(bq, aq1, aq2, fluents=[]):
+        if aq1 == aq2:
+            return None
         bq.assign()
         aq1.assign()
         obstacles = set(world.static_obstacles)
@@ -608,6 +615,8 @@ def get_gripper_motion_gen(world, teleport=False, **kwargs):
     resolutions = GRIPPER_RESOLUTION * np.ones(len(world.gripper_joints))
 
     def fn(gq1, gq2):
+        if gq1 == gq2:
+            return None
         if teleport:
             path = [gq1.values, gq2.values]
         else:

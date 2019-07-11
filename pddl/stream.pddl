@@ -53,15 +53,15 @@
   )
 
   (:stream plan-base-motion
-    :fluents (AtAConf AtWorldPose AtGrasp) ; AtGConf, AtAngle
-    :inputs (?bq1 ?bq2)
-    :domain (and (BConf ?bq1) (BConf ?bq2) (MovableBase))
+    :fluents (AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
+    :inputs (?bq1 ?bq2 ?aq)
+    :domain (and (AConf ?bq1 ?aq) (AConf ?bq2 ?aq) (MovableBase))
     :outputs (?bt)
     :certified (and ; (BTraj ?bt)
-                    (BaseMotion ?bq1 ?bq2 ?bt))
+                    (BaseMotion ?bq1 ?bq2 ?aq ?bt))
   )
   (:stream plan-arm-motion
-    :fluents (AtWorldPose AtGrasp) ; AtBConf | AtAngle
+    :fluents (AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
     :inputs (?bq ?aq1 ?aq2)
     :domain (and (AConf ?bq ?aq1) (AConf ?bq ?aq2))
     :outputs (?at)
