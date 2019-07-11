@@ -66,13 +66,13 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
     init = [
         ('BConf', init_bq),
         ('AtBConf', init_bq),
-        ('AConf', init_aq),
+        ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
         ('GConf', init_gq),
         ('AtGConf', init_gq),
         ('HandEmpty',),
 
-        ('AConf', world.carry_conf),
+        ('AConf', init_bq, world.carry_conf),
         ('GConf', world.open_gq),
         ('GConf', world.closed_gq),
 

@@ -15,7 +15,7 @@
     :inputs (?o ?gty)
     :domain (and (Graspable ?o) (GraspType ?gty))
     :outputs (?g)
-    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty))
+    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty)) ; TODO: produce carry conf
   )
 
   ; Movable base
@@ -23,14 +23,14 @@
     :inputs (?o ?p ?g)
     :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (MovableBase))
     :outputs (?bq ?at)
-    :certified (and (BConf ?bq) (ATraj ?at) ; (AConf ?aq)
+    :certified (and (BConf ?bq) (ATraj ?at) (AConf ?bq @rest_aq) ; (AConf ?aq)
                     (Pick ?o ?p ?g ?bq ?at))
   )
   (:stream plan-pull
     :inputs (?j ?a1 ?a2)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase))
     :outputs (?bq ?at)
-    :certified (and (BConf ?bq) (ATraj ?at) ; (AConf ?aq)
+    :certified (and (BConf ?bq) (ATraj ?at) (AConf ?bq @rest_aq) ; (AConf ?aq)
                     (Pull ?j ?a1 ?a2 ?bq ?at))
   )
 
@@ -59,12 +59,12 @@
                     (BaseMotion ?bq1 ?bq2 ?bt))
   )
   (:stream plan-arm-motion
-    :fluents (AtBConf AtWorldPose AtGrasp) ; AtAngle
-    :inputs (?aq1 ?aq2)
-    :domain (and (AConf ?aq1) (AConf ?aq2))
+    :fluents (AtWorldPose AtGrasp) ; AtBConf | AtAngle
+    :inputs (?bq ?aq1 ?aq2)
+    :domain (and (AConf ?bq ?aq1) (AConf ?bq ?aq2))
     :outputs (?at)
     :certified (and ; (ATraj ?bt)
-                    (ArmMotion ?aq1 ?aq2 ?at))
+                    (ArmMotion ?bq ?aq1 ?aq2 ?at))
   )
   (:stream plan-gripper-motion
     :inputs (?gq1 ?gq2)

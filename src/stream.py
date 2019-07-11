@@ -580,8 +580,8 @@ def get_reachability_test(world, **kwargs):
 def get_arm_motion_gen(world, collisions=True, teleport=False):
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
 
-    def fn(aq1, aq2, fluents=[]):
-        # TODO: condition explicitly on a base conf?
+    def fn(bq, aq1, aq2, fluents=[]):
+        bq.assign()
         aq1.assign()
         obstacles = set(world.static_obstacles)
         attachments = parse_fluents(world, fluents, obstacles)
