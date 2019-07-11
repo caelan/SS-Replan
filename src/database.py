@@ -68,7 +68,6 @@ def project_base_pose(base_pose):
     return base_values
 
 def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
-    # TODO: should I not actually use surface?
     # TODO: Gaussian perturbation
     gripper_from_base_list = load_place_database(world.robot_name, surface_name, grasp_type,
                                                  field='tool_from_base_list')
@@ -120,17 +119,4 @@ def visualize_database(tool_from_base_list):
         # TODO: move away from the environment
         handles.extend(draw_point(point_from_pose(gripper_from_base), color=RED))
     wait_for_user()
-    return handles
-
-
-def draw_picks(world, surface_name, grasp_type, **kwargs): # object_name=None,
-    surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
-    handles = []
-    for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
-        object_pose = multiply(surface_pose, surface_from_object)
-        handles.extend(draw_point(point_from_pose(object_pose), **kwargs))
-        #if object_name is not None:
-        #set_pose(world.get_body(object_name), object_pose)
-        #wait_for_user()
-    #wait_for_user()
     return handles
