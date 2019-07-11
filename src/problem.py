@@ -5,23 +5,19 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf
-from pybullet_tools.utils import get_joint_name, is_placed_on_aabb, create_attachment, \
-    child_link_from_joint, get_link_name, parent_joint_from_link, is_fixed, link_from_name, \
-    get_link_pose, wait_for_user, get_min_limits, get_max_limits, spaced_colors, draw_point, \
-    Point, LockRenderer, add_segments, convex_hull, add_text, convex_centroid, get_pose, \
-    multiply, point_from_pose, RED, get_point
+from pybullet_tools.utils import get_joint_name, create_attachment, \
+    child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
+    LockRenderer
 
-import numpy as np
-
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, CABINETS, DRAWERS, \
-    get_surface, COUNTERS, RelPose, ALL_JOINTS, get_grasps, invert
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, get_surface, COUNTERS, RelPose, get_supporting
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
-    get_base_motion_fn, base_cost_fn, get_pull_gen_fn, compute_surface_aabb, get_door_test, CLOSED, DOOR_STATUSES, \
+    get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, \
     get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen
-from src.database import has_place_database, load_pull_base_poses, \
-    get_surface_reference_pose, load_placements, load_place_base_poses
+from src.database import has_place_database
+from src.visualization import add_markers
+
 
 def existential_quantification(goal_literals):
     # TODO: merge with pddlstream-experiments
@@ -37,74 +33,9 @@ def existential_quantification(goal_literals):
 
 ################################################################################
 
-def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
-    print(name, len(base_confs))
-    handles = []
-    if not base_confs:
-        return handles
-    z = get_point(world.floor)[2] + floor_z
-    base_points = [base_conf[:2] for base_conf in base_confs]
-    # for x, y in base_points:
-    #    handles.extend(draw_point(Point(x, y, z), color=color))
-    hull = convex_hull(base_points)
-    vertices = [Point(x, y, z) for x, y, in hull.vertices]
-    handles.extend(add_segments(vertices, closed=True, **kwargs))
-    cx, cy = convex_centroid(hull.vertices)
-    centroid = [cx, cy, z]
-    # draw_point(centroid, color=color)
-    handles.append(add_text(name, position=centroid, **kwargs))
-    return handles
-
 # https://github.mit.edu/caelan/stripstream/blob/master/scripts/openrave/run_belief_online.py
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
-
-def add_markers(world):
-    handles = []
-    for joint_name, color in zip(ALL_JOINTS, spaced_colors(len(ALL_JOINTS))):
-        base_confs = list(load_pull_base_poses(world, joint_name))
-        handles.extend(visualize_base_confs(world, joint_name, base_confs, color=color))
-
-    for surface_name in ALL_SURFACES:
-        surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
-        for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
-            object_points = []
-            for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
-                object_pose = multiply(surface_pose, surface_from_object)
-                object_points.append(point_from_pose(object_pose))
-            if not object_points:
-                continue
-            #for object_point in object_points:
-            #    handles.extend(draw_point(object_point, color=color))
-            _, _, z = np.average(object_points, axis=0)
-            hull = convex_hull([object_point[:2] for object_point in object_points])
-            vertices = [Point(x, y, z) for x, y, in hull.vertices]
-            handles.extend(add_segments(vertices, color=color, closed=True))
-
-    for name in world.movable:
-        body = world.get_body(name)
-        pose = get_pose(body)
-        surface_name = get_supporting(world, name)
-        if surface_name is None:
-            continue
-        for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
-            base_confs = []
-            for grasp in get_grasps(world, name, grasp_types=[grasp_type]):
-                tool_pose = multiply(pose, invert(grasp.grasp_pose))
-                base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
-            handles.extend(visualize_base_confs(world, grasp_type, base_confs, color=color))
-    return handles
-
-def get_supporting(world, obj_name):
-    body = world.get_body(obj_name)
-    supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
-        body, compute_surface_aabb(world, surface),
-        above_epsilon=1e-2, below_epsilon=5e-2)]
-    if len(supporting) != 1:
-        print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
-        return None
-    [surface_name] = supporting
-    return surface_name
 
 def pdddlstream_from_problem(task, debug=False, **kwargs):
     print(task)

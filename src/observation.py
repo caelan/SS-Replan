@@ -18,8 +18,8 @@ from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN
-from src.stream import get_stable_gen, compute_surface_aabb, test_supported
-from src.utils import OPEN_SURFACES
+from src.stream import get_stable_gen, test_supported
+from src.utils import OPEN_SURFACES, compute_surface_aabb
 
 KITCHEN_FROM_ZED_LEFT = (
     (1.0600011348724365, 1.529999017715454, 0.5699998736381531),

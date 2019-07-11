@@ -8,9 +8,13 @@ from collections import namedtuple
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
-from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, unit_pose, BodySaver, multiply, Pose, \
-    get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, set_color, \
-    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links
+from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, \
+    unit_pose, BodySaver, multiply, Pose, \
+    get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
+    set_color, \
+    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
+    is_placed_on_aabb, get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
+    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh
 
 try:
     import trac_ik_python
@@ -305,6 +309,47 @@ class RelPose(object):
         if self.reference_body is None:
             return 'wp{}'.format(id(self) % 1000)
         return 'rp{}'.format(id(self) % 1000)
+
+def compute_surface_aabb(world, name):
+    surface_name, shape_name, _ = get_surface(name)
+    surface_link = link_from_name(world.kitchen, surface_name)
+    surface_pose = get_link_pose(world.kitchen, surface_link)
+    if shape_name == SURFACE_TOP:
+        surface_aabb = get_aabb(world.kitchen, surface_link)
+    elif shape_name == SURFACE_BOTTOM:
+        data = sorted(get_collision_data(world.kitchen, surface_link),
+                      key=lambda d: point_from_pose(get_data_pose(d))[2])[0]
+        extent = np.array(get_data_extents(data))
+        aabb = AABB(-extent/2., +extent/2.)
+        vertices = apply_affine(multiply(surface_pose, get_data_pose(data)), get_aabb_vertices(aabb))
+        surface_aabb = aabb_from_points(vertices)
+    else:
+        [data] = filter(lambda d: d.filename != '',
+                        get_collision_data(world.kitchen, surface_link))
+        meshes = read_obj(data.filename)
+        #colors = spaced_colors(len(meshes))
+        #set_color(world.kitchen, link=surface_link, color=np.zeros(4))
+        mesh = meshes[shape_name]
+        #for i, (name, mesh) in enumerate(meshes.items()):
+        mesh = tform_mesh(multiply(surface_pose, get_data_pose(data)), mesh=mesh)
+        surface_aabb = aabb_from_points(mesh.vertices)
+        #add_text(surface_name, position=surface_aabb[1])
+        #draw_mesh(mesh, color=colors[i])
+        #wait_for_user()
+    #draw_aabb(surface_aabb)
+    #wait_for_user()
+    return surface_aabb
+
+def get_supporting(world, obj_name):
+    body = world.get_body(obj_name)
+    supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
+        body, compute_surface_aabb(world, surface),
+        above_epsilon=1e-2, below_epsilon=5e-2)]
+    if len(supporting) != 1:
+        print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
+        return None
+    [surface_name] = supporting
+    return surface_name
 
 ################################################################################
 
