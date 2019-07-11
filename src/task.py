@@ -63,6 +63,17 @@ def add_kinect(world):
 
 ################################################################################
 
+# skeleton = [
+#     ('calibrate', [WILD, WILD, WILD]),
+#     ('move_base', [WILD, WILD, WILD]),
+#     ('pull', ['indigo_drawer_top_joint', WILD, WILD,
+#               'indigo_drawer_top', WILD, WILD, WILD, WILD, WILD  ]),
+#     ('move_base', [WILD, WILD, WILD]),
+#     ('pick', ['big_red_block0', WILD, WILD, WILD,
+#               'indigo_drawer_top', WILD, WILD, WILD, WILD]),
+#     ('move_base', [WILD, WILD, WILD]),
+# ]
+
 def stow_block(world):
     # for joint in world.kitchen_joints:
     # for name in LEFT_VISIBLE:

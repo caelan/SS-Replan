@@ -95,6 +95,18 @@ def get_link_obstacles(world, link_name):
 
 ################################################################################
 
+def get_test_near_pose(world, **kwargs):
+    def test(o, p, bq):
+        return True
+    return test
+
+def get_test_near_joint(world, **kwargs):
+    def test(j, bq):
+        return True
+    return test
+
+################################################################################
+
 def test_supported(world, body, surface_name, collisions=True):
     surface_aabb = compute_surface_aabb(world, surface_name)
     if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):

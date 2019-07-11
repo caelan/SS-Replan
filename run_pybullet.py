@@ -63,14 +63,19 @@ def solve_pddlstream(world, problem, args, debug=False):
     print('Streams:', stream_map.keys())
 
     stream_info = {
-        # TODO: check if already on the stove
+        'test-door': StreamInfo(p_success=0, eager=True),
+        'test-near-pose': StreamInfo(p_success=0, eager=True),
+        'test-near-joint': StreamInfo(p_success=0, eager=True),
+
         'compute-pose-kin': StreamInfo(p_success=0.5, eager=True),
         'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
-        'test-door': StreamInfo(p_success=0, eager=True),
-        'plan-pick': StreamInfo(),
-        'plan-pull': StreamInfo(),
+
+        'plan-pick': StreamInfo(overhead=1e1),
+        'plan-pull': StreamInfo(overhead=1e1),
+
         'plan-base-motion': StreamInfo(overhead=1e3),
         'plan-arm-motion': StreamInfo(overhead=1e2),
+
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
@@ -78,16 +83,6 @@ def solve_pddlstream(world, problem, args, debug=False):
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
 
-    # skeleton = [
-    #     ('calibrate', [WILD, WILD, WILD]),
-    #     ('move_base', [WILD, WILD, WILD]),
-    #     ('pull', ['indigo_drawer_top_joint', WILD, WILD,
-    #               'indigo_drawer_top', WILD, WILD, WILD, WILD, WILD  ]),
-    #     ('move_base', [WILD, WILD, WILD]),
-    #     ('pick', ['big_red_block0', WILD, WILD, WILD,
-    #               'indigo_drawer_top', WILD, WILD, WILD, WILD]),
-    #     ('move_base', [WILD, WILD, WILD]),
-    # ]
     #constraints = PlanConstraints(skeletons=[skeleton], exact=True)
     constraints = PlanConstraints()
 
@@ -124,9 +119,9 @@ def solve_pddlstream(world, problem, args, debug=False):
     # print(SOLUTIONS)
     print_solution(solution)
     plan, cost, evaluations = solution
+    commands = commands_from_plan(world, plan)
     pr.disable()
     pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
-    commands = commands_from_plan(world, plan)
     return commands
 
 ################################################################################

@@ -13,8 +13,8 @@ from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, get_surface, COUNTERS, 
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
-    get_calibrate_gen, get_fixed_pick_gen_fn, \
-    get_fixed_pull_gen_fn, get_compute_angle_kin, get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen
+    get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
+    get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, get_test_near_joint
 from src.database import has_place_database
 from src.visualization import add_markers
 
@@ -127,6 +127,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
         for conf in [init_conf, open_conf, closed_conf]:
             pose, = compute_angle_kin(link_name, joint_name, conf)
             init.extend([
+                ('Joint', joint_name),
                 ('Angle', joint_name, conf),
                 ('Movable', link_name),
                 ('AngleKin', link_name, pose, joint_name, conf),
@@ -212,6 +213,9 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
         'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
         'plan-gripper-motion': from_fn(get_gripper_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
+
+        'test-near-pose': from_test(get_test_near_pose(world, **kwargs)),
+        'test-near-joint': from_test(get_test_near_joint(world, **kwargs)),
 
         'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),

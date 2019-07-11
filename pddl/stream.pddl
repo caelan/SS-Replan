@@ -37,23 +37,33 @@
   )
 
   ; Fixed base
-  (:stream fixed-plan-pick ; TODO: check if ?p ?g in convex hull
+  (:stream test-near-pose
+    :inputs (?o ?p ?bq)
+    :domain (and (WorldPose ?o ?p) (Graspable ?o) (InitBConf ?bq))
+    :certified (NearPose ?o ?p ?bq)
+  )
+  (:stream fixed-plan-pick
     :inputs (?o ?p ?g ?bq)
-    :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (InitBConf ?bq))
+    :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (NearPose ?o ?p ?bq))
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at))
   )
-  (:stream fixed-plan-pull ; TODO: check if ?j within range
+  (:stream test-near-joint
+    :inputs (?j ?bq)
+    :domain (and (Joint ?j) (InitBConf ?bq))
+    :certified (NearJoint ?j ?bq)
+  )
+  (:stream fixed-plan-pull
     :inputs (?j ?a1 ?a2 ?bq)
-    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
+    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (NearJoint ?j ?bq))
     :outputs (?aq1 ?aq2 ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq1) (AConf ?bq ?aq2)
                     (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at))
   )
 
   (:stream plan-base-motion
-    :fluents (AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
+    :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
     :inputs (?bq1 ?bq2 ?aq)
     :domain (and (AConf ?bq1 ?aq) (AConf ?bq2 ?aq) (MovableBase))
     :outputs (?bt)
@@ -61,7 +71,7 @@
                     (BaseMotion ?bq1 ?bq2 ?aq ?bt))
   )
   (:stream plan-arm-motion
-    :fluents (AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
+    :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
     :inputs (?bq ?aq1 ?aq2)
     :domain (and (AConf ?bq ?aq1) (AConf ?bq ?aq2))
     :outputs (?at)
