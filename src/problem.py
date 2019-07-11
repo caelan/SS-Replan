@@ -78,7 +78,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
 
         ('Calibrated',),
 
-        ('CanMoveBase',),  # TODO: could always remove this
+        ('CanMoveBase',),
         ('CanMoveArm',),
         ('CanMoveGripper',),
 

@@ -23,9 +23,10 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 
 BASE_CONSTANT = 1
 BASE_VELOCITY = 0.25
-SELF_COLLISIONS = True # TODO: include self-collisions
+SELF_COLLISIONS = True
 MAX_CONF_DISTANCE = 0.75
 
+MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
@@ -224,7 +225,7 @@ def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
 
 def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                   teleport=False, switches_only=False,
-                  approach_path=True, **kwargs):
+                  approach_path=not MOVE_ARM, **kwargs):
     # TODO: use velocities in the distance function
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
     aq = world.carry_conf
@@ -255,8 +256,9 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
         return None
     if not approach_path:
         return grasp_path
-    aq.assign()
     # TODO: plan one with attachment placed and one held
+    # TODO: can still use this as a witness that the conf is reachable
+    aq.assign()
     approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
                                       attachments=attachments,
                                       obstacles=obstacles,
@@ -311,8 +313,10 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
                                       obstacles=obstacles, **kwargs)
         if approach_path is None:
             return
-        #aq = world.carry_conf
-        aq = Conf(world.robot, world.arm_joints, approach_path[0])
+        if MOVE_ARM:
+            aq = Conf(world.robot, world.arm_joints, approach_path[0])
+        else:
+            aq = world.carry_conf
 
         surface_attachment = create_attachment(world.kitchen, surface_link, obj_body)
         cmd = Sequence(State(savers=[robot_saver, obj_saver], attachments=[surface_attachment]), commands=[
@@ -434,9 +438,12 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
             return
         approach_paths.append(approach_path)
 
-    #aq1 = world.carry_conf
-    aq1 = Conf(world.robot, world.arm_joints, approach_path[0])
-    aq2 = aq1
+    if MOVE_ARM:
+        aq1 = Conf(world.robot, world.arm_joints, approach_paths[0][0])
+        aq2 = Conf(world.robot, world.arm_joints, approach_paths[-1][0])
+    else:
+        aq1 = world.carry_conf
+        aq2 = aq1
 
     set_joint_positions(world.kitchen, [door_joint], door_path[0])
     set_joint_positions(world.robot, world.arm_joints, arm_path[0])
@@ -578,9 +585,11 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
 def get_reachability_test(world, **kwargs):
     base_motion_fn = get_base_motion_fn(world, restarts=2, iterations=50, smooth=0, **kwargs)
     bq0 = Conf(world.robot, world.base_joints)
+    # TODO: can check for arm motions as well
 
     def test(bq):
-        outputs = base_motion_fn(bq0, bq, fluents=[])
+        aq = world.carry_conf
+        outputs = base_motion_fn(aq, bq0, bq, fluents=[])
         return outputs is not None
     return test
 
