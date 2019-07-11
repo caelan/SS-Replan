@@ -222,8 +222,9 @@ def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
         return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
     return gen_fn
 
-def plan_approach(world, approach_pose, attachments=[],
-                  obstacles=set(), teleport=False, switches_only=False, **kwargs):
+def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
+                  teleport=False, switches_only=False,
+                  approach_path=True, **kwargs):
     # TODO: use velocities in the distance function
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
     aq = world.carry_conf
@@ -252,6 +253,8 @@ def plan_approach(world, approach_pose, attachments=[],
     if grasp_path is None:
         print('Grasp path failure')
         return None
+    if not approach_path:
+        return grasp_path
     aq.assign()
     # TODO: plan one with attachment placed and one held
     approach_path = plan_joint_motion(world.robot, world.arm_joints, approach_conf,
@@ -296,11 +299,10 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
         robot_saver = BodySaver(world.robot)
         obj_saver = BodySaver(obj_body)
 
-        aq = world.carry_conf
         if randomize:
             set_joint_positions(world.robot, world.arm_joints, sample_fn())
         else:
-            aq.assign()
+            world.carry_conf.assign()
         full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
         if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
             # print('Grasp IK failure', grasp_conf)
@@ -309,6 +311,8 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
                                       obstacles=obstacles, **kwargs)
         if approach_path is None:
             return
+        #aq = world.carry_conf
+        aq = Conf(world.robot, world.arm_joints, approach_path[0])
 
         surface_attachment = create_attachment(world.kitchen, surface_link, obj_body)
         cmd = Sequence(State(savers=[robot_saver, obj_saver], attachments=[surface_attachment]), commands=[
@@ -393,10 +397,8 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
 
     base_conf.assign()
     world.open_gripper()
-    aq = world.carry_conf
-    aq.assign()
-    #door_saver = BodySaver()
-    robot_saver = BodySaver(world.robot)
+    world.carry_conf.assign()
+    robot_saver = BodySaver(world.robot) # TODO: door_saver?
 
     for door_conf in [door_path[0], door_path[-1]]:
         set_joint_positions(world.kitchen, [door_joint], door_conf)
@@ -432,6 +434,10 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
             return
         approach_paths.append(approach_path)
 
+    #aq1 = world.carry_conf
+    aq1 = Conf(world.robot, world.arm_joints, approach_path[0])
+    aq2 = aq1
+
     set_joint_positions(world.kitchen, [door_joint], door_path[0])
     set_joint_positions(world.robot, world.arm_joints, arm_path[0])
     grasp_width = close_until_collision(world.robot, world.gripper_joints,
@@ -448,7 +454,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         finger_cmd.commands[0].reverse(),
         Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ], name='pull')
-    yield (aq, cmd,)
+    yield (aq1, aq2, cmd,)
 
 ################################################################################
 

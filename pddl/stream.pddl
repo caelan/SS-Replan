@@ -30,10 +30,10 @@
   (:stream plan-pull
     :inputs (?j ?a1 ?a2)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase))
-    :outputs (?bq ?aq ?at)
+    :outputs (?bq ?aq1 ?aq2 ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
-                    (AConf ?bq @rest_aq) (AConf ?bq ?aq)
-                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+                    (AConf ?bq @rest_aq) (AConf ?bq ?aq1) (AConf ?bq ?aq2)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at))
   )
 
   ; Fixed base
@@ -47,9 +47,9 @@
   (:stream fixed-plan-pull ; TODO: check if ?j within range
     :inputs (?j ?a1 ?a2 ?bq)
     :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (InitBConf ?bq))
-    :outputs (?aq ?at)
-    :certified (and (ATraj ?at) (AConf ?bq ?aq)
-                    (Pull ?j ?a1 ?a2 ?bq ?aq ?at))
+    :outputs (?aq1 ?aq2 ?at)
+    :certified (and (ATraj ?at) (AConf ?bq ?aq1) (AConf ?bq ?aq2)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at))
   )
 
   (:stream plan-base-motion
