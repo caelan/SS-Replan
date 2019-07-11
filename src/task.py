@@ -72,7 +72,7 @@ def stow_block(world):
     # wait_for_user()
 
     entity_name = add_block(world, idx=0)
-    entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
+    #entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
     # obstruction_name = add_box(world)
     # test_grasps(world, entity_name)
     set_all_static()

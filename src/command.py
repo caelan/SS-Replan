@@ -87,7 +87,6 @@ class Trajectory(Command):
     def execute(self, domain, moveit, observer): # TODO: actor
         #robot_entity = domain.get_robot()
         # TODO: ensure the same joint names
-        # TODO: allow partial gripper closures
         status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         #time.sleep(1.0)
         return status
@@ -188,8 +187,9 @@ class Detach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        if self.world.robot == self.robot:
-            return open_gripper(self.robot, moveit)
+        pass
+        #if self.world.robot == self.robot:
+        #    return open_gripper(self.robot, moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))

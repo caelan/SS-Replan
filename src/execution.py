@@ -23,6 +23,8 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
     joint_names = get_joint_names(robot, joints)
     distance_fn = get_distance_fn(robot, joints)
     #difference_fn = get_difference_fn(robot, joints)
+    if len(joints) == 2:
+        path = path[-1:]
     for target_conf in path:
         velocity = None
         #velocity = list(0.25 * np.array(max_velocities))
