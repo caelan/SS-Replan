@@ -550,7 +550,6 @@ def parse_fluents(world, fluents, obstacles):
 
 def get_base_motion_fn(world, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
-    # TODO: ensure only forward drive?
 
     def fn(bq1, bq2, aq, fluents=[]):
         if bq1 == bq2:
@@ -565,9 +564,10 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
         if teleport:
             path = [bq1.values, bq2.values]
         else:
+            # It's important that the extend function is reversible to avoid getting trapped
             path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=attachments,
                                             obstacles=obstacles, custom_limits=world.custom_limits,
-                                            self_collisions=False,
+                                            reversible=True, self_collisions=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
                 print('Failed to find a base motion plan!')
