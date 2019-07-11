@@ -307,6 +307,7 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
         # TODO: check if within database convex hull
         # TODO: check approach
         # TODO: flag to check if initially in collision
+        # TODO: sample placements in reach of current base pose
 
         obj_body = world.get_body(name)
         world_from_body = pose.get_world_from_body()

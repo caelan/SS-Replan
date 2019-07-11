@@ -165,6 +165,13 @@ def pdddlstream_from_problem(world, close_doors=False, return_home=False,
             above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
             print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
+            world_pose = RelPose(body, init=True)
+            # Treats as obstacle
+            init += [
+                ('Movable', obj_name), # TODO: misnomer
+                ('WorldPose', obj_name, world_pose),
+                ('AtWorldPose', obj_name, world_pose),
+            ]
             continue
             #raise RuntimeError(obj_name, supporting)
         [surface_name] = supporting

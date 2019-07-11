@@ -41,7 +41,7 @@ def constraints_from_plan(plan):
     # TODO: use the task plan to constrain solution
     raise NotImplementedError()
 
-def goal_formula_from_goal(goals):
+def goal_formula_from_goal(world, goals):
     #regex = re.compile(r"(\w+)\((\)\n")
     # TODO: return initial literals as well
     init = []
@@ -53,14 +53,12 @@ def goal_formula_from_goal(goals):
             obj, = args
             surface = 'indigo_tmp'
             atom = ('On', obj, surface)
-        #elif predicate == '???':
-        #    atom = ('Holding', obj)
         elif predicate == 'is_free':
-            #arm, = args
             atom = ('HandEmpty',)
-        #elif predicate == 'gripper_closed':
-        #    #arm, = args
-        #    atom = None
+        elif predicate == 'gripper_closed':
+            assert value is False
+            value = True
+            atom = ('AtGConf', world.open_gq)
         elif predicate == 'cabinet_is_open':
             cabinet, = args
             joint_name = '{}_joint'.format(cabinet)
@@ -75,9 +73,7 @@ def goal_formula_from_goal(goals):
             init.append(('Stackable', obj, surface))
             atom = ('On', obj, surface)
         else:
-            print('Skipping {}={}'.format(head, value))
-            continue
-            #raise NotImplementedError(predicate)
+            raise NotImplementedError(predicate)
         goal_literals.append(atom if value else Not(atom))
     return init, And(*goal_literals)
 
@@ -140,12 +136,7 @@ def main():
 
     # Need to reset at the start
     if task != NONE:
-        objects, goal, plan = trial_manager.get_task(task=task, reset=True)
-        goals = [(h.format(o), v) for h, v in goal for o in objects]
-        print('Goals:', goals)
-        additional_init, goal_formula = goal_formula_from_goal(goals)
-    # TODO: fixed_base_suppressors
-    #trial_manager.disable() # Disables collisions
+        objects, goal, _ = trial_manager.get_task(task=task, reset=True)
 
     # TODO: why can't I use this earlier?
     robot_entity = domain.get_robot()
@@ -154,7 +145,13 @@ def main():
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[1, -1, 2])
-    open_gripper(world.robot, moveit)
+
+    if task != NONE:
+        goals = [(h.format(o), v) for h, v in goal for o in objects]
+        print('Goals:', goals)
+        additional_init, goal_formula = goal_formula_from_goal(world, goals)
+    # TODO: fixed_base_suppressors
+    #trial_manager.disable() # Disables collisions
 
     world_state = observer.observe() # domain.root
     with LockRenderer():

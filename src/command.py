@@ -85,11 +85,9 @@ class Trajectory(Command):
             yield
 
     def execute(self, domain, moveit, observer): # TODO: actor
-        robot_entity = domain.get_robot()
-        if len(robot_entity.joints) != len(self.joints):
-            # TODO: ensure the same joint names
-            # TODO: allow partial gripper closures
-            return
+        #robot_entity = domain.get_robot()
+        # TODO: ensure the same joint names
+        # TODO: allow partial gripper closures
         status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         time.sleep(1.0)
         return status
