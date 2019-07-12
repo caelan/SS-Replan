@@ -2,27 +2,23 @@
 
 import sys
 import os
-
-sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
-                for d in ['pddlstream', 'ss-pybullet'])
-
 import rospy
 import traceback
 import numpy as np
 
+sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
+                for d in ['pddlstream', 'ss-pybullet'])
+
 import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
-    get_max_velocity, get_max_force, wait_for_user, get_camera, dump_body, link_from_name, \
-    point_from_pose, get_yaw, get_pitch, get_link_pose, draw_pose, multiply, \
-    invert, set_joint_positions, set_base_values
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, wait_for_user
 
 from src.issac import update_world, kill_lula, update_isaac_sim
 from src.world import World
-from run_pybullet import solve_pddlstream, create_parser, simulate_plan
+from run_pybullet import create_parser
+from src.planner import solve_pddlstream, simulate_plan
 from src.problem import pdddlstream_from_problem
-from src.execution import open_gripper, control_base
 from src.task import Task
 
 from pddlstream.language.constants import Not, And
