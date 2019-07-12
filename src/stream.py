@@ -11,11 +11,11 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     point_from_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, create_attachment, Point, set_configuration, \
-    flatten_links
+    flatten_links, convex_hull, is_point_in_polygon
 
 from src.utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
-    compute_surface_aabb
+    compute_surface_aabb, GRASP_TYPES, BASE_JOINTS
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses
@@ -96,13 +96,36 @@ def get_link_obstacles(world, link_name):
 ################################################################################
 
 def get_test_near_pose(world, **kwargs):
-    def test(o, p, bq):
-        return True
+    vertices_from_surface = {}
+    base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
+
+    def test(object_name, pose, bq):
+        surface_name = pose.support
+        if (object_name, surface_name) not in vertices_from_surface:
+            base_confs = []
+            for grasp_type in GRASP_TYPES:
+                for grasp in get_grasps(world, object_name):
+                    tool_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose))
+                    base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
+            base_points = [base_conf[:2] for base_conf in base_confs]
+            vertices_from_surface[object_name, surface_name] = convex_hull(base_points).vertices
+        bq.assign()
+        base_point = point_from_pose(get_link_pose(world.robot, base_link))
+        return is_point_in_polygon(base_point[:2], vertices_from_surface[object_name, surface_name])
     return test
 
 def get_test_near_joint(world, **kwargs):
-    def test(j, bq):
-        return True
+    vertices_from_joint = {}
+    base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
+
+    def test(joint_name, bq):
+        if joint_name not in vertices_from_joint:
+            base_confs = list(load_pull_base_poses(world, joint_name))
+            base_points = [base_conf[:2] for base_conf in base_confs]
+            vertices_from_joint[joint_name] = convex_hull(base_points).vertices
+        bq.assign()
+        base_point = point_from_pose(get_link_pose(world.robot, base_link))
+        return is_point_in_polygon(base_point[:2], vertices_from_joint[joint_name])
     return test
 
 ################################################################################
@@ -118,6 +141,7 @@ def test_supported(world, body, surface_name, collisions=True):
 
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=5e-3, **kwargs):
+
     # TODO: remove fixed collisions with contained surfaces
     def gen(obj_name, surface_name):
         obj_body = world.get_body(obj_name)
@@ -132,6 +156,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 [x, y, _] = point_from_pose(sampled_pose_surface)
                 _, _, yaw = euler_from_quat(quat_from_pose(sampled_pose_surface))
                 dx, dy = np.random.normal(scale=pos_scale, size=2)
+                # TODO: avoid reloading
                 z = stable_z_on_aabb(obj_body, surface_aabb)
                 theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
                 #yaw = np.random.uniform(*CIRCULAR_LIMITS)

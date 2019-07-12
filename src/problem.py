@@ -50,6 +50,8 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
     init_gq = Conf(world.robot, world.gripper_joints)
+    # TODO: order goals for serialization
+    # TODO: calibration by line of sight with many particles on the robot's arm
 
     constant_map = {
         '@world': 'world',

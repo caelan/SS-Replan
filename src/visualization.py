@@ -25,38 +25,41 @@ def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
     return handles
 
 
-def add_markers(world):
+def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
     handles = []
-    for joint_name, color in zip(ALL_JOINTS, spaced_colors(len(ALL_JOINTS))):
-        base_confs = list(load_pull_base_poses(world, joint_name))
-        handles.extend(visualize_base_confs(world, joint_name, base_confs, color=color))
+    if placements:
+        for surface_name in ALL_SURFACES:
+            surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
+            for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
+                object_points = []
+                for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
+                    object_pose = multiply(surface_pose, surface_from_object)
+                    object_points.append(point_from_pose(object_pose))
+                if not object_points:
+                    continue
+                #for object_point in object_points:
+                #    handles.extend(draw_point(object_point, color=color))
+                _, _, z = np.average(object_points, axis=0)
+                hull = convex_hull([object_point[:2] for object_point in object_points])
+                vertices = [Point(x, y, z) for x, y, in hull.vertices]
+                handles.extend(add_segments(vertices, color=color, closed=True))
 
-    for surface_name in ALL_SURFACES:
-        surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
-        for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
-            object_points = []
-            for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
-                object_pose = multiply(surface_pose, surface_from_object)
-                object_points.append(point_from_pose(object_pose))
-            if not object_points:
+    if pull_bases:
+        for joint_name, color in zip(ALL_JOINTS, spaced_colors(len(ALL_JOINTS))):
+            base_confs = list(load_pull_base_poses(world, joint_name))
+            handles.extend(visualize_base_confs(world, joint_name, base_confs, color=color))
+
+    if pick_bases:
+        for name in world.movable:
+            body = world.get_body(name)
+            pose = get_pose(body)
+            surface_name = get_supporting(world, name)
+            if surface_name is None:
                 continue
-            #for object_point in object_points:
-            #    handles.extend(draw_point(object_point, color=color))
-            _, _, z = np.average(object_points, axis=0)
-            hull = convex_hull([object_point[:2] for object_point in object_points])
-            vertices = [Point(x, y, z) for x, y, in hull.vertices]
-            handles.extend(add_segments(vertices, color=color, closed=True))
-
-    for name in world.movable:
-        body = world.get_body(name)
-        pose = get_pose(body)
-        surface_name = get_supporting(world, name)
-        if surface_name is None:
-            continue
-        for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
-            base_confs = []
-            for grasp in get_grasps(world, name, grasp_types=[grasp_type]):
-                tool_pose = multiply(pose, invert(grasp.grasp_pose))
-                base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
-            handles.extend(visualize_base_confs(world, grasp_type, base_confs, color=color))
+            for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
+                base_confs = []
+                for grasp in get_grasps(world, name, grasp_types=[grasp_type]):
+                    tool_pose = multiply(pose, invert(grasp.grasp_pose))
+                    base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
+                handles.extend(visualize_base_confs(world, grasp_type, base_confs, color=color))
     return handles
