@@ -158,7 +158,7 @@ def main():
         #base_positions = [1.0, 0, np.pi]
         #set_base_values(world.robot, base_positions)
         #world.set_initial_conf()
-        update_isaac_sim(domain, observer, sim_manager, world)
+        #update_isaac_sim(domain, observer, sim_manager, world)
     wait_for_user()
 
     #goal_values = [1.5, -1, np.pi]

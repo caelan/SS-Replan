@@ -7,7 +7,8 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     child_link_from_joint, multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
     BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body, draw_pose, \
-    point_from_pose, euler_from_quat, quat_from_pose, Pose, Point, Euler
+    point_from_pose, euler_from_quat, quat_from_pose, Pose, Point, Euler, base_values_from_pose, \
+    pose_from_base_values, INF
 from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_'
@@ -66,21 +67,17 @@ def get_world_from_model(observer, entity, body):
 def update_robot(world, domain, observer, world_state):
     entity = world_state.entities[domain.robot]
     # Update joint positions
-    #set_joint_positions(world.robot, world.base_joints, entity.carter_pos) # Should be 0
+    world.set_base_conf(entity.carter_pos) # Should be 0
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
     world_from_entity = get_world_from_model(observer, entity, world.robot)
-    set_pose(world.robot, world_from_entity)
-    #print(get_link_pose(world.robot, world.base_link))
 
-    # TODO: not quite right
-    #x, y, z = point_from_pose(world_from_entity)
-    #roll, pitch, yaw = euler_from_quat(quat_from_pose(world_from_entity))
-    #set_pose(world.robot, Pose(Point(z=z), Euler(roll=roll, pitch=pitch)))
-    #base_values = [x, y, yaw]
-    #set_joint_positions(world.robot, world.base_joints, base_values)
-    #print(get_link_pose(world.robot, world.base_link))
+    base_values = base_values_from_pose(world_from_entity, tolerance=INF)
+    entity_from_origin = pose_from_base_values(base_values)
+    world_from_origin = multiply(world_from_entity, entity_from_origin)
+    set_pose(world.robot, world_from_origin)
+    world.set_base_conf(base_values)
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
@@ -174,8 +171,9 @@ def update_world(world, domain, observer, world_state):
             raise NotImplementedError(entity.__class__)
     world.update_custom_limits()
     display_kinect(world, observer)
-    draw_pose(get_pose(world.robot), length=1)
-    #draw_pose(get_link_pose(world.robot, word.base_link))
+    draw_pose(get_pose(world.robot), length=3)
+    #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
+    #wait_for_user()
 
 ################################################################################
 

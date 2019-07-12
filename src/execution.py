@@ -5,8 +5,9 @@ from src.issac import update_robot, ISSAC_REFERENCE_FRAME, lookup_pose, \
 from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
     euler_from_quat, quat_from_pose, dump_body, circular_difference, \
-    joints_from_names, get_max_velocity, get_distance, get_angle, INF, waypoints_from_path
+    joints_from_names, get_max_velocity, get_distance, get_angle, INF, waypoints_from_path, HideOutput
 from src.utils import WHEEL_JOINTS
+from pddlstream.utils import Verbose
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
@@ -24,7 +25,7 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
     distance_fn = get_distance_fn(robot, joints)
     #difference_fn = get_difference_fn(robot, joints)
 
-    path = waypoints_from_path(path)
+    #path = waypoints_from_path(path)
     if len(joints) == 2:
         path = path[-1:]
     for i, target_conf in enumerate(path):
@@ -36,7 +37,8 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
         #rate = rospy.Rate(1000)
         start_time = rospy.Time.now()
         while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < timeout):
-            world_state = observer.observe()
+            with Verbose():
+                world_state = observer.observe()
             robot_entity = world_state.entities[domain.robot]
             #difference = difference_fn(target_conf, robot_entity.q)
             if distance_fn(target_conf, robot_entity.q) < threshold:

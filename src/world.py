@@ -154,6 +154,11 @@ class World(object):
         #conf[1] += np.pi / 4
         #conf[3] -= np.pi / 4
         return conf
+    # TODO: could perform base motion planning without free joints
+    def get_base_conf(self):
+        return get_joint_positions(self.robot, self.base_joints)
+    def set_base_conf(self, conf):
+        set_joint_positions(self.robot, self.base_joints, conf)
     def all_bodies(self):
         return self.movable | {self.robot, self.kitchen, self.floor}
     def get_world_aabb(self):
