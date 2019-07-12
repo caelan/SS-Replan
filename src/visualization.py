@@ -1,9 +1,9 @@
 import numpy as np
 
 from pybullet_tools.utils import get_point, convex_hull, Point, add_segments, convex_centroid, add_text, spaced_colors, \
-    multiply, point_from_pose, get_pose, invert
+    multiply, point_from_pose, get_pose, invert, link_from_name
 from src.database import load_pull_base_poses, get_surface_reference_pose, load_placements, load_place_base_poses
-from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_supporting, get_grasps
+from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_supporting, get_grasps, get_surface
 
 
 def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
@@ -29,12 +29,14 @@ def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
     handles = []
     if placements:
         for surface_name in ALL_SURFACES:
-            surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
+            surface = get_surface(surface_name)
+            surface_link = link_from_name(world.kitchen, surface.link)
+            #surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
             for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
                 object_points = []
                 for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
-                    object_pose = multiply(surface_pose, surface_from_object)
-                    object_points.append(point_from_pose(object_pose))
+                    #object_points.append(point_from_pose(multiply(surface_pose, surface_from_object)))
+                    object_points.append(point_from_pose(surface_from_object))
                 if not object_points:
                     continue
                 #for object_point in object_points:
@@ -42,7 +44,8 @@ def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
                 _, _, z = np.average(object_points, axis=0)
                 hull = convex_hull([object_point[:2] for object_point in object_points])
                 vertices = [Point(x, y, z) for x, y, in hull.vertices]
-                handles.extend(add_segments(vertices, color=color, closed=True))
+                handles.extend(add_segments(vertices, color=color, closed=True,
+                                            parent=world.kitchen, parent_link=surface_link))
 
     if pull_bases:
         for joint_name, color in zip(ALL_JOINTS, spaced_colors(len(ALL_JOINTS))):
@@ -50,6 +53,7 @@ def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
             handles.extend(visualize_base_confs(world, joint_name, base_confs, color=color))
 
     if pick_bases:
+        # TODO: could make relative as well
         for name in world.movable:
             body = world.get_body(name)
             pose = get_pose(body)
