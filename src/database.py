@@ -5,7 +5,7 @@ import numpy as np
 
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
     euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint, has_gui, \
-    point_from_pose, RED
+    point_from_pose, RED, child_link_from_joint, get_pose, get_point, invert
 from src.utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
@@ -74,11 +74,14 @@ def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
     random.shuffle(gripper_from_base_list)
     handles = []
     for gripper_from_base in gripper_from_base_list:
-        base_values = project_base_pose(multiply(tool_pose, gripper_from_base))
+        world_from_model = get_pose(world.robot)
+        base_values = project_base_pose(multiply(invert(world_from_model), tool_pose, gripper_from_base))
+        #x, y, _ = base_values
+        #_, _, z = get_point(world.floor)
         #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
-        #handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))
+        #handles.extend(draw_point(np.array([x, y, z + 0.01]), color=(1, 0, 0), size=0.05))
+        #wait_for_user()
         yield base_values
-    #wait_for_user()
 
 ################################################################################
 
@@ -101,7 +104,8 @@ def load_pull_base_poses(world, joint_name):
     random.shuffle(joint_from_base_list)
     handles = []
     for joint_from_base in joint_from_base_list:
-        base_values = project_base_pose(multiply(parent_pose, joint_from_base))
+        world_from_model = get_pose(world.robot)
+        base_values = project_base_pose(multiply(invert(world_from_model), parent_pose, joint_from_base))
         #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
         #x, y, _ = base_values
         #handles.extend(draw_point(np.array([x, y, -0.1]), color=(1, 0, 0), size=0.05))

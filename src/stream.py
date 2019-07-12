@@ -255,6 +255,7 @@ def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
         if learned:
             base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
         else:
+            # TODO: be careful when get_pose() is not None
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
         pose.assign()
         return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
@@ -544,6 +545,7 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
         if learned:
             base_generator = load_pull_base_poses(world, joint_name)
         else:
+            # TODO: be careful when get_pose() is not None
             base_generator = uniform_pose_generator(world.robot, target_pose)
 
         for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles):

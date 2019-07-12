@@ -40,7 +40,6 @@ TASKS = [
 
 def goal_formula_from_goal(world, goals, plan):
     #regex = re.compile(r"(\w+)\((\)\n")
-    # TODO: return initial literals as well
     task = Task(world, movable_base=False, fixed_base=True)
     init = []
     goal_literals = []
