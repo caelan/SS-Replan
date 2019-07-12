@@ -1,10 +1,14 @@
-from src.execution import joint_state_control, open_gripper, close_gripper
+from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
-    wait_for_duration, user_input, wait_for_user, flatten_links
+    wait_for_duration, user_input, wait_for_user, flatten_links, get_max_limit, get_joint_limits
 from src.issac import update_robot
 
+import numpy as np
 import time
 
+MOVEIT = True
+DEFAULT_SLEEP = 1.0
+FORCE = 100
 
 class State(object):
     def __init__(self, savers=[], attachments=[]):
@@ -42,7 +46,7 @@ class Command(object):
     def iterate(self, world, state):
         raise NotImplementedError()
 
-    def execute(self, domain, world_state, observer):
+    def execute(self, domain, moveit, observer):
         raise NotImplementedError()
 
 class Sequence(object):
@@ -85,11 +89,24 @@ class Trajectory(Command):
             yield
 
     def execute(self, domain, moveit, observer): # TODO: actor
-        #robot_entity = domain.get_robot()
         # TODO: ensure the same joint names
-        status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
-        #time.sleep(1.0)
-        return status
+
+        if MOVEIT:
+            if len(self.joints) == 2:
+                joint = self.joints[0]
+                average = np.average(get_joint_limits(self.robot, joint))
+                position = self.path[-1][0]
+                if position < average:
+                    moveit.close_gripper(force=FORCE)
+                else:
+                    moveit.open_gripper()
+            else:
+                moveit_control(self.robot, self.joints, self.path, moveit, observer)
+            time.sleep(DEFAULT_SLEEP)
+        else:
+            status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
+        time.sleep(DEFAULT_SLEEP)
+        #return status
 
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
@@ -124,14 +141,19 @@ class DoorTrajectory(Command):
     def execute(self, domain, moveit, observer):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
-        close_gripper(self.robot, moveit, effort=1000)
-        #joints = self.robot_joints + self.world.gripper_joints
-        #path = [list(conf) + list(moveit.gripper.closed_positions) for conf in self.robot_path]
-        #status = joint_state_control(self.robot, joints, path, domain, moveit, observer)
-        status = joint_state_control(self.robot, self.robot_joints, self.robot_path, domain, moveit, observer)
-        #time.sleep(1.0)
-        open_gripper(self.robot, moveit)
-        return status
+        if MOVEIT:
+            moveit.close_gripper(force=FORCE)
+            time.sleep(DEFAULT_SLEEP)
+            moveit_control(self.robot, self.robot_joints, self.robot_path, moveit, observer)
+            time.sleep(DEFAULT_SLEEP)
+            moveit.open_gripper()
+            time.sleep(DEFAULT_SLEEP)
+        else:
+            close_gripper(self.robot, moveit)
+            status = joint_state_control(self.robot, self.robot_joints, self.robot_path,
+                                         domain, moveit, observer)
+            open_gripper(self.robot, moveit)
+        #return status
 
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.robot_joints) + len(self.door_joints),
@@ -160,7 +182,11 @@ class Attach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        if self.world.robot == self.robot:
+        if self.world.robot != self.robot:
+            return
+        if MOVEIT:
+            moveit.close_gripper()
+        else:
             return close_gripper(self.robot, moveit)
 
     def __repr__(self):
@@ -187,9 +213,12 @@ class Detach(Command):
         yield
 
     def execute(self, domain, moveit, observer):
-        pass
-        #if self.world.robot == self.robot:
-        #    return open_gripper(self.robot, moveit)
+        if self.world.robot != self.robot:
+            return
+        if MOVEIT:
+            moveit.open_gripper()
+        else:
+            return open_gripper(self.robot, moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))

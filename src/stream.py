@@ -97,6 +97,8 @@ def get_link_obstacles(world, link_name):
 
 def get_test_near_pose(world, **kwargs):
     vertices_from_surface = {}
+    # TODO: grow the convex hull
+    # TODO: alternatively, distance to hull
 
     def test(object_name, pose, bq):
         surface_name = pose.support
@@ -141,6 +143,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                    z_offset=5e-3, **kwargs):
 
     # TODO: remove fixed collisions with contained surfaces
+    # TODO: place where currently standing
     def gen(obj_name, surface_name):
         obj_body = world.get_body(obj_name)
         surface_aabb = compute_surface_aabb(world, surface_name)

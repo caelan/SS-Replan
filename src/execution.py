@@ -1,13 +1,17 @@
 import numpy as np
+import time
 
 from src.issac import update_robot, ISSAC_REFERENCE_FRAME, lookup_pose, \
     ISSAC_PREFIX, ISSAC_CARTER_FRAME, CONTROL_TOPIC
 from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
     euler_from_quat, quat_from_pose, dump_body, circular_difference, \
-    joints_from_names, get_max_velocity, get_distance, get_angle, INF, waypoints_from_path, HideOutput
+    joints_from_names, get_max_velocity, get_distance, get_angle, INF, \
+    waypoints_from_path, HideOutput, elapsed_time
 from src.utils import WHEEL_JOINTS
 from pddlstream.utils import Verbose
+
+ARM_SPEED = 0.1*np.pi
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
@@ -49,15 +53,18 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
         else:
             print('Failed to reach set point')
     # TODO: send zero velocity command?
-    # moveit.execute(plan, required_orig_err=0.05, timeout=20.0,
-    #               publish_display_trajectory=True)
     # TODO: return status
     return None
 
-def moveit_control(robot, joints, path):
+################################################################################s
+
+def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     from trajectory_msgs.msg import JointTrajectoryPoint
     from moveit_msgs.msg import RobotTrajectory
     import rospy
+
+    if moveit.use_lula:
+        speed = 0.5*speed
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used
@@ -65,33 +72,49 @@ def moveit_control(robot, joints, path):
     plan.joint_trajectory.header.frame_id = ISSAC_REFERENCE_FRAME
     plan.joint_trajectory.header.stamp = rospy.Time(0)
     plan.joint_trajectory.joint_names = get_joint_names(robot, joints)
+    #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
 
-    speed = 0.1
+    #path = waypoints_from_path(path) # Neither moveit or lula benefit from this
     distance_fn = get_distance_fn(robot, joints)
     distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
     time_from_starts = np.cumsum(distances) / speed
-    # print(time_from_starts)
 
     for i in range(1, len(path)):
         point = JointTrajectoryPoint()
         point.positions = list(path[i])
         # Don't need velocities, accelerations, or efforts
-        vector = np.array(path[i]) - np.array(path[i-1])
-        duration = (time_from_starts[i] - time_from_starts[i-1])
-        point.velocities = list(vector / duration)
-        point.accelerations = list(np.ones(len(joints)))
-        point.effort = list(np.ones(len(joints)))
+        #vector = np.array(path[i]) - np.array(path[i-1])
+        #duration = (time_from_starts[i] - time_from_starts[i-1])
+        #point.velocities = list(vector / duration)
+        #point.accelerations = list(np.ones(len(joints)))
+        #point.effort = list(np.ones(len(joints)))
         point.time_from_start = rospy.Duration(time_from_starts[i])
         plan.joint_trajectory.points.append(point)
 
-def lula_control(world, path, domain, observer, world_state):
-    robot_entity = domain.get_robot()
+    print('Following {} waypoints in {:.3f} seconds'.format(
+        len(path), time_from_starts[-1]))
+    world_state = observer.observe()
+    suppress_all(world_state)
+    moveit.verbose = False
+    moveit.last_ik = plan.joint_trajectory.points[-1].positions
+    start_time = time.time()
+    with Verbose():
+        moveit.execute(plan, required_orig_err=0.005, timeout=5.0,
+                       publish_display_trajectory=False) # Always is in base_link frame
+    print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
+
+def suppress_all(world_state):
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L138
     for name, entity in world_state.entities.items():
        if entity.controllable_object is not None:
            #entity.controllable_object.unsuppress()
            entity.controllable_object.suppress() # Propagate to parents?
        # entity.set_detached()
        #domain.attachments[actor] = goal
+
+def lula_control(world, path, domain, observer, world_state):
+    suppress_all(world_state)
+    robot_entity = domain.get_robot()
     franka = robot_entity.robot
     for i, positions in enumerate(path):
        print('{}/{}'.format(i, len(path)))
@@ -213,6 +236,7 @@ def control_base(goal_values, moveit, observer, timeout=INF):
 #FINGER_VELOCITY_LIMIT = 0.2
 
 def open_gripper(robot, moveit, effort=20, sleep=1.0):
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L155
     # robot_entity = domain.get_robot()
     # franka = robot_entity.robot
     # gripper = franka.end_effector.gripper
@@ -234,6 +258,7 @@ def open_gripper(robot, moveit, effort=20, sleep=1.0):
     return None
 
 def close_gripper(robot, moveit, effort=20, sleep=1.0):
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L218
     # controllable_object is not needed for joint positions
     # TODO: attach_obj
     # robot_entity = domain.get_robot()
