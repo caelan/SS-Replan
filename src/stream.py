@@ -11,7 +11,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     point_from_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, create_attachment, Point, set_configuration, \
-    flatten_links, convex_hull, is_point_in_polygon
+    flatten_links, convex_hull, is_point_in_polygon, grow_polygon
 
 from src.utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
@@ -109,7 +109,7 @@ def get_test_near_pose(world, **kwargs):
                     tool_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose))
                     base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
             base_points = [base_conf[:2] for base_conf in base_confs]
-            vertices_from_surface[object_name, surface_name] = convex_hull(base_points).vertices
+            vertices_from_surface[object_name, surface_name] = grow_polygon(base_confs, radius=0.05)
         bq.assign()
         base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         return is_point_in_polygon(base_point[:2], vertices_from_surface[object_name, surface_name])
@@ -121,8 +121,7 @@ def get_test_near_joint(world, **kwargs):
     def test(joint_name, bq):
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
-            base_points = [base_conf[:2] for base_conf in base_confs]
-            vertices_from_joint[joint_name] = convex_hull(base_points).vertices
+            vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=0.05)
         bq.assign()
         base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         return is_point_in_polygon(base_point[:2], vertices_from_joint[joint_name])

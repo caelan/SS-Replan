@@ -1,4 +1,4 @@
-from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control
+from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, control_base
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, get_max_limit, get_joint_limits
 from src.issac import update_robot
@@ -90,9 +90,13 @@ class Trajectory(Command):
 
     def execute(self, domain, moveit, observer): # TODO: actor
         # TODO: ensure the same joint names
+        if self.joints == self.world.base_joints:
+            assert not moveit.use_lula
+            control_base(self.path[-1], moveit, observer)
+            return
 
         if MOVEIT:
-            if len(self.joints) == 2:
+            if self.joints == self.world.gripper_joints:
                 joint = self.joints[0]
                 average = np.average(get_joint_limits(self.robot, joint))
                 position = self.path[-1][0]

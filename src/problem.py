@@ -79,7 +79,6 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
         ('GConf', world.closed_gq),
 
         ('Calibrated',),
-
         ('CanMoveBase',),
         ('CanMoveArm',),
         ('CanMoveGripper',),

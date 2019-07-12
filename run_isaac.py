@@ -40,7 +40,7 @@ TASKS = [
 
 def goal_formula_from_goal(world, goals, plan):
     #regex = re.compile(r"(\w+)\((\)\n")
-    task = Task(world, movable_base=False, fixed_base=True)
+    task = Task(world, movable_base=True, fixed_base=True)
     init = []
     goal_literals = []
     # TODO: use the task plan to constrain solution
@@ -117,7 +117,7 @@ def main():
     parser.add_argument('-watch', action='store_true',
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
-    task = args.problem.replace('_', ' ')
+    task_name = args.problem.replace('_', ' ')
     #if args.seed is not None:
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
@@ -134,8 +134,8 @@ def main():
     trial_manager.set_camera(randomize=False)
 
     # Need to reset at the start
-    if task != NONE:
-        objects, goal, plan = trial_manager.get_task(task=task, reset=True)
+    if task_name != NONE:
+        objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
 
     # TODO: why can't I use this earlier?
     robot_entity = domain.get_robot()
@@ -145,7 +145,7 @@ def main():
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[1, -1, 2])
 
-    if task != NONE:
+    if task_name != NONE:
         goals = [(h.format(o), v) for h, v in goal for o in objects]
         print('Goals:', goals)
         task, additional_init, goal_formula = goal_formula_from_goal(world, goals, plan)
@@ -155,15 +155,16 @@ def main():
     world_state = observer.observe() # domain.root
     with LockRenderer():
         update_world(world, domain, observer, world_state)
-        #base_positions = [1.0, 0, np.pi]
-        #set_base_values(world.robot, base_positions)
-        #world.set_initial_conf()
-        #update_isaac_sim(domain, observer, sim_manager, world)
+        if task.movable_base:
+            world.set_base_conf([2.0, 0, 0]) #np.pi])
+            #world.set_initial_conf()
+            update_isaac_sim(domain, observer, sim_manager, world)
+            world.update_custom_limits()
     wait_for_user()
 
     #goal_values = [1.5, -1, np.pi]
     #control_base(goal_values, moveit, observer)
-    if task == NONE:
+    if task_name == NONE:
         return
 
     #cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])

@@ -159,15 +159,16 @@ class World(object):
         return get_joint_positions(self.robot, self.base_joints)
     def set_base_conf(self, conf):
         set_joint_positions(self.robot, self.base_joints, conf)
+    @property
     def all_bodies(self):
-        return self.movable | {self.robot, self.kitchen, self.floor}
+        return set(self.body_from_name.values()) | {self.robot, self.kitchen}
     def get_world_aabb(self):
-        return aabb_union(get_aabb(body) for body in get_bodies() if body != self.floor)
+        return aabb_union(get_aabb(body) for body in self.all_bodies)
     def update_floor(self):
         z = stable_z(self.kitchen, self.floor)
         set_point(self.floor, np.array(get_point(self.floor)) - np.array([0, 0, z]))
     def update_custom_limits(self):
-        robot_extent = get_aabb_extent(get_aabb(self.robot))
+        #robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners
         #min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
         min_extent = 0.0

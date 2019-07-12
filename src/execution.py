@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import math
 
 from src.issac import update_robot, ISSAC_REFERENCE_FRAME, lookup_pose, \
     ISSAC_PREFIX, ISSAC_CARTER_FRAME, CONTROL_TOPIC
@@ -93,8 +94,9 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
 
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), time_from_starts[-1]))
-    world_state = observer.observe()
-    suppress_all(world_state)
+    if moveit.use_lula:
+        world_state = observer.observe()
+        suppress_all(world_state)
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
     start_time = time.time()
@@ -127,7 +129,7 @@ def lula_control(world, path, domain, observer, world_state):
 
 ################################################################################s
 
-def control_base(goal_values, moveit, observer, timeout=INF):
+def control_base(goal_values, moveit, observer, timeout=INF, verbose=False):
     from sensor_msgs.msg import JointState
     from std_msgs.msg import Header
     import rospy
@@ -138,17 +140,17 @@ def control_base(goal_values, moveit, observer, timeout=INF):
     unit_right = np.array([-1, +1])
 
     min_speed = 12 # Technically 9.085
-    max_speed = 30
+    max_speed = 30 # radians per second
 
-    ramp_down_pos = 0.25
-    ramp_down_yaw = np.pi / 8
+    ramp_down_pos = 0.25 # meters
+    ramp_down_yaw = np.pi / 8 # radians
 
     #dump_body(world.robot)
     # https://github.mit.edu/caelan/base-trajectory-action/blob/master/src/base_trajectory.cpp
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/scripts/set_base_joint_states.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter.py
-    linear_threshold = 0.04
-    angular_threshold = np.pi / 64
+    linear_threshold = 0.05
+    angular_threshold = math.radians(3)
 
     # TODO: open-loop odometry (use wheel encoders)
     # TODO: ensure that we are rotating about the correct axis (i.e. base_joints aligned with axis)
@@ -157,11 +159,12 @@ def control_base(goal_values, moveit, observer, timeout=INF):
     reached_goal_pos = False
     goal_pos = np.array(goal_values[:2])
     goal_yaw = goal_values[2]
-
-    #pub = moveit.joint_cmd_pub
-    pub = rospy.Publisher(CONTROL_TOPIC, JointState, queue_size=1)
+    goal_pos_error = INF
+    goal_yaw_error = INF
+    pub = moveit.joint_cmd_pub
+    #pub = rospy.Publisher(CONTROL_TOPIC, JointState, queue_size=1)
     try:
-        rate = rospy.Rate(100)
+        #rate = rospy.Rate(100)
         start_time = rospy.Time.now()
         while (not rospy.is_shutdown()) and ((rospy.Time.now() - start_time).to_sec() < timeout):
             #world_state = observer.observe()
@@ -172,52 +175,56 @@ def control_base(goal_values, moveit, observer, timeout=INF):
 
             base_pose = lookup_pose(observer.tf_listener, ISSAC_PREFIX + ISSAC_CARTER_FRAME)
             pos = np.array(point_from_pose(base_pose)[:2])
-            _, _, yaw = map(wrap_angle, euler_from_quat(quat_from_pose(base_pose)))
-
             x, y, _ = point_from_pose(base_pose)
-            print('x={:.3f}, y={:.3f}, yaw={:.3f}'.format(x, y, yaw))
+            _, _, yaw = map(wrap_angle, euler_from_quat(quat_from_pose(base_pose)))
+            if verbose:
+                print('x={:.3f}, y={:.3f}, yaw={:.3f}'.format(x, y, yaw))
 
             movement_yaw = get_angle(pos, goal_pos)
             movement_yaw_error = abs(circular_difference(movement_yaw, yaw))
             delta_pos = goal_pos - pos
-            pos_error = np.linalg.norm(delta_pos)
+            goal_pos_error = np.linalg.norm(delta_pos)
             goal_yaw_error = abs(circular_difference(goal_yaw, yaw))
-            print('Linear error: {:.5f} ({:.5f})'.format(pos_error, linear_threshold))
-            print('Angular error: {:.5f} ({:.5f})'.format(goal_yaw_error, angular_threshold))
+            print('Linear error: {:.3f} ({:.3f})'.format(
+                goal_pos_error, linear_threshold))
+            print('Angular error: {:.1f} ({:.1f})'.format(
+                *map(math.degrees, [goal_yaw_error, angular_threshold])))
 
             target_yaw = None
-            if reached_goal_pos or (pos_error < linear_threshold):
+            if reached_goal_pos or (goal_pos_error < linear_threshold):
                 reached_goal_pos = True
-                print('rotating towards goal yaw')
+                print('Rotating towards goal yaw')
                 if goal_yaw_error < angular_threshold:
                     return True
                 target_yaw = goal_yaw
             else:
                 if movement_yaw_error < angular_threshold:
-                    print('moving towards goal position')
+                    print('Moving towards goal position')
                 else:
-                    print('moving towards movement yaw')
+                    print('Rotating towards movement yaw')
                     target_yaw = movement_yaw
 
             if target_yaw is None:
                 # target_pos = goal_pos
-                print('Linear delta:', delta_pos)
-                pos_fraction = min(1, pos_error / ramp_down_pos)
+                if verbose:
+                    print('Linear delta:', delta_pos)
+                pos_fraction = min(1, goal_pos_error / ramp_down_pos)
                 speed = (1 - pos_fraction) * min_speed + pos_fraction * max_speed
                 joint_velocities = speed * unit_forward
             else:
                 delta_yaw = circular_difference(target_yaw, yaw)
-                print('Angular delta:', delta_yaw)
+                if verbose:
+                    print('Angular delta:', delta_yaw)
                 #print(robot_entity.carter_interface) # None
                 #print(robot_entity.joints) # Only arm joints
                 #print(robot_entity.q, robot_entity.dq)
+                #speed = max_speed
                 #speed = min(max_speed, 60*np.abs(delta_yaw) / np.pi)
                 yaw_fraction = min(1., abs(delta_yaw) / ramp_down_yaw)
                 speed = (1 - yaw_fraction)*min_speed + yaw_fraction*max_speed
-                #speed = max_speed
                 joint_velocities = - np.sign(delta_yaw) * speed * unit_right
-
-            print('Velocities:', joint_velocities.round(3).tolist())
+            if verbose:
+                print('Velocities:', joint_velocities.round(3).tolist())
             #world_state = observer.observe()
             #update_robot(world, domain, observer, world_state)
             pub.publish(JointState(header=Header(), name=WHEEL_JOINTS, velocity=list(joint_velocities)))
@@ -226,8 +233,12 @@ def control_base(goal_values, moveit, observer, timeout=INF):
         rospy.logerr("Service call failed: %s" % e)
     finally:
         joint_velocities = np.zeros(len(WHEEL_JOINTS))
-        print('Velocities:', joint_velocities.round(3).tolist())
+        if verbose:
+            print('Velocities:', joint_velocities.round(3).tolist())
         pub.publish(JointState(header=Header(), name=WHEEL_JOINTS, velocity=list(joint_velocities)))
+        print('Linear error: {:.3f} ({:.3f})'.format(goal_pos_error, linear_threshold))
+        print('Angular error: {:.1f} ({:.1f})'.format(
+            *map(math.degrees, [goal_yaw_error, angular_threshold])))
     return False
 
 ################################################################################s

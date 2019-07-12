@@ -44,7 +44,7 @@ def get_robot_reference_frame(domain):
     _, reference_frame = entity.base_frame.split('/')  # 'measured/right_gripper'
     return reference_frame
 
-def get_world_from_model(observer, entity, body):
+def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     # TODO: be careful with how base joints are handled
     reference_frame = entity.current_root  # Likely ISSAC_REFERENCE_FRAME
     # world_from_reference = unit_pose()
@@ -59,7 +59,7 @@ def get_world_from_model(observer, entity, body):
 
     entity_link = link_from_name(body, entity_frame) if get_links(body) else BASE_LINK
     frame_from_entity = get_link_pose(body, entity_link)
-    frame_from_model = get_pose(body)
+    frame_from_model = get_link_pose(body, model_link)
     entity_from_model = multiply(invert(frame_from_entity), frame_from_model)
     world_from_model = multiply(world_from_entity, entity_from_model)
     return world_from_model
@@ -71,7 +71,7 @@ def update_robot(world, domain, observer, world_state):
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
-    world_from_entity = get_world_from_model(observer, entity, world.robot)
+    world_from_entity = get_world_from_model(observer, entity, world.robot) #, model_link=BASE_LINK)
 
     base_values = base_values_from_pose(world_from_entity, tolerance=INF)
     entity_from_origin = pose_from_base_values(base_values)
@@ -144,7 +144,6 @@ def update_world(world, domain, observer, world_state):
     world.reset()
     update_robot(world, domain, observer, world_state)
     for name, entity in world_state.entities.items():
-        #dump_dict(entity)
         #entity.obj_type
         #entity.semantic_frames
         if isinstance(entity, RobotArm):
@@ -161,7 +160,7 @@ def update_world(world, domain, observer, world_state):
             world_from_entity = get_world_from_model(observer, entity, world.kitchen)
             with LockRenderer():
                 set_pose(world.kitchen, world_from_entity)
-                world.update_floor()
+                world.update_floor() # TODO: draw floor under the robot instead?
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):
