@@ -97,7 +97,6 @@ def get_link_obstacles(world, link_name):
 
 def get_test_near_pose(world, **kwargs):
     vertices_from_surface = {}
-    base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
 
     def test(object_name, pose, bq):
         surface_name = pose.support
@@ -110,13 +109,12 @@ def get_test_near_pose(world, **kwargs):
             base_points = [base_conf[:2] for base_conf in base_confs]
             vertices_from_surface[object_name, surface_name] = convex_hull(base_points).vertices
         bq.assign()
-        base_point = point_from_pose(get_link_pose(world.robot, base_link))
+        base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         return is_point_in_polygon(base_point[:2], vertices_from_surface[object_name, surface_name])
     return test
 
 def get_test_near_joint(world, **kwargs):
     vertices_from_joint = {}
-    base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
 
     def test(joint_name, bq):
         if joint_name not in vertices_from_joint:
@@ -124,7 +122,7 @@ def get_test_near_joint(world, **kwargs):
             base_points = [base_conf[:2] for base_conf in base_confs]
             vertices_from_joint[joint_name] = convex_hull(base_points).vertices
         bq.assign()
-        base_point = point_from_pose(get_link_pose(world.robot, base_link))
+        base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         return is_point_in_polygon(base_point[:2], vertices_from_joint[joint_name])
     return test
 

@@ -10,19 +10,19 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
-    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, RED, BLUE, LockRenderer, child_link_from_joint
+    invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
+    RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR
 from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES
 from src.world import World
 from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
-from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_date, get_surface_reference_pose, SEPARATOR
+from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
 
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()
     #set_seed(args.seed)
 
-    base_link = child_link_from_joint(joint_from_name(world.robot, BASE_JOINTS[-1]))
     #dump_body(world.robot)
     parent_pose = get_surface_reference_pose(world.kitchen, surface_name)
 
@@ -61,7 +61,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         rel_pose.assign()
         bq.assign()
         world.carry_conf.assign()
-        base_pose = get_link_pose(world.robot, base_link)
+        base_pose = get_link_pose(world.robot, world.base_link)
         tool_pose = multiply(rel_pose.get_world_from_body(), invert(grasp.grasp_pose))
         tool_from_base = multiply(invert(tool_pose), base_pose)
         tool_from_base_list.append(tool_from_base)
@@ -80,7 +80,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     data = {
         'date': date,
         'robot_name': robot_name, # get_name | get_body_name | get_base_name | world.robot_name
-        'base_link': get_link_name(world.robot, base_link),
+        'base_link': get_link_name(world.robot, world.base_link),
         'tool_link': get_link_name(world.robot, world.tool_link),
         'kitchen_name': get_body_name(world.kitchen),
         'surface_name': surface_name,

@@ -121,6 +121,9 @@ class World(object):
         return joints_from_names(self.kitchen, filter(
             ALL_JOINTS.__contains__, self.kitchen_yaml['cspace']))
     @property
+    def base_link(self):
+        return child_link_from_joint(self.base_joints[-1])
+    @property
     def tool_link(self):
         return link_from_name(self.robot, get_tool_link(self.robot))
     @property

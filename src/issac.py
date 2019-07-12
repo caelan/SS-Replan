@@ -6,7 +6,8 @@ from pybullet_tools.pr2_utils import draw_viewcone, get_detection_cone, get_view
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     child_link_from_joint, multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
-    BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body
+    BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body, draw_pose, \
+    point_from_pose, euler_from_quat, quat_from_pose, Pose, Point, Euler
 from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_'
@@ -70,7 +71,13 @@ def update_robot(world, domain, observer, world_state):
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
     world_from_entity = get_world_from_model(observer, entity, world.robot)
-    set_pose(world.robot, world_from_entity)
+    #set_pose(world.robot, world_from_entity)
+
+    x, y, z = point_from_pose(world_from_entity)
+    roll, pitch, yaw = euler_from_quat(quat_from_pose(world_from_entity))
+    set_pose(world.robot, Pose(Point(z=z), Euler(roll=roll, pitch=pitch)))
+    base_values = [x, y, yaw]
+    set_joint_positions(world.robot, world.base_joints, base_values)
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
@@ -164,6 +171,8 @@ def update_world(world, domain, observer, world_state):
             raise NotImplementedError(entity.__class__)
     world.update_custom_limits()
     display_kinect(world, observer)
+    draw_pose(get_pose(world.robot), length=1)
+    #draw_pose(get_link_pose(world.robot, word.base_link))
 
 ################################################################################
 

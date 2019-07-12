@@ -1,37 +1,18 @@
-import datetime
 import os
 import random
-import numpy as np
 
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
     euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint, has_gui, \
-    point_from_pose, RED, child_link_from_joint, get_pose, get_point, invert
-from src.utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name
+    point_from_pose, RED, child_link_from_joint, get_pose, get_point, invert, base_values_from_pose
+from src.utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name, unit_pose
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
 PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
 
-SEPARATOR = '\n' + 50*'-' + '\n'
+# TODO: which frame should the place motion be in?
+# Do I trust the robot base or the kitchen for the floor plane?
 
-def get_random_seed():
-    # random.getstate()[1][0]
-    return np.random.get_state()[1][0]
-
-
-def set_seed(seed):
-    # These generators are different and independent
-    if seed is None:
-        return
-    random.seed(seed)
-    np.random.seed(seed % (2**32))
-    print('Seed:', seed)
-
-
-def get_date():
-    return datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
-
-################################################################################
 
 def get_surface_reference_pose(kitchen, surface_name):
     surface = get_surface(surface_name)
@@ -61,6 +42,7 @@ def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
     return placements
 
 def project_base_pose(base_pose):
+    #return base_values_from_pose(base_pose)
     base_point, base_quat = base_pose
     x, y, _ = base_point
     _, _, theta = euler_from_quat(base_quat)
@@ -74,7 +56,8 @@ def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
     random.shuffle(gripper_from_base_list)
     handles = []
     for gripper_from_base in gripper_from_base_list:
-        world_from_model = get_pose(world.robot)
+        #world_from_model = get_pose(world.robot)
+        world_from_model = unit_pose()
         base_values = project_base_pose(multiply(invert(world_from_model), tool_pose, gripper_from_base))
         #x, y, _ = base_values
         #_, _, z = get_point(world.floor)
@@ -104,7 +87,8 @@ def load_pull_base_poses(world, joint_name):
     random.shuffle(joint_from_base_list)
     handles = []
     for joint_from_base in joint_from_base_list:
-        world_from_model = get_pose(world.robot)
+        #world_from_model = get_pose(world.robot)
+        world_from_model = unit_pose()
         base_values = project_base_pose(multiply(invert(world_from_model), parent_pose, joint_from_base))
         #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
         #x, y, _ = base_values
