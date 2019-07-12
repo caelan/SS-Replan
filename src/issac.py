@@ -66,18 +66,21 @@ def get_world_from_model(observer, entity, body):
 def update_robot(world, domain, observer, world_state):
     entity = world_state.entities[domain.robot]
     # Update joint positions
-    set_joint_positions(world.robot, world.base_joints, entity.carter_pos) # Should be 0
+    #set_joint_positions(world.robot, world.base_joints, entity.carter_pos) # Should be 0
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
     world_from_entity = get_world_from_model(observer, entity, world.robot)
-    #set_pose(world.robot, world_from_entity)
+    set_pose(world.robot, world_from_entity)
+    #print(get_link_pose(world.robot, world.base_link))
 
-    x, y, z = point_from_pose(world_from_entity)
-    roll, pitch, yaw = euler_from_quat(quat_from_pose(world_from_entity))
-    set_pose(world.robot, Pose(Point(z=z), Euler(roll=roll, pitch=pitch)))
-    base_values = [x, y, yaw]
-    set_joint_positions(world.robot, world.base_joints, base_values)
+    # TODO: not quite right
+    #x, y, z = point_from_pose(world_from_entity)
+    #roll, pitch, yaw = euler_from_quat(quat_from_pose(world_from_entity))
+    #set_pose(world.robot, Pose(Point(z=z), Euler(roll=roll, pitch=pitch)))
+    #base_values = [x, y, yaw]
+    #set_joint_positions(world.robot, world.base_joints, base_values)
+    #print(get_link_pose(world.robot, world.base_link))
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose

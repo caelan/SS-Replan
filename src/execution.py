@@ -5,7 +5,7 @@ from src.issac import update_robot, ISSAC_REFERENCE_FRAME, lookup_pose, \
 from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
     euler_from_quat, quat_from_pose, dump_body, circular_difference, \
-    joints_from_names, get_max_velocity, get_distance, get_angle, INF
+    joints_from_names, get_max_velocity, get_distance, get_angle, INF, waypoints_from_path
 from src.utils import WHEEL_JOINTS
 
 def get_joint_names(body, joints):
@@ -23,9 +23,12 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
     joint_names = get_joint_names(robot, joints)
     distance_fn = get_distance_fn(robot, joints)
     #difference_fn = get_difference_fn(robot, joints)
+
+    path = waypoints_from_path(path)
     if len(joints) == 2:
         path = path[-1:]
-    for target_conf in path:
+    for i, target_conf in enumerate(path):
+        print('Waypoint {} / {}'.format(i, len(path)))
         velocity = None
         #velocity = list(0.25 * np.array(max_velocities))
         joint_state = JointState(name=joint_names, position=list(target_conf), velocity=velocity)
