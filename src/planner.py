@@ -13,7 +13,7 @@ from src.command import Wait, State, execute_plan
 VIDEO_FILENAME = 'video.mp4'
 
 
-def solve_pddlstream(world, problem, args, debug=False):
+def solve_pddlstream(problem, args, debug=False):
     _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
@@ -75,11 +75,9 @@ def solve_pddlstream(world, problem, args, debug=False):
     # print([(s.cost, s.time) for s in SOLUTIONS])
     # print(SOLUTIONS)
     print_solution(solution)
-    plan, cost, evaluations = solution
-    commands = commands_from_plan(world, plan)
     pr.disable()
     pstats.Stats(pr).sort_stats('tottime').print_stats(25)  # cumtime | tottime
-    return commands
+    return solution
 
 ################################################################################
 

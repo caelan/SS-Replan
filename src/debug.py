@@ -4,7 +4,8 @@ from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, 
     link_from_name, get_joints, get_sample_fn, set_joint_positions, sample_placement, set_pose, get_pose, draw_pose, \
     BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision, get_link_descendants, \
     set_color, get_collision_data, read_obj, spaced_colors, get_link_pose, aabb_from_points, get_data_pose, tform_mesh, \
-    multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree
+    multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree, get_aabb_extent, \
+    load_pybullet, set_joint_position, get_all_links, get_center_extent
 from src.utils import get_grasps
 
 
@@ -176,4 +177,24 @@ def test_rays(zed_left_point, entity_body):
     ray_result = ray_collision(ray)
     print(ray_result)
     draw_ray(ray, ray_result)
+    wait_for_user()
+
+def compare_kitchens(world):
+    KITCHEN1 = 'models/kitchen_description/urdf/kitchen_part_right_gen_stl.urdf'
+    KITCHEN2 = 'models/kitchen_description/urdf/kitchen_part_right_gen_obj.urdf'
+    mesh1 = read_obj('models/kitchen_description/meshes/obj/drawer_blender.obj', decompose=False)
+    aabb1 = aabb_from_points(mesh1.vertices)
+    mesh2 = read_obj('models/kitchen_description/meshes/obj/drawer_stl.obj', decompose=False)
+    aabb2 = aabb_from_points(mesh2.vertices)
+    print(get_aabb_center(aabb2) - get_aabb_center(aabb1), get_aabb_extent(aabb2) - get_aabb_extent(aabb1))
+
+    kitchen2 = load_pybullet(KITCHEN2, fixed_base=True)
+    for joint in world.kitchen_joints:
+        set_joint_position(world.kitchen, joint, world.open_conf(joint))
+        set_joint_position(kitchen2, joint, world.open_conf(joint))
+    wait_for_user()
+    for link in get_all_links(world.kitchen):
+        center1, extent1 = get_center_extent(world.kitchen, link=link)
+        center2, extent2 = get_center_extent(kitchen2, link=link)
+        print(get_link_name(world.kitchen, link), center2 - center1, extent2 - extent1)
     wait_for_user()

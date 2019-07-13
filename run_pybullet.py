@@ -8,13 +8,11 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan
+from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block
 #from src.debug import dump_link_cross_sections, test_rays
-
-#from examples.pybullet.pr2.run import post_process
 
 def create_parser():
     parser = argparse.ArgumentParser()
@@ -59,7 +57,9 @@ def main():
     task = stow_block(world)
     problem = pdddlstream_from_problem(task,
         collisions=not args.cfree, teleport=args.teleport)
-    commands = solve_pddlstream(world, problem, args)
+    solution = solve_pddlstream(problem, args)
+    plan, cost, evaluations = solution
+    commands = commands_from_plan(world, plan)
     simulate_plan(world, commands, args)
     world.destroy()
 

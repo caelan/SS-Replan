@@ -17,7 +17,7 @@ from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, wait
 from src.issac import update_world, kill_lula, update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
-from src.planner import solve_pddlstream, simulate_plan
+from src.planner import solve_pddlstream, simulate_plan, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.task import Task
 
@@ -172,7 +172,9 @@ def main():
     problem[-2].extend(additional_init)
     problem = problem[:-1] + (And(problem[-1], goal_formula),)
     saver = WorldSaver()
-    commands = solve_pddlstream(world, problem, args)
+    solution = solve_pddlstream(problem, args)
+    plan, cost, evaluations = solution
+    commands = commands_from_plan(world, plan)
     if args.watch or args.record:
         simulate_plan(world, commands, args)
     else:
