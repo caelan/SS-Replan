@@ -16,6 +16,14 @@ DISABLED_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
 }
 
+# IKFast
+# https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/tree/master/control_tools/ik
+# https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ik/ik_tools/pr2_with_sensor_ik/ik_generator.py
+# http://openrave.org/docs/0.8.2/openravepy/ikfast/
+# http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/ikfast/ikfast_tutorial.html
+# http://docs.ros.org/kinetic/api/framefab_irb6600_support/html/doc/ikfast_tutorial.html
+# https://github.com/yijiangh/choreo/blob/bc777069b8eb7283c74af26e5461532aec3d9e8a/framefab_robot/abb/framefab_irb6600/framefab_irb6600_support/doc/ikfast_tutorial.rst
+# http://wiki.ros.org/collada_urdf
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
@@ -78,7 +86,7 @@ class World(object):
         # TODO: store poses as well?
         self.update_floor()
         self.update_custom_limits()
-        self.initial_state = WorldSaver()
+        self.initial_saver = WorldSaver()
         #self.init_bq = Conf(self.robot, self.base_joints)
         #self.init_aq = Conf(self.robot, self.arm_joints)
         #self.init_gq = Conf(self.robot, self.gripper_joints)
