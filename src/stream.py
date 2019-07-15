@@ -708,6 +708,11 @@ DOOR_STATUSES = [OPEN, CLOSED]
 JOINT_THRESHOLD = 1e-3
 # TODO: retrieve from entity
 
+def get_gripper_test(world):
+    def test(gq):
+        return np.max(np.abs(np.array(gq.values) - np.array(world.open_gq.values))) <= JOINT_THRESHOLD
+    return test
+
 def get_door_test(world):
     def test(joint_name, conf, status):
         [joint] = conf.joints

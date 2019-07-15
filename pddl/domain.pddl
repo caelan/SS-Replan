@@ -42,6 +42,9 @@
     (Cooked ?o)
     (Calibrated)
 
+    (OpenGripper)
+    (OpenGConf ?gq)
+
     (Status ?s)
     (DoorStatus ?j ?s)
     (AngleWithin ?j ?a ?s)
@@ -119,7 +122,7 @@
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                        (AtBConf ?bq) (Calibrated)
-                       (AtAConf ?aq) (AtGConf @open_gq)
+                       (AtAConf ?aq) (OpenGripper)
                        (Accessible ?o2 ?p2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
@@ -152,7 +155,7 @@
                        (AtAngle ?j ?a1) (HandEmpty)
                        (AtWorldPose ?o ?p1)
                        (AtBConf ?bq) (Calibrated)
-                       (AtAConf ?aq1) (AtGConf @open_gq)
+                       (AtAConf ?aq1) (OpenGripper)
                        ; TODO: ensure the final conf is safe
                        (not (UnsafeATraj ?at))
                   )
@@ -183,6 +186,12 @@
     (exists (?g) (and (Grasp ?o ?g)
                       (AtGrasp ?o ?g)))
   )
+  (:derived (OpenGripper)
+    ;(AtGConf @open_gq)
+    (exists (?gq) (and (OpenGConf ?gq)
+                       (AtGConf ?gq)))
+  )
+
   (:derived (DoorStatus ?j ?s)
     (exists (?a) (and (AngleWithin ?j ?a ?s)
                       (AtAngle ?j ?a)))

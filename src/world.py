@@ -180,9 +180,6 @@ class World(object):
                                      get_link_pose(self.robot, tip_link))
             world_from_tip = multiply(world_from_tool, tool_from_tip)
             base_from_tip = multiply(invert(world_from_base), world_from_tip)
-
-            print(self.ik_solver.joint_names)
-
             joints = joints_from_names(self.robot, self.ik_solver.joint_names)
             seed_state = get_joint_positions(self.robot, joints)
             #seed_state = [0.0] * self.ik_solver.number_of_joints

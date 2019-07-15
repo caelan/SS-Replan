@@ -14,7 +14,8 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
-    get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, get_test_near_joint
+    get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
+    get_test_near_joint, get_gripper_test
 from src.database import has_place_database
 from src.visualization import add_markers
 
@@ -216,6 +217,8 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
 
     stream_map = {
         'test-door': from_test(get_door_test(world)),
+        'test-gripper': from_test(get_gripper_test(world)),
+
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world)),
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),

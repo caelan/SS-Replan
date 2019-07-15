@@ -75,6 +75,7 @@ def add_kinect(world):
 # ]
 
 def stow_block(world):
+    world.open_gq.assign()
     # for joint in world.kitchen_joints:
     # for name in LEFT_VISIBLE:
     for name in DRAWER_JOINTS[1:2]:

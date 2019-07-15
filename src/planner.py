@@ -20,6 +20,7 @@ def solve_pddlstream(problem, args, debug=False):
     print('Streams:', stream_map.keys())
 
     stream_info = {
+        'test-gripper': StreamInfo(p_success=0, eager=True),
         'test-door': StreamInfo(p_success=0, eager=True),
         'test-near-pose': StreamInfo(p_success=0, eager=True),
         'test-near-joint': StreamInfo(p_success=0, eager=True),
@@ -30,8 +31,8 @@ def solve_pddlstream(problem, args, debug=False):
         'plan-pick': StreamInfo(overhead=1e1),
         'plan-pull': StreamInfo(overhead=1e1),
 
-        'plan-base-motion': StreamInfo(overhead=1e3),
-        'plan-arm-motion': StreamInfo(overhead=1e2),
+        'plan-base-motion': StreamInfo(overhead=1e3, defer=True),
+        'plan-arm-motion': StreamInfo(overhead=1e2, defer=True),
 
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
