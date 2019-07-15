@@ -13,7 +13,7 @@ from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_P
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
 from ikfast.ik import sample_tool_ik
 
-DISABLED_COLLISIONS = {
+DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
 }
 
@@ -66,8 +66,11 @@ class World(object):
         self.custom_limits = {}
         self.base_limits_handles = []
         self.initial_attachments = {}
-        self.disabled_collisions = {tuple(link_from_name(self.robot, link) for link in pair)
-                                    for pair in DISABLED_COLLISIONS}
+
+        self.disabled_collisions = set()
+        if self.robot_name == FRANKA_CARTER:
+            self.disabled_collisions.update(tuple(link_from_name(self.robot, link) for link in pair)
+                                            for pair in DISABLED_FRANKA_COLLISIONS)
 
         self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
         self.open_gq = Conf(self.robot, self.gripper_joints,
@@ -91,7 +94,7 @@ class World(object):
         return joints_from_names(self.robot, BASE_JOINTS)
     @property
     def arm_joints(self):
-        if self.robot_yaml is None:
+        if self.robot_name == EVE:
             return get_eve_arm_joints(self.robot, arm=DEFAULT_ARM)
         return joints_from_names(self.robot, self.robot_yaml['cspace'])
     @property
@@ -132,7 +135,7 @@ class World(object):
         return set(self.body_from_name.values()) | {self.robot, self.kitchen}
     @property
     def default_conf(self):
-        if self.robot_yaml is None:
+        if self.robot_name == EVE:
             # Eve starts outside of joint limits
             conf = [np.average(get_joint_limits(self.robot, joint)) for joint in self.arm_joints]
             #conf = np.zeros(len(self.arm_joints))
@@ -177,6 +180,8 @@ class World(object):
                                      get_link_pose(self.robot, tip_link))
             world_from_tip = multiply(world_from_tool, tool_from_tip)
             base_from_tip = multiply(invert(world_from_base), world_from_tip)
+
+            print(self.ik_solver.joint_names)
 
             joints = joints_from_names(self.robot, self.ik_solver.joint_names)
             seed_state = get_joint_positions(self.robot, joints)

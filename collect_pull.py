@@ -47,9 +47,9 @@ def collect_pull(world, joint_name, args):
             failures += 1
             continue
         open_conf.assign()
-        bq, at = result
+        bq, aq, at = result
         bq.assign()
-        world.carry_conf.assign()
+        aq.assign()
         #next(at.commands[2].iterate(None, None))
         base_pose = get_link_pose(world.robot, world.base_link)
         #handle_pose = get_link_pose(world.robot, base_link)

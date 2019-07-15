@@ -11,9 +11,9 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
-    RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR
+    RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR, dump_body
 from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
-    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES
+    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE
 from src.world import World
 from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
 from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
@@ -26,7 +26,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     #dump_body(world.robot)
     parent_pose = get_surface_reference_pose(world.kitchen, surface_name)
 
-    stable_gen_fn = get_stable_gen(world, collisions=not args.cfree)
+    stable_gen_fn = get_stable_gen(world, learned=False, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world)
     ik_ir_gen = get_pick_gen_fn(world, collisions=not args.cfree, teleport=args.teleport,
                                 learned=False, max_attempts=args.attempts,
@@ -57,10 +57,10 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
                 len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
             failures += 1
             continue
-        bq, at = result
+        bq, aq, at = result
         rel_pose.assign()
         bq.assign()
-        world.carry_conf.assign()
+        aq.assign()
         base_pose = get_link_pose(world.robot, world.base_link)
         tool_pose = multiply(rel_pose.get_world_from_body(), invert(grasp.grasp_pose))
         tool_from_base = multiply(invert(tool_pose), base_pose)
@@ -113,6 +113,8 @@ def main():
                         help='The maximum runtime')
     parser.add_argument('-num_samples', default=1000, type=int,
                         help='The number of samples')
+    parser.add_argument('-robot', default=FRANKA_CARTER, choices=[FRANKA_CARTER, EVE],
+                        help='The robot to use.')
     parser.add_argument('-seed', default=None,
                         help='The random seed to use.')
     parser.add_argument('-teleport', action='store_true',
@@ -128,7 +130,8 @@ def main():
     #surface_names = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
     #surface_names = CABINET_JOINTS + SURFACES + DRAWER_JOINTS
 
-    world = World(use_gui=args.visualize)
+    world = World(use_gui=args.visualize, robot_name=args.robot)
+    dump_body(world.robot)
     for joint in world.kitchen_joints:
         world.open_door(joint) # open_door | close_door
     world.open_gripper()

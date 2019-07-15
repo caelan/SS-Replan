@@ -147,9 +147,9 @@ EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
 #EVE_TOOL_LINK = 'qbhand_{arm}_palm_link'
 EVE_TOOL_LINK = 'qbhand_{arm}_tendon_virtual_link'
 
-EVE_HIP_JOINTS = ['j_hip_z', 'j_hip_x', 'j_hip_y']
-EVE_ANKLE_JOINTS = ['j_knee_y', 'j_ankle_y', 'j_ankle_x']
 EVE_WHEEL_JOINTS = ['j_{a}_wheel_y', 'j_{a}_wheel_y']
+EVE_ANKLE_JOINTS = ['j_knee_y', 'j_ankle_y', 'j_ankle_x']
+EVE_HIP_JOINTS = ['j_hip_z', 'j_hip_x', 'j_hip_y']
 EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
                   'j_{a}_elbow_y', 'j_{a}_elbow_z', 'j_{a}_wrist_y', 'j_{a}_wrist_x'] # j_neck_y
 
@@ -157,9 +157,11 @@ EVE = 'Eve'
 ARMS = ['left', 'right']
 DEFAULT_ARM = ARMS[0]
 
+# TODO: the Eve URDF is strange
+
 def get_eve_arm_joints(robot, arm):
-    name = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
-    return joints_from_names(robot, name)
+    names = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
+    return joints_from_names(robot, names)
 
 ################################################################################
 
@@ -377,7 +379,8 @@ SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
 UNDER_GRASP = 'under' # TODO: for franka_carter
 GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 
-def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, use_width=True, **kwargs):
+def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
+    use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
