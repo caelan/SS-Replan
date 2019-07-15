@@ -6,9 +6,11 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.incremental import solve_incremental
 from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo
+from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
 from src.command import Wait, State, execute_plan
+from src.stream import BASE_CONSTANT
 
 VIDEO_FILENAME = 'video.mp4'
 REPLAN_ACTIONS = {'calibrate'}
@@ -38,7 +40,7 @@ def solve_pddlstream(problem, args, debug=False):
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
-        # 'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda q1, q2: BASE_CONSTANT),
+        'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
     replan_actions = REPLAN_ACTIONS if args.defer else set()

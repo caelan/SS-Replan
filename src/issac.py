@@ -75,9 +75,12 @@ def update_robot(world, domain, observer, world_state):
 
     base_values = base_values_from_pose(world_from_entity, tolerance=INF)
     entity_from_origin = pose_from_base_values(base_values)
-    world_from_origin = multiply(world_from_entity, entity_from_origin)
+    world_from_origin = multiply(world_from_entity, invert(entity_from_origin))
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
+
+    print(entity.carter_pos)
+    print(base_values)
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
@@ -171,7 +174,7 @@ def update_world(world, domain, observer, world_state):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-    world.update_initial() # TODO: draw floor under the robot instead?
+    # TODO: draw floor under the robot instead?
     display_kinect(world, observer)
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)

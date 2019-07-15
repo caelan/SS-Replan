@@ -20,6 +20,7 @@ from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.task import Task
+from src.execution import control_base
 
 from pddlstream.language.constants import Not, And
 
@@ -111,6 +112,7 @@ def planning_loop(domain, trial_manager, task, additional_init, goal_formula, ar
     observer = trial_manager.observer
     world = task.world
 
+    # TODO: track the plan cost
     while True:
         world_state = observer.observe()
         update_world(world, domain, observer, world_state)
@@ -120,7 +122,8 @@ def planning_loop(domain, trial_manager, task, additional_init, goal_formula, ar
         saver = WorldSaver()
         solution = solve_pddlstream(problem, args)
         plan, cost, evaluations = solution
-        commands = commands_from_plan(world, plan)
+        commands = commands_from_plan(world, plan, defer=args.defer)
+        print('Commands:', commands)
         if args.watch or args.record:
             simulate_plan(world, commands, args)
         else:
@@ -184,12 +187,14 @@ def main():
     with LockRenderer():
         update_world(world, domain, observer, world_state)
         if task.movable_base:
-            world.set_base_conf([2.0, 0, 0]) #np.pi])
+            world.set_base_conf([2.0, 0, np.pi/2])
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
         world.update_initial()
     wait_for_user()
     # TODO: initial robot base conf is in collision
+
+    #control_base([2.0, 0, -np.pi], domain.get_robot().get_motion_interface(), observer)
     success = planning_loop(domain, trial_manager, task, additional_init, goal_formula, args)
     print('Success:', success)
     world.destroy()

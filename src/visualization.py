@@ -7,7 +7,6 @@ from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_supporting, get
 
 
 def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
-    print(name, len(base_confs))
     handles = []
     if not base_confs:
         return handles
