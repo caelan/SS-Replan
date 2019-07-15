@@ -12,9 +12,9 @@ from distutils.core import setup, Extension
 # see: https://docs.python.org/3/extending/building.html
 
 # lib name template: 'ikfast_<robot name>'
-IKFAST = 'ikfast_franka_panda'
+from ikfast.utils import IKFAST, CPP_PATH
 
-ikfast_module = Extension(IKFAST, sources=['panda_arm_hand_on_carter.cpp'])
+ikfast_module = Extension(IKFAST, sources=[CPP_PATH])
 
 setup(name=IKFAST,
       version='1.0',

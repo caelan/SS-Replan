@@ -19,24 +19,22 @@ from openravepy.misc import InitOpenRAVELogging
 # https://github.com/ros-planning/moveit_ikfast/blob/kinetic-devel/scripts/round_collada_numbers.py
 
 # pip install sympy==0.7.1 --upgrade --user
+from ikfast.utils import DAE_PATH, BASE_LINK, TOOL_LINK, FREE_JOINT, CPP_PATH
 
 InitOpenRAVELogging()
 env = Environment()
 # If needed, use the following command to generate a .dae file from a .urdf file.
 # rosrun collada_urdf urdf_to_collada <input-urdf> <output.dae>
 
-dae_path = 'panda_arm_hand_on_carter.dae'
-
-kinbody = env.ReadRobotURI(dae_path)
+kinbody = env.ReadRobotURI(DAE_PATH)
 env.Add(kinbody)
 solver = ikfast.IKFastSolver(kinbody=kinbody)
 
-base_link = kinbody.GetLink('chassis_link').GetIndex()
-ee_link = kinbody.GetLink('right_gripper').GetIndex()
+base_link = kinbody.GetLink(BASE_LINK).GetIndex()
+ee_link = kinbody.GetLink(TOOL_LINK).GetIndex()
 free_joints = [
     #kinbody.GetJoint('l_upper_arm_roll_joint').GetDOFIndex(), # Third link
-    kinbody.GetJoint('panda_joint4').GetDOFIndex(),
-	# panda_joint2, panda_joint3, panda_joint4 don't seem to work
+    kinbody.GetJoint(FREE_JOINT).GetDOFIndex(),
 ]
 
 chaintree = solver.generateIkSolver(baselink=base_link,
@@ -44,13 +42,9 @@ chaintree = solver.generateIkSolver(baselink=base_link,
 									freeindices=free_joints,
 									solvefn=ikfast.IKFastSolver.solveFullIK_6D)
 
-#filename = os.path.basename(dae_path)
-filename, extension = os.path.splitext(dae_path)
-cpp_path = '{}.cpp'.format(filename)
-
 code = solver.writeIkSolver(chaintree)
-with open(cpp_path, 'w') as f:
+with open(CPP_PATH, 'w') as f:
     f.write(code)
-print('Wrote', cpp_path)
+print('Wrote', CPP_PATH)
 
 # scp create_cpp.py demo@128.30.47.147:/home/demo/
