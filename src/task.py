@@ -103,7 +103,8 @@ def stow_block(world):
     pose.assign()
     #wait_for_user()
 
-    return Task(world, goal_hand_empty=True,
+    return Task(world, goal_hand_empty=False,
+                #goal_holding=[entity_name],
                 goal_on={entity_name: 'indigo_drawer_top'},
                 goal_closed=ALL_JOINTS)
 
