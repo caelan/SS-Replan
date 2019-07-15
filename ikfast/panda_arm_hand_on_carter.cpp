@@ -12395,7 +12395,7 @@ static PyObject *get_fk(PyObject *self, PyObject *args)
 
 static PyMethodDef ikfast_methods[] =
 {
-    {"get_ik", get_ik, METH_VARARGS, "compute ik solutions using ikfast."},
+    {"get_ik", get_ik, METH_VARARGS, "Compute ik solutions using ikfast."},
     {"get_fk", get_fk, METH_VARARGS, "Compute fk solutions using ikfast."},
     {NULL, NULL, 0, NULL}
     // Not sure why/if this is needed. It shows up in the examples though(something about Sentinel).
@@ -12403,9 +12403,9 @@ static PyMethodDef ikfast_methods[] =
 
 #if PY_MAJOR_VERSION >= 3
 
-static struct PyModuleDef ikfast_kuka_kr6_r900_module = {
+static struct PyModuleDef ikfast_franka_panda_module = {
     PyModuleDef_HEAD_INIT,
-    "ikfast_kuka_kr6_r900",   /* name of module */
+    "ikfast_franka_panda",   /* name of module */
     NULL, /* module documentation, may be NULL */
     -1,       /* size of per-interpreter state of the module,
                  or -1 if the module keeps state in global variables. */
@@ -12415,19 +12415,19 @@ static struct PyModuleDef ikfast_kuka_kr6_r900_module = {
 #define INITERROR return NULL
 
 PyMODINIT_FUNC
-PyInit_ikfast_kuka_kr6_r900(void)
+PyInit_ikfast_franka_panda(void)
 
 #else // PY_MAJOR_VERSION < 3
 #define INITERROR return
 
 PyMODINIT_FUNC
-initikfast_kuka_kr6_r900(void)
+initikfast_franka_panda(void)
 #endif
 {
 #if PY_MAJOR_VERSION >= 3
-    PyObject *module = PyModule_Create(&ikfast_kuka_kr6_r900_module);
+    PyObject *module = PyModule_Create(&ikfast_franka_panda_module);
 #else
-    PyObject *module = Py_InitModule("ikfast_kuka_kr6_r900", ikfast_methods);
+    PyObject *module = Py_InitModule("ikfast_franka_panda", ikfast_methods);
 #endif
 
 if (module == NULL)
