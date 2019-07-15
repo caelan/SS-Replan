@@ -7,7 +7,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, \
-    get_max_limits, add_body_name, WorldSaver
+    get_max_limits, add_body_name, WorldSaver, dump_body
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
@@ -15,15 +15,6 @@ from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_P
 DISABLED_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
 }
-
-# IKFast
-# https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/tree/master/control_tools/ik
-# https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ik/ik_tools/pr2_with_sensor_ik/ik_generator.py
-# http://openrave.org/docs/0.8.2/openravepy/ikfast/
-# http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/ikfast/ikfast_tutorial.html
-# http://docs.ros.org/kinetic/api/framefab_irb6600_support/html/doc/ikfast_tutorial.html
-# https://github.com/yijiangh/choreo/blob/bc777069b8eb7283c74af26e5461532aec3d9e8a/framefab_robot/abb/framefab_irb6600/framefab_irb6600_support/doc/ikfast_tutorial.rst
-# http://wiki.ros.org/collada_urdf
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
@@ -42,6 +33,7 @@ class World(object):
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
         with HideOutput(enable=True):
             self.robot = load_pybullet(urdf_path)
+        #dump_body(self.robot)
         #chassis_pose = get_link_pose(self.robot, link_from_name(self.robot, 'chassis_link'))
         #wheel_pose = get_link_pose(self.robot, link_from_name(self.robot, 'left_wheel_link'))
         #wait_for_user()

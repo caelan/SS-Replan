@@ -686,18 +686,17 @@ def get_gripper_motion_gen(world, teleport=False, **kwargs):
 
 def get_calibrate_gen(world, collisions=True, teleport=False):
 
-    def fn(bq):
+    def fn(bq): #, aq):
         # TODO: include if holding anything?
         bq.assign()
         aq = world.carry_conf
-        aq.assign()
-        world.open_gripper()
+        #aq.assign() # TODO: could sample aq instead achieve it by move actions
+        #world.open_gripper()
         robot_saver = BodySaver(world.robot)
         cmd = Sequence(State(savers=[robot_saver]), commands=[
             #Trajectory(world, world.robot, world.arm_joints, approach_path),
             # TODO: calibrate command
         ], name='calibrate')
-        #return (aq, cmd,)
         return (cmd,)
     return fn
 

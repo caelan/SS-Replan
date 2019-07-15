@@ -84,13 +84,12 @@
     :outputs (?gt)
     :certified (GripperMotion ?gq1 ?gq2 ?gt)
   )
-  ;(:stream plan-calibrate-motion
-  ;  :inputs (?bq)
-  ;  :domain (BConf ?bq)
-  ;  :outputs (?at)
-  ;  :certified (and (ATraj ?at) ; (AConf ?aq)
-  ;                  (CalibrateMotion ?bq ?at))
-  ;)
+  (:stream plan-calibrate-motion
+    :inputs (?bq)
+    :domain (BConf ?bq)
+    :outputs (?at) ; ?aq
+    :certified (and (ATraj ?at) (CalibrateMotion ?bq @rest_aq ?at))
+  )
 
   (:stream compute-pose-kin
     :inputs (?o1 ?rp ?o2 ?p2)

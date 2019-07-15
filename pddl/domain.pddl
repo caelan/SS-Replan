@@ -18,7 +18,7 @@
     (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
-    (CalibrateMotion ?bq ?at)
+    (CalibrateMotion ?bq ?aq ?at)
     (BTraj ?bt)
     (ATraj ?at)
     (Conf ?j ?q)
@@ -88,7 +88,8 @@
   (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
     :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at)
-                       (AtBConf ?bq) (AtAConf ?aq1) (CanMoveArm))
+                       (AtBConf ?bq) (AtAConf ?aq1)
+                       (Calibrated) (CanMoveArm)) ; TODO: require calibration for arm movements?
     :effect (and (AtAConf ?aq2)
                  (not (AtAConf ?aq1)) (not (CanMoveArm))
                  (increase (total-cost) (MoveArmCost)))
@@ -102,18 +103,17 @@
                  (increase (total-cost) (MoveGripperCost)))
   )
 
-  ;(:action calibrate
-  ;  :parameters (?bq ?at)
-  ;  :precondition (and (CalibrateMotion ?bq ?at)
-  ;                     (AtBConf ?bq)
-  ;                     (AtAConf @rest_aq) ; (AtAConf ?aq)
-  ;                     (not (Calibrated))
-  ;                     ; TODO: visibility constraints
-  ;                 )
-  ;  :effect (and (Calibrated) ; Could make this be a new pose ?bq2
-  ;               ; (not (AtBConf ?bq))
-  ;               (increase (total-cost) (CalibrateCost)))
-  ;)
+  (:action calibrate
+    :parameters (?bq ?aq ?at)
+    :precondition (and (CalibrateMotion ?bq ?aq ?at)
+                       (AtBConf ?bq) (AtAConf ?aq)
+                       (not (Calibrated))
+                       ; TODO: visibility constraints
+                   )
+    :effect (and (Calibrated)
+                 ; (not (AtBConf ?bq)) ; Could make this be a new pose ?bq2
+                 (increase (total-cost) (CalibrateCost)))
+  )
   (:action pick
     :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?aq ?at)
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)

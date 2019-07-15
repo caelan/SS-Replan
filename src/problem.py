@@ -7,7 +7,7 @@ from pddlstream.utils import read, get_file_path
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, create_attachment, \
     child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    LockRenderer
+    LockRenderer, WorldSaver
 
 from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, get_surface, COUNTERS, RelPose, get_supporting
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
@@ -68,16 +68,17 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
     init = [
         ('BConf', init_bq),
         ('AtBConf', init_bq),
+        ('AConf', init_bq, world.carry_conf),
+
         ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
+
         ('GConf', init_gq),
         ('AtGConf', init_gq),
-        ('HandEmpty',),
-
-        ('AConf', init_bq, world.carry_conf),
         ('GConf', world.open_gq),
         ('GConf', world.closed_gq),
 
+        ('HandEmpty',),
         ('Calibrated',),
         ('CanMoveBase',),
         ('CanMoveArm',),
@@ -113,9 +114,18 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
     if task.return_init_bq:
-        goal_literals.append(('AtBConf', init_bq))
-    if task.return_init_aq:
-        goal_literals.append(('AtAConf', init_aq))
+        with WorldSaver():
+            world.initial_saver.restore()
+            goal_bq = Conf(world.robot, world.base_joints)
+            goal_aq = Conf(world.robot, world.arm_joints)
+        init.extend([
+            ('BConf', goal_bq),
+            ('AConf', goal_bq, world.carry_conf),
+        ])
+        goal_literals.append(('AtBConf', goal_bq))
+        if task.return_init_aq:
+            init.append(('AConf', goal_bq, goal_aq))
+            goal_literals.append(('AtAConf', goal_aq))
 
     surface_poses = {}
     for joint in world.kitchen_joints:
@@ -126,6 +136,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         for conf in [init_conf, open_conf, closed_conf]:
+            # TODO: return to initial poses?
             pose, = compute_angle_kin(link_name, joint_name, conf)
             init.extend([
                 ('Joint', joint_name),

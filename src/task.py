@@ -10,7 +10,7 @@ from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, get_y
 
 class Task(object):
     def __init__(self, world,  skeletons=[],
-                 movable_base=True, fixed_base=False, noisy_base=False,
+                 movable_base=True, fixed_base=False, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[],
                  goal_on={}, goal_closed=[], goal_cooked=[]):
