@@ -11,6 +11,7 @@ from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoS
 from src.command import Wait, State, execute_plan
 
 VIDEO_FILENAME = 'video.mp4'
+REPLAN_ACTIONS = {'calibrate'}
 
 
 def solve_pddlstream(problem, args, debug=False):
@@ -40,6 +41,7 @@ def solve_pddlstream(problem, args, debug=False):
         # 'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda q1, q2: BASE_CONSTANT),
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
+    replan_actions = REPLAN_ACTIONS if args.defer else set()
 
     #constraints = PlanConstraints(skeletons=[skeleton], exact=True)
     constraints = PlanConstraints()
@@ -58,6 +60,7 @@ def solve_pddlstream(problem, args, debug=False):
             # effort_weight = 0 if args.optimal else 1
             effort_weight = 1e-3 if args.optimal else 1
             solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
+                                     replan_actions=replan_actions,
                                      planner=planner, max_planner_time=max_planner_time,
                                      unit_costs=args.unit, success_cost=success_cost,
                                      max_time=args.max_time, verbose=True, debug=debug,
@@ -82,7 +85,7 @@ def solve_pddlstream(problem, args, debug=False):
 
 ################################################################################
 
-def commands_from_plan(world, plan):
+def commands_from_plan(world, plan, defer=False):
     if plan is None:
         return None
     # TODO: propagate the state
@@ -96,6 +99,8 @@ def commands_from_plan(world, plan):
             commands.append(Wait(world, steps=100))
         else:
             raise NotImplementedError(action)
+        if defer and (action in REPLAN_ACTIONS):
+            break
     return commands
 
 ################################################################################

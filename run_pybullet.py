@@ -20,6 +20,8 @@ def create_parser():
                         help='Specifies the planning algorithm that should be used')
     parser.add_argument('-cfree', action='store_true',
                         help='When enabled, disables collision checking (for debugging).')
+    parser.add_argument('-defer', action='store_true',
+                        help='When enabled, defers evaluation of motion planning streams.')
     parser.add_argument('-optimal', action='store_true',
                         help='Runs in an anytime mode')
     #parser.add_argument('-problem', default='test_block',
@@ -59,7 +61,7 @@ def main():
         collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
     plan, cost, evaluations = solution
-    commands = commands_from_plan(world, plan)
+    commands = commands_from_plan(world, plan, defer=args.defer)
     simulate_plan(world, commands, args)
     world.destroy()
 
