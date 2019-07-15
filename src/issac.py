@@ -79,9 +79,6 @@ def update_robot(world, domain, observer, world_state):
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
 
-    print(entity.carter_pos)
-    print(base_values)
-
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
     import rospy

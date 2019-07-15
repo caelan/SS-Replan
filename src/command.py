@@ -1,6 +1,7 @@
 from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, follow_trajectory
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
-    wait_for_duration, user_input, wait_for_user, flatten_links, get_max_limit, get_joint_limits
+    wait_for_duration, user_input, wait_for_user, flatten_links, \
+    get_max_limit, get_joint_limits, waypoints_from_path
 from src.issac import update_robot
 
 import numpy as np
@@ -31,6 +32,8 @@ class State(object):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, list(self.savers), self.attachments)
     # TODO: copy?
+
+################################################################################
 
 class Command(object):
     def __init__(self, world):
@@ -91,8 +94,22 @@ class Trajectory(Command):
     def execute(self, domain, moveit, observer): # TODO: actor
         # TODO: ensure the same joint names
         if self.joints == self.world.base_joints:
-            assert not moveit.use_lula
-            follow_trajectory(self.path, moveit, observer)
+            #assert not moveit.use_lula
+            world_state = domain.root
+            robot_entity = world_state.entities[domain.robot]
+            carter = robot_entity.carter_interface
+            if carter is None:
+                follow_trajectory(self.path, moveit, observer)
+            else:
+                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
+                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_policies.py
+                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_predicates.py#L164
+                for conf in waypoints_from_path(self.path):
+                    carter.move_to_safe(conf)
+                    #carter.move_to_async(conf)
+                    #carter.simple_move(cmd)
+                carter.simple_stop()
+                #carter.pub_disable_deadman_switch.publish(True)
             return
 
         if MOVEIT:
@@ -166,12 +183,13 @@ class DoorTrajectory(Command):
 ################################################################################s
 
 class Attach(Command):
-    def __init__(self, world, robot, link, body):
+    def __init__(self, world, robot, link, body, grasp=None):
         # TODO: names or bodies?
         super(Attach, self).__init__(world)
         self.robot = robot
         self.link = link
         self.body = body
+        self.grasp = grasp
 
     @property
     def bodies(self):

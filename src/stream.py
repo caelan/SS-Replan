@@ -361,7 +361,7 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
             Trajectory(world, world.robot, world.arm_joints, approach_path),
             finger_cmd.commands[0],
             Detach(world, world.kitchen, surface_link, obj_body),
-            Attach(world, world.robot, world.tool_link, obj_body),
+            Attach(world, world.robot, world.tool_link, obj_body, grasp=grasp),
             Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
         ], name='pick')
         yield (aq, cmd,)
