@@ -7,10 +7,11 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, \
-    get_max_limits, add_body_name, WorldSaver, dump_body
+    get_max_limits, add_body_name, WorldSaver, dump_body, wait_for_user
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
+from ikfast.ik import sample_tool_ik
 
 DISABLED_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
@@ -166,14 +167,14 @@ class World(object):
         self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
         self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)
         return self.custom_limits
-    def solve_inverse_kinematics(self, world_from_tool, use_track_ik=USE_TRACK_IK, **kwargs):
+    def solve_inverse_kinematics(self, world_from_tool, use_track_ik=True, **kwargs):
         if use_track_ik:
             assert self.ik_solver is not None
             base_link = link_from_name(self.robot, self.ik_solver.base_link)
             world_from_base = get_link_pose(self.robot, base_link)
             tip_link = link_from_name(self.robot, self.ik_solver.tip_link)
             tool_from_tip = multiply(invert(get_link_pose(self.robot, self.tool_link)),
-                                      get_link_pose(self.robot, tip_link))
+                                     get_link_pose(self.robot, tip_link))
             world_from_tip = multiply(world_from_tool, tool_from_tip)
             base_from_tip = multiply(invert(world_from_base), world_from_tip)
 
@@ -187,8 +188,14 @@ class World(object):
                 return conf
             set_joint_positions(self.robot, joints, conf)
             return get_configuration(self.robot)
-        return sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
-                                     custom_limits=self.custom_limits, **kwargs)
+        conf = sample_tool_ik(self.robot, world_from_tool, max_attempts=100)
+        if conf is None:
+            return conf
+        set_joint_positions(self.robot, self.arm_joints, conf)
+        #wait_for_user()
+        return get_configuration(self.robot)
+        #return sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
+        #                             custom_limits=self.custom_limits, **kwargs)
 
     #########################
 

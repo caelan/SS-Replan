@@ -19,7 +19,7 @@ from openravepy.misc import InitOpenRAVELogging
 # https://github.com/ros-planning/moveit_ikfast/blob/kinetic-devel/scripts/round_collada_numbers.py
 
 # pip install sympy==0.7.1 --upgrade --user
-from ikfast.utils import DAE_PATH, BASE_LINK, TOOL_LINK, FREE_JOINT, CPP_PATH
+from utils import DAE_PATH, BASE_LINK, TOOL_LINK, FREE_JOINT, CPP_PATH
 
 InitOpenRAVELogging()
 env = Environment()

@@ -12,7 +12,7 @@ from distutils.core import setup, Extension
 # see: https://docs.python.org/3/extending/building.html
 
 # lib name template: 'ikfast_<robot name>'
-from ikfast.utils import IKFAST, CPP_PATH
+from utils import IKFAST, CPP_PATH
 
 ikfast_module = Extension(IKFAST, sources=[CPP_PATH])
 
