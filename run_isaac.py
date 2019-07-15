@@ -29,14 +29,17 @@ TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
     'put_away', # tomato_soup_can
     'put_spam',
-    NONE,
+    #NONE,
 ]
+
+
+# cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 
 ################################################################################
 
-def goal_formula_from_goal(world, goals, plan):
+def goal_formula_from_goal(world, goals, plan, fixed=False):
     #regex = re.compile(r"(\w+)\((\)\n")
-    task = Task(world, movable_base=True, fixed_base=True)
+    task = Task(world, movable_base=not fixed, fixed_base=True, return_init_bq=not fixed)
     init = []
     goal_literals = []
     # TODO: use the task plan to constrain solution
@@ -102,10 +105,46 @@ def create_trial_args(**kwargs):
 
 ################################################################################
 
+def planning_loop(domain, trial_manager, task, additional_init, goal_formula, args):
+    robot_entity = domain.get_robot()
+    moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
+    observer = trial_manager.observer
+    world = task.world
+
+    while True:
+        world_state = observer.observe()
+        update_world(world, domain, observer, world_state)
+        problem = pdddlstream_from_problem(task, collisions=not args.cfree, teleport=args.teleport)
+        problem[-2].extend(additional_init)
+        problem = problem[:-1] + (And(problem[-1], goal_formula),)
+        saver = WorldSaver()
+        solution = solve_pddlstream(problem, args)
+        plan, cost, evaluations = solution
+        commands = commands_from_plan(world, plan)
+        if args.watch or args.record:
+            simulate_plan(world, commands, args)
+        else:
+            wait_for_user()
+        saver.restore()
+        if (commands is None) or args.teleport:
+            return False
+        if not commands:
+            return True
+
+        #sim_manager.pause() # Careful! This actually does pause the system
+        #rospy.sleep(1.) # Small sleep might be needed
+        #sim_manager.pause() # The second invocation resumes
+
+        #wait_for_user()
+        for command in commands:
+            command.execute(domain, moveit, observer)
+
+################################################################################
+
 def main():
     parser = create_parser()
-    #parser.add_argument('-fixed', action='store_true',
-    #                    help="When enabled, fixes the robot's base")
+    parser.add_argument('-fixed', action='store_true',
+                        help="When enabled, fixes the robot's base")
     parser.add_argument('-lula', action='store_true',
                         help='When enabled, uses LULA instead of JointState control')
     parser.add_argument('-problem', default=TASKS[2], choices=TASKS,
@@ -118,7 +157,7 @@ def main():
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
 
-    rospy.init_node("test")
+    rospy.init_node("Isaac STRIPStream")
     #with HideOutput():
     domain = kitchen_domain.KitchenDomain(sim=True, sigma=0, lula=args.lula)
 
@@ -130,21 +169,14 @@ def main():
     trial_manager.set_camera(randomize=False)
 
     # Need to reset at the start
-    if task_name != NONE:
-        objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
-
-    # TODO: why can't I use this earlier?
-    robot_entity = domain.get_robot()
-    moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    #world_state = observer.observe() # domain.root
+    objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[1, -1, 2])
 
-    if task_name != NONE:
-        goals = [(h.format(o), v) for h, v in goal for o in objects]
-        print('Goals:', goals)
-        task, additional_init, goal_formula = goal_formula_from_goal(world, goals, plan)
+    goals = [(h.format(o), v) for h, v in goal for o in objects]
+    print('Goals:', goals)
+    task, additional_init, goal_formula = goal_formula_from_goal(world, goals, plan, args.fixed)
     # TODO: fixed_base_suppressors
     #trial_manager.disable() # Disables collisions
 
@@ -155,43 +187,13 @@ def main():
             world.set_base_conf([2.0, 0, 0]) #np.pi])
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
-            world.update_custom_limits()
+        world.update_initial()
     wait_for_user()
-
-    #goal_values = [1.5, -1, np.pi]
-    #control_base(goal_values, moveit, observer)
-    if task_name == NONE:
-        return
-
-    #cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
-    #drawer_link = link_from_name(world.kitchen, 'indigo_drawer_top')
-    #draw_pose(multiply(get_link_pose(world.kitchen, drawer_link), (cage_handle_from_drawer)))
-
     # TODO: initial robot base conf is in collision
-    problem = pdddlstream_from_problem(task, collisions=not args.cfree, teleport=args.teleport)
-    problem[-2].extend(additional_init)
-    problem = problem[:-1] + (And(problem[-1], goal_formula),)
-    saver = WorldSaver()
-    solution = solve_pddlstream(problem, args)
-    plan, cost, evaluations = solution
-    commands = commands_from_plan(world, plan)
-    if args.watch or args.record:
-        simulate_plan(world, commands, args)
-    else:
-        wait_for_user()
-    if (commands is None) or args.teleport:
-        return
-    #wait_for_user()
-    saver.restore()
-
-    #sim_manager.pause() # Careful! This actually does pause the system
-    #rospy.sleep(1.) # Small sleep might be needed
-    #sim_manager.pause() # The second invocation resumes
-
-    # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
-    for command in commands:
-        command.execute(domain, moveit, observer)
+    success = planning_loop(domain, trial_manager, task, additional_init, goal_formula, args)
+    print('Success:', success)
     world.destroy()
+    # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
 
 if __name__ == '__main__':
     #main()

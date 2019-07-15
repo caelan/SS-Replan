@@ -102,6 +102,8 @@ def display_kinect(world, observer):
     from sensor_msgs.msg import CameraInfo
     import rospy
 
+    if world.kinects:
+        return
     camera_infos = []
     def callback(camera_info):
         if camera_infos:
@@ -121,6 +123,7 @@ def display_kinect(world, observer):
         world_from_camera = lookup_pose(observer.tf_listener, ISAAC_CAMERA_FRAME)
         cone_body = get_viewcone(camera_matrix=camera_matrix, color=apply_alpha(RED, 0.1))
         set_pose(cone_body, world_from_camera)
+        world.kinects.append(cone_body)
         #kitchen_from_camera = multiply(invert(get_pose(world.kitchen)), world_from_camera)
         #print(kitchen_from_camera)
 
@@ -141,7 +144,7 @@ def update_world(world, domain, observer, world_state):
     # Using state is nice because it applies noise
 
     print('Entities:', sorted(world_state.entities))
-    world.reset()
+    #world.reset()
     update_robot(world, domain, observer, world_state)
     for name, entity in world_state.entities.items():
         #entity.obj_type
@@ -149,8 +152,9 @@ def update_world(world, domain, observer, world_state):
         if isinstance(entity, RobotArm):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
-            ycb_obj_path = get_ycb_obj_path(entity.obj_type)
-            world.add_body(name, ycb_obj_path, color=np.ones(4), mass=1)
+            if name not in world.body_from_name:
+                ycb_obj_path = get_ycb_obj_path(entity.obj_type)
+                world.add_body(name, ycb_obj_path, color=np.ones(4), mass=1)
             body = world.get_body(name)
             world_from_entity = get_world_from_model(observer, entity, body)
             set_pose(body, world_from_entity)
@@ -160,7 +164,6 @@ def update_world(world, domain, observer, world_state):
             world_from_entity = get_world_from_model(observer, entity, world.kitchen)
             with LockRenderer():
                 set_pose(world.kitchen, world_from_entity)
-                world.update_floor() # TODO: draw floor under the robot instead?
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):
@@ -168,9 +171,9 @@ def update_world(world, domain, observer, world_state):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-    world.update_custom_limits()
+    world.update_initial() # TODO: draw floor under the robot instead?
     display_kinect(world, observer)
-    draw_pose(get_pose(world.robot), length=3)
+    #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
     #wait_for_user()
 

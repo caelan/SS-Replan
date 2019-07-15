@@ -66,6 +66,7 @@ class World(object):
         self.custom_limits = {}
         self.base_limits_handles = []
         self.initial_attachments = {}
+        self.kinects = []
 
         self.disabled_collisions = set()
         if self.robot_name == FRANKA_CARTER:
@@ -156,8 +157,9 @@ class World(object):
     def get_world_aabb(self):
         return aabb_union(get_aabb(body) for body in self.all_bodies)
     def update_floor(self):
-        z = stable_z(self.kitchen, self.floor)
-        set_point(self.floor, np.array(get_point(self.kitchen)) - np.array([0, 0, z]))
+        z = stable_z(self.kitchen, self.floor) - get_point(self.floor)[2]
+        point = np.array(get_point(self.kitchen)) - np.array([0, 0, z])
+        set_point(self.floor, point)
     def update_custom_limits(self, min_extent=0.0):
         #robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners

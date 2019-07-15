@@ -151,6 +151,8 @@ def control_base(goal_values, moveit, observer, timeout=INF, verbose=False):
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter.py
     linear_threshold = 0.05
     angular_threshold = math.radians(3)
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_policies.py
 
     # TODO: open-loop odometry (use wheel encoders)
     # TODO: ensure that we are rotating about the correct axis (i.e. base_joints aligned with axis)
