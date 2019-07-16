@@ -8,7 +8,7 @@ from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
     euler_from_quat, quat_from_pose, dump_body, circular_difference, \
     joints_from_names, get_max_velocity, get_distance, get_angle, INF, \
-    waypoints_from_path, HideOutput, elapsed_time
+    waypoints_from_path, HideOutput, elapsed_time, get_closest_angle_fn
 from src.utils import WHEEL_JOINTS
 from pddlstream.utils import Verbose
 
@@ -129,12 +129,14 @@ def lula_control(world, path, domain, observer, world_state):
 
 ################################################################################s
 
-def control_base(goal_values, moveit, observer, timeout=INF, sleep=1.0, verbose=False):
+def base_control(world, goal_values, moveit, observer,
+                 timeout=INF, sleep=1.0, verbose=False):
     from sensor_msgs.msg import JointState
     from std_msgs.msg import Header
     import rospy
     #joints = joints_from_names(world.robot, WHEEL_JOINTS)
     #max_velocities = np.array([get_max_velocity(world.robot, joint) for joint in joints])
+    assert len(goal_values) == 3
 
     unit_forward = np.array([-1, -1]) # Negative seems to be forward
     unit_right = np.array([-1, +1])
@@ -157,6 +159,8 @@ def control_base(goal_values, moveit, observer, timeout=INF, sleep=1.0, verbose=
     # TODO: subscribe to /robot/joint_states for wheel positions
 
     # linear/angular
+    closet_angle_fn = get_closest_angle_fn(world.robot, world.base_joints)
+
     reached_goal_pos = False
     goal_pos = np.array(goal_values[:2])
     goal_yaw = goal_values[2]
@@ -170,22 +174,23 @@ def control_base(goal_values, moveit, observer, timeout=INF, sleep=1.0, verbose=
     while (not rospy.is_shutdown()) and ((rospy.Time.now() - start_time).to_sec() < timeout):
         #world_state = observer.observe()
         #robot_entity = world_state.entities[domain.robot]
-        #print(robot_entity.carter_pos, robot_entity.carter_vel)
+        #print(robot_entity.carter_pos, robot_entity.carter_vel) # zeros
         #robot_entity.base_link
         #print(pose_from_tform(robot_entity.pose))
 
         base_pose = lookup_pose(observer.tf_listener, ISSAC_PREFIX + ISSAC_CARTER_FRAME)
-        pos = np.array(point_from_pose(base_pose)[:2])
+        current_values = np.array(point_from_pose(base_pose))
+        current_pos = current_values[:2]
         x, y, _ = point_from_pose(base_pose)
-        _, _, yaw = map(wrap_angle, euler_from_quat(quat_from_pose(base_pose)))
+        _, _, current_yaw = map(wrap_angle, euler_from_quat(quat_from_pose(base_pose)))
         if verbose:
-            print('x={:.3f}, y={:.3f}, yaw={:.3f}'.format(x, y, yaw))
+            print('x={:.3f}, y={:.3f}, yaw={:.3f}'.format(x, y, current_yaw))
 
-        movement_yaw = get_angle(pos, goal_pos)
-        movement_yaw_error = abs(circular_difference(movement_yaw, yaw))
-        delta_pos = goal_pos - pos
+        movement_yaw, _ = closet_angle_fn(current_values, goal_values)
+        movement_yaw_error = abs(circular_difference(movement_yaw, current_yaw))
+        delta_pos = goal_pos - current_pos
         goal_pos_error = np.linalg.norm(delta_pos)
-        goal_yaw_error = abs(circular_difference(goal_yaw, yaw))
+        goal_yaw_error = abs(circular_difference(goal_yaw, current_yaw))
         print('Linear error: {:.3f} ({:.3f})'.format(
             goal_pos_error, linear_threshold))
         print('Angular error: {:.1f} ({:.1f})'.format(
@@ -213,7 +218,7 @@ def control_base(goal_values, moveit, observer, timeout=INF, sleep=1.0, verbose=
             speed = (1 - pos_fraction) * min_speed + pos_fraction * max_speed
             joint_velocities = speed * unit_forward
         else:
-            delta_yaw = circular_difference(target_yaw, yaw)
+            delta_yaw = circular_difference(target_yaw, current_yaw)
             if verbose:
                 print('Angular delta:', delta_yaw)
             #print(robot_entity.carter_interface) # None
@@ -245,11 +250,11 @@ def control_base(goal_values, moveit, observer, timeout=INF, sleep=1.0, verbose=
         *map(math.degrees, [goal_yaw_error, angular_threshold])))
     return False
 
-def follow_trajectory(path, moveit, observer, **kwargs):
+def follow_base_trajectory(world, path, moveit, observer, **kwargs):
     path = waypoints_from_path(path)
     for i, base_values in enumerate(path):
         print('Waypoint {} / {}'.format(i, len(path)))
-        control_base(base_values, moveit, observer, **kwargs)
+        base_control(world, base_values, moveit, observer, **kwargs)
 
 
 ################################################################################s

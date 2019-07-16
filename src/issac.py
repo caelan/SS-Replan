@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import signal
+import time
 
 from pybullet_tools.pr2_utils import draw_viewcone, get_detection_cone, get_viewcone
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
@@ -219,6 +220,7 @@ def update_isaac_sim(domain, observer, sim_manager, world):
     world_from_carter = get_link_pose(world.robot, carter_link)
     unreal_from_carter = multiply(unreal_from_world, world_from_carter)
     sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
+    time.sleep(0.1)
 
     #sim_manager.reset()
     #sim_manager.wait_for_services()

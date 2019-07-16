@@ -13,7 +13,7 @@ import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, wait_for_user
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, wait_for_user, wait_for_duration
 
 from src.issac import update_world, kill_lula, update_isaac_sim
 from src.world import World
@@ -21,23 +21,33 @@ from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.task import Task
-from src.execution import control_base
+from src.execution import base_control
 
 from pddlstream.language.constants import Not, And
-
-NONE = 'none'
 
 TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
     'put_away', # tomato_soup_can
     'put_spam',
-    #NONE,
 ]
 
 SPAM = 'potted_meat_can'
+MUSTARD = 'mustard_bottle'
+TOMATO_SOUP = 'mustard_bottle'
+SUGAR = 'mustard_bottle'
+CHEEZIT = 'cracker_box'
+
+YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
+
 TOP_DRAWER = 'indigo_drawer_top'
 
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
+
+# Detection
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L470
 
 ################################################################################
 
@@ -179,15 +189,14 @@ def main():
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
 
-    rospy.init_node("Isaac STRIPStream")
+    rospy.init_node("STRIPStream")
     #with HideOutput():
     domain = kitchen_domain.KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
 
     if args.execute:
         observer = RosObserver(domain)
-        objects = []
-        goal = []
-        plan = []
+        sim_manager = None
+        objects, goal, plan = [], [], []
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
@@ -210,15 +219,14 @@ def main():
     world_state = observer.observe() # domain.root
     with LockRenderer():
         update_world(world, domain, observer, world_state)
-        if not args.execute and task.movable_base:
-            world.set_base_conf([2.0, 0, np.pi/2])
+        if (sim_manager is not None) and task.movable_base:
+            world.set_base_conf([2.0, 0, -np.pi/2])
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
         world.update_initial()
-    #wait_for_user()
+    wait_for_duration(duration=0.1)
     # TODO: initial robot base conf is in collision
 
-    #control_base([2.0, 0, -np.pi], domain.get_robot().get_motion_interface(), observer)
     success = planning_loop(domain, observer, task, additional_init, goal_formula, args)
     print('Success:', success)
     world.destroy()

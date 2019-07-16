@@ -371,6 +371,7 @@ def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn
     ir_sampler = get_pick_ir_gen_fn(world, max_attempts=1, **kwargs)
     ik_fn = get_fixed_pick_gen_fn(world, teleport=teleport, **kwargs)
+    # TODO: sample in the neighborhood of the base conf to ensure robust
 
     def gen(*inputs):
         _, pose, _ = inputs

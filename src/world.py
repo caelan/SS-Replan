@@ -17,6 +17,12 @@ DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
 }
 
+DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476e-05,
+                    -2.8105969429016113, -0.00025768374325707555, 3.0363450050354004, 0.7410701513290405]
+
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py#L59
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L52
+
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.client = connect(use_gui=use_gui)
@@ -67,6 +73,7 @@ class World(object):
         self.base_limits_handles = []
         self.initial_attachments = {}
         self.kinects = []
+        self.holding = None
 
         self.disabled_collisions = set()
         if self.robot_name == FRANKA_CARTER:
@@ -142,10 +149,11 @@ class World(object):
             #conf = np.zeros(len(self.arm_joints))
             #conf[3] -= np.pi / 2
             return conf
-        conf = np.array(self.robot_yaml['default_q'])
-        #conf[1] += np.pi / 4
-        #conf[3] -= np.pi / 4
-        return conf
+        return DEFAULT_ARM_CONF
+        #conf = np.array(self.robot_yaml['default_q'])
+        ##conf[1] += np.pi / 4
+        ##conf[3] -= np.pi / 4
+        #return conf
 
     #########################
 
