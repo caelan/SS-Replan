@@ -63,6 +63,7 @@ def solve_pddlstream(problem, args, debug=False):
             effort_weight = 1e-3 if args.optimal else 1
             solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
                                      replan_actions=replan_actions,
+                                     # TODO: start complexity
                                      planner=planner, max_planner_time=max_planner_time,
                                      unit_costs=args.unit, success_cost=success_cost,
                                      max_time=args.max_time, verbose=True, debug=debug,

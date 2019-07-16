@@ -13,9 +13,10 @@ import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, wait_for_user, wait_for_duration
+from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
+    wait_for_user, wait_for_duration, Pose, Point, Euler
 
-from src.issac import update_world, kill_lula, update_isaac_sim
+from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan
@@ -51,10 +52,13 @@ TOP_DRAWER = 'indigo_drawer_top'
 
 ################################################################################
 
-def goal_formula_from_goal(world, goals, plan, fixed=False):
+def task_from_trial_manager(world, trial_manager, task_name, fixed=False):
+    objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
+    goals = [(h.format(o), v) for h, v in goal for o in objects]
+    print('Goals:', goals)
     #regex = re.compile(r"(\w+)\((\)\n")
     task = Task(world, #goal_on={SPAM: TOP_DRAWER},
-        movable_base=not fixed, fixed_base=True, return_init_bq=not fixed)
+        movable_base=not fixed, fixed_base=True, return_init_bq=True)
     init = []
     goal_literals = []
 
@@ -89,7 +93,7 @@ def goal_formula_from_goal(world, goals, plan, fixed=False):
         else:
             raise NotImplementedError(predicate)
         goal_literals.append(atom if value else Not(atom))
-    return task, init, And(*goal_literals)
+    return task, init, goal_literals
 
 ################################################################################
 
@@ -121,23 +125,10 @@ def create_trial_args(**kwargs):
 
 ################################################################################
 
-def planning_loop(domain, observer, task, additional_init, goal_formula, args):
+def planning_loop(domain, observer, task, args, additional_init=[], additional_goals=[]):
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
     world = task.world
-
-    name = SPAM
-    surface = TOP_DRAWER
-    joint = '{}_joint'.format(surface)
-    additional_init = [
-        ('Stackable', name, surface),
-    ]
-    goal_formula = And(*[
-        #('Holding', name),
-        ('On', name, surface),
-        ('DoorStatus', joint, 'closed'),
-        #('DoorStatus', joint, 'open'),
-    ])
 
     # TODO: track the plan cost
     while True:
@@ -145,7 +136,7 @@ def planning_loop(domain, observer, task, additional_init, goal_formula, args):
         update_world(world, domain, observer, world_state)
         problem = pdddlstream_from_problem(task, collisions=not args.cfree, teleport=args.teleport)
         problem[-2].extend(additional_init)
-        problem = problem[:-1] + (And(problem[-1], goal_formula),)
+        problem = problem[:-1] + (And(problem[-1], *additional_goals),)
         saver = WorldSaver()
         solution = solve_pddlstream(problem, args)
         plan, cost, evaluations = solution
@@ -174,9 +165,11 @@ def planning_loop(domain, observer, task, additional_init, goal_formula, args):
 def main():
     parser = create_parser()
     parser.add_argument('-execute', action='store_true',
-                        help="When enabled, ...")
+                        help="When enabled, uses the real robot")
     parser.add_argument('-fixed', action='store_true',
                         help="When enabled, fixes the robot's base")
+    parser.add_argument('-jump', action='store_true',
+                        help="When enabled, skips base control")
     parser.add_argument('-lula', action='store_true',
                         help='When enabled, uses LULA instead of JointState control')
     parser.add_argument('-problem', default=TASKS[2], choices=TASKS,
@@ -188,33 +181,39 @@ def main():
     #if args.seed is not None:
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
+    use_lula = args.execute or args.lula
 
     rospy.init_node("STRIPStream")
     #with HideOutput():
-    domain = kitchen_domain.KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
+    domain = kitchen_domain.KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
+
+    world = World(use_gui=True) # args.visualize)
+    set_camera_pose(camera_point=[2, 0, 2])
 
     if args.execute:
         observer = RosObserver(domain)
         sim_manager = None
-        objects, goal, plan = [], [], []
+        additional_init, additional_goals = [], []
+        task = Task(world, goal_on={SPAM: TOP_DRAWER},
+                    movable_base=not args.fixed, fixed_base=False)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
-        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
+        trial_manager = TrialManager(trial_args, domain, lula=use_lula)
         observer = trial_manager.observer
         sim_manager = trial_manager.sim
-        trial_manager.set_camera(randomize=False)
+        #camera_point = Point(4.95, -9.03, 2.03)
+        camera_point = Point(4.5, -9.5, 2.)
+        camera_pose = Pose(camera_point, Euler(roll=-3*np.pi/4))
+        # TODO: could make the camera follow the robot around
+        set_isaac_camera(sim_manager, camera_pose)
+        #trial_manager.set_camera(randomize=False)
         # Need to reset at the start
-        objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
-
-    world = World(use_gui=True) # args.visualize)
-    set_camera_pose(camera_point=[1, -1, 2])
-
-    goals = [(h.format(o), v) for h, v in goal for o in objects]
-    print('Goals:', goals)
-    task, additional_init, goal_formula = goal_formula_from_goal(world, goals, plan, args.fixed)
-    # TODO: fixed_base_suppressors
-    #trial_manager.disable() # Disables collisions
+        task, additional_init, additional_goals = task_from_trial_manager(
+            world, trial_manager, task_name, fixed=args.fixed)
+        if args.jump:
+            domain.get_robot().carter_interface = sim_manager
+        #trial_manager.disable() # Disables collisions
 
     world_state = observer.observe() # domain.root
     with LockRenderer():
@@ -227,7 +226,14 @@ def main():
     wait_for_duration(duration=0.1)
     # TODO: initial robot base conf is in collision
 
-    success = planning_loop(domain, observer, task, additional_init, goal_formula, args)
+    #wait_for_user()
+    #return
+    #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
+    #wait_for_user()
+    #return
+
+    success = planning_loop(domain, observer, task, args,
+                            additional_init=additional_init, additional_goals=additional_goals)
     print('Success:', success)
     world.destroy()
     # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false

@@ -2,17 +2,24 @@ import numpy as np
 import time
 import math
 
-from src.issac import update_robot, ISSAC_REFERENCE_FRAME, lookup_pose, \
-    ISSAC_PREFIX, ISSAC_CARTER_FRAME, CONTROL_TOPIC
+from src.issac import update_robot, ISSAC_FRANKA_FRAME, lookup_pose, \
+    ISSAC_PREFIX, ISSAC_WORLD_FRAME, CONTROL_TOPIC, ISSAC_CARTER_FRAME
 from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
     euler_from_quat, quat_from_pose, dump_body, circular_difference, \
     joints_from_names, get_max_velocity, get_distance, get_angle, INF, \
-    waypoints_from_path, HideOutput, elapsed_time, get_closest_angle_fn
+    waypoints_from_path, HideOutput, elapsed_time, get_closest_angle_fn, \
+    pose_from_base_values, wait_for_user, draw_pose, remove_handles, get_link_pose, BodySaver
 from src.utils import WHEEL_JOINTS
 from pddlstream.utils import Verbose
 
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+
 ARM_SPEED = 0.1*np.pi
+
+def ROSPose(pose):
+    point, quat = pose
+    return Pose(position=Point(*point), orientation=Quaternion(*quat))
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
@@ -59,6 +66,15 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
 
 ################################################################################s
 
+def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
+    import moveit_msgs.msg
+    trajectory_start = moveit.robot.get_current_state()
+    display_trajectory = moveit_msgs.msg.DisplayTrajectory()
+    display_trajectory.trajectory_start = trajectory_start
+    display_trajectory.trajectory.append(plan)
+    display_trajectory.trajectory[0].joint_trajectory.header.frame_id = frame
+    moveit.display_trajectory_publisher.publish(display_trajectory)
+
 def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     from trajectory_msgs.msg import JointTrajectoryPoint
     from moveit_msgs.msg import RobotTrajectory
@@ -70,7 +86,7 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used
     plan = RobotTrajectory()
-    plan.joint_trajectory.header.frame_id = ISSAC_REFERENCE_FRAME
+    plan.joint_trajectory.header.frame_id = ISSAC_FRANKA_FRAME
     plan.joint_trajectory.header.stamp = rospy.Time(0)
     plan.joint_trajectory.joint_names = get_joint_names(robot, joints)
     #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
@@ -100,9 +116,12 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
     start_time = time.time()
+    # /move_group/display_planned_path
+    # TODO: display base motions?
+    #publish_display_trajectory(moveit, plan) # TODO: get this in the base_link frame
     with Verbose():
         moveit.execute(plan, required_orig_err=0.005, timeout=5.0,
-                       publish_display_trajectory=False) # Always is in base_link frame
+                       publish_display_trajectory=False)
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
 
 def suppress_all(world_state):
@@ -130,7 +149,9 @@ def lula_control(world, path, domain, observer, world_state):
 ################################################################################s
 
 def base_control(world, goal_values, moveit, observer,
-                 timeout=INF, sleep=1.0, verbose=False):
+                 timeout=30, sleep=1.0, verbose=False):
+    # https://github.mit.edu/caelan/ROS/blob/4f375489a4b3bac7c7a0451fe30e35ba02e6302f/base_navigation.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain_msgs/msg/Goal.msg
     from sensor_msgs.msg import JointState
     from std_msgs.msg import Header
     import rospy
@@ -144,8 +165,8 @@ def base_control(world, goal_values, moveit, observer,
     min_speed = 12 # Technically 9.085
     max_speed = 30 # radians per second
 
-    ramp_down_pos = 0.25 # meters
-    ramp_down_yaw = np.pi / 8 # radians
+    ramp_down_pos = 0.5 # meters
+    ramp_down_yaw = math.radians(25) # radians
 
     #dump_body(world.robot)
     # https://github.mit.edu/caelan/base-trajectory-action/blob/master/src/base_trajectory.cpp
@@ -160,7 +181,6 @@ def base_control(world, goal_values, moveit, observer,
 
     # linear/angular
     closet_angle_fn = get_closest_angle_fn(world.robot, world.base_joints)
-
     reached_goal_pos = False
     goal_pos = np.array(goal_values[:2])
     goal_yaw = goal_values[2]
@@ -186,13 +206,14 @@ def base_control(world, goal_values, moveit, observer,
         if verbose:
             print('x={:.3f}, y={:.3f}, yaw={:.3f}'.format(x, y, current_yaw))
 
+        vector_yaw = get_angle(current_pos, goal_pos)
         movement_yaw, _ = closet_angle_fn(current_values, goal_values)
         movement_yaw_error = abs(circular_difference(movement_yaw, current_yaw))
         delta_pos = goal_pos - current_pos
         goal_pos_error = np.linalg.norm(delta_pos)
-        goal_yaw_error = abs(circular_difference(goal_yaw, current_yaw))
         print('Linear error: {:.3f} ({:.3f})'.format(
             goal_pos_error, linear_threshold))
+        goal_yaw_error = abs(circular_difference(goal_yaw, current_yaw))
         print('Angular error: {:.1f} ({:.1f})'.format(
             *map(math.degrees, [goal_yaw_error, angular_threshold])))
 
@@ -216,7 +237,8 @@ def base_control(world, goal_values, moveit, observer,
                 print('Linear delta:', delta_pos)
             pos_fraction = min(1, goal_pos_error / ramp_down_pos)
             speed = (1 - pos_fraction) * min_speed + pos_fraction * max_speed
-            joint_velocities = speed * unit_forward
+            sign = math.cos(movement_yaw - vector_yaw)
+            joint_velocities = sign * speed * unit_forward
         else:
             delta_yaw = circular_difference(target_yaw, current_yaw)
             if verbose:
@@ -235,6 +257,8 @@ def base_control(world, goal_values, moveit, observer,
         #update_robot(world, domain, observer, world_state)
         pub.publish(JointState(header=Header(), name=WHEEL_JOINTS, velocity=list(joint_velocities)))
         #rate.sleep()
+    #except KeyboardInterrupt as e:
+    #    pass
     #except rospy.ServiceException as e:
     #    rospy.logerr("Service call failed: %s" % e)
     #finally:
@@ -245,17 +269,29 @@ def base_control(world, goal_values, moveit, observer,
     while (not rospy.is_shutdown()) and ((rospy.Time.now() - start_time).to_sec() < sleep):
         # TODO: actually query the state of the wheel joints
         pub.publish(JointState(header=Header(), name=WHEEL_JOINTS, velocity=list(joint_velocities)))
-    print('Linear error: {:.3f} ({:.3f})'.format(goal_pos_error, linear_threshold))
-    print('Angular error: {:.1f} ({:.1f})'.format(
+    print('Final linear error: {:.3f} ({:.3f})'.format(goal_pos_error, linear_threshold))
+    print('Final angular error: {:.1f} ({:.1f})'.format(
         *map(math.degrees, [goal_yaw_error, angular_threshold])))
     return False
 
 def follow_base_trajectory(world, path, moveit, observer, **kwargs):
+    from rospy import Publisher
     path = waypoints_from_path(path)
+    goal_pub = Publisher("~base_goal", PoseStamped, queue_size=1)
+    handles = []
     for i, base_values in enumerate(path):
         print('Waypoint {} / {}'.format(i, len(path)))
+        world.set_base_conf(base_values)
+        base_pose = get_link_pose(world.robot, world.base_link)
+        #base_pose = pose_from_base_values(base_values)
+        remove_handles(handles)
+        handles.extend(draw_pose(base_pose, length=1))
+        pose = PoseStamped()
+        pose.header.frame_id = ISSAC_WORLD_FRAME
+        pose.pose = ROSPose(base_pose)
+        goal_pub.publish(pose)
+        #wait_for_user()
         base_control(world, base_values, moveit, observer, **kwargs)
-
 
 ################################################################################s
 

@@ -2,7 +2,9 @@ from src.execution import joint_state_control, open_gripper, close_gripper, move
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, \
     get_max_limit, get_joint_limits, waypoints_from_path
-from src.issac import update_robot
+from src.issac import update_robot, update_isaac_robot
+
+from isaac_bridge.manager import SimulationManager
 
 import numpy as np
 import time
@@ -100,12 +102,17 @@ class Trajectory(Command):
         # TODO: ensure the same joint names
         if self.joints == self.world.base_joints:
             #assert not moveit.use_lula
-            world_state = domain.root
-            robot_entity = world_state.entities[domain.robot]
+            robot_entity = domain.get_robot()
+            #robot_entity = world_state.entities[domain.robot]
             carter = robot_entity.carter_interface
             if carter is None:
                 follow_base_trajectory(self.world, self.path, moveit, observer)
+            elif isinstance(carter, SimulationManager):
+                set_joint_positions(self.robot, self.joints, self.path[-1])
+                update_isaac_robot(observer, carter, self.world)
+                time.sleep(DEFAULT_SLEEP)
             else:
+                world_state = domain.root
                 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
                 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_policies.py
                 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_predicates.py#L164

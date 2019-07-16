@@ -15,7 +15,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
-    get_test_near_joint, get_gripper_test
+    get_test_near_joint, get_gripper_open_test
 from src.database import has_place_database
 from src.visualization import add_markers
 
@@ -53,6 +53,8 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
     init_gq = Conf(world.robot, world.gripper_joints)
     # TODO: order goals for serialization
     # TODO: calibration by line of sight with many particles on the robot's arm
+    # TODO: return set of facts that support the previous plan
+    # TODO: repackage stream outputs to avoid recomputation
 
     constant_map = {
         '@world': 'world',
@@ -119,6 +121,8 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
             world.initial_saver.restore()
             goal_bq = Conf(world.robot, world.base_joints)
             goal_aq = Conf(world.robot, world.arm_joints)
+        if task.fixed_base:
+            goal_bq = init_bq
         init.extend([
             ('BConf', goal_bq),
             ('AConf', goal_bq, world.carry_conf),
@@ -217,7 +221,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
 
     stream_map = {
         'test-door': from_test(get_door_test(world)),
-        'test-gripper': from_test(get_gripper_test(world)),
+        'test-gripper': from_test(get_gripper_open_test(world)),
 
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world)),

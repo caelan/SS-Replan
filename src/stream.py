@@ -706,25 +706,26 @@ def get_calibrate_gen(world, collisions=True, teleport=False):
 OPEN = 'open'
 CLOSED = 'closed'
 DOOR_STATUSES = [OPEN, CLOSED]
-JOINT_THRESHOLD = 1e-3
 # TODO: retrieve from entity
 
-def get_gripper_test(world):
+def get_gripper_open_test(world, tolerance=1e-2):
+    open_gq = world.open_gq.values - tolerance * np.ones(len(world.open_gq.joints))
     def test(gq):
-        return np.max(np.abs(np.array(gq.values) - np.array(world.open_gq.values))) <= JOINT_THRESHOLD
+        return np.less_equal(open_gq, gq.values).all()
     return test
 
-def get_door_test(world):
+def get_door_test(world, tolerance=1e-2):
     def test(joint_name, conf, status):
         [joint] = conf.joints
-        [position] = conf.values
+        sign = world.get_door_sign(joint)
+        position = sign*conf.values[0]
         if status == OPEN:
-            status_position = world.open_conf(joint)
+            open_position = sign * world.open_conf(joint) - tolerance
+            return open_position <= position
         elif status == CLOSED:
-            status_position = world.closed_conf(joint)
-        else:
-            raise NotImplementedError(status)
-        return abs(position - status_position) <= JOINT_THRESHOLD
+            closed_position = sign * world.closed_conf(joint) + tolerance
+            return position <= closed_position
+        raise NotImplementedError(status)
     return test
 
 ################################################################################

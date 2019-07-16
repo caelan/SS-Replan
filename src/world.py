@@ -23,6 +23,9 @@ DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py#L59
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L52
 
+CABINET_OPEN_ANGLE = 4 * np.pi / 9
+DRAWER_OPEN_FRACTION = 0.75
+
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.client = connect(use_gui=use_gui)
@@ -228,6 +231,8 @@ class World(object):
         self.closed_gq.assign()
     def open_gripper(self):
         self.open_gq.assign()
+    def get_door_sign(self, joint):
+        return -1 if 'left' in get_joint_name(self.kitchen, joint) else +1
     def closed_conf(self, joint):
         if 'left' in get_joint_name(self.kitchen, joint):
             return get_max_limit(self.kitchen, joint)
@@ -235,18 +240,18 @@ class World(object):
     def open_conf(self, joint):
         joint_name = get_joint_name(self.kitchen, joint)
         if 'left' in joint_name:
-            #print(get_joint_name(self.kitchen, joint), get_max_limit(self.kitchen, joint), get_min_limit(self.kitchen, joint))
             open_position = get_min_limit(self.kitchen, joint)
         else:
             open_position = get_max_limit(self.kitchen, joint)
         #print(get_joint_name(self.kitchen, joint), get_min_limit(self.kitchen, joint), get_max_limit(self.kitchen, joint))
         # drawers: [0.0, 0.4]
-        # doors: [0.0, 1.57]
+        # left doors: [-1.57, 0.0]
+        # right doors: [0.0, 1.57]
         if joint_name in CABINET_JOINTS:
             # TODO: could make fraction of max
-            return (4*np.pi / 9) * open_position / abs(open_position)
+            return CABINET_OPEN_ANGLE * open_position / abs(open_position)
         if joint_name in DRAWER_JOINTS:
-            return 0.75 * open_position
+            return DRAWER_OPEN_FRACTION * open_position
         return open_position
     def close_door(self, joint):
         set_joint_position(self.kitchen, joint, self.closed_conf(joint))

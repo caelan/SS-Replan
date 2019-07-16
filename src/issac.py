@@ -9,14 +9,15 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
     BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body, draw_pose, \
     point_from_pose, euler_from_quat, quat_from_pose, Pose, Point, Euler, base_values_from_pose, \
-    pose_from_base_values, INF
+    pose_from_base_values, INF, get_camera
 from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_'
-ISSAC_REFERENCE_FRAME = 'base_link' # Robot base
+ISSAC_FRANKA_FRAME = 'base_link' # Robot base
 UNREAL_WORLD_FRAME = 'ue_world'
 ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
-ISAAC_CAMERA_FRAME = ISSAC_PREFIX + 'zed_left' # Prefix of 00 for movable objects and camera
+ISSAC_CAMERA = 'zed_left'
+ISAAC_CAMERA_FRAME = ISSAC_PREFIX + ISSAC_CAMERA # Prefix of 00 for movable objects and camera
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
 CONTROL_TOPIC = '/sim/desired_joint_states'
 
@@ -182,6 +183,23 @@ def update_world(world, domain, observer, world_state):
 
 TEMPLATE = '%s_1'
 
+def set_isaac_camera(sim_manager, camera_pose):
+    from brain_ros.ros_world_state import make_pose
+    from isaac_bridge.manager import ros_camera_pose_correction
+    camera_tform = make_pose(camera_pose)
+    camera_tform = ros_camera_pose_correction(camera_tform, ISSAC_CAMERA)
+    sim_manager.set_pose(ISSAC_CAMERA, camera_tform, do_correction=False)
+
+def update_isaac_robot(observer, sim_manager, world):
+    unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
+                                    target_frame=UNREAL_WORLD_FRAME)
+    # robot_name = domain.robot # arm
+    robot_name = TEMPLATE % sim_manager.robot_name
+    carter_link = link_from_name(world.robot, ISSAC_CARTER_FRAME)
+    world_from_carter = get_link_pose(world.robot, carter_link)
+    unreal_from_carter = multiply(unreal_from_world, world_from_carter)
+    sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
+
 def update_isaac_sim(domain, observer, sim_manager, world):
     # RobotConfigModulator seems to just change the default config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
@@ -214,12 +232,9 @@ def update_isaac_sim(domain, observer, sim_manager, world):
     #print(kitchen_poses.ycb_place_in_drawer_q) # 7 DOF
     #config_modulator.send_config(get_joint_positions(world.robot, world.arm_joints)) # Arm joints
 
-    #robot_name = domain.robot # arm
-    robot_name = TEMPLATE % sim_manager.robot_name
-    carter_link = link_from_name(world.robot, ISSAC_CARTER_FRAME)
-    world_from_carter = get_link_pose(world.robot, carter_link)
-    unreal_from_carter = multiply(unreal_from_world, world_from_carter)
-    sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
+    update_isaac_robot(observer, sim_manager, world)
+    #print(get_camera())
+    #set_isaac_camera(sim_manager, camera_pose)
     time.sleep(0.1)
 
     #sim_manager.reset()
