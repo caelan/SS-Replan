@@ -8,6 +8,7 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
+from pybullet_tools.utils import wait_for_user
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -44,6 +45,32 @@ def create_parser():
 
 ################################################################################
 
+def run_deteriministic(task, args):
+    world = task.world
+    problem = pdddlstream_from_problem(task,
+        collisions=not args.cfree, teleport=args.teleport)
+    solution = solve_pddlstream(problem, args)
+    plan, cost, evaluations = solution
+    commands = commands_from_plan(world, plan, args.defer)
+    simulate_plan(world, commands, args)
+    wait_for_user()
+
+def run_stochastic(task, args):
+    world = task.world
+    while True:
+        problem = pdddlstream_from_problem(task,
+            collisions=not args.cfree, teleport=args.teleport)
+        solution = solve_pddlstream(problem, args)
+        plan, cost, evaluations = solution
+        commands = commands_from_plan(world, plan, defer=args.defer)
+        if commands is None:
+            return False
+        if not commands:
+            return True
+        simulate_plan(world, commands, args)
+
+################################################################################
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
@@ -57,12 +84,10 @@ def main():
     #return
 
     task = stow_block(world)
-    problem = pdddlstream_from_problem(task,
-        collisions=not args.cfree, teleport=args.teleport)
-    solution = solve_pddlstream(problem, args)
-    plan, cost, evaluations = solution
-    commands = commands_from_plan(world, plan, defer=args.defer)
-    simulate_plan(world, commands, args)
+    if args.defer:
+        run_stochastic(task, args)
+    else:
+        run_deteriministic(task, args)
     world.destroy()
 
 if __name__ == '__main__':

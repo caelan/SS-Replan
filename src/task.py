@@ -10,14 +10,13 @@ from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, get_y
 
 class Task(object):
     def __init__(self, world, skeletons=[],
-                 movable_base=True, fixed_base=False, noisy_base=True,
+                 movable_base=True, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[],
                  goal_on={}, goal_closed=[], goal_cooked=[]):
         self.world = world
         self.skeletons = list(skeletons)
         self.movable_base = movable_base
-        self.fixed_base = fixed_base
         self.noisy_base = noisy_base
         self.return_init_bq = return_init_bq
         self.return_init_aq = return_init_aq
@@ -74,8 +73,8 @@ def add_kinect(world):
 #     ('move_base', [WILD, WILD, WILD]),
 # ]
 
-def stow_block(world):
-    world.open_gq.assign()
+def stow_block(world, **kwargs):
+    #world.open_gq.assign()
     # for joint in world.kitchen_joints:
     # for name in LEFT_VISIBLE:
     for name in DRAWER_JOINTS[1:2]:
@@ -103,10 +102,11 @@ def stow_block(world):
     pose.assign()
     #wait_for_user()
 
-    return Task(world, goal_hand_empty=False,
+    return Task(world, movable_base=True,
+                goal_hand_empty=False,
                 #goal_holding=[entity_name],
                 goal_on={entity_name: 'indigo_drawer_top'},
-                goal_closed=ALL_JOINTS)
+                goal_closed=ALL_JOINTS, **kwargs)
 
 TASKS = [
     stow_block,

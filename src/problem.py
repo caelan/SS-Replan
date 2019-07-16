@@ -101,8 +101,8 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
             [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
     if task.movable_base:
         init.append(('MovableBase',))
-    if task.fixed_base:
-        init.append(('InitBConf', init_bq))
+    #if task.fixed_base:
+    init.append(('InitBConf', init_bq))
     if task.noisy_base:
         init.append(('NoisyBase',))
 
@@ -121,7 +121,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
             world.initial_saver.restore()
             goal_bq = Conf(world.robot, world.base_joints)
             goal_aq = Conf(world.robot, world.arm_joints)
-        if task.fixed_base:
+        if not task.movable_base:
             goal_bq = init_bq
         init.extend([
             ('BConf', goal_bq),

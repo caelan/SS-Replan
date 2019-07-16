@@ -49,7 +49,7 @@ def solve_pddlstream(problem, args, debug=False):
     constraints = PlanConstraints()
 
     success_cost = 0 if args.optimal else INF
-    planner = 'max-astar' if args.optimal else 'ff-wastar2'
+    planner = 'max-astar' if args.optimal else 'ff-wastar1'
     search_sample_ratio = 1 # TODO: could try decreasing
     max_planner_time = 10
 
@@ -108,16 +108,15 @@ def commands_from_plan(world, plan, defer=False):
 
 ################################################################################
 
-def simulate_plan(world, commands, args):
+def simulate_plan(world, commands, args, time_step=0.02):
     if commands is None:
         wait_for_user()
         return
     initial_state = State(savers=[WorldSaver()], attachments=world.initial_attachments.values())
     wait_for_user()
-    time_step = None if args.teleport else 0.02
+    time_step = None if args.teleport else time_step
     if args.record:
         with VideoSaver(VIDEO_FILENAME):
             execute_plan(world, initial_state, commands, time_step=time_step)
     else:
         execute_plan(world, initial_state, commands, time_step=time_step)
-    wait_for_user()

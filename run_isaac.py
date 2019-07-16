@@ -57,8 +57,7 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False):
     goals = [(h.format(o), v) for h, v in goal for o in objects]
     print('Goals:', goals)
     #regex = re.compile(r"(\w+)\((\)\n")
-    task = Task(world, #goal_on={SPAM: TOP_DRAWER},
-        movable_base=not fixed, fixed_base=True, return_init_bq=True)
+    task = Task(world, movable_base=not fixed)
     init = []
     goal_literals = []
 
@@ -144,8 +143,7 @@ def planning_loop(domain, observer, task, args, additional_init=[], additional_g
         print('Commands:', commands)
         if args.watch or args.record:
             simulate_plan(world, commands, args)
-        else:
-            wait_for_user()
+        wait_for_user()
         saver.restore()
         if (commands is None) or args.teleport:
             return False
@@ -195,7 +193,7 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world, goal_on={SPAM: TOP_DRAWER},
-                    movable_base=not args.fixed, fixed_base=False)
+                    movable_base=not args.fixed)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
