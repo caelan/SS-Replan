@@ -21,7 +21,7 @@ from src.database import load_placements, get_surface_reference_pose, load_place
     load_pull_base_poses
 
 
-BASE_CONSTANT = 1
+BASE_CONSTANT = 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 MAX_CONF_DISTANCE = 0.75
@@ -488,7 +488,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     set_joint_positions(world.robot, world.arm_joints, arm_path[0])
     grasp_width = close_until_collision(world.robot, world.gripper_joints,
                                         bodies=[(world.kitchen, [handle_link])])
-    gripper_motion_fn = get_gripper_motion_gen(world, collisions=collisions, **kwargs)
+    gripper_motion_fn = get_gripper_motion_gen(world, teleport=teleport, collisions=collisions, **kwargs)
     gripper_conf = Conf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 

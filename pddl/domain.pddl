@@ -85,8 +85,8 @@
                  (not (AtBConf ?bq1))
                  (not (CanMoveBase))
                  (when (NoisyBase) (not (Calibrated)))
-                 (increase (total-cost) (Distance ?bq1 ?bq2)))
-                 ; (increase (total-cost) (MoveCost ?bt)))
+                 ; (increase (total-cost) (Distance ?bq1 ?bq2)))
+                 (increase (total-cost) (MoveBaseCost)))
   )
   (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
@@ -171,12 +171,12 @@
                  (increase (total-cost) (PullCost)))
   )
 
-  (:action cook
-    :parameters (?r)
-    :precondition (Type ?r @stove)
-    :effect (and (forall (?o) (when (On ?o ?r) (Cooked ?o)))
-                 (increase (total-cost) (PullCost)))
-  )
+  ;(:action cook
+  ;  :parameters (?r)
+  ;  :precondition (Type ?r @stove)
+  ;  :effect (and (forall (?o) (when (On ?o ?r) (Cooked ?o)))
+  ;               (increase (total-cost) (CookCost)))
+  ;)
 
   (:derived (On ?o1 ?o2)
     (exists (?rp) (and (RelPose ?o1 ?rp ?o2)

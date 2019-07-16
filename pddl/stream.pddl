@@ -132,9 +132,9 @@
     :certified (AngleWithin ?j ?a ?s)
   )
 
-  (:function (Distance ?bq1 ?bq2)
-    (and (BConf ?bq1) (BConf ?bq2))
-  )
+  ;(:function (Distance ?bq1 ?bq2)
+  ;  (and (BConf ?bq1) (BConf ?bq2))
+  ;)
   ;(:function (MoveCost ?t)
   ;  (and (BTraj ?t))
   ;)

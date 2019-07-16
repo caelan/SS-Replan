@@ -16,7 +16,7 @@ VIDEO_FILENAME = 'video.mp4'
 REPLAN_ACTIONS = {'calibrate'}
 
 
-def solve_pddlstream(problem, args, debug=False):
+def solve_pddlstream(problem, args, success_cost=INF, debug=False):
     _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
@@ -48,7 +48,7 @@ def solve_pddlstream(problem, args, debug=False):
     #constraints = PlanConstraints(skeletons=[skeleton], exact=True)
     constraints = PlanConstraints()
 
-    success_cost = 0 if args.optimal else INF
+    success_cost = 0 if args.optimal else success_cost
     planner = 'max-astar' if args.optimal else 'ff-wastar1'
     search_sample_ratio = 1 # TODO: could try decreasing
     max_planner_time = 10
@@ -60,7 +60,8 @@ def solve_pddlstream(problem, args, debug=False):
         if args.algorithm == 'focused':
             # TODO: option to only consider costs during local optimization
             # effort_weight = 0 if args.optimal else 1
-            effort_weight = 1e-3 if args.optimal else 1
+            #effort_weight = 1e-3 if args.optimal else 1
+            effort_weight = 0
             solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
                                      replan_actions=replan_actions,
                                      # TODO: start complexity
@@ -109,11 +110,10 @@ def commands_from_plan(world, plan, defer=False):
 ################################################################################
 
 def simulate_plan(world, commands, args, time_step=0.02):
+    wait_for_user()
     if commands is None:
-        wait_for_user()
         return
     initial_state = State(savers=[WorldSaver()], attachments=world.initial_attachments.values())
-    wait_for_user()
     time_step = None if args.teleport else time_step
     if args.record:
         with VideoSaver(VIDEO_FILENAME):

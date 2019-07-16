@@ -15,7 +15,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
-    get_test_near_joint, get_gripper_open_test
+    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT
 from src.database import has_place_database
 from src.visualization import add_markers
 
@@ -87,6 +87,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
         ('CanMoveArm',),
         ('CanMoveGripper',),
 
+        Equal(('MoveBaseCost',), BASE_CONSTANT),
         Equal(('MoveArmCost',), 1),
         Equal(('MoveGripperCost',), 1),
         Equal(('CalibrateCost',), 1),
@@ -179,7 +180,22 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
             if has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 
-    for obj_name in world.movable:
+    grasped = set()
+    if world.holding is not None:
+        grasp = world.holding
+        obj_name = grasp.body_name
+        grasped.add(obj_name)
+        init += [
+            ('Movable', obj_name),
+            ('Graspable', obj_name),
+            ('Grasp', obj_name, grasp),
+            ('IsGraspType', obj_name, grasp, grasp.grasp_type),
+            ('AtGrasp', obj_name, grasp),
+        ]
+        print(init)
+        return
+
+    for obj_name in world.movable - grasped:
         # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(obj_name)
         surface_name =  get_supporting(world, obj_name)

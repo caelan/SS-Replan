@@ -48,7 +48,7 @@ class Command(object):
     def reverse(self):
         raise NotImplementedError()
 
-    def iterate(self, world, state):
+    def iterate(self, world, state, update=False):
         raise NotImplementedError()
 
     def execute(self, domain, moveit, observer):
@@ -93,7 +93,7 @@ class Trajectory(Command):
     def reverse(self):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
 
-    def iterate(self, world, state):
+    def iterate(self, world, state, update=False):
         for positions in self.path:
             set_joint_positions(self.robot, self.joints, positions)
             yield
@@ -170,7 +170,7 @@ class DoorTrajectory(Command):
         return self.__class__(self.world, self.robot, self.robot_joints, self.robot_path[::-1],
                               self.door, self.door_joints, self.door_path[::-1])
 
-    def iterate(self, world, state):
+    def iterate(self, world, state, update=False):
         for robot_conf, door_conf in zip(self.robot_path, self.door_path):
             set_joint_positions(self.robot, self.robot_joints, robot_conf)
             set_joint_positions(self.door, self.door_joints, door_conf)
@@ -216,8 +216,10 @@ class Attach(Command):
     def reverse(self):
         return Detach(self.world, self.robot, self.link, self.body)
 
-    def iterate(self, world, state):
+    def iterate(self, world, state, update=False):
         state.attachments[self.body] = create_attachment(self.robot, self.link, self.body)
+        if update and (self.world.robot == self.robot):
+            self.world.holding = self.grasp
         yield
 
     def execute(self, domain, moveit, observer):
@@ -246,9 +248,11 @@ class Detach(Command):
     def reverse(self):
         return Attach(self.world, self.robot, self.link, self.body)
 
-    def iterate(self, world, state):
+    def iterate(self, world, state, update=False):
         assert self.body in state.attachments
         del state.attachments[self.body]
+        if update and (self.world.robot == self.robot):
+            self.world.holding = None
         yield
 
     def execute(self, domain, moveit, observer):
@@ -274,7 +278,7 @@ class Wait(Command):
     def reverse(self):
         return self
 
-    def iterate(self, world, state):
+    def iterate(self, world, state, update=False):
         for _ in range(self.steps):
             yield
 
@@ -293,7 +297,7 @@ def execute_plan(world, state, commands, time_step=None):
         print('\nCommand {:2}: {}'.format(i, command))
         # TODO: skip to end
         # TODO: downsample
-        for j, _ in enumerate(command.iterate(world, state)):
+        for j, _ in enumerate(command.iterate(world, state, update=True)):
             state.derive()
             if j == 0:
                 continue

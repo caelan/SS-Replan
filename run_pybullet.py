@@ -8,7 +8,7 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user
+from pybullet_tools.utils import wait_for_user, INF
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -56,11 +56,14 @@ def run_deteriministic(task, args):
     wait_for_user()
 
 def run_stochastic(task, args):
+    # TODO: relax cost threshold after some time
+    last_cost = INF # TODO: update the remaining cost (removing attempted actions)
+    # The nice thing about having a correct belief model is that you actually know what cost makes progress
     world = task.world
     while True:
         problem = pdddlstream_from_problem(task,
             collisions=not args.cfree, teleport=args.teleport)
-        solution = solve_pddlstream(problem, args)
+        solution = solve_pddlstream(problem, args, success_cost=last_cost)
         plan, cost, evaluations = solution
         commands = commands_from_plan(world, plan, defer=args.defer)
         if commands is None:
