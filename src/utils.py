@@ -186,10 +186,8 @@ def load_ycb(ycb_type, **kwargs):
     # TODO: set color (as average) or texture
     return create_obj(ycb_obj_path, color=None, **kwargs)
 
-def get_surface(surface_name):
-    if surface_name in SURFACE_FROM_NAME:
-        return SURFACE_FROM_NAME[surface_name]
-    return Surface(surface_name, SURFACE_TOP, [])
+def surface_from_name(surface_name):
+    return SURFACE_FROM_NAME.get(surface_name, Surface(surface_name, SURFACE_TOP, []))
 
 #CABINET_PATH = os.path.join(SRL_PATH, 'packages/sektion_cabinet_model/urdf/sektion_cabinet.urdf')
 # Could recursively find all *.urdf | *.sdf
@@ -313,7 +311,7 @@ class RelPose(object):
         return 'rp{}'.format(id(self) % 1000)
 
 def compute_surface_aabb(world, name):
-    surface_name, shape_name, _ = get_surface(name)
+    surface_name, shape_name, _ = surface_from_name(name)
     surface_link = link_from_name(world.kitchen, surface_name)
     surface_pose = get_link_pose(world.kitchen, surface_link)
     if shape_name == SURFACE_TOP:
@@ -341,17 +339,6 @@ def compute_surface_aabb(world, name):
     #draw_aabb(surface_aabb)
     #wait_for_user()
     return surface_aabb
-
-def get_supporting(world, obj_name):
-    body = world.get_body(obj_name)
-    supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
-        body, compute_surface_aabb(world, surface),
-        above_epsilon=1e-2, below_epsilon=5e-2)]
-    if len(supporting) != 1:
-        print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
-        return None
-    [surface_name] = supporting
-    return surface_name
 
 ################################################################################
 

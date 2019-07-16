@@ -4,7 +4,7 @@ import random
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
     euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint, has_gui, \
     point_from_pose, RED, child_link_from_joint, get_pose, get_point, invert, base_values_from_pose
-from src.utils import GRASP_TYPES, get_surface, BASE_JOINTS, joint_from_name, unit_pose
+from src.utils import GRASP_TYPES, surface_from_name, BASE_JOINTS, joint_from_name, unit_pose
 
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
@@ -15,7 +15,7 @@ PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
 
 
 def get_surface_reference_pose(kitchen, surface_name):
-    surface = get_surface(surface_name)
+    surface = surface_from_name(surface_name)
     link = link_from_name(kitchen, surface.link)
     return get_link_pose(kitchen, link)
 

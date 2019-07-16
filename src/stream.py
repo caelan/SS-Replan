@@ -14,7 +14,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     flatten_links, convex_hull, is_point_in_polygon, grow_polygon
 
 from src.utils import get_grasps, iterate_approach_path, \
-    set_tool_pose, close_until_collision, get_descendant_obstacles, get_surface, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
+    set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
     compute_surface_aabb, GRASP_TYPES, BASE_JOINTS
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
@@ -72,7 +72,7 @@ def get_compute_angle_kin(world):
 ################################################################################
 
 def get_surface_obstacles(world, surface_name):
-    surface = get_surface(surface_name)
+    surface = surface_from_name(surface_name)
     obstacles = set()
     for joint_name in surface.joints:
         joint = joint_from_name(world.kitchen, joint_name)
@@ -169,7 +169,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 break
             set_pose(obj_body, body_pose_world)
             if test_supported(world, obj_body, surface_name, collisions=collisions):
-                surface = get_surface(surface_name)
+                surface = surface_from_name(surface_name)
                 surface_link = link_from_name(world.kitchen, surface.link)
                 attachment = create_attachment(world.kitchen, surface_link, obj_body)
                 p = RelPose(obj_body, reference_body=world.kitchen,
@@ -323,9 +323,9 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
         world_from_body = pose.get_world_from_body()
         gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
-        gripper_attachment = grasp.get_attachment()
+        #gripper_attachment = grasp.get_attachment()
 
-        surface = get_surface(pose.support)
+        surface = surface_from_name(pose.support)
         surface_link = link_from_name(world.kitchen, surface.link)
 
         finger_cmd, = gripper_motion_fn(world.open_gq, grasp.get_gripper_conf())
@@ -357,7 +357,8 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
             aq = world.carry_conf
 
         surface_attachment = create_attachment(world.kitchen, surface_link, obj_body)
-        cmd = Sequence(State(savers=[robot_saver, obj_saver], attachments=[surface_attachment]), commands=[
+        cmd = Sequence(State(world, savers=[robot_saver, obj_saver],
+                             attachments=[surface_attachment]), commands=[
             Trajectory(world, world.robot, world.arm_joints, approach_path),
             finger_cmd.commands[0],
             Detach(world, world.kitchen, surface_link, obj_body),
@@ -492,7 +493,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     gripper_conf = Conf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
-    cmd = Sequence(State(savers=[robot_saver]), commands=[
+    cmd = Sequence(State(world, savers=[robot_saver]), commands=[
         Trajectory(world, world.robot, world.arm_joints, approach_paths[0]),
         finger_cmd.commands[0],
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
@@ -616,7 +617,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                 #    wait_for_user()
                 return None
         # TODO: could actually plan with all joints as long as we return to the same config
-        cmd = Sequence(State(savers=[initial_saver]), commands=[
+        cmd = Sequence(State(world, savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.base_joints, path),
         ], name='base')
         return (cmd,)
@@ -660,7 +661,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
             if path is None:
                 print('Failed to find an arm motion plan!')
                 return None
-        cmd = Sequence(State(savers=[initial_saver]), commands=[
+        cmd = Sequence(State(world, savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
         ], name='arm')
         return (cmd,)
@@ -677,7 +678,7 @@ def get_gripper_motion_gen(world, teleport=False, **kwargs):
         else:
             extend_fn = get_extend_fn(gq2.body, gq2.joints, resolutions=resolutions)
             path = [gq1.values] + list(extend_fn(gq1.values, gq2.values))
-        cmd = Sequence(State(), commands=[
+        cmd = Sequence(State(world), commands=[
             Trajectory(world, gq2.body, gq2.joints, path),
         ], name='gripper')
         return (cmd,)
@@ -694,7 +695,7 @@ def get_calibrate_gen(world, collisions=True, teleport=False):
         #aq.assign() # TODO: could sample aq instead achieve it by move actions
         #world.open_gripper()
         robot_saver = BodySaver(world.robot)
-        cmd = Sequence(State(savers=[robot_saver]), commands=[
+        cmd = Sequence(State(world, savers=[robot_saver]), commands=[
             #Trajectory(world, world.robot, world.arm_joints, approach_path),
             # TODO: calibrate command
         ], name='calibrate')
@@ -769,7 +770,7 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
         state.assign()
         for command in at.commands:
             obstacles = get_link_obstacles(world, o) - command.bodies - p.bodies # Doesn't include o at p
-            for _ in command.iterate(world, state):
+            for _ in command.iterate(state):
                 state.derive()
                 for attachment in state.attachments.values():
                     if any(pairwise_collision(attachment.child, obst) for obst in obstacles):

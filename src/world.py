@@ -6,12 +6,14 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
     set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
-    get_joint_name, remove_body, disconnect, get_min_limits, \
-    get_max_limits, add_body_name, WorldSaver, dump_body, wait_for_user
+    get_joint_name, remove_body, disconnect, get_min_limits, create_attachment, \
+    get_max_limits, add_body_name, WorldSaver, dump_body, wait_for_user, is_placed_on_aabb
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
-    get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS
+    get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
+    ALL_SURFACES, compute_surface_aabb, surface_from_name
 from ikfast.ik import sample_tool_ik
+from src.command import State
 
 DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
@@ -28,6 +30,7 @@ DRAWER_OPEN_FRACTION = 0.75
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
+        self.task = None
         self.client = connect(use_gui=use_gui)
         add_data_path()
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
@@ -74,9 +77,7 @@ class World(object):
         self.path_from_name = {}
         self.custom_limits = {}
         self.base_limits_handles = []
-        self.initial_attachments = {}
         self.kinects = []
-        self.holding = None
 
         self.disabled_collisions = set()
         if self.robot_name == FRANKA_CARTER:
@@ -90,13 +91,28 @@ class World(object):
                               get_min_limits(self.robot, self.gripper_joints))
         self.update_initial()
     def update_initial(self):
-        # TODO: store poses as well?
+        # TODO: store initial poses as well?
         self.update_floor()
         self.update_custom_limits()
         self.initial_saver = WorldSaver()
+        self.initial_surfaces = {obj_name: self.get_supporting(obj_name)
+                                 for obj_name in self.movable}
         #self.init_bq = Conf(self.robot, self.base_joints)
         #self.init_aq = Conf(self.robot, self.arm_joints)
         #self.init_gq = Conf(self.robot, self.gripper_joints)
+    def get_initial_state(self):
+        initial_attachments = {}
+        self.initial_saver.restore()
+        for obj_name, surface_name in self.initial_surfaces.items():
+            if surface_name is None:
+                continue
+            body = self.get_body(obj_name)
+            surface = surface_from_name(surface_name)
+            surface_link = link_from_name(self.kitchen, surface.link)
+            attachment = create_attachment(self.kitchen, surface_link, body)
+            initial_attachments[body] = attachment  # TODO: init state instead
+        return State(self, savers=[self.initial_saver],
+                     attachments=initial_attachments.values())
 
     #########################
 
@@ -260,6 +276,16 @@ class World(object):
 
     #########################
 
+    def get_supporting(world, obj_name):
+        body = world.get_body(obj_name)
+        supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
+            body, compute_surface_aabb(world, surface),
+            above_epsilon=1e-2, below_epsilon=5e-2)]
+        if len(supporting) != 1:
+            print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
+            return None
+        [surface_name] = supporting
+        return surface_name
     def add_body(self, name, path, **kwargs):
         assert name not in self.body_from_name
         self.path_from_name[name] = path

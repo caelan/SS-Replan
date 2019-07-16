@@ -3,7 +3,7 @@ import numpy as np
 from pybullet_tools.utils import get_point, convex_hull, Point, add_segments, convex_centroid, add_text, spaced_colors, \
     multiply, point_from_pose, get_pose, invert, link_from_name, grow_polygon
 from src.database import load_pull_base_poses, get_surface_reference_pose, load_placements, load_place_base_poses
-from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_supporting, get_grasps, get_surface
+from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_grasps, surface_from_name
 
 
 def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
@@ -27,7 +27,7 @@ def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
     handles = []
     if placements:
         for surface_name in ALL_SURFACES:
-            surface = get_surface(surface_name)
+            surface = surface_from_name(surface_name)
             surface_link = link_from_name(world.kitchen, surface.link)
             #surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
             for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
@@ -55,7 +55,7 @@ def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
         for name in world.movable:
             body = world.get_body(name)
             pose = get_pose(body)
-            surface_name = get_supporting(world, name)
+            surface_name = world.get_supporting(name)
             if surface_name is None:
                 continue
             for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):

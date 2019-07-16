@@ -109,14 +109,13 @@ def commands_from_plan(world, plan, defer=False):
 
 ################################################################################
 
-def simulate_plan(world, commands, args, time_step=0.02):
+def simulate_plan(state, commands, args, time_step=0.02):
     wait_for_user()
     if commands is None:
         return
-    initial_state = State(savers=[WorldSaver()], attachments=world.initial_attachments.values())
     time_step = None if args.teleport else time_step
     if args.record:
         with VideoSaver(VIDEO_FILENAME):
-            execute_plan(world, initial_state, commands, time_step=time_step)
+            execute_plan(state, commands, time_step=time_step)
     else:
-        execute_plan(world, initial_state, commands, time_step=time_step)
+        execute_plan(state, commands, time_step=time_step)

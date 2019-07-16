@@ -15,6 +15,7 @@ class Task(object):
                  goal_hand_empty=False, goal_holding=[],
                  goal_on={}, goal_closed=[], goal_cooked=[]):
         self.world = world
+        world.task = self
         self.skeletons = list(skeletons)
         self.movable_base = movable_base
         self.noisy_base = noisy_base

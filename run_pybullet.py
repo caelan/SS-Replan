@@ -8,7 +8,8 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user, INF
+from pybullet_tools.utils import wait_for_user, INF, LockRenderer
+from src.visualization import add_markers
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -47,12 +48,13 @@ def create_parser():
 
 def run_deteriministic(task, args):
     world = task.world
+    state = world.get_initial_state()
     problem = pdddlstream_from_problem(task,
-        collisions=not args.cfree, teleport=args.teleport)
+        state, collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
     plan, cost, evaluations = solution
     commands = commands_from_plan(world, plan, args.defer)
-    simulate_plan(world, commands, args)
+    simulate_plan(state, commands, args)
     wait_for_user()
 
 def run_stochastic(task, args):
@@ -60,6 +62,7 @@ def run_stochastic(task, args):
     last_cost = INF # TODO: update the remaining cost (removing attempted actions)
     # The nice thing about having a correct belief model is that you actually know what cost makes progress
     world = task.world
+    state = world.get_initial_state()
     while True:
         problem = pdddlstream_from_problem(task,
             collisions=not args.cfree, teleport=args.teleport)
@@ -70,7 +73,7 @@ def run_stochastic(task, args):
             return False
         if not commands:
             return True
-        simulate_plan(world, commands, args)
+        simulate_plan(state, commands, args)
 
 ################################################################################
 
@@ -87,6 +90,8 @@ def main():
     #return
 
     task = stow_block(world)
+    with LockRenderer():
+        add_markers(world)
     if args.defer:
         run_stochastic(task, args)
     else:
