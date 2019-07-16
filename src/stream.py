@@ -345,9 +345,9 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
             world.carry_conf.assign()
         full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
         if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
-            # print('Grasp IK failure', grasp_conf)
+            print('Grasp IK failure')
             return
-        approach_path = plan_approach(world, approach_pose, attachments=[gripper_attachment],
+        approach_path = plan_approach(world, approach_pose, #attachments=[gripper_attachment],
                                       obstacles=obstacles, **kwargs)
         if approach_path is None:
             return

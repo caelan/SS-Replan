@@ -11,6 +11,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
+from brain_ros.ros_world_state import RosObserver
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, wait_for_user
 
@@ -33,6 +34,8 @@ TASKS = [
     #NONE,
 ]
 
+SPAM = 'potted_meat_can'
+TOP_DRAWER = 'indigo_drawer_top'
 
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 
@@ -40,9 +43,11 @@ TASKS = [
 
 def goal_formula_from_goal(world, goals, plan, fixed=False):
     #regex = re.compile(r"(\w+)\((\)\n")
-    task = Task(world, movable_base=not fixed, fixed_base=True, return_init_bq=not fixed)
+    task = Task(world, #goal_on={SPAM: TOP_DRAWER},
+        movable_base=not fixed, fixed_base=True, return_init_bq=not fixed)
     init = []
     goal_literals = []
+
     # TODO: use the task plan to constrain solution
     # TODO: include these within task instead
     for head, value in goals:
@@ -106,11 +111,23 @@ def create_trial_args(**kwargs):
 
 ################################################################################
 
-def planning_loop(domain, trial_manager, task, additional_init, goal_formula, args):
+def planning_loop(domain, observer, task, additional_init, goal_formula, args):
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    observer = trial_manager.observer
     world = task.world
+
+    name = SPAM
+    surface = TOP_DRAWER
+    joint = '{}_joint'.format(surface)
+    additional_init = [
+        ('Stackable', name, surface),
+    ]
+    goal_formula = And(*[
+        #('Holding', name),
+        ('On', name, surface),
+        ('DoorStatus', joint, 'closed'),
+        #('DoorStatus', joint, 'open'),
+    ])
 
     # TODO: track the plan cost
     while True:
@@ -146,6 +163,8 @@ def planning_loop(domain, trial_manager, task, additional_init, goal_formula, ar
 
 def main():
     parser = create_parser()
+    parser.add_argument('-execute', action='store_true',
+                        help="When enabled, ...")
     parser.add_argument('-fixed', action='store_true',
                         help="When enabled, fixes the robot's base")
     parser.add_argument('-lula', action='store_true',
@@ -162,17 +181,22 @@ def main():
 
     rospy.init_node("Isaac STRIPStream")
     #with HideOutput():
-    domain = kitchen_domain.KitchenDomain(sim=True, sigma=0, lula=args.lula)
+    domain = kitchen_domain.KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
 
-    #trial_args = parse.parse_kitchen_args()
-    trial_args = create_trial_args()
-    trial_manager = TrialManager(trial_args, domain, lula=args.lula)
-    observer = trial_manager.observer
-    sim_manager = trial_manager.sim
-    trial_manager.set_camera(randomize=False)
-
-    # Need to reset at the start
-    objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
+    if args.execute:
+        observer = RosObserver(domain)
+        objects = []
+        goal = []
+        plan = []
+    else:
+        #trial_args = parse.parse_kitchen_args()
+        trial_args = create_trial_args()
+        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
+        observer = trial_manager.observer
+        sim_manager = trial_manager.sim
+        trial_manager.set_camera(randomize=False)
+        # Need to reset at the start
+        objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[1, -1, 2])
@@ -186,16 +210,16 @@ def main():
     world_state = observer.observe() # domain.root
     with LockRenderer():
         update_world(world, domain, observer, world_state)
-        if task.movable_base:
+        if not args.execute and task.movable_base:
             world.set_base_conf([2.0, 0, np.pi/2])
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
         world.update_initial()
-    wait_for_user()
+    #wait_for_user()
     # TODO: initial robot base conf is in collision
 
     #control_base([2.0, 0, -np.pi], domain.get_robot().get_motion_interface(), observer)
-    success = planning_loop(domain, trial_manager, task, additional_init, goal_formula, args)
+    success = planning_loop(domain, observer, task, additional_init, goal_formula, args)
     print('Success:', success)
     world.destroy()
     # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false

@@ -64,8 +64,8 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     from moveit_msgs.msg import RobotTrajectory
     import rospy
 
-    if moveit.use_lula:
-        speed = 0.5*speed
+    #if moveit.use_lula:
+    #    speed = 0.5*speed
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used

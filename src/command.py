@@ -163,7 +163,7 @@ class DoorTrajectory(Command):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
         if MOVEIT:
-            moveit.close_gripper(force=FORCE)
+            moveit.close_gripper() #force=FORCE)
             time.sleep(DEFAULT_SLEEP)
             moveit_control(self.robot, self.robot_joints, self.robot_path, moveit, observer)
             time.sleep(DEFAULT_SLEEP)
@@ -207,7 +207,7 @@ class Attach(Command):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
-            moveit.close_gripper()
+            moveit.close_gripper(wait=True, sleep=0., speed=0.03)
         else:
             return close_gripper(self.robot, moveit)
 
