@@ -71,6 +71,11 @@ class Sequence(object):
 
 ################################################################################
 
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/isaac_bridge/launch/carter_localization_priors.launch#L6
+
+CARTER_X = 33.1
+CARTER_Y = 7.789
+
 class Trajectory(Command):
     def __init__(self, world, robot, joints, path):
         super(Trajectory, self).__init__(world)

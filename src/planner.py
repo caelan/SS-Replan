@@ -49,7 +49,7 @@ def solve_pddlstream(problem, args, debug=False):
     constraints = PlanConstraints()
 
     success_cost = 0 if args.optimal else INF
-    planner = 'max-astar' if args.optimal else 'ff-astar'
+    planner = 'max-astar' if args.optimal else 'ff-wastar2'
     search_sample_ratio = 1 # TODO: could try decreasing
     max_planner_time = 10
 
