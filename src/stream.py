@@ -177,6 +177,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 yield (p,)
     return gen
 
+# TODO: sample placements in reach of current base pose
 
 def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport=False,
     # TODO: produce carry arm confs here
@@ -198,68 +199,12 @@ def inverse_reachability(world, base_generator, obstacles=set(), max_attempts=25
             bq = Conf(world.robot, world.base_joints, base_conf)
             bq.assign()
             world.carry_conf.assign()
-            if any(pairwise_collision(world.robot, b) for b in obstacles): #  + [obj]
-                continue
-            #print('IR attempts:', i)
-            yield (bq,)
-            break
+            if not any(pairwise_collision(world.robot, b) for b in obstacles): #  + [obj]
+                #print('IR attempts:', i)
+                yield (bq,)
+                break
         else:
             yield None
-
-def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25,
-                  max_successes=1, max_failures=0, **kwargs):
-    successes = 0
-    failures = 0
-    ir_generator = ir_sampler(*inputs)
-    while True:
-        for attempt in range(max_attempts):
-            try:
-                ir_outputs = next(ir_generator)
-            except StopIteration:
-                return
-            if ir_outputs is None: # break instead?
-                continue
-            ik_outputs = next(ik_fn(*(inputs + ir_outputs)), None)
-            if ik_outputs is None:
-                continue
-            successes += 1
-            print('IK attempt:', attempt)
-            yield ir_outputs + ik_outputs
-            if max_successes < successes:
-                return
-            break
-        else:
-            failures += 1
-            if max_failures < failures: # pose.init
-                return
-            yield None
-
-################################################################################
-
-def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
-    # TODO: vary based on surface (for drawers)
-    def gen_fn(name, pose, grasp):
-        assert pose.support is not None
-        obj = world.get_body(name)
-        pose.assign() # May set the drawer confs as well
-        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
-        if not collisions:
-            obstacles = set()
-        for _ in iterate_approach_path(world, pose, grasp, body=obj):
-            if any(pairwise_collision(world.gripper, b) or pairwise_collision(obj, b)
-                   for b in obstacles):
-                return iter([])
-
-        # TODO: check collisions with obj at pose
-        gripper_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        if learned:
-            base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
-        else:
-            # TODO: be careful when get_pose() is not None
-            base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        pose.assign()
-        return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
-    return gen_fn
 
 def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                   teleport=False, switches_only=False,
@@ -309,15 +254,25 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
         return None
     return approach_path + grasp_path
 
+################################################################################
+
+def is_approach_safe(world, name, pose, grasp, obstacles):
+    assert pose.support is not None
+    obj = world.get_body(name)
+    pose.assign()  # May set the drawer confs as well
+    for _ in iterate_approach_path(world, pose, grasp, body=obj):
+        if any(pairwise_collision(world.gripper, b) # or pairwise_collision(obj, b)
+               for b in obstacles):
+            return True
+    return True
+
 def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
     sample_fn = get_sample_fn(world.robot, world.arm_joints)
     gripper_motion_fn = get_gripper_motion_gen(world, collisions=collisions, **kwargs)
 
     def gen(name, pose, grasp, base_conf):
         # TODO: check if within database convex hull
-        # TODO: check approach
         # TODO: flag to check if initially in collision
-        # TODO: sample placements in reach of current base pose
 
         obj_body = world.get_body(name)
         world_from_body = pose.get_world_from_body()
@@ -367,6 +322,54 @@ def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
         ], name='pick')
         yield (aq, cmd,)
     return gen
+
+def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
+    # TODO: vary based on surface (for drawers)
+    def gen_fn(name, pose, grasp):
+        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
+        if not collisions:
+            obstacles = set()
+        if not is_approach_safe(world, name, pose, grasp, obstacles):
+            return iter([])
+
+        # TODO: check collisions with obj at pose
+        gripper_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
+        if learned:
+            base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
+        else:
+            # TODO: be careful when get_pose() is not None
+            base_generator = uniform_pose_generator(world.robot, gripper_pose)
+        pose.assign()
+        return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+    return gen_fn
+
+def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25,
+                  max_successes=1, max_failures=0, **kwargs):
+    successes = 0
+    failures = 0
+    ir_generator = ir_sampler(*inputs)
+    while True:
+        for attempt in range(max_attempts):
+            try:
+                ir_outputs = next(ir_generator)
+            except StopIteration:
+                return
+            if ir_outputs is None: # break instead?
+                continue
+            ik_outputs = next(ik_fn(*(inputs + ir_outputs)), None)
+            if ik_outputs is None:
+                continue
+            successes += 1
+            print('IK attempt:', attempt)
+            yield ir_outputs + ik_outputs
+            if max_successes < successes:
+                return
+            break
+        else:
+            failures += 1
+            if max_failures < failures: # pose.init
+                return
+            yield None
 
 def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
     # TODO: compose using general fn
@@ -520,7 +523,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
             return
         door_path, handle_path, tool_path = door_outputs
         for i in range(max_attempts):
-            randomize = i != 0
+            randomize = (i != 0)
             ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
                               randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
             if ik_outputs is not None:
@@ -555,12 +558,11 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
                 yield None
                 continue
             base_conf, = ir_outputs
-            randomize = random.random() < 0.5
+            randomize = (random.random() < 0.5)
             ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
                                         randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
-            if ik_outputs is None:
-                continue
-            yield ir_outputs + ik_outputs
+            if ik_outputs is not None:
+                yield ir_outputs + ik_outputs
     return gen
 
 ################################################################################
