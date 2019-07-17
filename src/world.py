@@ -11,7 +11,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, surface_from_name
+    ALL_SURFACES, compute_surface_aabb, surface_from_name, create_surface_attachment
 from ikfast.ik import sample_tool_ik
 from src.command import State
 
@@ -77,7 +77,7 @@ class World(object):
         self.path_from_name = {}
         self.custom_limits = {}
         self.base_limits_handles = []
-        self.kinects = []
+        self.kinects = [] # TODO: add kinect
 
         self.disabled_collisions = set()
         if self.robot_name == FRANKA_CARTER:
@@ -95,24 +95,16 @@ class World(object):
         self.update_floor()
         self.update_custom_limits()
         self.initial_saver = WorldSaver()
-        self.initial_surfaces = {obj_name: self.get_supporting(obj_name)
-                                 for obj_name in self.movable}
-        #self.init_bq = Conf(self.robot, self.base_joints)
-        #self.init_aq = Conf(self.robot, self.arm_joints)
-        #self.init_gq = Conf(self.robot, self.gripper_joints)
     def get_initial_state(self):
-        initial_attachments = {}
+        # TODO: would be better to explicitly keep the state around
+        initial_attachments = []
         self.initial_saver.restore()
-        for obj_name, surface_name in self.initial_surfaces.items():
-            if surface_name is None:
-                continue
-            body = self.get_body(obj_name)
-            surface = surface_from_name(surface_name)
-            surface_link = link_from_name(self.kitchen, surface.link)
-            attachment = create_attachment(self.kitchen, surface_link, body)
-            initial_attachments[body] = attachment  # TODO: init state instead
+        for obj_name in self.movable:
+            surface_name = self.get_supporting(obj_name)
+            if surface_name is not None:
+                initial_attachments.append(create_surface_attachment(self, obj_name, surface_name))
         return State(self, savers=[self.initial_saver],
-                     attachments=initial_attachments.values())
+                     attachments=initial_attachments)
 
     #########################
 
@@ -247,6 +239,9 @@ class World(object):
         self.closed_gq.assign()
     def open_gripper(self):
         self.open_gq.assign()
+
+    #########################
+
     def get_door_sign(self, joint):
         return -1 if 'left' in get_joint_name(self.kitchen, joint) else +1
     def closed_conf(self, joint):
@@ -276,10 +271,10 @@ class World(object):
 
     #########################
 
-    def get_supporting(world, obj_name):
-        body = world.get_body(obj_name)
+    def get_supporting(self, obj_name):
+        body = self.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
-            body, compute_surface_aabb(world, surface),
+            body, compute_surface_aabb(self, surface),
             above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
             print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
@@ -295,13 +290,13 @@ class World(object):
         return name
     def get_body(self, name):
         return self.body_from_name[name]
+    def get_name(self, name):
+        inverse = {v: k for k, v in self.body_from_name.items()}
+        return inverse.get(name, None)
     def remove_body(self, name):
         body = self.get_body(name)
         remove_body(body)
         del self.body_from_name[name]
-    def get_name(self, name):
-        inverse = {v: k for k, v in self.body_from_name.items()}
-        return inverse.get(name, None)
     def reset(self):
         #remove_all_debug()
         for name in list(self.body_from_name):

@@ -5,11 +5,10 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf
-from pybullet_tools.utils import get_joint_name, create_attachment, \
-    child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    LockRenderer, WorldSaver
+from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
+    WorldSaver
 
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, get_surface, COUNTERS, RelPose, get_supporting
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, create_surface_attachment
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -17,7 +16,6 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT
 from src.database import has_place_database
-from src.visualization import add_markers
 
 
 def existential_quantification(goal_literals):
@@ -38,15 +36,12 @@ def existential_quantification(goal_literals):
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 
-def pdddlstream_from_problem(task, debug=False, **kwargs):
+def pdddlstream_from_problem(state, debug=False, **kwargs):
+    world = state.world # One world per state
+    task = world.task # One task per world
     print(task)
-    world = task.world
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
     stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
-
-    with LockRenderer():
-        add_markers(world)
-    #wait_for_user()
 
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
@@ -137,7 +132,8 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
         link = child_link_from_joint(joint)
-        link_name = get_link_name(world.kitchen, link) # Relies on the fact that drawers have identical surface and link names
+        # Relies on the fact that drawers have identical surface and link names
+        link_name = get_link_name(world.kitchen, link)
         init_conf = Conf(world.kitchen, [joint], init=True)
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
@@ -159,7 +155,7 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
                 ])
 
     for surface_name in ALL_SURFACES:
-        surface = get_surface(surface_name)
+        surface = surface_from_name(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
         parent_joint = parent_joint_from_link(surface_link)
         if parent_joint in world.kitchen_joints:
@@ -180,28 +176,23 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
             if has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 
-    grasped = set()
-    if world.holding is not None:
-        grasp = world.holding
-        obj_name = grasp.body_name
-        grasped.add(obj_name)
-        init += [
-            ('Movable', obj_name),
-            ('Graspable', obj_name),
-            ('Grasp', obj_name, grasp),
-            ('IsGraspType', obj_name, grasp, grasp.grasp_type),
-            ('AtGrasp', obj_name, grasp),
-        ]
-        print(init)
-        return
-
-    for obj_name in world.movable - grasped:
+    for obj_name in world.movable:
         # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(obj_name)
-        surface_name =  get_supporting(world, obj_name)
+        if (state.grasped is not None) and (state.grasped.body_name == obj_name):
+            grasp = state.grasped
+            init += [
+                ('Movable', obj_name),
+                ('Graspable', obj_name),
+                ('Grasp', obj_name, grasp),
+                ('IsGraspType', obj_name, grasp, grasp.grasp_type),
+                ('AtGrasp', obj_name, grasp),
+            ]
+            continue
+        surface_name =  world.get_supporting(obj_name)
         if surface_name is None:
-            world_pose = RelPose(body, init=True)
             # Treats as obstacle
+            world_pose = RelPose(body, init=True)
             init += [
                 ('Movable', obj_name), # TODO: misnomer
                 ('WorldPose', obj_name, world_pose),
@@ -209,15 +200,11 @@ def pdddlstream_from_problem(task, debug=False, **kwargs):
             ]
             continue
             #raise RuntimeError(obj_name, supporting)
-        surface = get_surface(surface_name)
-        surface_link = link_from_name(world.kitchen, surface.link)
-        attachment = create_attachment(world.kitchen, surface_link, body)
-        world.initial_attachments[body] = attachment # TODO: init state instead
-        rel_pose = RelPose(body, reference_body=world.kitchen, reference_link=surface_link,
-                       confs=[attachment], support=surface_name, init=True)
+        attachment = create_surface_attachment(world, obj_name, surface_name)
+        rel_pose = RelPose(body, reference_body=attachment.parent, reference_link=attachment.parent_link,
+                           confs=[attachment], support=surface_name, init=True)
         surface_pose = surface_poses[surface_name]
         world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
-
         init += [
             ('Movable', obj_name),
             ('Graspable', obj_name),

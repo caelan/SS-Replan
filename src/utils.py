@@ -14,7 +14,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     set_color, \
     LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
     is_placed_on_aabb, get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
-    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh
+    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment
 
 try:
     import trac_ik_python
@@ -268,6 +268,12 @@ def create_gripper(robot, visual=False):
     return gripper
 
 ################################################################################
+
+def create_surface_attachment(world, obj_name, surface_name):
+    body = world.get_body(obj_name)
+    surface = surface_from_name(surface_name)
+    surface_link = link_from_name(world.kitchen, surface.link)
+    return create_attachment(world.kitchen, surface_link, body)
 
 class RelPose(object):
 #class RelPose(Pose):

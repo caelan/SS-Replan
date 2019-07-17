@@ -49,8 +49,8 @@ def create_parser():
 def run_deteriministic(task, args):
     world = task.world
     state = world.get_initial_state()
-    problem = pdddlstream_from_problem(task,
-        state, collisions=not args.cfree, teleport=args.teleport)
+    problem = pdddlstream_from_problem(state,
+        collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
     plan, cost, evaluations = solution
     commands = commands_from_plan(world, plan, args.defer)
@@ -64,7 +64,7 @@ def run_stochastic(task, args):
     world = task.world
     state = world.get_initial_state()
     while True:
-        problem = pdddlstream_from_problem(task,
+        problem = pdddlstream_from_problem(state,
             collisions=not args.cfree, teleport=args.teleport)
         solution = solve_pddlstream(problem, args, success_cost=last_cost)
         plan, cost, evaluations = solution

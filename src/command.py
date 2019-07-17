@@ -1,8 +1,9 @@
 from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, follow_base_trajectory
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, \
-    get_max_limit, get_joint_limits, waypoints_from_path
+    get_max_limit, get_joint_limits, waypoints_from_path, link_from_name
 from src.issac import update_robot, update_isaac_robot
+from src.utils import surface_from_name
 
 from isaac_bridge.manager import SimulationManager
 
@@ -42,6 +43,10 @@ class State(object):
 class Command(object):
     def __init__(self, world):
         self.world = world
+
+    #@property
+    #def robot(self):
+    #    return self.world.robot
 
     @property
     def bodies(self):
@@ -218,9 +223,13 @@ class Attach(Command):
     def reverse(self):
         return Detach(self.world, self.robot, self.link, self.body)
 
+    def attach(self):
+        return create_attachment(self.robot, self.link, self.body)
+
     def iterate(self, state):
-        state.attachments[self.body] = create_attachment(self.robot, self.link, self.body)
-        state.grasped = self.grasp
+        state.attachments[self.body] = self.attach()
+        if self.robot == self.world.robot:
+           state.grasped = self.grasp
         yield
 
     def execute(self, domain, moveit, observer):
@@ -233,6 +242,15 @@ class Attach(Command):
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
+
+#class AttachSurface(Attach):
+#    def __init__(self, world, obj_name, surface_name):
+#        body = world.get_body(obj_name)
+#        surface = surface_from_name(surface_name)
+#        surface_link = link_from_name(world.kitchen, surface.link)
+#        super(AttachSurface, self).__init__(world, world.kitchen, surface_link, body)
+#        self.obj_name = obj_name
+#        self.surface_name = surface_name
 
 class Detach(Command):
     def __init__(self, world, robot, link, body):
@@ -252,7 +270,8 @@ class Detach(Command):
     def iterate(self, state):
         assert self.body in state.attachments
         del state.attachments[self.body]
-        state.grasped = None
+        if self.robot == self.world.robot:
+            state.grasped = None
         yield
 
     def execute(self, domain, moveit, observer):
@@ -265,6 +284,8 @@ class Detach(Command):
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
+
+################################################################################s
 
 class Wait(Command):
     def __init__(self, world, steps):
@@ -297,7 +318,7 @@ def execute_plan(state, commands, time_step=None):
         print('\nCommand {:2}: {}'.format(i, command))
         # TODO: skip to end
         # TODO: downsample
-        for j, _ in enumerate(command.iterate(state, update=True)):
+        for j, _ in enumerate(command.iterate(state)):
             state.derive()
             if j == 0:
                 continue
