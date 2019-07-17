@@ -15,7 +15,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
 
 from src.utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
-    compute_surface_aabb, GRASP_TYPES, BASE_JOINTS
+    compute_surface_aabb, GRASP_TYPES, BASE_JOINTS, create_surface_attachment
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses
@@ -169,11 +169,9 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 break
             set_pose(obj_body, body_pose_world)
             if test_supported(world, obj_body, surface_name, collisions=collisions):
-                surface = surface_from_name(surface_name)
-                surface_link = link_from_name(world.kitchen, surface.link)
-                attachment = create_attachment(world.kitchen, surface_link, obj_body)
-                p = RelPose(obj_body, reference_body=world.kitchen,
-                            reference_link=surface_link, support=surface_name, confs=[attachment])
+                attachment = create_surface_attachment(world, obj_name, surface_name)
+                p = RelPose(attachment.child, reference_body=attachment.parent,
+                            reference_link=attachment.parent_link, support=surface_name, confs=[attachment])
                 yield (p,)
     return gen
 
@@ -256,130 +254,106 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
 
 ################################################################################
 
-def is_approach_safe(world, name, pose, grasp, obstacles):
+def is_approach_safe(world, obj_name, pose, grasp, obstacles):
     assert pose.support is not None
-    obj = world.get_body(name)
+    obj_body = world.get_body(obj_name)
     pose.assign()  # May set the drawer confs as well
-    for _ in iterate_approach_path(world, pose, grasp, body=obj):
-        if any(pairwise_collision(world.gripper, b) # or pairwise_collision(obj, b)
-               for b in obstacles):
+    for _ in iterate_approach_path(world, pose, grasp, body=obj_body):
+        if any(pairwise_collision(world.gripper, obst) # or pairwise_collision(obj_body, obst)
+               for obst in obstacles):
             return True
     return True
 
-def get_fixed_pick_gen_fn(world, randomize=False, collisions=True, **kwargs):
-    sample_fn = get_sample_fn(world.robot, world.arm_joints)
-    gripper_motion_fn = get_gripper_motion_gen(world, collisions=collisions, **kwargs)
+def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True, **kwargs):
+    # TODO: check if within database convex hull
+    # TODO: flag to check if initially in collision
 
-    def gen(name, pose, grasp, base_conf):
-        # TODO: check if within database convex hull
-        # TODO: flag to check if initially in collision
+    obj_body = world.get_body(obj_name)
+    pose.assign()
+    base_conf.assign()
+    world.open_gripper()
+    robot_saver = BodySaver(world.robot)
+    obj_saver = BodySaver(obj_body)
 
-        obj_body = world.get_body(name)
-        world_from_body = pose.get_world_from_body()
-        gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
-        #gripper_attachment = grasp.get_attachment()
+    if randomize:
+        sample_fn = get_sample_fn(world.robot, world.arm_joints)
+        set_joint_positions(world.robot, world.arm_joints, sample_fn())
+    else:
+        world.carry_conf.assign()
+    world_from_body = pose.get_world_from_body()
+    gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
+    full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
+    if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
+        print('Grasp IK failure')
+        return
+    approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
+    approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
+                                  obstacles=obstacles, **kwargs)
+    if approach_path is None:
+        return
+    if MOVE_ARM:
+        aq = Conf(world.robot, world.arm_joints, approach_path[0])
+    else:
+        aq = world.carry_conf
 
-        surface = surface_from_name(pose.support)
-        surface_link = link_from_name(world.kitchen, surface.link)
+    gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
+    finger_cmd, = gripper_motion_fn(world.open_gq, grasp.get_gripper_conf())
+    attachment = create_surface_attachment(world, obj_name, pose.support)
+    cmd = Sequence(State(world, savers=[robot_saver, obj_saver],
+                         attachments=[attachment]), commands=[
+        Trajectory(world, world.robot, world.arm_joints, approach_path),
+        finger_cmd.commands[0],
+        Detach(world, attachment.parent, attachment.parent_link, attachment.child),
+        Attach(world, world.robot, world.tool_link, obj_body, grasp=grasp),
+        Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
+    ], name='pick')
+    yield (aq, cmd,)
 
-        finger_cmd, = gripper_motion_fn(world.open_gq, grasp.get_gripper_conf())
-        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support) # | {obj_body}
+################################################################################
+
+def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
+
+    def gen(obj_name, pose, grasp, base_conf):
+        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)  # | {obj_body}
         if not collisions:
             obstacles = set()
-
-        pose.assign()
-        base_conf.assign()
-        world.open_gripper()
-        robot_saver = BodySaver(world.robot)
-        obj_saver = BodySaver(obj_body)
-
-        if randomize:
-            set_joint_positions(world.robot, world.arm_joints, sample_fn())
-        else:
-            world.carry_conf.assign()
-        full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
-        if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
-            print('Grasp IK failure')
+        if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
             return
-        approach_path = plan_approach(world, approach_pose, #attachments=[gripper_attachment],
-                                      obstacles=obstacles, **kwargs)
-        if approach_path is None:
-            return
-        if MOVE_ARM:
-            aq = Conf(world.robot, world.arm_joints, approach_path[0])
-        else:
-            aq = world.carry_conf
-
-        surface_attachment = create_attachment(world.kitchen, surface_link, obj_body)
-        cmd = Sequence(State(world, savers=[robot_saver, obj_saver],
-                             attachments=[surface_attachment]), commands=[
-            Trajectory(world, world.robot, world.arm_joints, approach_path),
-            finger_cmd.commands[0],
-            Detach(world, world.kitchen, surface_link, obj_body),
-            Attach(world, world.robot, world.tool_link, obj_body, grasp=grasp),
-            Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
-        ], name='pick')
-        yield (aq, cmd,)
+        for i in range(max_attempts):
+            randomize = (i != 0)
+            ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
+                                        randomize=randomize), None)
+            if ik_outputs is not None:
+                yield ik_outputs
+                break
     return gen
 
-def get_pick_ir_gen_fn(world, collisions=True, learned=True, **kwargs):
-    # TODO: vary based on surface (for drawers)
-    def gen_fn(name, pose, grasp):
+def get_pick_gen_fn(world, collisions=True, learned=True, max_attempts=25, **kwargs):
+    # TODO: sample in the neighborhood of the base conf to ensure robust
+
+    def gen(obj_name, pose, grasp):
         obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
         if not collisions:
             obstacles = set()
-        if not is_approach_safe(world, name, pose, grasp, obstacles):
-            return iter([])
+        if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
+            return
 
         # TODO: check collisions with obj at pose
         gripper_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
             base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
         else:
-            # TODO: be careful when get_pose() is not None
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        pose.assign()
-        return inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
-    return gen_fn
-
-def compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=25,
-                  max_successes=1, max_failures=0, **kwargs):
-    successes = 0
-    failures = 0
-    ir_generator = ir_sampler(*inputs)
-    while True:
-        for attempt in range(max_attempts):
-            try:
-                ir_outputs = next(ir_generator)
-            except StopIteration:
-                return
+        for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs):
             if ir_outputs is None: # break instead?
+                yield None
                 continue
-            ik_outputs = next(ik_fn(*(inputs + ir_outputs)), None)
-            if ik_outputs is None:
-                continue
-            successes += 1
-            print('IK attempt:', attempt)
-            yield ir_outputs + ik_outputs
-            if max_successes < successes:
-                return
-            break
-        else:
-            failures += 1
-            if max_failures < failures: # pose.init
-                return
-            yield None
-
-def get_pick_gen_fn(world, max_attempts=25, teleport=False, **kwargs):
-    # TODO: compose using general fn
-    ir_sampler = get_pick_ir_gen_fn(world, max_attempts=1, **kwargs)
-    ik_fn = get_fixed_pick_gen_fn(world, teleport=teleport, **kwargs)
-    # TODO: sample in the neighborhood of the base conf to ensure robust
-
-    def gen(*inputs):
-        _, pose, _ = inputs
-        return compose_ir_ik(ir_sampler, ik_fn, inputs, max_attempts=max_attempts, **kwargs)
+            base_conf, = ir_outputs
+            randomize = (random.random() < 0.5)
+            ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
+                                        randomize=randomize), None)
+            if ik_outputs is not None:
+                yield ir_outputs + ik_outputs
     return gen
 
 ################################################################################
@@ -453,8 +427,8 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
             return
 
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
-    sample_fn = get_sample_fn(world.robot, world.arm_joints)
     if randomize:
+        sample_fn = get_sample_fn(world.robot, world.arm_joints)
         set_joint_positions(world.robot, world.arm_joints, sample_fn())
     arm_path = []
     for i, tool_pose in enumerate(tool_path):
@@ -545,14 +519,12 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
         if result is None:
             return
         door_path, handle_path, tool_path = result
-        index = int(len(tool_path)/2) # index = 0
-        target_pose = tool_path[index]
         if learned:
             base_generator = load_pull_base_poses(world, joint_name)
         else:
-            # TODO: be careful when get_pose() is not None
+            index = int(len(tool_path) / 2)  # index = 0
+            target_pose = tool_path[index]
             base_generator = uniform_pose_generator(world.robot, target_pose)
-
         for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles):
             if ir_outputs is None: # break instead?
                 yield None
