@@ -72,19 +72,17 @@ def sample_placement(world, entity_name, surface_name, **kwargs):
     pose.assign()
 
 def close_all_doors(world):
-    for name in DRAWER_JOINTS[1:2]:
-        joint = joint_from_name(world.kitchen, name)
-        # world.open_door(joint)
+    for joint in world.kitchen_joints:
         world.close_door(joint)
 
 def open_all_doors(world):
-    for name in DRAWER_JOINTS[1:2]:
-        joint = joint_from_name(world.kitchen, name)
+    for joint in world.kitchen_joints:
         world.open_door(joint)
 
 ################################################################################
 
 def relocate_block(world, **kwargs):
+    #open_all_doors(world)
     entity_name = add_block(world, idx=0)
     initial_surface = 'hitman_tmp'
     goal_surface = 'indigo_tmp'

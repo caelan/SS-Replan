@@ -27,6 +27,7 @@ def solve_pddlstream(problem, args, success_cost=INF, debug=False):
         'test-door': StreamInfo(p_success=0, eager=True),
         'test-near-pose': StreamInfo(p_success=0, eager=True),
         'test-near-joint': StreamInfo(p_success=0, eager=True),
+        # TODO: sample nearby pose?
 
         'compute-pose-kin': StreamInfo(p_success=0.5, eager=True),
         'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),

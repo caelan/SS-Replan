@@ -66,7 +66,7 @@
   )
   (:functions
     (Distance ?bq1 ?bq2)
-    ; (MoveCost ?bt)
+    (MoveBaseCost)
     (MoveArmCost)
     (MoveGripperCost)
     (PickCost)
