@@ -11,14 +11,14 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     point_from_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, create_attachment, Point, set_configuration, \
-    flatten_links, convex_hull, is_point_in_polygon, grow_polygon
+    flatten_links, convex_hull, is_point_in_polygon, grow_polygon, wait_for_user
 
 from src.utils import get_grasps, iterate_approach_path, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
     compute_surface_aabb, GRASP_TYPES, BASE_JOINTS, create_surface_attachment
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
-    load_pull_base_poses
+    load_pull_base_poses, load_forward_placements
 from src.visualization import visualize_base_confs
 
 
@@ -97,24 +97,32 @@ def get_link_obstacles(world, link_name):
 ################################################################################
 
 def get_test_near_pose(world, **kwargs):
-    vertices_from_surface = {}
+    #vertices_from_surface = {}
+    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=0.)
     # TODO: alternatively, distance to hull
 
     def test(object_name, pose, bq):
-        surface_name = pose.support
-        if (object_name, surface_name) not in vertices_from_surface:
-            base_confs = []
-            for grasp_type in GRASP_TYPES:
-                for grasp in get_grasps(world, object_name):
-                    tool_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose))
-                    base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
-            #visualize_base_confs(world, 'all', base_confs)
-            vertices_from_surface[object_name, surface_name] = grow_polygon(base_confs, radius=0.05)
-        if not vertices_from_surface[object_name, surface_name]:
+        #surface_name = pose.support
+        #if (object_name, surface_name) not in vertices_from_surface:
+        #    base_confs = []
+        #    for grasp_type in GRASP_TYPES:
+        #        for grasp in get_grasps(world, object_name):
+        #            tool_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose))
+        #            base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
+        #    #visualize_base_confs(world, 'all', base_confs)
+        #    vertices_from_surface[object_name, surface_name] = grow_polygon(base_confs, radius=0.05)
+        #if not vertices_from_surface[object_name, surface_name]:
+        #    return False
+        #bq.assign()
+        #base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
+        #return is_point_in_polygon(base_point[:2], vertices_from_surface[object_name, surface_name])
+        if not base_from_objects:
             return False
         bq.assign()
-        base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
-        return is_point_in_polygon(base_point[:2], vertices_from_surface[object_name, surface_name])
+        world_from_base = get_link_pose(world.robot, world.base_link)
+        world_from_object = pose.get_world_from_body()
+        base_from_object = multiply(invert(world_from_base), world_from_object)
+        return is_point_in_polygon(point_from_pose(base_from_object), base_from_objects)
     return test
 
 def get_test_near_joint(world, **kwargs):

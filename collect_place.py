@@ -57,6 +57,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
                 len(entries), args.num_samples, elapsed_time(start_time)))
             failures += 1
             continue
+        # TODO: ensure an arm motion exists
         bq, aq, at = result
         rel_pose.assign()
         bq.assign()
