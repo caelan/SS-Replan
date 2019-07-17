@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 
+from __future__ import print_function
+
 import sys
 import argparse
 import os
@@ -9,8 +11,11 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, INF, LockRenderer
+from pddlstream.language.constants import Action
+from pddlstream.algorithms.constraints import WILD
+from pddlstream.language.object import OPT_PREFIX
 from src.visualization import add_markers
-from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan
+from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block, relocate_block
@@ -53,27 +58,58 @@ def run_deteriministic(task, args):
         collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
     plan, cost, evaluations = solution
-    commands = commands_from_plan(world, plan, args.defer)
+    plan_prefix = extract_plan_prefix(plan, defer=args.defer)
+    commands = commands_from_plan(world, plan_prefix)
     simulate_plan(state, commands, args)
     wait_for_user()
 
+def make_skeleton(plan):
+    # TODO: could always replace objects with a free variable
+    skeleton = []
+    for action in plan:
+        if not isinstance(action, Action):
+            continue
+        name, args = action
+        new_args = [arg if isinstance(arg, str) and not arg.startswith(OPT_PREFIX) else WILD
+                    for arg in args]
+        skeleton.append(Action(name, new_args))
+    return skeleton
+
 def run_stochastic(task, args):
-    # TODO: relax cost threshold after some time
-    last_cost = INF # TODO: update the remaining cost (removing attempted actions)
+    # TODO: relax hard constraints threshold after some time
+    # Soft constraints tell you when you succeed
+    # Hard constraints are nice because they allow the solver to prune
+    # Constrain to use the previous plan skeleton
+    # Allow a plan skeleton to be short-cutted (don't need to move base twice)
+    # Technically all values change upon each observation
+    #last_cost = INF # TODO: update the remaining cost (removing attempted actions)
     # The nice thing about having a correct belief model is that you actually know what cost makes progress
+    last_skeleton = None
     world = task.world
     state = world.get_initial_state()
     while True:
         problem = pdddlstream_from_problem(state,
             collisions=not args.cfree, teleport=args.teleport)
-        solution = solve_pddlstream(problem, args, success_cost=last_cost)
-        plan, cost, evaluations = solution
-        commands = commands_from_plan(world, plan, defer=args.defer)
-        if commands is None:
+        plan, cost, evaluations = solve_pddlstream(problem, args, last_skeleton) #, success_cost=last_cost)
+        # TODO: first attempt cheaper path
+        if (plan is None) and (last_skeleton is not None):
+            plan, cost, evaluations = solve_pddlstream(problem, args) #, success_cost=last_cost)
+        if plan is None:
+            print('Failure')
             return False
-        if not commands:
-            return True
+        if not plan:
+            break
+        plan_prefix = extract_plan_prefix(plan, defer=args.defer)
+        print('Prefix:', plan_prefix)
+        commands = commands_from_plan(world, plan_prefix)
         simulate_plan(state, commands, args)
+        plan_postix = plan[len(plan_prefix):]
+        #last_cost = cost
+        last_skeleton = make_skeleton(plan_postix)
+        if not plan_prefix:
+            break
+    print('Success')
+    return True
 
 ################################################################################
 

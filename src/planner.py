@@ -16,7 +16,7 @@ VIDEO_FILENAME = 'video.mp4'
 REPLAN_ACTIONS = {'calibrate'}
 
 
-def solve_pddlstream(problem, args, success_cost=INF, debug=False):
+def solve_pddlstream(problem, args, skeleton=None, success_cost=INF, debug=False):
     _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
@@ -46,9 +46,10 @@ def solve_pddlstream(problem, args, success_cost=INF, debug=False):
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
     replan_actions = REPLAN_ACTIONS if args.defer else set()
-
-    #constraints = PlanConstraints(skeletons=[skeleton], exact=True)
-    constraints = PlanConstraints()
+    if skeleton:
+        constraints = PlanConstraints(skeletons=[skeleton], exact=True)
+    else:
+        constraints = PlanConstraints()
 
     success_cost = 0 if args.optimal else success_cost
     planner = 'max-astar' if args.optimal else 'ff-wastar1'
@@ -91,7 +92,18 @@ def solve_pddlstream(problem, args, success_cost=INF, debug=False):
 
 ################################################################################
 
-def commands_from_plan(world, plan, defer=False):
+def extract_plan_prefix(plan, defer=False):
+    if plan is None:
+        return None
+    prefix = []
+    for action in plan:
+        name, args = action
+        prefix.append(action)
+        if defer and (name in REPLAN_ACTIONS):
+            break
+    return prefix
+
+def commands_from_plan(world, plan):
     if plan is None:
         return None
     # TODO: propagate the state
@@ -105,8 +117,6 @@ def commands_from_plan(world, plan, defer=False):
             commands.append(Wait(world, steps=100))
         else:
             raise NotImplementedError(action)
-        if defer and (action in REPLAN_ACTIONS):
-            break
     return commands
 
 ################################################################################
