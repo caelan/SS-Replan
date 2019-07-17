@@ -92,8 +92,8 @@ def main():
     #task = stow_block(world)
     task = relocate_block(world)
     with LockRenderer():
-        add_markers(world, inverse_place=True)
-    wait_for_user()
+        add_markers(world, inverse_place=False)
+    #wait_for_user()
     if args.defer:
         run_stochastic(task, args)
     else:

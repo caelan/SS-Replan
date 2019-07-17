@@ -16,17 +16,20 @@ def get_surface_reference_pose(kitchen, surface_name):
     link = link_from_name(kitchen, surface.link)
     return get_link_pose(kitchen, link)
 
-def has_place_database(robot_name, surface_name, grasp_type):
-    path = os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
+def get_place_path(robot_name, surface_name, grasp_type):
+    return os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
         robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type))
-    return os.path.exists(path)
 
-def load_place_database(robot_name, surface_name, grasp_type, field):
+def has_place_database(robot_name, surface_name, grasp_type):
+    return os.path.exists(get_place_path(robot_name, surface_name, grasp_type))
+
+def load_place_entries(robot_name, surface_name, grasp_type):
     if not has_place_database(robot_name, surface_name, grasp_type):
         return []
-    path = os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
-        robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type))
-    return [entry[field] for entry in read_json(path).get('entries', [])]
+    return read_json(get_place_path(robot_name, surface_name, grasp_type)).get('entries', [])
+
+def load_place_database(robot_name, surface_name, grasp_type, field):
+    return [entry[field] for entry in load_place_entries(robot_name, surface_name, grasp_type)]
 
 def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
     # TODO: could also annotate which grasp came with which placement
@@ -34,7 +37,7 @@ def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
     for grasp_type in grasp_types:
         placements.extend(load_place_database(world.robot_name, surface_name, grasp_type,
                                               field='surface_from_object'))
-    #random.shuffle(placements)
+    random.shuffle(placements)
     return placements
 
 def project_base_pose(base_pose):
@@ -52,6 +55,15 @@ def load_forward_placements(world, surface_names=ALL_SURFACES, grasp_types=GRASP
             base_from_objects.extend(load_place_database(world.robot_name, surface_name, grasp_type,
                                                          field='base_from_object'))
     return base_from_objects
+
+def load_inverse_placements(world, surface_name, grasp_types=GRASP_TYPES):
+    surface_from_bases = []
+    for grasp_type in grasp_types:
+        for entry in load_place_entries(world.robot_name, surface_name, grasp_type):
+            surface_from_bases.append(multiply(entry['surface_from_object'],
+                                               invert(entry['base_from_object'])))
+    random.shuffle(surface_from_bases)
+    return surface_from_bases
 
 def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
     # TODO: Gaussian perturbation
@@ -77,10 +89,13 @@ def get_joint_reference_pose(kitchen, surface_name):
     link = parent_link_from_joint(kitchen, joint)
     return get_link_pose(kitchen, link)
 
+def get_pull_path(robot_name, joint_name):
+    return os.path.join(DATABASE_DIRECTORY, PULL_IR_FILENAME.format(
+        robot_name=robot_name, joint_name=joint_name))
+
 def load_pull_database(robot_name, joint_name):
-    filename = PULL_IR_FILENAME.format(robot_name=robot_name, joint_name=joint_name)
-    path = os.path.join(DATABASE_DIRECTORY, filename)
     data = {}
+    path = get_pull_path(robot_name, joint_name)
     if os.path.exists(path):
         data = read_json(path)
     return [entry['joint_from_base'] for entry in data.get('entries', [])]
