@@ -24,13 +24,12 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     #set_seed(args.seed)
 
     #dump_body(world.robot)
-    parent_pose = get_surface_reference_pose(world.kitchen, surface_name)
+    surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
+    # TODO: this assumes the drawer is open
 
     stable_gen_fn = get_stable_gen(world, learned=False, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world)
-    ik_ir_gen = get_pick_gen_fn(world, collisions=not args.cfree, teleport=args.teleport,
-                                learned=False, max_attempts=args.attempts,
-                                max_successes=1, max_failures=0)
+    ik_ir_gen = get_pick_gen_fn(world, learned=False, collisions=not args.cfree, teleport=args.teleport)
 
     stable_gen = stable_gen_fn(object_name, surface_name)
     grasps = list(grasp_gen_fn(object_name, grasp_type))
@@ -40,11 +39,10 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {}'.format(
         robot_name, object_name, surface_name, grasp_type))
 
-    tool_from_base_list = []
-    surface_from_object_list = []
+    entries = []
     start_time = time.time()
     failures = 0
-    while (len(tool_from_base_list) < args.num_samples) and \
+    while (len(entries) < args.num_samples) and \
             (elapsed_time(start_time) < args.max_time): #and (failures <= max_failures):
         (rel_pose,) = next(stable_gen)
         if rel_pose is None:
@@ -54,7 +52,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
             result = next(ik_ir_gen(object_name, rel_pose, grasp), None)
         if result is None:
             print('Failure! | {} / {} [{:.3f}]'.format(
-                len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
+                len(entries), args.num_samples, elapsed_time(start_time)))
             failures += 1
             continue
         bq, aq, at = result
@@ -62,21 +60,22 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         bq.assign()
         aq.assign()
         base_pose = get_link_pose(world.robot, world.base_link)
-        tool_pose = multiply(rel_pose.get_world_from_body(), invert(grasp.grasp_pose))
-        tool_from_base = multiply(invert(tool_pose), base_pose)
-        tool_from_base_list.append(tool_from_base)
-        surface_from_object = multiply(invert(parent_pose), rel_pose.get_world_from_body())
-        surface_from_object_list.append(surface_from_object)
+        object_pose = rel_pose.get_world_from_body()
+        tool_pose = multiply(object_pose, invert(grasp.grasp_pose))
+        entries.append({
+            'tool_from_base': multiply(invert(tool_pose), base_pose),
+            'surface_from_object': multiply(invert(surface_pose), object_pose),
+            'base_from_object': multiply(invert(base_pose), object_pose),
+        })
         print('Success! | {} / {} [{:.3f}]'.format(
-            len(tool_from_base_list), args.num_samples, elapsed_time(start_time)))
+            len(entries), args.num_samples, elapsed_time(start_time)))
         if has_gui():
             wait_for_user()
     #visualize_database(tool_from_base_list)
-    if not tool_from_base_list:
+    if not entries:
         return None
 
     # Assuming the kitchen is fixed but the objects might be open world
-    # TODO: could store per data point
     data = {
         'date': date,
         'robot_name': robot_name, # get_name | get_body_name | get_base_name | world.robot_name
@@ -86,8 +85,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         'surface_name': surface_name,
         'object_name': object_name,
         'grasp_type': grasp_type,
-        'tool_from_base_list': tool_from_base_list,
-        'surface_from_object_list': surface_from_object_list,
+        'entries': entries,
     }
 
     filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
@@ -101,8 +99,8 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-attempts', default=100, type=int,
-                        help='The number of attempts')
+    #parser.add_argument('-attempts', default=100, type=int,
+    #                    help='The number of attempts')
     parser.add_argument('-cfree', action='store_true',
                         help='When enabled, disables collision checking (for debugging).')
     #parser.add_argument('-grasp_type', default=GRASP_TYPES[0],
@@ -122,7 +120,6 @@ def main():
     parser.add_argument('-visualize', action='store_true',
                         help='When enabled, visualizes planning rather than the world (for debugging).')
     args = parser.parse_args()
-    # TODO: open any cabinet doors
 
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
@@ -146,6 +143,7 @@ def main():
                     for grasp_type in GRASP_TYPES]
     print('Combinations:', combinations)
     for surface_name, grasp_type in combinations:
+        surface_name = 'hitman_tmp'
         #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
         collect_place(world, object_name, surface_name, grasp_type, args)
     world.destroy()

@@ -91,7 +91,7 @@ def main():
 
     task = stow_block(world)
     with LockRenderer():
-        add_markers(world)
+        add_markers(world, pick_bases=False)
     if args.defer:
         run_stochastic(task, args)
     else:

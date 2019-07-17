@@ -22,6 +22,18 @@ def visualize_base_confs(world, name, base_confs, floor_z=0.005, **kwargs):
     handles.append(add_text(name, position=centroid, **kwargs))
     return handles
 
+def get_forward_reachability(world):
+    for surface_name in ALL_SURFACES:
+        surface = surface_from_name(surface_name)
+
+        for grasp_type, color in zip(GRASP_TYPES):
+            object_points = []
+            for surface_from_object in load_placements(world, surface_name, grasp_types=[grasp_type]):
+                # object_points.append(point_from_pose(multiply(surface_pose, surface_from_object)))
+                object_points.append(point_from_pose(surface_from_object))
+            if not object_points:
+                continue
+
 
 def add_markers(world, placements=True, pull_bases=True, pick_bases=False):
     handles = []

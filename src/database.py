@@ -10,9 +10,6 @@ DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
 PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
 
-# TODO: which frame should the place motion be in?
-# Do I trust the robot base or the kitchen for the floor plane?
-
 
 def get_surface_reference_pose(kitchen, surface_name):
     surface = surface_from_name(surface_name)
@@ -48,6 +45,19 @@ def project_base_pose(base_pose):
     _, _, theta = euler_from_quat(base_quat)
     base_values = (x, y, theta)
     return base_values
+
+def load_stuff(world, surface_name, grasp_type):
+    surface = surface_from_name(surface_name)
+    for joint in surface.joints:
+        world.open_door(joint_from_name(world.kitchen, joint))
+    # TODO: this assumes that nearby
+    world_from_surface = get_surface_reference_pose(world.kitchen, surface_name)
+    surface_from_object_list = load_place_database(world.robot_name, surface_name, grasp_type,
+                                              field='surface_from_object_list')
+    tool_from_base_list = load_place_database(world.robot_name, surface_name, grasp_type,
+                                              field='tool_from_base_list')
+    #assert len(surface_from_object) == len(tool_from_base_list)
+    #for surface_from_object, tool_from_base
 
 def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
     # TODO: Gaussian perturbation

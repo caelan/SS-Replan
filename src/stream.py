@@ -19,6 +19,7 @@ from src.utils import get_grasps, iterate_approach_path, \
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses
+from src.visualization import visualize_base_confs
 
 
 BASE_CONSTANT = 10
@@ -107,6 +108,7 @@ def get_test_near_pose(world, **kwargs):
                 for grasp in get_grasps(world, object_name):
                     tool_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose))
                     base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
+            #visualize_base_confs(world, 'all', base_confs)
             vertices_from_surface[object_name, surface_name] = grow_polygon(base_confs, radius=0.05)
         bq.assign()
         base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
@@ -144,9 +146,11 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
     def gen(obj_name, surface_name):
         obj_body = world.get_body(obj_name)
         surface_aabb = compute_surface_aabb(world, surface_name)
-        learned_poses = load_placements(world, surface_name)
+        learned_poses = None
         while True:
             if learned:
+                if learned_poses is None:
+                    learned_poses = load_placements(world, surface_name)
                 if not learned_poses:
                     break
                 surface_pose_world = get_surface_reference_pose(world.kitchen, surface_name)
