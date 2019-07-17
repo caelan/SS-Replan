@@ -161,7 +161,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         if parent_joint in world.kitchen_joints:
             assert surface_name in surface_poses
             #joint_name = get_joint_name(world.kitchen, parent_joint)
-            #init.append(('Connected', surface_name, joint_name))
+            init.append(('CheckNearby', surface_name))
         else:
             pose = RelPose(world.kitchen, surface_link, init=True)
             surface_poses[surface_name] = pose
@@ -170,7 +170,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
                 ('WorldPose', surface_name, pose),
                 #('AtRelPose', surface_name, pose, 'world'),
                 ('AtWorldPose', surface_name, pose),
-                ('Counter', surface_name, pose),
+                ('Counter', surface_name, pose), # Fixed surface
             ]
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
@@ -184,6 +184,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
             init += [
                 ('Movable', obj_name),
                 ('Graspable', obj_name),
+                ('CheckNearby', obj_name),
                 ('Grasp', obj_name, grasp),
                 ('IsGraspType', obj_name, grasp, grasp.grasp_type),
                 ('AtGrasp', obj_name, grasp),
@@ -208,6 +209,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         init += [
             ('Movable', obj_name),
             ('Graspable', obj_name),
+            ('CheckNearby', obj_name),
             ('RelPose', obj_name, rel_pose, surface_name),
             ('AtRelPose', obj_name, rel_pose, surface_name),
             ('WorldPose', obj_name, world_pose),

@@ -46,7 +46,7 @@
   ; Fixed base
   (:stream test-near-pose
     :inputs (?o ?p ?bq)
-    :domain (and (WorldPose ?o ?p) (Graspable ?o) (InitBConf ?bq))
+    :domain (and (WorldPose ?o ?p) (CheckNearby ?o) (InitBConf ?bq))
     :certified (NearPose ?o ?p ?bq)
   )
   (:stream fixed-plan-pick
