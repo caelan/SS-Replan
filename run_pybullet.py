@@ -89,8 +89,8 @@ def main():
     #test_observation(world, entity_name, world_from_zed_left)
     #return
 
-    #task = stow_block(world)
-    task = relocate_block(world)
+    task = stow_block(world)
+    #task = relocate_block(world)
     with LockRenderer():
         add_markers(world, inverse_place=False)
     #wait_for_user()

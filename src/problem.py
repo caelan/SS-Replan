@@ -189,6 +189,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
                 ('Grasp', obj_name, grasp),
                 ('IsGraspType', obj_name, grasp, grasp.grasp_type),
                 ('AtGrasp', obj_name, grasp),
+                ('Holding', obj_name),
             ]
             continue
         surface_name =  world.get_supporting(obj_name)
@@ -216,6 +217,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
             ('WorldPose', obj_name, world_pose),
             ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
             ('AtWorldPose', obj_name, world_pose),
+            ('On', obj_name, surface_name),
         ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
 
     #for body, ty in problem.body_types:

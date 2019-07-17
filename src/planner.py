@@ -5,7 +5,7 @@ from pddlstream.algorithms.constraints import PlanConstraints
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.incremental import solve_incremental
 from pddlstream.language.constants import print_solution
-from pddlstream.language.stream import StreamInfo
+from pddlstream.language.stream import StreamInfo, PartialInputs
 from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
@@ -27,10 +27,11 @@ def solve_pddlstream(problem, args, success_cost=INF, debug=False):
         'test-door': StreamInfo(p_success=0, eager=True),
         'test-near-pose': StreamInfo(p_success=0, eager=True),
         'test-near-joint': StreamInfo(p_success=0, eager=True),
-        # TODO: sample nearby pose?
 
-        'compute-pose-kin': StreamInfo(p_success=0.5, eager=True),
-        'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
+        # TODO: need to be careful about conditional effects
+        'compute-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
+                                       p_success=0.5, eager=True),
+        #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
 
         'plan-pick': StreamInfo(overhead=1e1),
         'plan-pull': StreamInfo(overhead=1e1),
