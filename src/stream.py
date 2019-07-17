@@ -2,7 +2,7 @@ import copy
 import random
 import numpy as np
 
-from itertools import islice
+from itertools import islice, cycle
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
@@ -186,7 +186,7 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
-def inverse_reachability(world, base_generator, obstacles=set(), max_attempts=25, **kwargs):
+def inverse_reachability(world, base_generator, obstacles=set(), max_attempts=50, **kwargs):
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
     while True:
@@ -202,7 +202,8 @@ def inverse_reachability(world, base_generator, obstacles=set(), max_attempts=25
                 yield (bq,)
                 break
         else:
-            yield None
+            print('Failed after {} IR attempts:'.format(max_attempts))
+            return
 
 def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                   teleport=False, switches_only=False,
@@ -328,7 +329,7 @@ def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
                 break
     return gen
 
-def get_pick_gen_fn(world, collisions=True, learned=True, max_attempts=25, **kwargs):
+def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwargs):
     # TODO: sample in the neighborhood of the base conf to ensure robust
 
     def gen(obj_name, pose, grasp):
@@ -341,19 +342,24 @@ def get_pick_gen_fn(world, collisions=True, learned=True, max_attempts=25, **kwa
         # TODO: check collisions with obj at pose
         gripper_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
-            base_generator = load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type)
+            base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
         else:
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs):
-            if ir_outputs is None: # break instead?
+        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+        while True:
+            for i in range(max_attempts):
+                try:
+                    base_conf, = next(safe_base_generator)
+                except StopIteration:
+                    return
+                randomize = (random.random() < 0.5)
+                ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
+                                            randomize=randomize), None)
+                if ik_outputs is not None:
+                    yield (base_conf,) + ik_outputs
+                    break
+            else:
                 yield None
-                continue
-            base_conf, = ir_outputs
-            randomize = (random.random() < 0.5)
-            ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
-                                        randomize=randomize), None)
-            if ik_outputs is not None:
-                yield ir_outputs + ik_outputs
     return gen
 
 ################################################################################
@@ -505,7 +511,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
                 break
     return gen
 
-def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwargs):
+def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, learned=True, **kwargs):
     # TODO: could condition pick/place into cabinet on the joint angle
     obstacles = world.static_obstacles
     if not collisions:
@@ -520,21 +526,23 @@ def get_pull_gen_fn(world, collisions=True, teleport=False, learned=True, **kwar
             return
         door_path, handle_path, tool_path = result
         if learned:
-            base_generator = load_pull_base_poses(world, joint_name)
+            base_generator = cycle(load_pull_base_poses(world, joint_name))
         else:
             index = int(len(tool_path) / 2)  # index = 0
             target_pose = tool_path[index]
             base_generator = uniform_pose_generator(world.robot, target_pose)
-        for ir_outputs in inverse_reachability(world, base_generator, obstacles=obstacles):
-            if ir_outputs is None: # break instead?
-                yield None
-                continue
-            base_conf, = ir_outputs
-            randomize = (random.random() < 0.5)
-            ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
-                                        randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
-            if ik_outputs is not None:
-                yield ir_outputs + ik_outputs
+        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+        while True:
+            for i in range(max_attempts):
+                try:
+                    base_conf, = next(safe_base_generator)
+                except StopIteration:
+                    return
+                randomize = (random.random() < 0.5)
+                ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
+                                            randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
+                if ik_outputs is not None:
+                    yield (base_conf,) + ik_outputs
     return gen
 
 ################################################################################
