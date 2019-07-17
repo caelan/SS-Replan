@@ -58,7 +58,7 @@ def add_markers(world, placements=True, forward_place=True, pull_bases=True, inv
                 base_points = list(map(point_from_pose, load_inverse_placements(world, surface_name,
                                                                                 grasp_types=[grasp_type])))
                 if base_points:
-                    continue
+                    #continue
                     #_, _, z = np.average(base_points, axis=0)
                     z = get_floor_z(world) - surface_point[2]
                     base_points = [Point(x, y, z) for x, y in grow_polygon(base_points, radius=0.05)]

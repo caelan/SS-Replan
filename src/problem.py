@@ -166,6 +166,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
             pose = RelPose(world.kitchen, surface_link, init=True)
             surface_poses[surface_name] = pose
             init += [
+                ('CheckNearby', surface_name),
                 #('RelPose', surface_name, pose, 'world'),
                 ('WorldPose', surface_name, pose),
                 #('AtRelPose', surface_name, pose, 'world'),

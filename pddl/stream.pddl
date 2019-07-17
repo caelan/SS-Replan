@@ -19,7 +19,7 @@
   )
   (:stream sample-nearby-pose
     :inputs (?o1 ?o2 ?p2 ?bq)
-    :domain (and (Stackable ?o1 ?o2) (WorldPose ?o2 ?p2) (InitBConf ?bq)) ; TODO: open?
+    :domain (and (Stackable ?o1 ?o2) (NearPose ?o2 ?p2 ?bq)) ; TODO: open?
     :outputs (?p1 ?rp)
     :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
                     (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))

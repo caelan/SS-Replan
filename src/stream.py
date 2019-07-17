@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, create_attachment, Point, set_configuration, \
     flatten_links, convex_hull, is_point_in_polygon, grow_polygon, wait_for_user, draw_pose, BLACK, unit_pose
 
-from src.utils import get_grasps, iterate_approach_path, \
+from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
     compute_surface_aabb, GRASP_TYPES, BASE_JOINTS, create_surface_attachment
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
@@ -98,16 +98,33 @@ def get_link_obstacles(world, link_name):
 
 def get_test_near_pose(world, **kwargs):
     base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=0.)
+    vertices_from_surface = {}
     # TODO: alternatively, distance to hull
 
     def test(object_name, pose, base_conf):
-        if not base_from_objects:
-            return False
-        base_conf.assign()
-        world_from_base = get_link_pose(world.robot, world.base_link)
-        world_from_object = pose.get_world_from_body()
-        base_from_object = multiply(invert(world_from_base), world_from_object)
-        return is_point_in_polygon(point_from_pose(base_from_object), base_from_objects)
+        if object_name in ALL_SURFACES:
+            surface_name = object_name
+            if surface_name not in vertices_from_surface:
+                vertices_from_surface[surface_name] = grow_polygon(
+                    map(point_from_pose, load_inverse_placements(world, surface_name)), radius=0.0)
+            if not vertices_from_surface[surface_name]:
+                return False
+            base_conf.assign()
+            pose.assign()
+            surface = surface_from_name(surface_name)
+            world_from_surface = get_link_pose(world.kitchen, link_from_name(world.kitchen, surface.link))
+            world_from_base = get_link_pose(world.robot, world.base_link)
+            surface_from_base = multiply(invert(world_from_surface), world_from_base)
+            return is_point_in_polygon(point_from_pose(surface_from_base), vertices_from_surface[surface_name])
+        else:
+            if not base_from_objects:
+                return False
+            base_conf.assign()
+            pose.assign()
+            world_from_base = get_link_pose(world.robot, world.base_link)
+            world_from_object = pose.get_world_from_body()
+            base_from_object = multiply(invert(world_from_base), world_from_object)
+            return is_point_in_polygon(point_from_pose(base_from_object), base_from_objects)
     return test
 
 def get_test_near_joint(world, **kwargs):
@@ -180,22 +197,10 @@ def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
     stable_gen = get_stable_gen(world, **kwargs)
     test_near_pose = get_test_near_pose(world, **kwargs)
     compute_pose_kin = get_compute_pose_kin(world)
-    vertices_from_surface = {}
 
     def gen(obj_name, surface_name, pose2, base_conf):
-        if surface_name not in vertices_from_surface:
-           vertices_from_surface[surface_name] = grow_polygon(
-               map(point_from_pose, load_inverse_placements(world, surface_name)), radius=0.0)
-        if not vertices_from_surface[surface_name]:
-            return
-        base_conf.assign()
-        pose2.assign()
-        surface = surface_from_name(surface_name)
-        world_from_surface = get_link_pose(world.kitchen, link_from_name(world.kitchen, surface.link))
-        world_from_base = get_link_pose(world.robot, world.base_link)
-        surface_from_base = multiply(invert(world_from_surface), world_from_base)
-        if not is_point_in_polygon(point_from_pose(surface_from_base), vertices_from_surface[surface_name]):
-            return
+        #base_conf.assign()
+        #pose2.assign()
         while True:
             for rel_pose, in islice(stable_gen(obj_name, surface_name), max_attempts):
                 pose1, = compute_pose_kin(obj_name, rel_pose, surface_name, pose2)
