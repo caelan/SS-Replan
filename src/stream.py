@@ -97,7 +97,6 @@ def get_link_obstacles(world, link_name):
 
 def get_test_near_pose(world, **kwargs):
     vertices_from_surface = {}
-    # TODO: grow the convex hull
     # TODO: alternatively, distance to hull
 
     def test(object_name, pose, bq):
@@ -108,7 +107,6 @@ def get_test_near_pose(world, **kwargs):
                 for grasp in get_grasps(world, object_name):
                     tool_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose))
                     base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
-            base_points = [base_conf[:2] for base_conf in base_confs]
             vertices_from_surface[object_name, surface_name] = grow_polygon(base_confs, radius=0.05)
         bq.assign()
         base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
@@ -175,7 +173,21 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 yield (p,)
     return gen
 
-# TODO: sample placements in reach of current base pose
+def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
+    stable_gen = get_stable_gen(world, **kwargs)
+    test_near_pose = get_test_near_pose(world, **kwargs)
+    compute_pose_kin = get_compute_pose_kin(world)
+
+    def gen(obj_name, surface_name, pose2, base_conf):
+        while True:
+            for rel_pose, in islice(stable_gen(obj_name, surface_name), max_attempts):
+                pose1, = compute_pose_kin(obj_name, rel_pose, surface_name, pose2)
+                if test_near_pose(obj_name, pose1, base_conf):
+                    yield (pose1, rel_pose)
+                    break
+            else:
+                yield None
+    return gen
 
 def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport=False,
     # TODO: produce carry arm confs here
@@ -285,7 +297,6 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
     full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
     if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
-        print('Grasp IK failure')
         return
     approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
     approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
@@ -326,7 +337,8 @@ def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
                                         randomize=randomize), None)
             if ik_outputs is not None:
                 yield ik_outputs
-                break
+                return
+        print('Fixed pick failure')
     return gen
 
 def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwargs):
@@ -359,6 +371,7 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
                     yield (base_conf,) + ik_outputs
                     break
             else:
+                print('Pick failure')
                 yield None
     return gen
 
@@ -508,7 +521,8 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
                               randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
             if ik_outputs is not None:
                 yield ik_outputs
-                break
+                return
+        print('Fixed pull failure')
     return gen
 
 def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, learned=True, **kwargs):
@@ -543,6 +557,10 @@ def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, lea
                                             randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
                 if ik_outputs is not None:
                     yield (base_conf,) + ik_outputs
+                    break
+            else:
+                print('Pull failure')
+                yield None
     return gen
 
 ################################################################################

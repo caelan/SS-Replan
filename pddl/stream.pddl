@@ -4,6 +4,12 @@
     :domain (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty))
     :certified (AdmitsGrasp ?o ?g ?o2)
   )
+  (:stream sample-grasp
+    :inputs (?o ?gty)
+    :domain (and (Graspable ?o) (GraspType ?gty))
+    :outputs (?g)
+    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty)) ; TODO: produce carry conf
+  )
 
   (:stream sample-pose
     :inputs (?o ?r)
@@ -11,12 +17,13 @@
     :outputs (?rp)
     :certified (RelPose ?o ?rp ?r)
   )
-  (:stream sample-grasp
-    :inputs (?o ?gty)
-    :domain (and (Graspable ?o) (GraspType ?gty))
-    :outputs (?g)
-    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty)) ; TODO: produce carry conf
-  )
+  ;(:stream sample-nearby-pose
+  ;  :inputs (?o1 ?o2 ?p2 ?bq)
+  ;  :domain (and (Stackable ?o1 ?o2) (WorldPose ?o2 ?p2) (InitBConf ?bq))
+  ;  :outputs (?p1 ?rp)
+  ;  :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
+  ;                  (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
+  ;)
 
   ; Movable base
   (:stream plan-pick
@@ -95,8 +102,8 @@
     :inputs (?o1 ?rp ?o2 ?p2)
     :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2))
     :outputs (?p1)
-    :certified (and (WorldPose ?o1 ?p1) ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation
-                    (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
+    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
+    ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation?
   )
   ;(:stream compute-angle-kin
   ;  :inputs (?o ?j ?a)

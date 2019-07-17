@@ -14,7 +14,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
-    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT
+    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen
 from src.database import has_place_database
 
 
@@ -228,6 +228,8 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
 
         'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
         'sample-grasp': from_gen_fn(get_grasp_gen(world)),
+        'sample-nearby-pose': from_gen_fn(get_nearby_stable_gen(world, **kwargs)),
+
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
 
