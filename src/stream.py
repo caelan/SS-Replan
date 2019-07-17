@@ -110,6 +110,8 @@ def get_test_near_pose(world, **kwargs):
                     base_confs.extend(load_place_base_poses(world, tool_pose, surface_name, grasp_type))
             #visualize_base_confs(world, 'all', base_confs)
             vertices_from_surface[object_name, surface_name] = grow_polygon(base_confs, radius=0.05)
+        if not vertices_from_surface[object_name, surface_name]:
+            return False
         bq.assign()
         base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         return is_point_in_polygon(base_point[:2], vertices_from_surface[object_name, surface_name])
@@ -122,6 +124,10 @@ def get_test_near_joint(world, **kwargs):
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
             vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=0.05)
+        if not vertices_from_joint[joint_name]:
+            return False
+        # TODO: can't open hitman_drawer_top_joint any more
+        # Likely due to conservative carter geometry
         bq.assign()
         base_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         return is_point_in_polygon(base_point[:2], vertices_from_joint[joint_name])

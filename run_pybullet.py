@@ -13,7 +13,7 @@ from src.visualization import add_markers
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan
 from src.world import World
 from src.problem import pdddlstream_from_problem
-from src.task import stow_block
+from src.task import stow_block, relocate_block
 #from src.debug import dump_link_cross_sections, test_rays
 
 def create_parser():
@@ -89,9 +89,11 @@ def main():
     #test_observation(world, entity_name, world_from_zed_left)
     #return
 
-    task = stow_block(world)
+    #task = stow_block(world)
+    task = relocate_block(world)
     with LockRenderer():
-        add_markers(world, pick_bases=False)
+        add_markers(world, inverse_place=True)
+    wait_for_user()
     if args.defer:
         run_stochastic(task, args)
     else:

@@ -92,7 +92,7 @@ CABINETS = [
 ]
 
 DRAWERS = [
-    'hitman_drawer_top', #'hitman_drawer_bottom',
+    #'hitman_drawer_top', #'hitman_drawer_bottom',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 

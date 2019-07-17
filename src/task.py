@@ -63,6 +63,41 @@ def add_kinect(world):
 
 ################################################################################
 
+def sample_placement(world, entity_name, surface_name, **kwargs):
+    # TODO: check for collisions
+    with WorldSaver():
+        placement_gen = get_stable_gen(world, pos_scale=1e-3, rot_scale=1e-2, **kwargs)
+        pose, = next(placement_gen(entity_name, surface_name), (None,))
+    assert pose is not None
+    pose.assign()
+
+def close_all_doors(world):
+    for name in DRAWER_JOINTS[1:2]:
+        joint = joint_from_name(world.kitchen, name)
+        # world.open_door(joint)
+        world.close_door(joint)
+
+def open_all_doors(world):
+    for name in DRAWER_JOINTS[1:2]:
+        joint = joint_from_name(world.kitchen, name)
+        world.open_door(joint)
+
+################################################################################
+
+def relocate_block(world, **kwargs):
+    entity_name = add_block(world, idx=0)
+    initial_surface = 'hitman_tmp'
+    goal_surface = 'indigo_tmp'
+    set_all_static()
+    add_kinect(world)
+    sample_placement(world, entity_name, initial_surface, learned=True)
+
+    return Task(world, movable_base=True,
+                goal_on={entity_name: goal_surface},
+                goal_closed=ALL_JOINTS, **kwargs)
+
+################################################################################
+
 # skeleton = [
 #     ('calibrate', [WILD, WILD, WILD]),
 #     ('move_base', [WILD, WILD, WILD]),
@@ -96,12 +131,7 @@ def stow_block(world, **kwargs):
     surface_name = COUNTERS[0] # COUNTERS | DRAWERS | SURFACES | CABINETS
     #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
     print('Initial surface:', surface_name)
-    with WorldSaver():
-        placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
-        pose, = next(placement_gen(entity_name, surface_name), (None,))
-    assert pose is not None
-    pose.assign()
-    #wait_for_user()
+    sample_placement(world, entity_name, surface_name)
 
     return Task(world, movable_base=True,
                 goal_hand_empty=False,
@@ -110,5 +140,6 @@ def stow_block(world, **kwargs):
                 goal_closed=ALL_JOINTS, **kwargs)
 
 TASKS = [
+    relocate_block,
     stow_block,
 ]

@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 
+from __future__ import print_function
+
 import argparse
 import os
 import random
@@ -13,7 +15,7 @@ from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
     RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR, dump_body
 from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
-    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE
+    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS
 from src.world import World
 from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
 from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
@@ -107,7 +109,7 @@ def main():
     #                    help='Specifies the type of grasp.')
     #parser.add_argument('-problem', default='test_block',
     #                    help='The name of the problem to solve.')
-    parser.add_argument('-max_time', default=10*60, type=float,
+    parser.add_argument('-max_time', default=5*60, type=float,
                         help='The maximum runtime')
     parser.add_argument('-num_samples', default=1000, type=int,
                         help='The number of samples')
@@ -124,11 +126,12 @@ def main():
     # TODO: sample from set of objects?
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     surface_names = ALL_SURFACES
-    #surface_names = SURFACES + CABINET_JOINTS + DRAWER_JOINTS
-    #surface_names = CABINET_JOINTS + SURFACES + DRAWER_JOINTS
+    #surface_names = DRAWERS
+    grasp_types = GRASP_TYPES
+    #grasp_types = [TOP_GRASP]
 
     world = World(use_gui=args.visualize, robot_name=args.robot)
-    dump_body(world.robot)
+    #dump_body(world.robot)
     for joint in world.kitchen_joints:
         world.open_door(joint) # open_door | close_door
     world.open_gripper()
@@ -139,11 +142,14 @@ def main():
         TOP_GRASP: RED,
         SIDE_GRASP: BLUE,
     }
+    print('Surfaces:', surface_names)
+    print('Grasps:', grasp_types)
     combinations = [(surface_name, grasp_type) for surface_name in surface_names
-                    for grasp_type in GRASP_TYPES]
+                    for grasp_type in grasp_types]
+    # TODO: parallelize
     print('Combinations:', combinations)
+    wait_for_user('Start?')
     for surface_name, grasp_type in combinations:
-        surface_name = 'hitman_tmp'
         #draw_picks(world, object_name, surface_name, grasp_type, color=grasp_colors[grasp_type])
         collect_place(world, object_name, surface_name, grasp_type, args)
     world.destroy()
