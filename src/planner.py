@@ -51,8 +51,8 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
-        'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
-        # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
+        #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
+        #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
     #print(set(stream_map) - set(stream_info))
     replan_actions = REPLAN_ACTIONS if args.defer else set()
@@ -79,7 +79,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
                                      planner=planner, max_planner_time=max_planner_time,
                                      unit_costs=args.unit, success_cost=success_cost,
                                      max_time=args.max_time, verbose=True, debug=debug,
-                                     unit_efforts=True, effort_weight=effort_weight,
+                                     unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
                                      # bind=True, max_skeletons=None,
                                      search_sample_ratio=search_sample_ratio)
         elif args.algorithm == 'incremental':

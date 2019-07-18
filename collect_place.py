@@ -128,8 +128,10 @@ def main():
     object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
     surface_names = ALL_SURFACES
     #surface_names = DRAWERS
+    #surface_names = ['indigo_drawer_top']
     grasp_types = GRASP_TYPES
     #grasp_types = [TOP_GRASP]
+    #grasp_types = ['side']
 
     world = World(use_gui=args.visualize, robot_name=args.robot)
     #dump_body(world.robot)

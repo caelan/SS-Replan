@@ -123,9 +123,9 @@ def stow_block(world, **kwargs):
     add_kinect(world)  # TODO: this needs to be after set_all_static
 
     #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    #initial_surface = COUNTERS[0]
-    initial_surface = 'indigo_drawer_top'
-    goal_surface = 'baker' # hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
+    initial_surface = COUNTERS[0]
+    #initial_surface = 'indigo_drawer_top'
+    goal_surface = 'indigo_drawer_top' # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
     sample_placement(world, entity_name, initial_surface)
 
