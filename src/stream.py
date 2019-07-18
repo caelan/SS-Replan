@@ -410,7 +410,9 @@ def get_handle_grasp(world, joint, pre_distance=0.1):
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
             # TODO: can adjust the position and orientation on the handle
-            handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2)))
+            #handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=0)))
+            # NOTE: THE ABOVE DOESN'T WORK WITH LULA
+            handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=np.pi)))
             handle_pregrasp = multiply((pre_direction, unit_quat()), handle_grasp)
             return link, handle_grasp, handle_pregrasp
     raise RuntimeError()

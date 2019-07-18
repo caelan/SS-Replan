@@ -67,7 +67,7 @@ class World(object):
             # limit effort and velocities are required
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                                 timeout=0.005, epsilon=1e-5, solve_type="Speed",
-                                urdf_string=read(urdf_path))
+                                urdf_string=read(urdf_path)) # Speed, Distance, Manipulation1, Manipulation2
             #print(self.ik_solver.joint_names, self.ik_solver.link_names)
             # https://bitbucket.org/traclabs/trac_ik/src/master/trac_ik_python/
             #self.ik_solver.set_joint_limits([0.0] * self.ik_solver.number_of_joints, upper_bound)
