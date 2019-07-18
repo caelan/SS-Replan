@@ -142,7 +142,7 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
     while True:
         # TODO: Isaac class for these things
         world_state = observer.observe()
-        update_world(world, domain, observer, world_state)
+        update_world(world, domain, observer, world_state, USE_OBJECTS)
         saver = WorldSaver()
 
         problem = pdddlstream_from_problem(state, collisions=not args.cfree, teleport=args.teleport)
@@ -189,7 +189,7 @@ def localize_all(world_state):
         obj.detect()
         #obj.administrator.detect()
         #print(obj.pose[:3, 3])
-    wait_for_duration(0.5)
+    wait_for_duration(1.0)
 
 def main():
     parser = create_parser()

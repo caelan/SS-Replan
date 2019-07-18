@@ -9,7 +9,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
     BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body, draw_pose, \
     point_from_pose, euler_from_quat, quat_from_pose, Pose, Point, Euler, base_values_from_pose, \
-    pose_from_base_values, INF, get_camera
+    pose_from_base_values, INF, get_camera, pose_from_pose2d
 from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_'
@@ -69,10 +69,11 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
 def update_robot(world, domain, observer, world_state):
     entity = world_state.entities[domain.robot]
     # Update joint positions
-    carter_pos = entity.carter_pos
-    #carter_pos = entity.carter_interface.running_pose
-    print('Carter pos:', carter_pos)
-    world.set_base_conf(carter_pos) # Should be 0
+    carter_values = entity.carter_pos
+    #carter_values = entity.carter_interface.running_pose
+    print('Carter base:', carter_values) # will be zero if a carter object isn't created
+    #world.set_base_conf(carter_values)
+    world.set_base_conf(np.zeros(3))
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
@@ -83,6 +84,14 @@ def update_robot(world, domain, observer, world_state):
     world_from_origin = multiply(world_from_entity, invert(entity_from_origin))
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
+    print('Initial base:', base_values)
+
+    #map_from_carter = pose_from_pose2d(carter_values)
+    #world_from_carter = pose_from_pose2d(base_values)
+    #map_from_world = multiply(map_from_carter, invert(world_from_carter))
+    #print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
+    #print()
+
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
@@ -162,7 +171,7 @@ def update_world(world, domain, observer, world_state, objects=None):
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
                 print('Loading', ycb_obj_path)
-                world.add_body(name, ycb_obj_path, color=np.ones(4), mass=1)
+                world.add_body(name, ycb_obj_path, color=np.ones(4), mass=0)
             body = world.get_body(name)
             frame_name = ISSAC_PREFIX + name
             world_from_entity = lookup_pose(observer.tf_listener, frame_name)
@@ -170,6 +179,7 @@ def update_world(world, domain, observer, world_state, objects=None):
             #world_from_entity = pose_from_tform(entity.pose)
             #print(name, world_from_entity)
             set_pose(body, world_from_entity)
+            # TODO: prune objects that are far away
         elif isinstance(entity, Drawer):
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
@@ -190,6 +200,7 @@ def update_world(world, domain, observer, world_state, objects=None):
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
     #wait_for_user()
+    world.fix_geometry()
 
 ################################################################################
 

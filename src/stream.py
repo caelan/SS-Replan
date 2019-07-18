@@ -11,7 +11,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     point_from_pose, sample_placement_on_aabb, get_sample_fn, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, create_attachment, Point, set_configuration, \
-    flatten_links, convex_hull, is_point_in_polygon, grow_polygon, wait_for_user, draw_pose, BLACK, unit_pose
+    flatten_links, convex_hull, is_point_in_polygon, grow_polygon, \
+    wait_for_user, draw_pose, BLACK, unit_pose, get_relative_pose
 
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
@@ -413,6 +414,7 @@ def get_handle_grasp(world, joint, pre_distance=0.1):
             #handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=0)))
             # NOTE: THE ABOVE DOESN'T WORK WITH LULA
             handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=np.pi)))
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/kitchen_poses.py
             handle_pregrasp = multiply((pre_direction, unit_quat()), handle_grasp)
             return link, handle_grasp, handle_pregrasp
     raise RuntimeError()
