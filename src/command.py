@@ -9,6 +9,7 @@ from isaac_bridge.manager import SimulationManager
 
 import numpy as np
 import time
+import copy
 
 MOVEIT = True
 DEFAULT_SLEEP = 1.0
@@ -30,13 +31,15 @@ class State(object):
             # Derived values
             # TODO: topological sort
             attachment.assign()
+    def copy(self):
+        return State(self.world, self.savers, self.grasped, self.attachments.values())
+        #return copy.deepcopy(self)
     def assign(self):
         for saver in self.savers:
             saver.restore()
         self.derive()
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, list(self.savers), self.attachments)
-    # TODO: copy?
 
 ################################################################################
 
@@ -58,7 +61,7 @@ class Command(object):
     def iterate(self, state):
         raise NotImplementedError()
 
-    def execute(self, domain, moveit, observer):
+    def execute(self, domain, moveit, observer, state):
         raise NotImplementedError()
 
 class Sequence(object):
@@ -105,19 +108,22 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
 
-    def execute(self, domain, moveit, observer): # TODO: actor
+    def execute(self, domain, moveit, observer, state):
         # TODO: ensure the same joint names
         if self.joints == self.world.base_joints:
             #assert not moveit.use_lula
-            robot_entity = domain.get_robot()
+            robot_entity = domain.get_robot() # TODO: actor
             #robot_entity = world_state.entities[domain.robot]
             carter = robot_entity.carter_interface
             if carter is None:
                 follow_base_trajectory(self.world, self.path, moveit, observer)
             elif isinstance(carter, SimulationManager):
+                sim_manager = carter
+                sim_manager.pause() # TODO: context manager
                 set_joint_positions(self.robot, self.joints, self.path[-1])
-                update_isaac_robot(observer, carter, self.world)
+                update_isaac_robot(observer, sim_manager, self.world)
                 time.sleep(DEFAULT_SLEEP)
+                sim_manager.pause()
             else:
                 world_state = domain.root
                 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
@@ -183,7 +189,7 @@ class DoorTrajectory(Command):
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
 
-    def execute(self, domain, moveit, observer):
+    def execute(self, domain, moveit, observer, state):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
         if MOVEIT:
@@ -232,7 +238,7 @@ class Attach(Command):
            state.grasped = self.grasp
         yield
 
-    def execute(self, domain, moveit, observer):
+    def execute(self, domain, moveit, observer, state):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
@@ -274,7 +280,7 @@ class Detach(Command):
             state.grasped = None
         yield
 
-    def execute(self, domain, moveit, observer):
+    def execute(self, domain, moveit, observer, state):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
@@ -303,7 +309,7 @@ class Wait(Command):
         for _ in range(self.steps):
             yield
 
-    def execute(self, domain, moveit, observer):
+    def execute(self, domain, moveit, observer, state):
         pass
 
     def __repr__(self):
@@ -313,7 +319,7 @@ class Wait(Command):
 
 ################################################################################s
 
-def execute_plan(state, commands, time_step=None):
+def iterate_plan(state, commands, time_step=None):
     for i, command in enumerate(commands):
         print('\nCommand {:2}: {}'.format(i, command))
         # TODO: skip to end

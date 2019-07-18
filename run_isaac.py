@@ -19,9 +19,9 @@ from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
 from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot
 from src.world import World
 from run_pybullet import create_parser
-from src.planner import solve_pddlstream, simulate_plan, commands_from_plan
+from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.problem import pdddlstream_from_problem
-from src.task import Task
+from src.task import Task, close_all_doors
 from src.execution import base_control
 
 from pddlstream.language.constants import Not, And
@@ -124,25 +124,30 @@ def create_trial_args(**kwargs):
 
 ################################################################################
 
-def planning_loop(domain, observer, task, args, additional_init=[], additional_goals=[]):
+def planning_loop(domain, observer, state, args, additional_init=[], additional_goals=[]):
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    world = task.world
+    world = state.world # One world per state
+    #task = world.task # One task per world
 
     # TODO: track the plan cost
     while True:
+        # TODO: Isaac class for these things
+
         world_state = observer.observe()
         update_world(world, domain, observer, world_state)
-        problem = pdddlstream_from_problem(task, collisions=not args.cfree, teleport=args.teleport)
+        problem = pdddlstream_from_problem(state, collisions=not args.cfree, teleport=args.teleport)
         problem[-2].extend(additional_init)
         problem = problem[:-1] + (And(problem[-1], *additional_goals),)
         saver = WorldSaver()
         solution = solve_pddlstream(problem, args)
         plan, cost, evaluations = solution
-        commands = commands_from_plan(world, plan, defer=args.defer)
+        plan_prefix = extract_plan_prefix(plan, defer=args.defer)
+        print('Prefix:', plan_prefix)
+        commands = commands_from_plan(world, plan_prefix)
         print('Commands:', commands)
         if args.watch or args.record:
-            simulate_plan(world, commands, args)
+            simulate_plan(state.copy(), commands, args)
         wait_for_user()
         saver.restore()
         if (commands is None) or args.teleport:
@@ -150,13 +155,9 @@ def planning_loop(domain, observer, task, args, additional_init=[], additional_g
         if not commands:
             return True
 
-        #sim_manager.pause() # Careful! This actually does pause the system
-        #rospy.sleep(1.) # Small sleep might be needed
-        #sim_manager.pause() # The second invocation resumes
-
         #wait_for_user()
         for command in commands:
-            command.execute(domain, moveit, observer)
+            command.execute(domain, moveit, observer, state)
 
 ################################################################################
 
@@ -216,12 +217,14 @@ def main():
     world_state = observer.observe() # domain.root
     with LockRenderer():
         update_world(world, domain, observer, world_state)
+        #close_all_doors(world)
         if (sim_manager is not None) and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
         world.update_initial()
     wait_for_duration(duration=0.1)
+    state = world.get_initial_state()
     # TODO: initial robot base conf is in collision
 
     #wait_for_user()
@@ -230,7 +233,7 @@ def main():
     #wait_for_user()
     #return
 
-    success = planning_loop(domain, observer, task, args,
+    success = planning_loop(domain, observer, state, args,
                             additional_init=additional_init, additional_goals=additional_goals)
     print('Success:', success)
     world.destroy()

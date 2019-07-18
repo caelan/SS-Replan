@@ -201,12 +201,14 @@ def update_isaac_robot(observer, sim_manager, world):
     sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
 
 def update_isaac_sim(domain, observer, sim_manager, world):
+    import rospy
     # RobotConfigModulator seems to just change the default config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/robot_config_modulator.py
     #sim_manager = trial_manager.sim
     #ycb_objects = kitchen_poses.supported_ycb_objects
 
+    sim_manager.pause() # This pauses the simulator
     unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
                                     target_frame=UNREAL_WORLD_FRAME)
 
@@ -222,9 +224,10 @@ def update_isaac_sim(domain, observer, sim_manager, world):
         joints = get_movable_joints(body)
         #joints = world.arm_joints
         # Doesn't seem to fail if the kitchen joint doesn't exist
+        # TODO: doesn't seem to actually work
         names = get_joint_names(body, joints)
         positions = get_joint_positions(body, joints)
-        sim_manager.set_joints(names, positions)
+        sim_manager.set_joints(names, positions, duration=rospy.Duration(5.0))
         print('Kitchen joints:', names)
 
     # Changes the default configuration
@@ -236,6 +239,8 @@ def update_isaac_sim(domain, observer, sim_manager, world):
     #print(get_camera())
     #set_isaac_camera(sim_manager, camera_pose)
     time.sleep(0.1)
+    # rospy.sleep(1.) # Small sleep might be needed
+    sim_manager.pause() # The second invocation resumes the simulator
 
     #sim_manager.reset()
     #sim_manager.wait_for_services()

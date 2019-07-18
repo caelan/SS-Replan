@@ -788,7 +788,7 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
         # TODO: check door collisions
         # TODO: still need to check static links at least once
         p.assign()
-        state = copy.copy(at.context)
+        state = at.context.copy()
         state.assign()
         for command in at.commands:
             obstacles = get_link_obstacles(world, o) - command.bodies - p.bodies # Doesn't include o at p

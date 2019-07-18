@@ -125,6 +125,7 @@ def run_stochastic(task, args):
     last_cost = INF
     world = task.world
     state = world.get_initial_state()
+    # TODO: make this a generic policy
     while True:
         problem = pdddlstream_from_problem(state,
             collisions=not args.cfree, teleport=args.teleport)

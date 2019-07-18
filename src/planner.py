@@ -11,7 +11,7 @@ from pddlstream.language.stream import StreamInfo, PartialInputs
 from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
-from src.command import Wait, State, execute_plan
+from src.command import Wait, State, iterate_plan
 from src.stream import BASE_CONSTANT
 
 VIDEO_FILENAME = 'video.mp4'
@@ -136,6 +136,6 @@ def simulate_plan(state, commands, args, time_step=0.02):
     time_step = None if args.teleport else time_step
     if args.record:
         with VideoSaver(VIDEO_FILENAME):
-            execute_plan(state, commands, time_step=time_step)
+            iterate_plan(state, commands, time_step=time_step)
     else:
-        execute_plan(state, commands, time_step=time_step)
+        iterate_plan(state, commands, time_step=time_step)

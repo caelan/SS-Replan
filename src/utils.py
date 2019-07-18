@@ -11,8 +11,7 @@ from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_unti
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, \
     unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
-    set_color, \
-    LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
+    set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
     is_placed_on_aabb, get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment
 
@@ -53,9 +52,9 @@ CARTER_FRANKA_PATH = os.path.join(MODELS_PATH, 'carter_description/urdf/carter_f
 
 VISUAL = False
 if VISUAL:
-    FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_collision.urdf')
-else:
     FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_visual.urdf')
+else:
+    FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_collision.urdf')
 
 #CARTER_FRANKA_PATH = os.path.join(SRL_PATH, 'packages/third_party/carter_description/urdf/carter_franka.urdf')
 FRANKA_YAML = os.path.join(SRL_PATH, 'packages/external/lula_franka/config/robot_descriptor.yaml')
