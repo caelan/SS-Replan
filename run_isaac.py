@@ -12,6 +12,8 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 import brain_ros.kitchen_domain as kitchen_domain
 from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
+from brain_ros.lula_policies import LulaInitializeDart
+from lula_dartpy.object_administrator import ObjectAdministrator
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, wait_for_duration, Pose, Point, Euler
@@ -45,7 +47,7 @@ TOP_DRAWER = 'indigo_drawer_top'
 
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 
-# Detection
+# Detection & Tracking
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
@@ -151,7 +153,7 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
         commands = commands_from_plan(world, plan_prefix)
         print('Commands:', commands)
         if args.watch or args.record:
-            simulate_plan(state.copy(), commands, args)
+            simulate_plan(state.copy(), commands, args) # TODO: operate on real state
         wait_for_user()
 
         saver.restore()
@@ -167,6 +169,12 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
         last_skeleton = make_wild_skeleton(plan_postfix)
 
 ################################################################################
+
+class Interface(object):
+    def __init__(self, domain, observer, sim_manager=None):
+        self.domain = domain
+        self.observer = observer
+        self.sim_manager = sim_manager
 
 def main():
     parser = create_parser()
@@ -195,6 +203,31 @@ def main():
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
+
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/4a902e24b6272fbc50ee5d9ac1f873f49640d93a/packages/brain/src/brain_ros/carter_predicates.py#L218
+    init_right_rospath = 'package://lula_franka/data/keypoint_frames/' + \
+                         'dart_localization_frame_right2.pkl'
+    init_left_rospath = 'package://lula_franka/data/keypoint_frames/' + \
+                        'dart_localization_frame_left.pkl'
+    init_chewie_rospath = 'package://lula_franka/data/keypoint_frames/' + \
+                          'dart_localization_frame_left.pkl'
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
+    dart = LulaInitializeDart(localization_rospaths={
+        'left': init_left_rospath,
+        'open_chewie': init_chewie_rospath,
+        'right': init_right_rospath,
+    }, time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
+
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
+    #obj = world_state.entities[goal]
+    #obj.localize()
+    #obj.detect()
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
+    #administrator = ObjectAdministrator(obj_frame, wait_for_connection=False)
+    #administrator.activate() # localize
+    #administrator.detect_once() # detect
+    #administrator.deactivate() # stop_localizing
 
     if args.execute:
         observer = RosObserver(domain)

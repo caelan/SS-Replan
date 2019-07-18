@@ -132,6 +132,7 @@ class Trajectory(Command):
                 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_predicates.py#L164
                 # TODO: ensure that I transform into the correct base units
                 # The base uses its own motion planner
+                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
                 world_state[domain.robot].suppress_fixed_bases()
                 carter.move_to_async(self.path[-1])
                 #for conf in waypoints_from_path(self.path):
