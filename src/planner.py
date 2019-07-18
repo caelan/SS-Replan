@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import cProfile
 import pstats
 
@@ -16,12 +18,13 @@ VIDEO_FILENAME = 'video.mp4'
 REPLAN_ACTIONS = {'calibrate'}
 
 
-def solve_pddlstream(problem, args, skeleton=None, success_cost=INF, debug=False):
+def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
     _, _, _, stream_map, init, goal = problem
     print('Init:', init)
     print('Goal:', goal)
     print('Streams:', stream_map.keys())
 
+    opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
         'test-gripper': StreamInfo(p_success=0, eager=True),
         'test-door': StreamInfo(p_success=0, eager=True),
@@ -32,12 +35,18 @@ def solve_pddlstream(problem, args, skeleton=None, success_cost=INF, debug=False
         'compute-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
                                        p_success=0.5, eager=True),
         #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
+        #'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
+        #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
+        #'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
 
-        'plan-pick': StreamInfo(overhead=1e1),
-        'plan-pull': StreamInfo(overhead=1e1),
-
-        'plan-base-motion': StreamInfo(overhead=1e3, defer=True),
-        'plan-arm-motion': StreamInfo(overhead=1e2, defer=True),
+        'plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        #'fixed-plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        #'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        #'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
+        'plan-base-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e3, defer=True),
+        'plan-arm-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e2, defer=True),
+        #'plan-gripper-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
 
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
@@ -45,14 +54,13 @@ def solve_pddlstream(problem, args, skeleton=None, success_cost=INF, debug=False
         'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
         # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
+    #print(set(stream_map) - set(stream_info))
     replan_actions = REPLAN_ACTIONS if args.defer else set()
-    if skeleton:
-        constraints = PlanConstraints(skeletons=[skeleton], exact=True)
-    else:
-        constraints = PlanConstraints()
+    skeletons = None if skeleton is None else [skeleton]
+    constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
 
-    success_cost = 0 if args.optimal else success_cost
-    planner = 'max-astar' if args.optimal else 'ff-wastar1'
+    success_cost = 0 if args.optimal else INF
+    planner = 'ff-astar' if args.optimal else 'ff-wastar1'
     search_sample_ratio = 1 # TODO: could try decreasing
     max_planner_time = 10
 
@@ -67,7 +75,7 @@ def solve_pddlstream(problem, args, skeleton=None, success_cost=INF, debug=False
             effort_weight = 0
             solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
                                      replan_actions=replan_actions,
-                                     # TODO: start complexity
+                                     initial_complexity=5,
                                      planner=planner, max_planner_time=max_planner_time,
                                      unit_costs=args.unit, success_cost=success_cost,
                                      max_time=args.max_time, verbose=True, debug=debug,

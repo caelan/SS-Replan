@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, \
     And, Equal, PDDLProblem
 from pddlstream.language.stream import DEBUG
@@ -36,6 +38,20 @@ def existential_quantification(goal_literals):
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 
+ACTION_COSTS = {
+    'move_base': BASE_CONSTANT,
+    'move_arm': 1,
+    'move_gripper': 1,
+    'calibrate': 1,
+    'pick': 1,
+    'place': 1,
+    'pull': 1,
+    'cook': 1,
+}
+
+def title_from_snake(s):
+    return ''.join(x.title() for x in s.split('_'))
+
 def pdddlstream_from_problem(state, debug=False, **kwargs):
     world = state.world # One world per state
     task = world.task # One task per world
@@ -67,6 +83,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         ('BConf', init_bq),
         ('AtBConf', init_bq),
         ('AConf', init_bq, world.carry_conf),
+        ('RestAConf', world.carry_conf),
 
         ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
@@ -81,16 +98,11 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         ('CanMoveBase',),
         ('CanMoveArm',),
         ('CanMoveGripper',),
-
-        Equal(('MoveBaseCost',), BASE_CONSTANT),
-        Equal(('MoveArmCost',), 1),
-        Equal(('MoveGripperCost',), 1),
-        Equal(('CalibrateCost',), 1),
-        Equal(('PickCost',), 1),
-        Equal(('PlaceCost',), 1),
-        Equal(('PullCost',), 1),
-        Equal(('CookCost',), 1),
     ]
+    for action_name, cost in ACTION_COSTS.items():
+        function_name = '{}Cost'.format(title_from_snake(action_name))
+        function = (function_name,)
+        init.append(Equal(function, cost))
     init += [('Type', obj_name, 'stove') for obj_name in STOVES] + \
             [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Status', status) for status in DOOR_STATUSES] + \
@@ -250,14 +262,14 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
 
         'compute-pose-kin': from_fn(compute_pose_kin),
-        'compute-angle-kin': from_fn(compute_angle_kin),
+        #'compute-angle-kin': from_fn(compute_angle_kin),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
         'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
 
         # 'MoveCost': move_cost_fn,
-        'Distance': base_cost_fn,
+        # 'Distance': base_cost_fn,
     }
     if debug:
         stream_map = DEBUG

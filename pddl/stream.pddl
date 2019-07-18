@@ -27,19 +27,23 @@
 
   ; Movable base
   (:stream plan-pick
-    :inputs (?o ?p ?g)
-    :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (MovableBase))
+    :inputs (?o ?p ?g) ; ?aq0)
+    :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (MovableBase)) ; (RestAConf ?aq0))
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
-                    (AConf ?bq @rest_aq) (AConf ?bq ?aq)
+                    ; (AConf ?bq ?aq0)
+                    (AConf ?bq @rest_aq)
+                    (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at))
   )
   (:stream plan-pull
-    :inputs (?j ?a1 ?a2)
-    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase))
+    :inputs (?j ?a1 ?a2) ; ?aq0)
+    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase)) ; (RestAConf ?aq0))
     :outputs (?bq ?aq1 ?aq2 ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
-                    (AConf ?bq @rest_aq) (AConf ?bq ?aq1) (AConf ?bq ?aq2)
+                    ; (AConf ?bq ?aq0)
+                    (AConf ?bq @rest_aq) ; TODO: strange effect with plan constraints
+                    (AConf ?bq ?aq1) (AConf ?bq ?aq2)
                     (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at))
   )
 
@@ -79,6 +83,7 @@
   )
   (:stream plan-arm-motion
     :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
+    ; TODO: disjunctive stream conditions
     :inputs (?bq ?aq1 ?aq2)
     :domain (and (AConf ?bq ?aq1) (AConf ?bq ?aq2))
     :outputs (?at)
@@ -92,10 +97,12 @@
     :certified (GripperMotion ?gq1 ?gq2 ?gt)
   )
   (:stream plan-calibrate-motion
-    :inputs (?bq)
-    :domain (BConf ?bq)
+    :inputs (?bq) ; ?aq0)
+    :domain (and (BConf ?bq)) ; (RestAConf ?aq0))
     :outputs (?at) ; ?aq
-    :certified (and (ATraj ?at) (CalibrateMotion ?bq @rest_aq ?at))
+    :certified (and (ATraj ?at)
+                    ;(CalibrateMotion ?bq ?aq0 ?at))
+                    (CalibrateMotion ?bq @rest_aq ?at))
   )
 
   (:stream compute-pose-kin

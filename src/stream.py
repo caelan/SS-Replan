@@ -366,7 +366,7 @@ def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
 def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwargs):
     # TODO: sample in the neighborhood of the base conf to ensure robust
 
-    def gen(obj_name, pose, grasp):
+    def gen(obj_name, pose, grasp, *args):
         obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
         if not collisions:
             obstacles = set()
@@ -553,7 +553,7 @@ def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, lea
     if not collisions:
         obstacles = set()
 
-    def gen(joint_name, door_conf1, door_conf2):
+    def gen(joint_name, door_conf1, door_conf2, *args):
         if door_conf1 == door_conf2:
             return
         door_joint = joint_from_name(world.kitchen, joint_name)
@@ -710,7 +710,7 @@ def get_gripper_motion_gen(world, teleport=False, **kwargs):
 
 def get_calibrate_gen(world, collisions=True, teleport=False):
 
-    def fn(bq): #, aq):
+    def fn(bq, *args): #, aq):
         # TODO: include if holding anything?
         bq.assign()
         aq = world.carry_conf

@@ -116,7 +116,7 @@ SURFACE_FROM_NAME = {
     'indigo_drawer_bottom': Surface('indigo_drawer_bottom', SURFACE_BOTTOM, ['indigo_drawer_bottom_joint']),
 }
 
-ALL_SURFACES = OPEN_SURFACES + DRAWERS # + CABINETS
+ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS # + CABINETS
 
 ################################################################################
 
@@ -135,7 +135,7 @@ DRAWER_JOINTS = [
 #LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
 #                'dagger_door_left_joint', 'dagger_door_right_joint']
 
-ALL_JOINTS = DRAWER_JOINTS # + CABINET_JOINTS
+ALL_JOINTS = [] + DRAWER_JOINTS # + CABINET_JOINTS
 
 ################################################################################
 

@@ -91,8 +91,11 @@ def relocate_block(world, **kwargs):
     sample_placement(world, entity_name, initial_surface, learned=True)
 
     return Task(world, movable_base=True,
-                goal_on={entity_name: goal_surface},
-                goal_closed=ALL_JOINTS, **kwargs)
+                return_init_bq=True, # return_init_aq=False,
+                goal_holding=[entity_name],
+                #goal_on={entity_name: goal_surface},
+                #goal_closed=ALL_JOINTS,
+                **kwargs)
 
 ################################################################################
 
