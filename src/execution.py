@@ -115,6 +115,7 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
         suppress_all(world_state)
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
+    moveit.dilation = 2
     start_time = time.time()
     # /move_group/display_planned_path
     # TODO: display base motions?
@@ -122,6 +123,7 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     with Verbose():
         moveit.execute(plan, required_orig_err=0.005, timeout=5.0,
                        publish_display_trajectory=False)
+        #moveit.go_local(q=path[-1], ...)
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
 
 def suppress_all(world_state):
