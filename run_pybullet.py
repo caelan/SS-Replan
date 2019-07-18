@@ -89,7 +89,6 @@ def make_exact_skeleton(plan):
                 else:
                     new_arg = arg
             else:
-
                 if 'move_arm' in name and (i not in [0, 2]) and False:
                     new_arg = WILD
                 else:
@@ -172,8 +171,8 @@ def main():
 
     task = stow_block(world)
     #task = relocate_block(world)
-    with LockRenderer():
-        add_markers(world, inverse_place=False)
+    #with LockRenderer():
+    #    add_markers(world, inverse_place=False)
     #wait_for_user()
     if args.defer:
         run_stochastic(task, args)

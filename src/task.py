@@ -112,12 +112,6 @@ def relocate_block(world, **kwargs):
 
 def stow_block(world, **kwargs):
     #world.open_gq.assign()
-    # for joint in world.kitchen_joints:
-    # for name in LEFT_VISIBLE:
-    for name in DRAWER_JOINTS[1:2]:
-        joint = joint_from_name(world.kitchen, name)
-        # world.open_door(joint)
-        # world.close_door(joint)
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
     # wait_for_user()
 
@@ -128,16 +122,17 @@ def stow_block(world, **kwargs):
     set_all_static()
     add_kinect(world)  # TODO: this needs to be after set_all_static
 
-    #surface_name = random.choice(DRAWERS)
-    surface_name = COUNTERS[0] # COUNTERS | DRAWERS | SURFACES | CABINETS
-    #surface_name = 'indigo_tmp' # hitman_drawer_top_joint | hitman_tmp | indigo_tmp
-    print('Initial surface:', surface_name)
-    sample_placement(world, entity_name, surface_name)
+    #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
+    #initial_surface = COUNTERS[0]
+    initial_surface = 'indigo_drawer_top'
+    goal_surface = 'baker' # hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
+    print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
+    sample_placement(world, entity_name, initial_surface)
 
     return Task(world, movable_base=True,
                 goal_hand_empty=False,
                 #goal_holding=[entity_name],
-                goal_on={entity_name: 'indigo_drawer_top'},
+                goal_on={entity_name: goal_surface},
                 goal_closed=ALL_JOINTS, **kwargs)
 
 TASKS = [
