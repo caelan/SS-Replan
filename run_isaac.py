@@ -5,15 +5,18 @@ import os
 import rospy
 import traceback
 import numpy as np
+import math
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-import brain_ros.kitchen_domain as kitchen_domain
+from brain_ros.kitchen_domain import KitchenDomain
+#from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain # from grasps import *
 from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from brain_ros.lula_policies import LulaInitializeDart
 from lula_dartpy.object_administrator import ObjectAdministrator
+from isaac_bridge.carter import Carter, KitchenDemoCarter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, wait_for_duration, Pose, Point, Euler
@@ -37,11 +40,13 @@ TASKS = [
 
 SPAM = 'potted_meat_can'
 MUSTARD = 'mustard_bottle'
-TOMATO_SOUP = 'mustard_bottle'
-SUGAR = 'mustard_bottle'
+TOMATO_SOUP = 'tomato_soup_can'
+SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
 
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
+
+USE_OBJECTS = [CHEEZIT, SPAM, SUGAR]  # , TOMATO_SOUP]
 
 TOP_DRAWER = 'indigo_drawer_top'
 
@@ -176,6 +181,16 @@ class Interface(object):
         self.observer = observer
         self.sim_manager = sim_manager
 
+def localize_all(world_state):
+    for name in USE_OBJECTS:
+        obj = world_state.entities[name]
+        #wait_for_duration(1.0)
+        obj.localize()
+        obj.detect()
+        #obj.administrator.detect()
+        #print(obj.pose[:3, 3])
+    wait_for_duration(0.5)
+
 def main():
     parser = create_parser()
     parser.add_argument('-execute', action='store_true',
@@ -196,13 +211,23 @@ def main():
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
     use_lula = args.execute or args.lula
+    args.watch |= args.execute
 
     rospy.init_node("STRIPStream")
     #with HideOutput():
-    domain = kitchen_domain.KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
+    #if args.execute:
+    #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
+    #else:
+    domain = KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
+    carter = Carter(goal_threshold_tra=0.10,
+                    goal_threshold_rot=math.radians(15.),
+                    vel_threshold_lin=0.01,
+                    vel_threshold_ang=math.radians(1.0))
+    domain.get_robot().carter_interface = carter
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
+    # /home/cpaxton/srl_system/workspace/src/external/lula_franka
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/4a902e24b6272fbc50ee5d9ac1f873f49640d93a/packages/brain/src/brain_ros/carter_predicates.py#L218
     init_right_rospath = 'package://lula_franka/data/keypoint_frames/' + \
@@ -213,10 +238,12 @@ def main():
                           'dart_localization_frame_left.pkl'
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
     dart = LulaInitializeDart(localization_rospaths={
-        'left': init_left_rospath,
-        'open_chewie': init_chewie_rospath,
-        'right': init_right_rospath,
+        'left': init_left_rospath, # left
+        'open_chewie': init_chewie_rospath, # middle
+        'right': init_right_rospath, # right
     }, time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
+    # Robot calibration policy
+
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
     #obj = world_state.entities[goal]
@@ -254,9 +281,20 @@ def main():
             domain.get_robot().carter_interface = sim_manager
         #trial_manager.disable() # Disables collisions
 
+    # Can disable lula world objects to improve speed
+    # Adjust DART to get a better estimate for the drawer joints
     world_state = observer.observe() # domain.root
+    #localize_all(world_state)
+    #wait_for_user()
+    #print('Entities:', sorted(world_state.entities))
     with LockRenderer():
-        update_world(world, domain, observer, world_state)
+        # Need to do expensive computation before localize_all
+        # Such as loading the meshes
+        update_world(world, domain, observer, world_state, USE_OBJECTS)
+        world_state = observer.observe()
+        # observer.update() observer.current_state
+        localize_all(world_state)
+        update_world(world, domain, observer, world_state, USE_OBJECTS)
         #close_all_doors(world)
         if (sim_manager is not None) and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
@@ -270,11 +308,12 @@ def main():
     #wait_for_user()
     #return
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
-    #wait_for_user()
+    wait_for_user('Plan?')
     #return
 
     success = planning_loop(domain, observer, state, args,
-                            additional_init=additional_init, additional_goals=additional_goals)
+                            additional_init=additional_init,
+                            additional_goals=additional_goals)
     print('Success:', success)
     world.destroy()
     # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false

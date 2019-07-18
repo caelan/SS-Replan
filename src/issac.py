@@ -69,7 +69,10 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
 def update_robot(world, domain, observer, world_state):
     entity = world_state.entities[domain.robot]
     # Update joint positions
-    world.set_base_conf(entity.carter_pos) # Should be 0
+    carter_pos = entity.carter_pos
+    #carter_pos = entity.carter_interface.running_pose
+    print('Carter pos:', carter_pos)
+    world.set_base_conf(carter_pos) # Should be 0
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
@@ -139,7 +142,7 @@ def display_kinect(world, observer):
         "/sim/{}_{}_camera/camera_info".format('left', 'color'),
         CameraInfo, callback, queue_size=1) # right, depth
 
-def update_world(world, domain, observer, world_state):
+def update_world(world, domain, observer, world_state, objects=None):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
@@ -154,11 +157,18 @@ def update_world(world, domain, observer, world_state):
         if isinstance(entity, RobotArm):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
+            if (objects is not None) and (name not in objects):
+                continue
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
+                print('Loading', ycb_obj_path)
                 world.add_body(name, ycb_obj_path, color=np.ones(4), mass=1)
             body = world.get_body(name)
-            world_from_entity = get_world_from_model(observer, entity, body)
+            frame_name = ISSAC_PREFIX + name
+            world_from_entity = lookup_pose(observer.tf_listener, frame_name)
+            #world_from_entity = get_world_from_model(observer, entity, body)
+            #world_from_entity = pose_from_tform(entity.pose)
+            #print(name, world_from_entity)
             set_pose(body, world_from_entity)
         elif isinstance(entity, Drawer):
             joint = joint_from_name(world.kitchen, entity.joint_name)
@@ -173,6 +183,8 @@ def update_world(world, domain, observer, world_state):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
+        #print(name, entity)
+        #wait_for_user()
     # TODO: draw floor under the robot instead?
     display_kinect(world, observer)
     #draw_pose(get_pose(world.robot), length=3)
