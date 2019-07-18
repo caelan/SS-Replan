@@ -110,7 +110,7 @@ def main():
     #                    help='Specifies the type of grasp.')
     #parser.add_argument('-problem', default='test_block',
     #                    help='The name of the problem to solve.')
-    parser.add_argument('-max_time', default=5*60, type=float,
+    parser.add_argument('-max_time', default=10*60, type=float,
                         help='The maximum runtime')
     parser.add_argument('-num_samples', default=1000, type=int,
                         help='The number of samples')
