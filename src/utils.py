@@ -379,21 +379,24 @@ GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
+    #fraction = 0.5
+    fraction = 0.75
+
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
 
             generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
-                                       grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf, **kwargs)
+                                       grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf, **kwargs)
         elif grasp_type == SIDE_GRASP:
             x, z = pre_distance * get_unit_vector([3, -1])
             pre_direction = [0, 0, x]
             post_direction = [0, 0, z]
             # Under grasps are actually easier for this robot
             generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
-                                        grasp_length=FINGER_EXTENT[2] / 2, max_width=np.inf,
-                                        top_offset=FINGER_EXTENT[0] / 2, **kwargs)
+                                        grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf,
+                                        top_offset=fraction*FINGER_EXTENT[0], **kwargs)
             #generator = grasps[4:]
             rotate_z = Pose(euler=[0, 0, np.pi]) if world.robot_name == FRANKA_CARTER else unit_pose()
             generator = (multiply(rotate_z, grasp) for grasp in generator)

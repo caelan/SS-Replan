@@ -124,6 +124,7 @@ class Trajectory(Command):
                 update_isaac_robot(observer, sim_manager, self.world)
                 time.sleep(DEFAULT_SLEEP)
                 sim_manager.pause()
+                # TODO: teleport attached
             else:
                 world_state = domain.root
                 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
@@ -242,7 +243,7 @@ class Attach(Command):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
-            moveit.close_gripper(wait=True, sleep=0., speed=0.03)
+            moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
         else:
             return close_gripper(self.robot, moveit)
 

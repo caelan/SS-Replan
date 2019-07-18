@@ -7,19 +7,18 @@ import argparse
 import os
 import numpy as np
 
+
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user, INF, LockRenderer
-from pddlstream.language.constants import Action
-from pddlstream.algorithms.constraints import WILD
-from pddlstream.language.object import OPT_PREFIX
-from pddlstream.utils import is_hashable
-from src.visualization import add_markers
+from pybullet_tools.utils import wait_for_user, INF
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
-from src.problem import pdddlstream_from_problem, ACTION_COSTS
-from src.task import stow_block, relocate_block
+from src.problem import pdddlstream_from_problem
+from src.task import stow_block
+from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix
+
+
 #from src.debug import dump_link_cross_sections, test_rays
 
 def create_parser():
@@ -66,52 +65,6 @@ def run_deteriministic(task, args):
 
 ################################################################################
 
-def make_wild_skeleton(plan):
-    skeleton = []
-    for name, args in plan:
-        new_args = [arg if isinstance(arg, str) and not arg.startswith(OPT_PREFIX) else WILD
-                    for arg in args]
-        skeleton.append(Action(name, new_args))
-    return skeleton
-
-def make_exact_skeleton(plan):
-    skeleton = []
-    arg_from_id = {}
-    var_from_id = {}
-    #var_from_opt = {}
-    for name, args in plan:
-        new_args = []
-        for i, arg in enumerate(args):
-            if isinstance(arg, str):
-                if arg.startswith(OPT_PREFIX):
-                    #new_arg = WILD
-                    new_arg = '?{}'.format(arg[len(OPT_PREFIX):])
-                else:
-                    new_arg = arg
-            else:
-                if 'move_arm' in name and (i not in [0, 2]) and False:
-                    new_arg = WILD
-                else:
-                    arg_from_id[id(arg)] = arg
-                    new_arg = var_from_id.setdefault(id(arg), '?w{}'.format(len(var_from_id)))
-            # TODO: not sure why this fails still
-            #print(arg, new_arg)
-            new_args.append(new_arg)
-        skeleton.append(Action(name, new_args))
-        print(skeleton[-1])
-    for i, var in sorted(var_from_id.items(), key=lambda pair: pair[-1]):
-        print(arg_from_id[i], var)
-    raw_input()
-    return skeleton
-
-def compute_plan_cost(plan):
-    if plan is None:
-        return INF
-    cost = 0
-    for name, args in plan:
-        cost += ACTION_COSTS[name]
-    return cost
-
 def run_stochastic(task, args):
     # TODO: relax hard constraints threshold after some time
     # Soft constraints tell you when you succeed
@@ -146,7 +99,7 @@ def run_stochastic(task, args):
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
         simulate_plan(state, commands, args)
-        plan_postfix = [action for action in plan[len(plan_prefix):] if isinstance(action, Action)]
+        plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
         #last_skeleton = make_exact_skeleton(plan_postfix)
         last_cost = compute_plan_cost(plan_postfix)

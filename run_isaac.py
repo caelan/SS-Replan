@@ -22,6 +22,7 @@ from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.problem import pdddlstream_from_problem
 from src.task import Task, close_all_doors
+from src.replan import get_plan_postfix, make_wild_skeleton
 from src.execution import base_control
 
 from pddlstream.language.constants import Not, And
@@ -130,18 +131,21 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
     world = state.world # One world per state
     #task = world.task # One task per world
 
-    # TODO: track the plan cost
+    last_skeleton = None
     while True:
         # TODO: Isaac class for these things
-
         world_state = observer.observe()
         update_world(world, domain, observer, world_state)
+        saver = WorldSaver()
+
         problem = pdddlstream_from_problem(state, collisions=not args.cfree, teleport=args.teleport)
         problem[-2].extend(additional_init)
         problem = problem[:-1] + (And(problem[-1], *additional_goals),)
-        saver = WorldSaver()
-        solution = solve_pddlstream(problem, args)
-        plan, cost, evaluations = solution
+
+        plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
+        if (plan is None) and (last_skeleton is not None):
+            plan, cost, evaluations = solve_pddlstream(problem, args)
+
         plan_prefix = extract_plan_prefix(plan, defer=args.defer)
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
@@ -149,6 +153,7 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
         if args.watch or args.record:
             simulate_plan(state.copy(), commands, args)
         wait_for_user()
+
         saver.restore()
         if (commands is None) or args.teleport:
             return False
@@ -158,6 +163,8 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
         #wait_for_user()
         for command in commands:
             command.execute(domain, moveit, observer, state)
+        plan_postfix = get_plan_postfix(plan, plan_prefix)
+        last_skeleton = make_wild_skeleton(plan_postfix)
 
 ################################################################################
 

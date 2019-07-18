@@ -220,7 +220,8 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
-def inverse_reachability(world, base_generator, obstacles=set(), max_attempts=50, **kwargs):
+def inverse_reachability(world, base_generator, obstacles=set(),
+                         max_attempts=50, min_distance=0.01, **kwargs):
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
     while True:
@@ -231,7 +232,8 @@ def inverse_reachability(world, base_generator, obstacles=set(), max_attempts=50
             bq = Conf(world.robot, world.base_joints, base_conf)
             bq.assign()
             world.carry_conf.assign()
-            if not any(pairwise_collision(world.robot, b) for b in obstacles): #  + [obj]
+            if not any(pairwise_collision(world.robot, b, max_distance=min_distance)
+                       for b in obstacles): #  + [obj]
                 #print('IR attempts:', i)
                 yield (bq,)
                 break
