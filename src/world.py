@@ -1,23 +1,24 @@
 import numpy as np
-
 from collections import namedtuple
 
+from ikfast.ik import sample_tool_ik
 from pybullet_tools.pr2_primitives import Conf
+from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutput, set_point, Point, stable_z, \
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
+    step_simulation, apply_alpha, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_placed_on_aabb, \
-    step_simulation, set_pose, apply_alpha, RED
-from pybullet_tools.pr2_utils import get_viewcone
+    Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
+    set_quat, quat_from_euler
+from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
     ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH
-from ikfast.ik import sample_tool_ik
-from src.command import State
 
 DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
@@ -286,6 +287,22 @@ class World(object):
         set_pose(body, pose)
         step_simulation()
         return name
+    def fix_geometry(self):
+        for name in self.movable:
+            body = self.get_body(name)
+            pose = get_pose(body)
+            # TODO: can also drop in simulation
+            x, y, z = point_from_pose(pose)
+            roll, pitch, yaw = euler_from_quat(quat_from_pose(pose))
+            set_quat(body, quat_from_euler(Euler(yaw=yaw)))
+            surface_name = self.get_supporting(name)
+            if surface_name is None:
+                continue
+            surface_aabb = compute_surface_aabb(self, surface_name)
+            new_z = stable_z_on_aabb(body, surface_aabb)
+            set_point(body, Point(x, y, new_z))
+            print('{}: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
+                name, roll, pitch, new_z - z))
     def get_supporting(self, obj_name):
         body = self.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(

@@ -1,24 +1,26 @@
-import random
 import numpy as np
-
+import random
 from itertools import islice, cycle
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import is_visible_point
-from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
-    get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
+from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, \
+    set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
+    get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
+    joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
     Euler, quat_from_euler, set_pose, has_link, \
     point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
+    Ray, batch_ray_collision, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, Point, set_configuration, \
-    flatten_links, is_point_in_polygon, grow_polygon, Ray, batch_ray_collision
-
-from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
-    set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
-    compute_surface_aabb, create_surface_attachment
+    flatten_links, is_point_in_polygon, grow_polygon
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
+from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
+    set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, \
+    CABINET_JOINTS, RelPose, FINGER_EXTENT, \
+    compute_surface_aabb, create_surface_attachment
 
 BASE_CONSTANT = 10
 BASE_VELOCITY = 0.25
@@ -438,6 +440,7 @@ def get_handle_grasp(world, joint, pre_distance=0.1):
             #handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=0)))
             # NOTE: THE ABOVE DOESN'T WORK WITH LULA
             handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=np.pi)))
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/kitchen_poses.py
             handle_pregrasp = multiply((pre_direction, unit_quat()), handle_grasp)
             return link, handle_grasp, handle_pregrasp
     raise RuntimeError()

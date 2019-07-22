@@ -6,9 +6,10 @@ import time
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
-    BASE_LINK, apply_alpha, RED, LockRenderer, base_values_from_pose, \
+    BASE_LINK, LockRenderer, base_values_from_pose, \
     pose_from_base_values, INF
-from src.utils import get_ycb_obj_path, ISSAC_CAMERA
+from src.utils import ISSAC_CAMERA
+from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
 ISSAC_FRANKA_FRAME = 'base_link' # Robot base
@@ -65,7 +66,11 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
 def update_robot(world, domain, observer, world_state):
     entity = world_state.entities[domain.robot]
     # Update joint positions
-    world.set_base_conf(entity.carter_pos) # Should be 0
+    carter_values = entity.carter_pos
+    #carter_values = entity.carter_interface.running_pose
+    print('Carter base:', carter_values) # will be zero if a carter object isn't created
+    #world.set_base_conf(carter_values)
+    world.set_base_conf(np.zeros(3))
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
@@ -76,6 +81,14 @@ def update_robot(world, domain, observer, world_state):
     world_from_origin = multiply(world_from_entity, invert(entity_from_origin))
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
+    print('Initial base:', base_values)
+
+    #map_from_carter = pose_from_pose2d(carter_values)
+    #world_from_carter = pose_from_pose2d(base_values)
+    #map_from_world = multiply(map_from_carter, invert(world_from_carter))
+    #print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
+    #print()
+
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
@@ -133,7 +146,7 @@ def display_kinect(world, observer):
         "/sim/{}_{}_camera/camera_info".format('left', 'color'),
         CameraInfo, callback, queue_size=1) # right, depth
 
-def update_world(world, domain, observer, world_state):
+def update_world(world, domain, observer, world_state, objects=None):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
@@ -148,12 +161,20 @@ def update_world(world, domain, observer, world_state):
         if isinstance(entity, RobotArm):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
+            if (objects is not None) and (name not in objects):
+                continue
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
-                world.add_body(name, ycb_obj_path, color=np.ones(4), mass=1)
+                print('Loading', ycb_obj_path)
+                world.add_body(name, ycb_obj_path, color=np.ones(4), mass=0)
             body = world.get_body(name)
-            world_from_entity = get_world_from_model(observer, entity, body)
+            frame_name = ISSAC_PREFIX + name
+            world_from_entity = lookup_pose(observer.tf_listener, frame_name)
+            #world_from_entity = get_world_from_model(observer, entity, body)
+            #world_from_entity = pose_from_tform(entity.pose)
+            #print(name, world_from_entity)
             set_pose(body, world_from_entity)
+            # TODO: prune objects that are far away
         elif isinstance(entity, Drawer):
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
@@ -167,11 +188,14 @@ def update_world(world, domain, observer, world_state):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
+        #print(name, entity)
+        #wait_for_user()
     # TODO: draw floor under the robot instead?
     display_kinect(world, observer)
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
     #wait_for_user()
+    world.fix_geometry()
 
 ################################################################################
 

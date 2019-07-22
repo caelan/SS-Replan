@@ -384,8 +384,8 @@ GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
-    #fraction = 0.5
-    fraction = 0.75
+    fraction = 0.5
+    #fraction = 0.25
 
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
