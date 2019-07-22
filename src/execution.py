@@ -139,6 +139,7 @@ def lula_control(world, path, domain, observer, world_state):
     suppress_all(world_state)
     robot_entity = domain.get_robot()
     franka = robot_entity.robot
+    #franka.set_speed(speed_level='slow')
     for i, positions in enumerate(path):
        print('{}/{}'.format(i, len(path)))
        timeout = 10.0 if i == len(positions)-1 else 2.0

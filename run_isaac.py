@@ -6,6 +6,7 @@ import rospy
 import traceback
 import numpy as np
 import math
+import pickle
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
@@ -21,7 +22,8 @@ from isaac_bridge.carter import Carter, KitchenDemoCarter
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, wait_for_duration, Pose, Point, Euler
 
-from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot
+from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot, \
+    load_calibrate_conf, KEYPOINT_PATH, LOCALIZATION_ROSPATHS
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
@@ -229,21 +231,10 @@ def main():
     set_camera_pose(camera_point=[2, 0, 2])
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
 
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/4a902e24b6272fbc50ee5d9ac1f873f49640d93a/packages/brain/src/brain_ros/carter_predicates.py#L218
-    init_right_rospath = 'package://lula_franka/data/keypoint_frames/' + \
-                         'dart_localization_frame_right2.pkl'
-    init_left_rospath = 'package://lula_franka/data/keypoint_frames/' + \
-                        'dart_localization_frame_left.pkl'
-    init_chewie_rospath = 'package://lula_franka/data/keypoint_frames/' + \
-                          'dart_localization_frame_left.pkl'
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
-    dart = LulaInitializeDart(localization_rospaths={
-        'left': init_left_rospath, # left
-        'open_chewie': init_chewie_rospath, # middle
-        'right': init_right_rospath, # right
-    }, time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
+    dart = LulaInitializeDart(localization_rospaths=LOCALIZATION_ROSPATHS,
+                              time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
     # Robot calibration policy
-
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
     #obj = world_state.entities[goal]

@@ -2,6 +2,7 @@ import numpy as np
 import os
 import signal
 import time
+import pickle
 
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
@@ -35,6 +36,33 @@ def dump_dict(obj):
     for i, key in enumerate(sorted(obj.__dict__)):
         print(i, key, obj.__dict__[key])
     print(dir(obj))
+
+################################################################################
+
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/4a902e24b6272fbc50ee5d9ac1f873f49640d93a/packages/external/lula_franka/scripts/move_carter.py
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/4a902e24b6272fbc50ee5d9ac1f873f49640d93a/packages/brain/src/brain_ros/carter_predicates.py#L218
+
+KEYPOINT_PATH = 'package://lula_franka/data/keypoint_frames/'
+LOCALIZATION_ROSPATHS = {
+    'left': os.path.join(KEYPOINT_PATH, 'dart_localization_frame_right2.pkl'),
+    #'open_chewie': os.path.join(keypoint_dir, 'dart_localization_frame_left.pkl'),
+    'right': os.path.join(KEYPOINT_PATH, 'dart_localization_frame_left.pkl'),
+}
+RETRACT_POSTURE_PATH = os.path.join(KEYPOINT_PATH, 'retract_posture.pkl')
+# TODO: could use pickled grasps as well
+
+def load_calibrate_conf(side='left'):
+    # TODO: sample arm configurations that are visible
+    from lula_pyutil.util import parse_pkg_name
+    #from lula_pyutil.math_util import pack_transform_to_T, unpack_transform_to_frame
+    rospath = LOCALIZATION_ROSPATHS[side]
+    init_path = parse_pkg_name(rospath)
+    dart_init_transform_stamped, dart_init_config = pickle.load(
+        open(init_path, 'rb'))
+    #init_pose = pack_transform_to_T(
+    #    dart_init_transform_stamped.transform)
+    #init_frame = unpack_transform_to_frame(init_pose)
+    return dart_init_config
 
 ################################################################################
 
