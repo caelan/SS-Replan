@@ -124,6 +124,11 @@ ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
 ################################################################################
 
+ISSAC_CAMERA = 'zed_left'
+KINECT_DEPTH = 5.0
+
+################################################################################
+
 CABINET_JOINTS = [
     'baker_joint',
     'chewie_door_left_joint', 'chewie_door_right_joint',

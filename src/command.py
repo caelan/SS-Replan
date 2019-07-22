@@ -1,7 +1,7 @@
 from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, follow_base_trajectory
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
-    wait_for_duration, user_input, wait_for_user, flatten_links, \
-    get_max_limit, get_joint_limits, waypoints_from_path, link_from_name
+    wait_for_duration, user_input, wait_for_user, flatten_links, remove_handles, \
+    get_max_limit, get_joint_limits, waypoints_from_path, link_from_name, batch_ray_collision, draw_ray
 from src.issac import update_robot, update_isaac_robot
 from src.utils import surface_from_name
 
@@ -10,6 +10,7 @@ from isaac_bridge.manager import SimulationManager
 import numpy as np
 import time
 import copy
+import math
 
 MOVEIT = True
 DEFAULT_SLEEP = 1.0
@@ -294,6 +295,33 @@ class Detach(Command):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
 
 ################################################################################s
+
+class Detect(Command):
+    def __init__(self, world, camera, name, rays):
+        super(Detect, self).__init__(world)
+        self.camera = camera
+        self.name = name
+        self.rays = tuple(rays)
+        # TODO: could instead use cones for full detection
+
+    def draw(self):
+        handles = []
+        for ray, result in zip(self.rays, batch_ray_collision(self.rays)):
+            handles.extend(draw_ray(ray, result))
+        return handles
+
+    def iterate(self, state):
+        handles = self.draw()
+        steps = int(math.ceil(1. / 0.02))
+        for _ in range(steps):
+            yield
+        remove_handles(handles)
+
+    def execute(self, domain, moveit, observer, state):
+        pass
+
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__, self.camera, self.name)
 
 class Wait(Command):
     def __init__(self, world, steps):

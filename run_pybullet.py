@@ -15,7 +15,7 @@ from pybullet_tools.utils import wait_for_user, INF
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
-from src.task import stow_block
+from src.task import stow_block, detect_block
 from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix
 
 
@@ -123,7 +123,8 @@ def main():
     #test_observation(world, entity_name, world_from_zed_left)
     #return
 
-    task = stow_block(world)
+    #task = stow_block(world)
+    task = detect_block(world)
     #task = relocate_block(world)
     #with LockRenderer():
     #    add_markers(world, inverse_place=False)

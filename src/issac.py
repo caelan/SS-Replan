@@ -3,21 +3,17 @@ import os
 import signal
 import time
 
-from pybullet_tools.pr2_utils import draw_viewcone, get_detection_cone, get_viewcone
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
-    child_link_from_joint, multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
-    get_movable_joints, get_joint_names, get_joint_positions, unit_pose, get_links, \
-    BASE_LINK, apply_alpha, RED, wait_for_user, LockRenderer, dump_body, draw_pose, \
-    point_from_pose, euler_from_quat, quat_from_pose, Pose, Point, Euler, base_values_from_pose, \
-    pose_from_base_values, INF, get_camera
-from src.utils import get_ycb_obj_path
+    multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
+    get_movable_joints, get_joint_names, get_joint_positions, get_links, \
+    BASE_LINK, apply_alpha, RED, LockRenderer, base_values_from_pose, \
+    pose_from_base_values, INF
+from src.utils import get_ycb_obj_path, ISSAC_CAMERA
 
-ISSAC_PREFIX = '00_'
+ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
 ISSAC_FRANKA_FRAME = 'base_link' # Robot base
 UNREAL_WORLD_FRAME = 'ue_world'
 ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
-ISSAC_CAMERA = 'zed_left'
-ISAAC_CAMERA_FRAME = ISSAC_PREFIX + ISSAC_CAMERA # Prefix of 00 for movable objects and camera
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
 CONTROL_TOPIC = '/sim/desired_joint_states'
 
@@ -122,12 +118,10 @@ def display_kinect(world, observer):
         #print(camera_matrix)
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
-        world_from_camera = lookup_pose(observer.tf_listener, ISAAC_CAMERA_FRAME)
-        cone_body = get_viewcone(camera_matrix=camera_matrix, color=apply_alpha(RED, 0.1))
-        set_pose(cone_body, world_from_camera)
-        world.kinects.append(cone_body)
-        #kitchen_from_camera = multiply(invert(get_pose(world.kitchen)), world_from_camera)
-        #print(kitchen_from_camera)
+
+        camera_name = ISSAC_CAMERA
+        world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
+        world.add_camera(camera_name, world_from_camera, camera_matrix)
 
         # draw_viewcone(world_from_camera)
         # /sim/left_color_camera/camera_info

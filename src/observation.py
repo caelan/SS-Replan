@@ -7,9 +7,8 @@ from itertools import islice
 
 from sklearn.neighbors import KernelDensity
 
-from examples.discrete_belief.dist import UniformDist, DDist, MixtureDist, GaussianDistribution, \
-    gauss, GMU, MultivariateGaussianDistribution, ProductGaussianDistribution, \
-    ProductDistribution, CUniformDist, DeltaDist, bayesEvidence, JDist
+from examples.discrete_belief.dist import UniformDist, DDist, GaussianDistribution, \
+    ProductDistribution, CUniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
 
 #from examples.discrete_belief.run import geometric_cost
@@ -19,7 +18,7 @@ from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ra
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN
 from src.stream import get_stable_gen, test_supported
-from src.utils import OPEN_SURFACES, compute_surface_aabb
+from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH
 
 KITCHEN_FROM_ZED_LEFT = (
     (1.0600011348724365, 1.529999017715454, 0.5699998736381531),
@@ -28,7 +27,6 @@ CAMERA_MATRIX = np.array(
     [[ 532.569,    0.,     320.,   ],
      [   0.,     532.569,  240.,   ],
      [   0.,       0.,       1.,   ]])
-DEPTH = 5.0
 Particle = namedtuple('Particle', ['sample', 'weight'])
 
 P_FALSE_POSITIVE = 0.0
@@ -59,7 +57,7 @@ def are_visible(world, camera_pose):
     camera_point = point_from_pose(camera_pose)
     for name in world.movable:
         point = point_from_pose(get_pose(world.get_body(name)))
-        if is_visible_point(CAMERA_MATRIX, DEPTH, point, camera_pose=camera_pose):
+        if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
             ray_names.append(name)
             rays.append(Ray(camera_point, point))
     ray_results = batch_ray_collision(rays)
@@ -98,7 +96,7 @@ def compute_detectable(particles, camera_pose):
     ray_indices = set()
     for index, particle in enumerate(particles):
         point = point_from_pose(particle.sample.value)
-        if is_visible_point(CAMERA_MATRIX, DEPTH, point, camera_pose=camera_pose):
+        if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
             ray_indices.add(index)
     return ray_indices
 

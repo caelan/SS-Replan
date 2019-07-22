@@ -1,17 +1,21 @@
 import numpy as np
 
+from collections import namedtuple
+
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutput, set_point, Point, stable_z, \
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
-    set_joint_positions, get_configuration, sub_inverse_kinematics, set_joint_position, get_min_limit, get_max_limit, \
-    get_joint_name, remove_body, disconnect, get_min_limits, create_attachment, \
-    get_max_limits, add_body_name, WorldSaver, dump_body, wait_for_user, is_placed_on_aabb
+    set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
+    get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
+    is_placed_on_aabb, \
+    step_simulation, set_pose, apply_alpha, RED
+from pybullet_tools.pr2_utils import get_viewcone
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, surface_from_name, create_surface_attachment
+    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH
 from ikfast.ik import sample_tool_ik
 from src.command import State
 
@@ -27,6 +31,10 @@ DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476
 
 CABINET_OPEN_ANGLE = 4 * np.pi / 9
 DRAWER_OPEN_FRACTION = 0.75
+
+Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
+
+################################################################################
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
@@ -77,7 +85,7 @@ class World(object):
         self.path_from_name = {}
         self.custom_limits = {}
         self.base_limits_handles = []
-        self.kinects = [] # TODO: add kinect
+        self.cameras = {}
 
         self.disabled_collisions = set()
         if self.robot_name == FRANKA_CARTER:
@@ -271,6 +279,13 @@ class World(object):
 
     #########################
 
+    def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH):
+        body = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
+                                          color=apply_alpha(RED, 0.1))
+        self.cameras[name] = Camera(body, camera_matrix, max_depth)
+        set_pose(body, pose)
+        step_simulation()
+        return name
     def get_supporting(self, obj_name):
         body = self.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(

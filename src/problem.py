@@ -16,7 +16,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
-    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen
+    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, get_compute_detect
 from src.database import has_place_database
 
 
@@ -106,6 +106,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
     init += [('Type', obj_name, 'stove') for obj_name in STOVES] + \
             [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Status', status) for status in DOOR_STATUSES] + \
+            [('Camera', name) for name in world.cameras] + \
             [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
     if task.movable_base:
         init.append(('MovableBase',))
@@ -121,7 +122,8 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
     goal_literals += [('Holding', name) for name in task.goal_holding] + \
                      [('On', name, surface) for name, surface in task.goal_on.items()] + \
                      [('DoorStatus', joint_name, CLOSED) for joint_name in task.goal_closed] + \
-                     [('Cooked', name) for name in task.goal_cooked]
+                     [('Cooked', name) for name in task.goal_cooked] + \
+                     [('Detected', name) for name in task.goal_detected]
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
     if task.return_init_bq:
@@ -263,6 +265,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
 
         'compute-pose-kin': from_fn(compute_pose_kin),
         #'compute-angle-kin': from_fn(compute_angle_kin),
+        'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),

@@ -19,6 +19,7 @@
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?aq ?at)
+    (Detect ?c ?o ?p ?r)
     (BTraj ?bt)
     (ATraj ?at)
     (Conf ?j ?q)
@@ -41,6 +42,7 @@
     (CanMoveGripper)
     (Cooked ?o)
     (Calibrated)
+    (Detected ?o)
 
     (OpenGripper)
     (OpenGConf ?gq)
@@ -128,11 +130,13 @@
                        (Accessible ?o2 ?p2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
+                       ; TODO: detect precondition
                   )
     :effect (and (AtGrasp ?o1 ?g)
                  (CanMoveBase) (CanMoveArm)
                  (Holding ?o1) (not (On ?o1 ?o2))
-                 (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?p1)) (not (HandEmpty))
+                 (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?p1))
+                 (not (HandEmpty)) (not (Detected ?o1))
                  (increase (total-cost) (PickCost)))
   )
   (:action place
@@ -174,6 +178,14 @@
                                               (AtWorldPose ?o4 ?p4)))
                  (increase (total-cost) (PullCost)))
   )
+
+  (:action detect
+    :parameters (?c ?o ?p ?r)
+    :precondition (and (Detect ?c ?o ?p ?r)
+                       (AtWorldPose ?o ?p))
+    :effect (Detected ?o)
+  )
+
 
   ;(:action cook
   ;  :parameters (?r)
@@ -220,7 +232,7 @@
   ;))
 
   (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
-    (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (not (= ?o1 ?o2))
+    (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Movable ?o2) (not (= ?o1 ?o2))
                             (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
                             (AtRelPose ?o2 ?rp2 ?s)))
   ))

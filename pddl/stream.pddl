@@ -104,6 +104,13 @@
                     ;(CalibrateMotion ?bq ?aq0 ?at))
                     (CalibrateMotion ?bq @rest_aq ?at))
   )
+  (:stream compute-detect
+    :inputs (?c ?o ?p)
+    :domain (and (Camera ?c) (WorldPose ?o ?p))
+    :outputs (?r)
+    :certified (and (Ray ?r)
+                    (Detect ?c ?o ?p ?r))
+  )
 
   (:stream compute-pose-kin
     :inputs (?o1 ?rp ?o2 ?p2)

@@ -1,26 +1,24 @@
-import copy
 import random
 import numpy as np
 
 from itertools import islice, cycle
 
 from pybullet_tools.pr2_primitives import Conf
+from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
     Euler, quat_from_euler, set_pose, has_link, \
-    point_from_pose, sample_placement_on_aabb, get_sample_fn, \
+    point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, create_attachment, Point, set_configuration, \
-    flatten_links, convex_hull, is_point_in_polygon, grow_polygon, wait_for_user, draw_pose, BLACK, unit_pose
+    get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, Point, set_configuration, \
+    flatten_links, is_point_in_polygon, grow_polygon, Ray, batch_ray_collision
 
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, CABINET_JOINTS, RelPose, FINGER_EXTENT, \
-    compute_surface_aabb, GRASP_TYPES, BASE_JOINTS, create_surface_attachment
-from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory
+    compute_surface_aabb, create_surface_attachment
+from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
-from src.visualization import visualize_base_confs
-
 
 BASE_CONSTANT = 10
 BASE_VELOCITY = 0.25
@@ -68,6 +66,33 @@ def get_compute_angle_kin(world):
         link = link_from_name(world.kitchen, o) # link not surface
         p = RelPose(world.kitchen, link, confs=[a], init=a.init)
         return (p,)
+    return fn
+
+################################################################################
+
+def get_compute_detect(world, **kwargs):
+    obstacles = world.static_obstacles
+
+    def fn(camera_name, obj_name, pose):
+        # TODO: condition that the drawer is open
+        camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
+        camera_pose = get_pose(camera_body)
+        camera_point = point_from_pose(camera_pose)
+        # TODO: could sample multiple rays around the object
+        obj_point = point_from_pose(pose.get_world_from_body())
+        if not is_visible_point(camera_matrix, camera_depth, obj_point, camera_pose):
+            return None
+        ray = Ray(camera_point, obj_point)
+        rays = [ray]
+        results = batch_ray_collision(rays)
+        colliding = {(result.objectUniqueId, frozenset([result.linkIndex])) for result in results
+                     if result.objectUniqueId != -1}
+        if obstacles & colliding:
+            return None
+        detect = Detect(world, camera_name, obj_name, rays)
+        #detect.draw()
+        #wait_for_user()
+        return (detect,)
     return fn
 
 ################################################################################

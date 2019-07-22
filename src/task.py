@@ -3,16 +3,17 @@ import numpy as np
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
     apply_alpha, RED, step_simulation, joint_from_name, set_all_static, WorldSaver
-from src.observation import KITCHEN_FROM_ZED_LEFT, DEPTH, CAMERA_MATRIX
+from src.observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX
 from src.stream import get_stable_gen
-from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS
+from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
+    get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, ISSAC_CAMERA, KINECT_DEPTH
 
 
 class Task(object):
     def __init__(self, world, skeletons=[],
                  movable_base=True, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
-                 goal_hand_empty=False, goal_holding=[],
+                 goal_hand_empty=False, goal_holding=[], goal_detected=[],
                  goal_on={}, goal_closed=[], goal_cooked=[]):
         self.world = world
         world.task = self
@@ -24,6 +25,7 @@ class Task(object):
         self.goal_hand_empty = goal_hand_empty
         self.goal_holding = set(goal_holding)
         self.goal_on = dict(goal_on)
+        self.goal_detected = set(goal_detected)
         self.goal_closed = set(goal_closed)
         self.goal_cooked = set(goal_cooked)
     def __repr__(self):
@@ -53,13 +55,10 @@ def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
     set_pose(obstruction_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
     return obstruction_name
 
-def add_kinect(world):
+def add_left_kinect(world):
     # TODO: could intersect convex with half plane
     world_from_zed_left = multiply(get_pose(world.kitchen), KITCHEN_FROM_ZED_LEFT)
-    cone_body = get_viewcone(depth=DEPTH, camera_matrix=CAMERA_MATRIX, color=apply_alpha(RED, 0.1))
-    set_pose(cone_body, world_from_zed_left)
-    step_simulation()
-    return cone_body
+    world.add_camera(ISSAC_CAMERA, world_from_zed_left, CAMERA_MATRIX)
 
 ################################################################################
 
@@ -81,13 +80,27 @@ def open_all_doors(world):
 
 ################################################################################
 
+def detect_block(world, **kwargs):
+    entity_name = add_block(world, idx=0)
+    initial_surface = 'indigo_drawer_top'
+    set_all_static()
+    add_left_kinect(world)
+    sample_placement(world, entity_name, initial_surface, learned=True)
+
+    return Task(world, movable_base=True,
+                return_init_bq=True, # return_init_aq=False,
+                goal_detected=[entity_name],
+                **kwargs)
+
+################################################################################
+
 def relocate_block(world, **kwargs):
     #open_all_doors(world)
     entity_name = add_block(world, idx=0)
     initial_surface = 'hitman_tmp'
     goal_surface = 'indigo_tmp'
     set_all_static()
-    add_kinect(world)
+    add_left_kinect(world)
     sample_placement(world, entity_name, initial_surface, learned=True)
 
     return Task(world, movable_base=True,
@@ -99,17 +112,6 @@ def relocate_block(world, **kwargs):
 
 ################################################################################
 
-# skeleton = [
-#     ('calibrate', [WILD, WILD, WILD]),
-#     ('move_base', [WILD, WILD, WILD]),
-#     ('pull', ['indigo_drawer_top_joint', WILD, WILD,
-#               'indigo_drawer_top', WILD, WILD, WILD, WILD, WILD  ]),
-#     ('move_base', [WILD, WILD, WILD]),
-#     ('pick', ['big_red_block0', WILD, WILD, WILD,
-#               'indigo_drawer_top', WILD, WILD, WILD, WILD]),
-#     ('move_base', [WILD, WILD, WILD]),
-# ]
-
 def stow_block(world, **kwargs):
     #world.open_gq.assign()
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
@@ -120,10 +122,10 @@ def stow_block(world, **kwargs):
     # obstruction_name = add_box(world)
     # test_grasps(world, entity_name)
     set_all_static()
-    add_kinect(world)  # TODO: this needs to be after set_all_static
+    add_left_kinect(world)  # TODO: this needs to be after set_all_static
 
     #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    initial_surface = COUNTERS[0]
+    initial_surface = 'hitman_tmp'
     #initial_surface = 'indigo_drawer_top'
     goal_surface = 'indigo_drawer_top' # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
@@ -134,6 +136,8 @@ def stow_block(world, **kwargs):
                 #goal_holding=[entity_name],
                 goal_on={entity_name: goal_surface},
                 goal_closed=ALL_JOINTS, **kwargs)
+
+################################################################################
 
 TASKS = [
     relocate_block,
