@@ -9,10 +9,8 @@
     (NoisyBase)
     (Movable ?o)
     (Counter ?o ?p)
+    (Graspable ?o)
 
-    (GConf ?gq)
-    (Angle ?j ?a)
-    (Grasp ?o ?g)
     (Pick ?o ?p ?g ?bq ?aq ?at)
     (Pull ?j ?q1 ?q2 ?bq ?aq1 ?aq2 ?at)
     (BaseMotion ?bq1 ?bq2 ?aq ?bt)
@@ -20,13 +18,18 @@
     (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?aq ?at)
     (Detect ?c ?o ?p ?r)
+
+    (Grasp ?o ?g)
     (BTraj ?bt)
     (ATraj ?at)
-    (Conf ?j ?q)
+    (GConf ?gq)
+    (Angle ?j ?a)
+    (Ray ?r)
 
     (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s)
     (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
     (CFreeTrajPose ?t ?o2 ?p2)
+    (OFreeRayPose ?r ?o ?p)
 
     (HandEmpty)
     (AtBConf ?bq)
@@ -58,6 +61,7 @@
     (UnsafeApproach ?o ?p ?g)
     (UnsafeATraj ?at)
     (UnsafeBTraj ?bt)
+    (OccludedRay ?r)
 
     (RelPose ?o1 ?rp ?o2)
     (WorldPose ?o ?p)
@@ -182,7 +186,9 @@
   (:action detect
     :parameters (?c ?o ?p ?r)
     :precondition (and (Detect ?c ?o ?p ?r)
-                       (AtWorldPose ?o ?p))
+                       (AtWorldPose ?o ?p)
+                       (not (OccludedRay ?r))
+                  )
     :effect (Detected ?o)
   )
 
@@ -232,7 +238,7 @@
   ;))
 
   (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
-    (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Movable ?o2) (not (= ?o1 ?o2))
+    (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Graspable ?o2) (not (= ?o1 ?o2))
                             (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
                             (AtRelPose ?o2 ?rp2 ?s)))
   ))
@@ -246,4 +252,13 @@
                            (not (CFreeTrajPose ?at ?o2 ?p2))
                            (AtWorldPose ?o2 ?p2)))
   ))
+
+  (:derived (OccludedRay ?r) (and (Ray ?r) (or
+    (exists (?o ?p) (and (WorldPose ?o ?p) (Movable ?o)
+                         (not (OFreeRayPose ?r ?o ?p))
+                         (AtWorldPose ?o ?p)))
+    ;(exists (?bq ?aq ?o ?p) (and (WorldPose ?o ?p) (Movable ?o)
+    ;                        (not (CFreeRayGrasp ?at ?o2 ?p2))
+    ;                        (AtWorldPose ?o2 ?p2)))
+  )))
 )

@@ -16,7 +16,8 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
-    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, get_compute_detect
+    get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
+    get_compute_detect, get_ofree_ray_pose_test
 from src.database import has_place_database
 
 
@@ -33,10 +34,6 @@ def existential_quantification(goal_literals):
     return And(*goal_formula)
 
 ################################################################################
-
-# https://github.mit.edu/caelan/stripstream/blob/master/scripts/openrave/run_belief_online.py
-# https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
-# https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 
 ACTION_COSTS = {
     'move_base': BASE_CONSTANT,
@@ -270,6 +267,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
         'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
+        'test-ofree-ray-pose': from_test(get_ofree_ray_pose_test(world, **kwargs)),
 
         # 'MoveCost': move_cost_fn,
         # 'Distance': base_cost_fn,

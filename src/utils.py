@@ -181,7 +181,7 @@ def get_ycb_types():
     return sorted(map(ycb_type_from_file, os.listdir(YCB_PATH)))
 
 def get_ycb_obj_path(ycb_type):
-    # TODO: simplify geometry
+    # TODO: simplify geometry (although pybullet does this automatically)
     path_from_type = {ycb_type_from_file(path): path for path in os.listdir(YCB_PATH)}
     if ycb_type not in path_from_type:
         return None
@@ -403,7 +403,8 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
                                         grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf,
                                         top_offset=fraction*FINGER_EXTENT[0], **kwargs)
             #generator = grasps[4:]
-            rotate_z = Pose(euler=[0, 0, np.pi]) if world.robot_name == FRANKA_CARTER else unit_pose()
+            #rotate_z = Pose(euler=[0, 0, np.pi]) if world.robot_name == FRANKA_CARTER else unit_pose()
+            rotate_z = Pose(euler=[0, 0, 0])
             generator = (multiply(rotate_z, grasp) for grasp in generator)
         else:
             raise ValueError(grasp_type)

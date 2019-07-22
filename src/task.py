@@ -47,8 +47,9 @@ def add_block(world, x=0.1, y=1.15, yaw=0, idx=0):
     return entity_name
 
 def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
-    obstruction_name = 'cracker_box{}'.format(idx)
-    obstruction_path = get_ycb_obj_path(obstruction_name)
+    ycb_type = 'cracker_box'
+    obstruction_name = '{}{}'.format(ycb_type, idx)
+    obstruction_path = get_ycb_obj_path(ycb_type)
     world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
     obstruction_body = world.get_body(obstruction_name)
     z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
@@ -82,10 +83,13 @@ def open_all_doors(world):
 
 def detect_block(world, **kwargs):
     entity_name = add_block(world, idx=0)
-    initial_surface = 'indigo_drawer_top'
+    obstruction_name = add_box(world, idx=0)
+    other_name = add_box(world, idx=1)
     set_all_static()
     add_left_kinect(world)
-    sample_placement(world, entity_name, initial_surface, learned=True)
+    #initial_surface = 'indigo_tmp' # indigo_tmp | indigo_drawer_top
+    #sample_placement(world, entity_name, initial_surface, learned=True)
+    sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     return Task(world, movable_base=True,
                 return_init_bq=True, # return_init_aq=False,

@@ -11,9 +11,9 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Euler, quat_from_euler, set_pose, has_link, \
     point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    Ray, batch_ray_collision, \
+    Ray, batch_ray_collision, wait_for_user, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, Point, set_configuration, \
-    flatten_links, is_point_in_polygon, grow_polygon
+    flatten_links, is_point_in_polygon, grow_polygon, Pose
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -85,17 +85,27 @@ def get_compute_detect(world, **kwargs):
         if not is_visible_point(camera_matrix, camera_depth, obj_point, camera_pose):
             return None
         ray = Ray(camera_point, obj_point)
-        rays = [ray]
-        results = batch_ray_collision(rays)
-        colliding = {(result.objectUniqueId, frozenset([result.linkIndex])) for result in results
-                     if result.objectUniqueId != -1}
-        if obstacles & colliding:
+        detect = Detect(world, camera_name, obj_name, pose, [ray])
+        if obstacles & detect.compute_occluding():
             return None
-        detect = Detect(world, camera_name, obj_name, rays)
         #detect.draw()
         #wait_for_user()
         return (detect,)
     return fn
+
+def get_ofree_ray_pose_test(world, **kwargs):
+    def test(ray, obj_name, pose):
+        if ray.name == obj_name:
+            return True
+        for name in world.movable - {ray.name, obj_name}:
+            set_pose(world.get_body(name), Pose(Point(z=-5.0))) # Prevent obstruction by other objects
+        ray.pose.assign()
+        pose.assign()
+        #ray.draw()
+        #wait_for_user()
+        obstacles = get_link_obstacles(world, obj_name)
+        return not obstacles & ray.compute_occluding()
+    return test
 
 ################################################################################
 

@@ -303,16 +303,24 @@ class Detach(Command):
 class Detect(Command):
     duration = 2.0
 
-    def __init__(self, world, camera, name, rays):
+    def __init__(self, world, camera, name, pose, rays):
         super(Detect, self).__init__(world)
         self.camera = camera
         self.name = name
+        self.pose = pose # Object pose
         self.rays = tuple(rays)
         # TODO: could instead use cones for full detection
 
+    def ray_collision(self):
+        return batch_ray_collision(self.rays)
+
+    def compute_occluding(self):
+        return {(result.objectUniqueId, frozenset([result.linkIndex]))
+                for result in self.ray_collision() if result.objectUniqueId != -1}
+
     def draw(self):
         handles = []
-        for ray, result in zip(self.rays, batch_ray_collision(self.rays)):
+        for ray, result in zip(self.rays, self.ray_collision()):
             handles.extend(draw_ray(ray, result))
         return handles
 

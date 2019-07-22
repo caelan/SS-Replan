@@ -49,6 +49,16 @@ ORIENTATION_STD = np.pi / 8
 # TODO: how to factor visibility observation costs such that the appropriate actions are selected
 # i.e. what to move out of the way
 
+# TODO: use a proper probabilistic programming library rather than dist.py
+
+################################################################################
+
+# https://github.com/caelan/pddlstream/tree/stable/examples/discrete_belief
+# https://github.mit.edu/caelan/stripstream/blob/master/scripts/openrave/run_belief_online.py
+# https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
+# https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
+# https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
+
 ################################################################################
 
 def are_visible(world, camera_pose):
@@ -230,7 +240,10 @@ def get_registration_fn(poses, visible, pos_std=POSITION_STD):
 
 ################################################################################
 
-def test_observation(world, entity_name, camera_pose, n=100):
+def test_observation(world, entity_name, n=100):
+    [camera_name] = list(world.cameras)
+    camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
+    camera_pose = get_pose(camera_body)
     surface_dist = UniformDist(OPEN_SURFACES[1:2])
     with LockRenderer():
         particles = create_belief(world, entity_name, surface_dist)

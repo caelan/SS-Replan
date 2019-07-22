@@ -12,6 +12,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, INF
+from src.observation import test_observation
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -119,16 +120,17 @@ def main():
     np.set_printoptions(precision=3, suppress=True)
     world = World(use_gui=True)
 
-    #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
-    #test_observation(world, entity_name, world_from_zed_left)
-    #return
-
     #task = stow_block(world)
     task = detect_block(world)
     #task = relocate_block(world)
     #with LockRenderer():
     #    add_markers(world, inverse_place=False)
     #wait_for_user()
+
+    #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
+    #test_observation(world, entity_name='big_red_block0')
+    #return
+
     if args.defer:
         run_stochastic(task, args)
     else:

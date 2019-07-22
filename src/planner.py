@@ -51,6 +51,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
+        'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True),
         #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
         #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
