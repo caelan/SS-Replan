@@ -367,6 +367,9 @@ class Grasp(object):
         self.grasp_pose = grasp_pose
         self.pregrasp_pose = pregrasp_pose
         self.grasp_width = grasp_width
+    def assign(self):
+        attachment = self.get_attachment()
+        attachment.assign()
     def get_attachment(self):
         return Attachment(self.world.robot, self.world.tool_link,
                           self.grasp_pose, self.world.get_body(self.body_name))

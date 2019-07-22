@@ -141,16 +141,17 @@
     :domain (and (ATraj ?at) (WorldPose ?o2 ?p2))
     :certified (CFreeTrajPose ?at ?o2 ?p2)
   )
+
   (:stream test-ofree-ray-pose
     :inputs (?r ?o ?p)
     :domain (and (Ray ?r) (WorldPose ?o ?p))
     :certified (OFreeRayPose ?r ?o ?p)
   )
-  ;(:stream test-occluded-ray-grasp ; TODO: include null grasp for robot geometry
-  ;  :inputs (?r ?o ?p)
-  ;  :domain (and (Ray ?r) (WorldPose ?o ?p))
-  ;  :certified (OccludedRay ?r ?o ?p)
-  ;)
+  (:stream test-ofree-ray-grasp
+    :inputs (?r ?bq ?aq ?o ?g)
+    :domain (and (Ray ?r) (AConf ?bq ?aq) (Grasp ?o ?g))
+    :certified (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
+  )
 
   (:stream test-gripper
     :inputs (?gq)

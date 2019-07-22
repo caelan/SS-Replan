@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     Ray, batch_ray_collision, wait_for_user, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, Point, set_configuration, \
-    flatten_links, is_point_in_polygon, grow_polygon, Pose
+    flatten_links, is_point_in_polygon, grow_polygon, Pose, wait_if_unlocked
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -93,17 +93,44 @@ def get_compute_detect(world, **kwargs):
         return (detect,)
     return fn
 
+def move_occluding(world, ray, obj_name):
+    if obj_name is None:
+        movable = world.movable - {ray.name}
+    else:
+        world.set_base_conf([-5.0, 0, 0])
+        movable = world.movable - {ray.name, obj_name}
+    # Prevent obstruction by other objects
+    for name in movable:
+        set_pose(world.get_body(name), Pose(Point(z=-5.0)))
+
 def get_ofree_ray_pose_test(world, **kwargs):
     def test(ray, obj_name, pose):
         if ray.name == obj_name:
             return True
-        for name in world.movable - {ray.name, obj_name}:
-            set_pose(world.get_body(name), Pose(Point(z=-5.0))) # Prevent obstruction by other objects
         ray.pose.assign()
         pose.assign()
+        move_occluding(world, ray, obj_name)
         #ray.draw()
         #wait_for_user()
         obstacles = get_link_obstacles(world, obj_name)
+        return not obstacles & ray.compute_occluding()
+    return test
+
+def get_ofree_ray_grasp_test(world, **kwargs):
+    def test(ray, bconf, aconf, obj_name, grasp):
+        if ray.name == obj_name:
+            return True
+        bconf.assign()
+        aconf.assign()
+        ray.pose.assign()
+        if obj_name is not None:
+            grasp.assign()
+            obstacles = get_link_obstacles(world, obj_name)
+        else:
+            obstacles = get_descendant_obstacles(world.robot)
+        move_occluding(world, ray, obj_name)
+        #ray.draw()
+        #wait_if_unlocked()
         return not obstacles & ray.compute_occluding()
     return test
 
@@ -647,8 +674,9 @@ def parse_fluents(world, fluents, obstacles):
             obstacles.update(get_link_obstacles(world, b))
         elif predicate == 'AtGrasp'.lower():
             b, g = args
-            attachments.append(g.get_attachment())
-            attachments[-1].assign()
+            if b is not None:
+                attachments.append(g.get_attachment())
+                attachments[-1].assign()
         else:
             raise NotImplementedError(predicate)
     return attachments
