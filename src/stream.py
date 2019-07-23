@@ -21,6 +21,7 @@ from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, \
     CABINET_JOINTS, RelPose, FINGER_EXTENT, \
     compute_surface_aabb, create_surface_attachment
+from src.visualization import GROW_BASE, GROW_PLACEMENT
 
 BASE_CONSTANT = 10
 BASE_VELOCITY = 0.25
@@ -76,6 +77,7 @@ def get_compute_detect(world, **kwargs):
     obstacles = world.static_obstacles
 
     def fn(camera_name, obj_name, pose):
+        # TODO: search over all cameras instead?
         # TODO: condition that the drawer is open
         camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
         camera_pose = get_pose(camera_body)
@@ -197,7 +199,7 @@ def get_test_near_joint(world, **kwargs):
     def test(joint_name, base_conf):
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
-            vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=0.05)
+            vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_BASE)
         if not vertices_from_joint[joint_name]:
             return False
         # TODO: can't open hitman_drawer_top_joint any more
@@ -292,13 +294,16 @@ def inverse_reachability(world, base_generator, obstacles=set(),
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
             if not all_between(lower_limits, base_conf, upper_limits):
                 continue
-            #pose.assign()
+            #pose.assign() # TODO: obj in obstacles?
             bq = Conf(world.robot, world.base_joints, base_conf)
             bq.assign()
-            world.carry_conf.assign()
-            if not any(pairwise_collision(world.robot, b, max_distance=min_distance)
-                       for b in obstacles): #  + [obj]
-                #print('IR attempts:', i)
+            for conf in world.special_confs:
+                # TODO: ensure the end-effector is visible at the calibrate_conf
+                conf.assign()
+                if any(pairwise_collision(world.robot, b, max_distance=min_distance) for b in obstacles):
+                    break
+            else:
+                # print('IR attempts:', i)
                 yield (bq,)
                 break
         else:
@@ -540,6 +545,8 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     if randomize:
         sample_fn = get_sample_fn(world.robot, world.arm_joints)
         set_joint_positions(world.robot, world.arm_joints, sample_fn())
+    else:
+        world.carry_conf.assign()
     arm_path = []
     for i, tool_pose in enumerate(tool_path):
         set_joint_positions(world.kitchen, [door_joint], door_path[i])

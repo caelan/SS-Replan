@@ -9,7 +9,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
     BASE_LINK, LockRenderer, base_values_from_pose, \
     pose_from_base_values, INF
-from src.utils import ISSAC_CAMERA
+from src.utils import CAMERAS, LEFT_CAMERA
 from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
@@ -18,6 +18,7 @@ UNREAL_WORLD_FRAME = 'ue_world'
 ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
 CONTROL_TOPIC = '/sim/desired_joint_states'
+TEMPLATE = '%s_1'
 
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
@@ -142,7 +143,7 @@ def display_kinect(world, observer):
     from sensor_msgs.msg import CameraInfo
     import rospy
 
-    if world.kinects:
+    if world.cameras:
         return
     camera_infos = []
     def callback(camera_info):
@@ -160,10 +161,11 @@ def display_kinect(world, observer):
         #print(camera_matrix)
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
-
-        camera_name = ISSAC_CAMERA
-        world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
-        world.add_camera(camera_name, world_from_camera, camera_matrix)
+        for camera_name in CAMERAS:
+            world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
+            if world_from_camera is not None:
+                #print(camera_name, tuple(world_from_camera[0]), tuple(world_from_camera[1]))
+                world.add_camera(camera_name, world_from_camera, camera_matrix)
 
         # draw_viewcone(world_from_camera)
         # /sim/left_color_camera/camera_info
@@ -172,7 +174,7 @@ def display_kinect(world, observer):
         # TODO: would be cool to display the kinect2 as well
 
     observer.camera_sub = rospy.Subscriber(
-        "/sim/{}_{}_camera/camera_info".format('left', 'color'),
+        "/sim/{}_{}_camera/camera_info".format('left', 'color'), # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
 
 def update_world(world, domain, observer, world_state, objects=None):
@@ -228,14 +230,12 @@ def update_world(world, domain, observer, world_state, objects=None):
 
 ################################################################################
 
-TEMPLATE = '%s_1'
-
 def set_isaac_camera(sim_manager, camera_pose):
     from brain_ros.ros_world_state import make_pose
     from isaac_bridge.manager import ros_camera_pose_correction
     camera_tform = make_pose(camera_pose)
-    camera_tform = ros_camera_pose_correction(camera_tform, ISSAC_CAMERA)
-    sim_manager.set_pose(ISSAC_CAMERA, camera_tform, do_correction=False)
+    camera_tform = ros_camera_pose_correction(camera_tform, LEFT_CAMERA)
+    sim_manager.set_pose(LEFT_CAMERA, camera_tform, do_correction=False)
 
 def update_isaac_robot(observer, sim_manager, world):
     unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,

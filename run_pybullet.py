@@ -11,7 +11,8 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user, INF
+from pybullet_tools.utils import wait_for_user, INF, LockRenderer
+from src.visualization import add_markers
 from src.observation import test_observation
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
@@ -123,8 +124,8 @@ def main():
     #task = stow_block(world)
     task = detect_block(world)
     #task = relocate_block(world)
-    #with LockRenderer():
-    #    add_markers(world, inverse_place=False)
+    with LockRenderer():
+        add_markers(world, inverse_place=False)
     #wait_for_user()
 
     #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))

@@ -18,15 +18,8 @@ from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ra
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN
 from src.stream import get_stable_gen, test_supported
-from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH
+from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX
 
-KITCHEN_FROM_ZED_LEFT = (
-    (1.0600011348724365, 1.529999017715454, 0.5699998736381531),
-    (-0.10374931246042252, 0.9274755120277405, -0.19101102650165558, -0.30420398712158203))
-CAMERA_MATRIX = np.array(
-    [[ 532.569,    0.,     320.,   ],
-     [   0.,     532.569,  240.,   ],
-     [   0.,       0.,       1.,   ]])
 Particle = namedtuple('Particle', ['sample', 'weight'])
 
 P_FALSE_POSITIVE = 0.0

@@ -62,8 +62,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
     init_gq = Conf(world.robot, world.gripper_joints)
 
     carry_aq = world.carry_conf
-    calibrate_aq = Conf(world.robot, world.arm_joints, load_calibrate_conf(side='left'))
-
+    calibrate_aq = world.calibrate_conf
     # TODO: order goals for serialization
     # TODO: return set of facts that support the previous plan
     # TODO: repackage stream outputs to avoid recomputation
@@ -74,7 +73,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         '@stove': 'stove',
 
         '@rest_aq': carry_aq,
-        '@calibrate_aq': calibrate_aq, # TODO: move to world?
+        '@calibrate_aq': calibrate_aq,
         '@open_gq': world.open_gq,
         '@closed_gq': world.closed_gq,
         '@open': OPEN,

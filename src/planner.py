@@ -130,7 +130,8 @@ def commands_from_plan(world, plan):
             commands.append(params[-1])
         elif action == 'place':
             commands.extend(params[-1].reverse().commands)
-        elif action in ['cook', 'calibrate']: # TODO: calibrate action
+        elif action in ['cook', 'calibrate']:
+            # TODO: calibrate action that uses fixed_base_suppressor
             steps = int(math.ceil(2.0 / DEFAULT_TIME_STEP))
             commands.append(Wait(world, steps=steps))
         else:

@@ -14,6 +14,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     is_placed_on_aabb, \
     Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler
+from src.issac import load_calibrate_conf
 from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
@@ -94,6 +95,8 @@ class World(object):
                                             for pair in DISABLED_FRANKA_COLLISIONS)
 
         self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
+        self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
+        self.special_confs = [self.carry_conf, self.calibrate_conf]
         self.open_gq = Conf(self.robot, self.gripper_joints,
                             get_max_limits(self.robot, self.gripper_joints))
         self.closed_gq = Conf(self.robot, self.gripper_joints,

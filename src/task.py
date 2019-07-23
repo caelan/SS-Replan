@@ -3,10 +3,9 @@ import numpy as np
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
     apply_alpha, RED, step_simulation, joint_from_name, set_all_static, WorldSaver
-from src.observation import KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
-    get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, ISSAC_CAMERA, KINECT_DEPTH
+    get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX
 
 
 class Task(object):
@@ -59,7 +58,7 @@ def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
 def add_left_kinect(world):
     # TODO: could intersect convex with half plane
     world_from_zed_left = multiply(get_pose(world.kitchen), KITCHEN_FROM_ZED_LEFT)
-    world.add_camera(ISSAC_CAMERA, world_from_zed_left, CAMERA_MATRIX)
+    world.add_camera(LEFT_CAMERA, world_from_zed_left, CAMERA_MATRIX)
 
 ################################################################################
 

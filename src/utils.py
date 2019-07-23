@@ -124,8 +124,28 @@ ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
 ################################################################################
 
-ISSAC_CAMERA = 'zed_left'
+LEFT_CAMERA = 'zed_left'
+RIGHT_CAMERA = 'zed_right'
+CAMERAS = [LEFT_CAMERA, RIGHT_CAMERA]
+
 KINECT_DEPTH = 5.0
+CAMERA_MATRIX = np.array(
+    [[ 532.569,    0.,     320.,   ],
+     [   0.,     532.569,  240.,   ],
+     [   0.,       0.,       1.,   ]])
+
+KITCHEN_FROM_ZED_LEFT = (
+    (1.0600011348724365, 1.529999017715454, 0.5699998736381531),
+    (-0.10374931246042252, 0.9274755120277405, -0.19101102650165558, -0.30420398712158203))
+KITCHEN_FROM_ZED_RIGHT = (
+    (1.5299999999999994, 1.0799999999999992, 0.54000000000000004),
+    (0.65328145599922349, 0.65328151921950173, -0.27059804812548999, -0.27059802705206382))
+CAMERA_POSES = {
+    LEFT_CAMERA: KITCHEN_FROM_ZED_LEFT,
+    RIGHT_CAMERA: KITCHEN_FROM_ZED_RIGHT,
+}
+
+# https://gitlab-master.nvidia.com/search?utf8=%E2%9C%93&snippets=&scope=&search=zed_right&project_id=7659
 
 ################################################################################
 

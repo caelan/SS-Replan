@@ -22,6 +22,7 @@ from isaac_bridge.carter import Carter, KitchenDemoCarter
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, wait_for_duration, Pose, Point, Euler
 
+from src.visualization import add_markers
 from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot, \
     load_calibrate_conf, KEYPOINT_PATH, LOCALIZATION_ROSPATHS
 from src.world import World
@@ -221,19 +222,21 @@ def main():
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
     #else:
     domain = KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
-    carter = Carter(goal_threshold_tra=0.10,
-                    goal_threshold_rot=math.radians(15.),
-                    vel_threshold_lin=0.01,
-                    vel_threshold_ang=math.radians(1.0))
-    domain.get_robot().carter_interface = carter
+    if args.execute:
+        # TODO: only seems to work in simulation
+        carter = Carter(goal_threshold_tra=0.10,
+                        goal_threshold_rot=math.radians(15.),
+                        vel_threshold_lin=0.01,
+                        vel_threshold_ang=math.radians(1.0))
+        domain.get_robot().carter_interface = carter
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
-    dart = LulaInitializeDart(localization_rospaths=LOCALIZATION_ROSPATHS,
-                              time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
+    #dart = LulaInitializeDart(localization_rospaths=LOCALIZATION_ROSPATHS,
+    #                          time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
     # Robot calibration policy
 
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
@@ -292,6 +295,7 @@ def main():
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
         world.update_initial()
+        add_markers(world, inverse_place=False)
     wait_for_duration(duration=0.1)
     state = world.get_initial_state()
     # TODO: initial robot base conf is in collision
