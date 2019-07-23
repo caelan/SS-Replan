@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import os
 import signal
@@ -164,7 +166,9 @@ def display_kinect(world, observer):
         for camera_name in CAMERAS:
             world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
             if world_from_camera is not None:
-                #print(camera_name, tuple(world_from_camera[0]), tuple(world_from_camera[1]))
+                world_from_kitchen = get_pose(world.kitchen)
+                kitchen_from_camera = multiply(invert(world_from_kitchen), world_from_camera)
+                print(camera_name, tuple(kitchen_from_camera[0]), tuple(kitchen_from_camera[1]))
                 world.add_camera(camera_name, world_from_camera, camera_matrix)
 
         # draw_viewcone(world_from_camera)

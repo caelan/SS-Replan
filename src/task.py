@@ -5,7 +5,8 @@ from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point
     apply_alpha, RED, step_simulation, joint_from_name, set_all_static, WorldSaver
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
-    get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX
+    get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
+    KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS
 
 
 class Task(object):
@@ -55,10 +56,10 @@ def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
     set_pose(obstruction_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
     return obstruction_name
 
-def add_left_kinect(world):
+def add_kinect(world, side=LEFT_CAMERA):
     # TODO: could intersect convex with half plane
-    world_from_zed_left = multiply(get_pose(world.kitchen), KITCHEN_FROM_ZED_LEFT)
-    world.add_camera(LEFT_CAMERA, world_from_zed_left, CAMERA_MATRIX)
+    world_from_zed_left = multiply(get_pose(world.kitchen), CAMERA_POSES[side])
+    world.add_camera(side, world_from_zed_left, CAMERA_MATRIX)
 
 ################################################################################
 
@@ -85,7 +86,8 @@ def detect_block(world, **kwargs):
     obstruction_name = add_box(world, idx=0)
     other_name = add_box(world, idx=1)
     set_all_static()
-    add_left_kinect(world)
+    for side in CAMERAS[:1]:
+        add_kinect(world, side)
     #initial_surface = 'indigo_tmp' # indigo_tmp | indigo_drawer_top
     #sample_placement(world, entity_name, initial_surface, learned=True)
     sample_placement(world, other_name, 'hitman_tmp', learned=True)
@@ -103,7 +105,7 @@ def relocate_block(world, **kwargs):
     initial_surface = 'hitman_tmp'
     goal_surface = 'indigo_tmp'
     set_all_static()
-    add_left_kinect(world)
+    add_kinect(world)
     sample_placement(world, entity_name, initial_surface, learned=True)
 
     return Task(world, movable_base=True,
@@ -125,7 +127,7 @@ def stow_block(world, **kwargs):
     # obstruction_name = add_box(world)
     # test_grasps(world, entity_name)
     set_all_static()
-    add_left_kinect(world)  # TODO: this needs to be after set_all_static
+    add_kinect(world)  # TODO: this needs to be after set_all_static
 
     #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
     initial_surface = 'hitman_tmp'

@@ -12,7 +12,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
-    is_placed_on_aabb, get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
+    get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment
 
 try:
@@ -138,8 +138,8 @@ KITCHEN_FROM_ZED_LEFT = (
     (1.0600011348724365, 1.529999017715454, 0.5699998736381531),
     (-0.10374931246042252, 0.9274755120277405, -0.19101102650165558, -0.30420398712158203))
 KITCHEN_FROM_ZED_RIGHT = (
-    (1.5299999999999994, 1.0799999999999992, 0.54000000000000004),
-    (0.65328145599922349, 0.65328151921950173, -0.27059804812548999, -0.27059802705206382))
+    (1.0300002098083496, -1.1000001430511475, 0.3399999439716339),
+    (0.7792050242424011, 0.45354312658309937, -0.20711229741573334, -0.3797929286956787))
 CAMERA_POSES = {
     LEFT_CAMERA: KITCHEN_FROM_ZED_LEFT,
     RIGHT_CAMERA: KITCHEN_FROM_ZED_RIGHT,

@@ -11,8 +11,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     step_simulation, apply_alpha, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
-    is_placed_on_aabb, \
-    Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
+    is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler
 from src.issac import load_calibrate_conf
 from src.command import State
@@ -307,8 +306,10 @@ class World(object):
             print('{}: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
                 name, roll, pitch, new_z - z))
     def get_supporting(self, obj_name):
+        # is_placed_on_aabb | is_center_on_aabb
+        # Only want to generate stable placements, but can operate on initially unstable ones
         body = self.get_body(obj_name)
-        supporting = [surface for surface in ALL_SURFACES if is_placed_on_aabb(
+        supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
             body, compute_surface_aabb(self, surface),
             above_epsilon=1e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:

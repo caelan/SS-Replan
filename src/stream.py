@@ -11,7 +11,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Euler, quat_from_euler, set_pose, has_link, \
     point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    Ray, batch_ray_collision, wait_for_user, \
+    is_center_on_aabb, Ray, batch_ray_collision, wait_for_user, \
     get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, Point, set_configuration, \
     flatten_links, is_point_in_polygon, grow_polygon, Pose, wait_if_unlocked
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
@@ -212,7 +212,9 @@ def get_test_near_joint(world, **kwargs):
 ################################################################################
 
 def test_supported(world, body, surface_name, collisions=True):
+    # TODO: is_center_on_aabb or is_placed_on_aabb
     surface_aabb = compute_surface_aabb(world, surface_name)
+    # TODO: epsilon thresholds?
     if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
         return False
     obstacles = world.static_obstacles | get_surface_obstacles(world, surface_name)
