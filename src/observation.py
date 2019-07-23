@@ -51,22 +51,64 @@ ORIENTATION_STD = np.pi / 8
 
 # TODO: symbol for elsewhere pose
 
-class PlacementDist(object):
-    def __init__(self, world, name, particles):
+class PoseDist(object):
+    def __init__(self, world, name, dist):
         self.world = world
         self.name = name
-        self.particles = particles
+        self.dist = dist
+    def poses_from_surface(self):
+        poses_from_surface = {}
+        for pose in self.dist.support():
+            poses_from_surface.setdefault(pose.support, set()).add(pose)
+        return poses_from_surface
+    def update(self, observation):
+        has_detection = self.name in observation.detections
+        pose_estimate = None
+        if has_detection:
+            pose_estimate = base_values_from_pose(observation.detections[self.name][0])
+        print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
+        # dist.conditionOnVar(index=1, has_detection=True)
 
+        poses = self.dist.support()
+        # TODO: do these updates simultaneously for each object
+        detectable_poses = compute_detectable(poses, observation.camera_pose)
+        visible_poses = compute_visible(poses, observation.camera_pose)
+        print('Total: {} | Detectable: {} | Visible: {}'.format(
+            len(poses), len(detectable_poses), len(visible_poses)))
+        assert set(visible_poses) <= set(detectable_poses)
+        # obs_fn = get_observation_fn(surface)
+        wait_for_user()
+
+        print('Prior:', self.dist)
+        detection_fn = get_detection_fn(poses, visible_poses)
+        registration_fn = get_registration_fn(poses, visible_poses)
+        new_dist = self.dist.copy()
+        # dist.obsUpdate(detection_fn, has_detection)
+        new_dist.obsUpdates([detection_fn, registration_fn], [has_detection, pose_estimate])
+        # dist = bayesEvidence(dist, detection_fn, has_detection) # projects out b and computes joint
+        # joint_dist = JDist(dist, detection_fn, registration_fn)
+        print('Posterior:', new_dist)
+        return self.__class__(self.world, self.name, new_dist)
+    def resample(self):
+        pass
+    def draw(self):
+        handles = []
+        for pose in self.dist.support():
+            # TODO: draw weights using color, length, or thickness
+            color = GREEN if pose == self.dist.mode() else RED
+            handles.extend(pose.draw(color=color, width=1))
+        return handles
 
 class BeliefState(object):
-    def __init__(self, world, placements={}, holding=None):
+    def __init__(self, world, pose_dists={}, holding=None):
         self.world = world
-        self.placements = placements
+        self.pose_dists = pose_dists
         self.holding = holding
         # TODO: belief fluents
 
-    def update(self):
-        pass
+    def update(self, observation):
+        for pose_dist in self.pose_dists:
+            pose_dist.update(observation)
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__)
 
@@ -100,7 +142,8 @@ def create_belief(world, entity_name, surface_dist, n=100):
             #pose.assign()
             #wait_for_user()
             handles.extend(rel_pose.draw(color=RED))
-    return UniformDist(placements)
+    dist = UniformDist(placements)
+    return PoseDist(world, entity_name, dist)
 
 ################################################################################
 
@@ -180,10 +223,16 @@ def density_generator(world, entity_name, surface_name, density):
 
 ################################################################################
 
+class Observation(object):
+    def __init__(self, camera_pose, detections):
+        # TODO: camera name?
+        self.camera_pose = camera_pose
+        self.detections = detections
+
 def observe_scene(world, camera_pose):
     # TODO: could use an UKF to propagate a GMM
     visible_entities = are_visible(world, camera_pose)
-    observations = {}
+    detections = {}
     # TODO: randomize robot's pose
     # TODO: false positives
     # TODO: difference probabilities based on whether in viewcone or not
@@ -200,10 +249,10 @@ def observe_scene(world, camera_pose):
             mean=np.zeros(1), cov=math.pow(ORIENTATION_STD, 2)*np.eye(1))
         noise_pose = Pose(Point(x=dx, y=dy), Euler(yaw=dyaw))
         observed_pose = multiply(pose, noise_pose)
-        observations.setdefault(visible_name, []).append(observed_pose)
+        detections.setdefault(visible_name, []).append(observed_pose)
         #wait_for_user()
         #set_pose(body, observed_pose)
-    return observations
+    return Observation(camera_pose, detections)
 
 ################################################################################
 
@@ -213,10 +262,10 @@ def observe_scene(world, camera_pose):
 
 def get_detection_fn(poses, visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
 
-    def fn(index):
+    def fn(pose):
         # P(detect | s in visible)
         # This could depend on the position as well
-        if index in visible:
+        if pose in visible:
             return DDist({True: 1 - p_fn, False: p_fn})
         return DDist({True: p_fp, False: 1 - p_fp})
     return fn
@@ -226,11 +275,11 @@ def get_registration_fn(poses, visible, pos_std=POSITION_STD):
     # TODO: clip probabilities so doesn't become zero
     # TODO: nearby objects that might cause misdetections
 
-    def fn(index, detection):
+    def fn(pose, detection):
         # P(obs point | state detect)
         if detection:
             # TODO: proportional weight in the event that no normalization
-            world_pose = poses[index].get_world_from_body()
+            world_pose = poses[pose].get_world_from_body()
             x, y, _ = point_from_pose(world_pose)
             return ProductDistribution([
                 GaussianDistribution(gmean=x, stdev=pos_std),
@@ -251,7 +300,7 @@ def test_observation(world, entity_name, n=100):
     camera_pose = get_pose(camera_body)
     surface_dist = UniformDist(OPEN_SURFACES[1:2])
     with LockRenderer():
-        dist = create_belief(world, entity_name, surface_dist)
+        pose_dist = create_belief(world, entity_name, surface_dist)
     #pose = random.choice(particles).sample
     # np.random.choice(elements, size=10, replace=True, p=probabilities)
     # random.choice(elements, k=10, weights=probabilities)
@@ -260,55 +309,23 @@ def test_observation(world, entity_name, n=100):
     # TODO: really want a piecewise distribution or something
     # The two observations do mimic how the examples are generated though
 
-    poses = dist.support()
-    samples_from_surface = {}
-    for pose in poses:
-        samples_from_surface.setdefault(pose.support, set()).add(pose)
-
-    detections = observe_scene(world, camera_pose)
-    has_detection = entity_name in detections
-    pose_estimate = None
-    if entity_name in detections:
-        pose_estimate = base_values_from_pose(detections[entity_name][0])
-    # TODO: each pose itself is hashable
-    print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
-    #dist.conditionOnVar(index=1, has_detection=True)
-
-    detectable_poses = compute_detectable(poses, camera_pose)
-    visible_poses = compute_visible(poses, camera_pose)
-    print('Total: {} | Detectable: {} | Visible: {}'.format(
-        len(poses), len(detectable_poses), len(visible_poses)))
-    assert set(visible_poses) <= set(detectable_poses)
-    #obs_fn = get_observation_fn(surface)
-    wait_for_user()
-
-    print('Prior:', dist)
-    detection_fn = get_detection_fn(poses, visible_poses)
-    registration_fn = get_registration_fn(poses, visible_poses)
-    #dist.obsUpdate(detection_fn, has_detection)
-    dist.obsUpdates([detection_fn, registration_fn], [has_detection, pose_estimate])
-    #dist = bayesEvidence(dist, detection_fn, has_detection) # projects out b and computes joint
-    #joint_dist = JDist(dist, detection_fn, registration_fn)
-    print('Posterior:', dist)
+    observation = observe_scene(world, camera_pose)
+    pose_dist = pose_dist.update(observation)
 
     remove_all_debug()
     with LockRenderer():
-        handles = []
-        for pose in dist.support():
-            # TODO: draw weights using color, length, or thickness
-            color = GREEN if pose == dist.mode() else RED
-            handles.extend(pose.draw(color=color, width=1))
+        pose_dist.draw()
     wait_for_user()
     remove_all_debug()
 
-    #norm_constant = compute_normalization(particles)
+    samples_from_surface = pose_dist.poses_from_surface()
     for surface_name in samples_from_surface:
         #surface_particles = samples_from_surface[surface_name]
         #print(surface_name, compute_normalization(surface_particles) / norm_constant)
-        surface_indices = samples_from_surface[surface_name] & set(dist.support())
-        density = compute_density(dist, poses)
+        surface_poses = samples_from_surface[surface_name] & set(pose_dist.dist.support())
+        density = compute_density(pose_dist.dist, surface_poses)
         predictions = list(islice(density_generator(
             world, entity_name, surface_name, density), n))
         wait_for_user()
 
-    return poses
+    return pose_dist

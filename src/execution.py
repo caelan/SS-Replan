@@ -50,7 +50,7 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
         start_time = rospy.Time.now()
         while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < timeout):
             with Verbose():
-                world_state = observer.observe()
+                world_state = observer.update()
             robot_entity = world_state.entities[domain.robot]
             #difference = difference_fn(target_conf, robot_entity.q)
             if distance_fn(target_conf, robot_entity.q) < threshold:
@@ -111,7 +111,7 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), time_from_starts[-1]))
     if moveit.use_lula:
-        world_state = observer.observe()
+        world_state = observer.update()
         suppress_all(world_state)
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
@@ -145,7 +145,7 @@ def lula_control(world, path, domain, observer, world_state):
        timeout = 10.0 if i == len(positions)-1 else 2.0
        franka.end_effector.go_config(positions, err_thresh=0.05,
            wait_for_target=True, wait_time=timeout, verbose=True) # TODO: go_guided/go_long_range
-       update_robot(world, domain, observer, observer.observe())
+       update_robot(world, domain, observer, observer.update())
        #wait_for_duration(1e-3)
        # TODO: attachments
 

@@ -146,7 +146,7 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
     last_skeleton = None
     while True:
         # TODO: Isaac class for these things
-        world_state = observer.observe()
+        world_state = observer.update()
         update_world(world, domain, observer, world_state, USE_OBJECTS)
         saver = WorldSaver()
 
@@ -279,7 +279,7 @@ def main():
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
-    world_state = observer.observe() # domain.root
+    world_state = observer.update() # domain.root
     #localize_all(world_state)
     #wait_for_user()
     #print('Entities:', sorted(world_state.entities))
@@ -287,7 +287,7 @@ def main():
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
         update_world(world, domain, observer, world_state, USE_OBJECTS)
-        world_state = observer.observe()
+        world_state = observer.update()
         # observer.update() observer.current_state
         localize_all(world_state)
         update_world(world, domain, observer, world_state, USE_OBJECTS)
