@@ -53,6 +53,7 @@ RETRACT_POSTURE_PATH = os.path.join(KEYPOINT_PATH, 'retract_posture.pkl')
 
 def load_calibrate_conf(side='left'):
     # TODO: sample arm configurations that are visible
+    # TODO: calibration by line of sight with many particles on the robot's arm
     from lula_pyutil.util import parse_pkg_name
     #from lula_pyutil.math_util import pack_transform_to_T, unpack_transform_to_frame
     rospath = LOCALIZATION_ROSPATHS[side]

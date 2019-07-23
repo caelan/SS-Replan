@@ -1,7 +1,9 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @world @gripper @stove @open @closed
-              @rest_aq @open_gq @closed_gq)
+  (:constants @world @gripper @stove
+              @open @closed
+              @rest_aq @calibrate_aq
+              @open_gq @closed_gq)
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -85,9 +87,12 @@
   )
 
   (:action move_base
-    :parameters (?bq1 ?bq2 ?aq ?bt)
-    :precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
-                       (AtBConf ?bq1) (AtAConf ?aq)
+    ;:parameters (?bq1 ?bq2 ?aq ?bt)
+    ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
+    ;                   (AtBConf ?bq1) (AtAConf ?aq)
+    :parameters (?bq1 ?bq2 ?bt)
+    :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt)
+                       (AtBConf ?bq1) (AtAConf @rest_aq)
                        (Calibrated) (CanMoveBase))
     :effect (and (AtBConf ?bq2)
                  (CanMoveArm)
@@ -118,13 +123,15 @@
   )
 
   (:action calibrate
-    :parameters (?bq ?aq ?at)
-    :precondition (and (CalibrateMotion ?bq ?aq ?at)
-                       (AtBConf ?bq) (AtAConf ?aq)
+    ;:parameters (?bq ?aq ?at)
+    ;:precondition (and (CalibrateMotion ?bq ?aq ?at)
+    :parameters (?bq)
+    :precondition (and (AConf ?bq @calibrate_aq)
+                       (AtBConf ?bq) (AtAConf @calibrate_aq)
                        (not (Calibrated))
                        ; TODO: visibility constraints
                    )
-    :effect (and (Calibrated)
+    :effect (and (Calibrated) (CanMoveArm)
                  ; (not (AtBConf ?bq)) ; Could make this be a new pose ?bq2
                  (increase (total-cost) (CalibrateCost)))
   )

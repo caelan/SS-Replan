@@ -32,7 +32,7 @@
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
-                    (AConf ?bq @rest_aq)
+                    (AConf ?bq @rest_aq) (AConf ?bq @calibrate_aq)
                     (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at))
   )
@@ -42,7 +42,8 @@
     :outputs (?bq ?aq1 ?aq2 ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
-                    (AConf ?bq @rest_aq) ; TODO: strange effect with plan constraints
+                    ; TODO: strange effect with plan constraints
+                    (AConf ?bq @rest_aq) (AConf ?bq @calibrate_aq)
                     (AConf ?bq ?aq1) (AConf ?bq ?aq2)
                     (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at))
   )
@@ -75,11 +76,10 @@
 
   (:stream plan-base-motion
     :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
-    :inputs (?bq1 ?bq2 ?aq)
+    :inputs (?bq1 ?bq2 ?aq) ; TODO: just rest_aq?
     :domain (and (AConf ?bq1 ?aq) (AConf ?bq2 ?aq) (MovableBase))
     :outputs (?bt)
-    :certified (and ; (BTraj ?bt)
-                    (BaseMotion ?bq1 ?bq2 ?aq ?bt))
+    :certified (BaseMotion ?bq1 ?bq2 ?aq ?bt)
   )
   (:stream plan-arm-motion
     :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
@@ -87,8 +87,7 @@
     :inputs (?bq ?aq1 ?aq2)
     :domain (and (AConf ?bq ?aq1) (AConf ?bq ?aq2))
     :outputs (?at)
-    :certified (and ; (ATraj ?bt)
-                    (ArmMotion ?bq ?aq1 ?aq2 ?at))
+    :certified (ArmMotion ?bq ?aq1 ?aq2 ?at)
   )
   (:stream plan-gripper-motion
     :inputs (?gq1 ?gq2)
@@ -96,14 +95,14 @@
     :outputs (?gt)
     :certified (GripperMotion ?gq1 ?gq2 ?gt)
   )
-  (:stream plan-calibrate-motion
-    :inputs (?bq) ; ?aq0)
-    :domain (and (BConf ?bq)) ; (RestAConf ?aq0))
-    :outputs (?at) ; ?aq
-    :certified (and (ATraj ?at)
-                    ;(CalibrateMotion ?bq ?aq0 ?at))
-                    (CalibrateMotion ?bq @rest_aq ?at))
-  )
+  ;(:stream plan-calibrate-motion
+  ;  :inputs (?bq) ; ?aq0)
+  ;  :domain (and (BConf ?bq)) ; (RestAConf ?aq0))
+  ;  :outputs (?at) ; ?aq
+  ;  :certified (and (ATraj ?at)
+  ;                  ;(CalibrateMotion ?bq ?aq0 ?at))
+  ;                  (CalibrateMotion ?bq @rest_aq ?at))
+  ;)
   (:stream compute-detect
     :inputs (?c ?o ?p)
     :domain (and (Camera ?c) (WorldPose ?o ?p))

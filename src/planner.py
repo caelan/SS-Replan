@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import cProfile
 import pstats
+import math
 
 from pddlstream.algorithms.constraints import PlanConstraints
 from pddlstream.algorithms.focused import solve_focused
@@ -115,27 +116,30 @@ def extract_plan_prefix(plan, defer=False):
             break
     return prefix
 
+DEFAULT_TIME_STEP = 0.02
+
 def commands_from_plan(world, plan):
     if plan is None:
         return None
     # TODO: propagate the state
     commands = []
     for action, params in plan:
-        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'calibrate']:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull']:
             commands.extend(params[-1].commands)
         elif action == 'detect':
             commands.append(params[-1])
         elif action == 'place':
             commands.extend(params[-1].reverse().commands)
-        elif action in ['cook']:
-            commands.append(Wait(world, steps=100))
+        elif action in ['cook', 'calibrate']: # TODO: calibrate action
+            steps = int(math.ceil(2.0 / DEFAULT_TIME_STEP))
+            commands.append(Wait(world, steps=steps))
         else:
             raise NotImplementedError(action)
     return commands
 
 ################################################################################
 
-def simulate_plan(state, commands, args, time_step=0.02):
+def simulate_plan(state, commands, args, time_step=DEFAULT_TIME_STEP):
     wait_for_user()
     if commands is None:
         return

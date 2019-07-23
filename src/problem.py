@@ -18,6 +18,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test
+from src.issac import load_calibrate_conf
 from src.database import has_place_database
 
 
@@ -59,8 +60,11 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
     init_gq = Conf(world.robot, world.gripper_joints)
+
+    carry_aq = world.carry_conf
+    calibrate_aq = Conf(world.robot, world.arm_joints, load_calibrate_conf(side='left'))
+
     # TODO: order goals for serialization
-    # TODO: calibration by line of sight with many particles on the robot's arm
     # TODO: return set of facts that support the previous plan
     # TODO: repackage stream outputs to avoid recomputation
 
@@ -69,7 +73,8 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
         '@gripper': 'gripper',
         '@stove': 'stove',
 
-        '@rest_aq': world.carry_conf,
+        '@rest_aq': carry_aq,
+        '@calibrate_aq': calibrate_aq, # TODO: move to world?
         '@open_gq': world.open_gq,
         '@closed_gq': world.closed_gq,
         '@open': OPEN,
@@ -79,8 +84,9 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
     init = [
         ('BConf', init_bq),
         ('AtBConf', init_bq),
-        ('AConf', init_bq, world.carry_conf),
-        ('RestAConf', world.carry_conf),
+        ('AConf', init_bq, carry_aq),
+        ('RestAConf', carry_aq),
+        ('AConf', init_bq, calibrate_aq),
 
         ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
@@ -135,7 +141,8 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
             goal_bq = init_bq
         init.extend([
             ('BConf', goal_bq),
-            ('AConf', goal_bq, world.carry_conf),
+            ('AConf', goal_bq, carry_aq),
+            ('AConf', goal_bq, calibrate_aq),
         ])
         goal_literals.append(('AtBConf', goal_bq))
         if task.return_init_aq:
