@@ -13,7 +13,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
     set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
-    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment
+    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point
 
 try:
     import trac_ik_python
@@ -340,6 +340,12 @@ class RelPose(object):
     def get_reference_from_body(self):
         return multiply(invert(self.get_world_from_reference()),
                         self.get_world_from_body())
+    def draw(self, **kwargs):
+        point_reference = point_from_pose(self.get_reference_from_body())
+        if self.reference_body is None:
+            return draw_point(point_reference, **kwargs)
+        return draw_point(point_reference, parent=self.reference_body,
+                          parent_link=self.reference_link, **kwargs)
     def __repr__(self):
         if self.reference_body is None:
             return 'wp{}'.format(id(self) % 1000)

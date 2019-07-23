@@ -56,10 +56,10 @@ def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
     set_pose(obstruction_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
     return obstruction_name
 
-def add_kinect(world, side=LEFT_CAMERA):
+def add_kinect(world, camera_name=LEFT_CAMERA):
     # TODO: could intersect convex with half plane
-    world_from_zed_left = multiply(get_pose(world.kitchen), CAMERA_POSES[side])
-    world.add_camera(side, world_from_zed_left, CAMERA_MATRIX)
+    world_from_camera = multiply(get_pose(world.kitchen), CAMERA_POSES[camera_name])
+    world.add_camera(camera_name, world_from_camera, CAMERA_MATRIX)
 
 ################################################################################
 
@@ -145,6 +145,7 @@ def stow_block(world, **kwargs):
 ################################################################################
 
 TASKS = [
+    detect_block,
     relocate_block,
     stow_block,
 ]

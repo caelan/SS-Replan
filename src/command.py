@@ -17,6 +17,7 @@ DEFAULT_SLEEP = 1.0
 FORCE = 100
 
 class State(object):
+    # TODO: rename to be world state?
     def __init__(self, world, savers=[], grasped=None, attachments=[]):
         # a part of the state separate from PyBullet
         self.world = world

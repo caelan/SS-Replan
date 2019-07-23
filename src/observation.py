@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import random
 import math
@@ -10,14 +12,15 @@ from sklearn.neighbors import KernelDensity
 from examples.discrete_belief.dist import UniformDist, DDist, GaussianDistribution, \
     ProductDistribution, CUniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
+#from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask
 
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN
-from src.stream import get_stable_gen, test_supported
+    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator
+from src.stream import get_stable_gen, test_supported, RelPose
 from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX
 
 Particle = namedtuple('Particle', ['sample', 'weight'])
@@ -32,13 +35,6 @@ ORIENTATION_STD = np.pi / 8
 # TODO: could do open world or closed world
 # For open world, can sum independent probabilities
 
-# For a point, observation types
-# outside cone, visible, occluded
-# no detection, detection at point, detection elsewhere
-
-# https://github.com/tlpmit/hpn
-# https://github.mit.edu/tlp/bhpn
-
 # TODO: how to factor visibility observation costs such that the appropriate actions are selected
 # i.e. what to move out of the way
 
@@ -46,11 +42,30 @@ ORIENTATION_STD = np.pi / 8
 
 ################################################################################
 
+# https://github.com/tlpmit/hpn
+# https://github.mit.edu/tlp/bhpn
+
 # https://github.com/caelan/pddlstream/tree/stable/examples/discrete_belief
 # https://github.mit.edu/caelan/stripstream/blob/master/scripts/openrave/run_belief_online.py
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
+
+class PlacementDist(object):
+    pass
+
+
+class BeliefState(object):
+    def __init__(self, world, placements={}, holding=None):
+        self.world = world
+        self.placements = placements
+        self.holding = holding
+        # TODO: belief fluents
+
+    def update(self):
+        pass
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__)
 
 ################################################################################
 
@@ -72,6 +87,7 @@ def compute_normalization(particles):
 
 def create_belief(world, entity_name, surface_dist, n=100):
     # TODO: halton seqeunce
+    #unit_generator(d, use_halton=True)
     particles = []
     handles = []
     placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
@@ -83,14 +99,10 @@ def create_belief(world, entity_name, surface_dist, n=100):
             rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
             if rel_pose is None:
                 continue
-            world_pose = WorldPose(rel_pose.body, rel_pose.get_world_from_body(), support=surface_name)
-            point = point_from_pose(world_pose.value)
-            weight = 1.
-            particle = Particle(world_pose, weight=weight)
-            particles.append(particle)
+            particles.append(Particle(rel_pose, weight=1.0))
             #pose.assign()
             #wait_for_user()
-            handles.extend(draw_point(point, color=RED))
+            handles.extend(rel_pose.draw(color=RED))
     return particles
 
 ################################################################################
@@ -98,7 +110,8 @@ def create_belief(world, entity_name, surface_dist, n=100):
 def compute_detectable(particles, camera_pose):
     ray_indices = set()
     for index, particle in enumerate(particles):
-        point = point_from_pose(particle.sample.value)
+        world_pose = particle.sample.get_world_from_body()
+        point = point_from_pose(world_pose)
         if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
             ray_indices.add(index)
     return ray_indices
@@ -108,7 +121,8 @@ def compute_visible(particles, camera_pose, draw=True):
     rays = []
     camera_point = point_from_pose(camera_pose)
     for i in ray_indices:
-        point = point_from_pose(particles[i].sample.value)
+        world_pose = particles[i].sample.get_world_from_body()
+        point = point_from_pose(world_pose)
         rays.append(Ray(camera_point, point))
     ray_results = batch_ray_collision(rays)
     if draw:
@@ -123,7 +137,7 @@ def compute_visible(particles, camera_pose, draw=True):
 ################################################################################
 
 def compute_density(particles, std=0.01):
-    weighted_points = [Particle(point_from_pose(particle.sample.value)[:2], particle.weight)
+    weighted_points = [Particle(point_from_pose(particle.sample.get_world_from_body())[:2], particle.weight)
                        for particle in particles]
     points, weights = zip(*weighted_points)
     # from sklearn.mixture import GaussianMixture
@@ -174,7 +188,7 @@ def density_generator(world, entity_name, surface_name, density):
 ################################################################################
 
 def observe_scene(world, camera_pose):
-    # Could use an UKF to propagate a GMM
+    # TODO: could use an UKF to propagate a GMM
     visible_entities = are_visible(world, camera_pose)
     observations = {}
     # TODO: randomize robot's pose
@@ -200,6 +214,10 @@ def observe_scene(world, camera_pose):
 
 ################################################################################
 
+# For a point, observation types
+# outside cone, visible, occluded
+# no detection, detection at point, detection elsewhere
+
 def get_detection_fn(poses, visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
 
     def fn(index):
@@ -219,7 +237,8 @@ def get_registration_fn(poses, visible, pos_std=POSITION_STD):
         # P(obs point | state detect)
         if detection:
             # TODO: proportional weight in the event that no normalization
-            x, y, _ = point_from_pose(poses[index].value)
+            world_pose = poses[index].get_world_from_body()
+            x, y, _ = point_from_pose(world_pose)
             return ProductDistribution([
                 GaussianDistribution(gmean=x, stdev=pos_std),
                 GaussianDistribution(gmean=y, stdev=pos_std),
@@ -253,7 +272,6 @@ def test_observation(world, entity_name, n=100):
     for index, pose in enumerate(poses):
         samples_from_surface.setdefault(pose.support, set()).add(index)
 
-
     dist = DDist({i: particles[i].weight for i in range(len(poses))}).normalize()
     detections = observe_scene(world, camera_pose)
     has_detection = entity_name in detections
@@ -261,7 +279,7 @@ def test_observation(world, entity_name, n=100):
     if entity_name in detections:
         pose_estimate = base_values_from_pose(detections[entity_name][0])
     # TODO: each pose itself is hashable
-    print(has_detection, pose_estimate)
+    print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
     #dist.conditionOnVar(index=1, has_detection=True)
 
     field_of_view_indices = compute_detectable(particles, camera_pose)
@@ -271,27 +289,25 @@ def test_observation(world, entity_name, n=100):
     #obs_fn = get_observation_fn(surface)
     wait_for_user()
 
+    print('Prior:', dist)
     detection_fn = get_detection_fn(poses, visible_indices)
     registration_fn = get_registration_fn(poses, visible_indices)
     #dist.obsUpdate(detection_fn, has_detection)
     dist.obsUpdates([detection_fn, registration_fn], [has_detection, pose_estimate])
     #dist = bayesEvidence(dist, detection_fn, has_detection) # projects out b and computes joint
     #joint_dist = JDist(dist, detection_fn, registration_fn)
-    print(dist)
+    print('Posterior:', dist)
 
     remove_all_debug()
-
     with LockRenderer():
         handles = []
-        z_offset = Point(z=0.1)
         for index in dist.support():
             # TODO: draw weights using color, length, or thickness
-            point = point_from_pose(poses[index].value)
             color = GREEN if index == dist.mode() else RED
-            handles.extend(draw_point(point + z_offset, color=color, width=1))
+            handles.extend(poses[index].draw(color=color, width=1))
     wait_for_user()
-
     remove_all_debug()
+
     #norm_constant = compute_normalization(particles)
     for surface_name in samples_from_surface:
         #surface_particles = samples_from_surface[surface_name]
