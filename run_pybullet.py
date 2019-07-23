@@ -53,7 +53,7 @@ def create_parser():
 
 ################################################################################
 
-def run_deteriministic(task, args):
+def run_deterministic(task, args):
     world = task.world
     state = world.get_initial_state()
     problem = pdddlstream_from_problem(state,
@@ -124,18 +124,18 @@ def main():
     #task = stow_block(world)
     task = detect_block(world)
     #task = relocate_block(world)
-    with LockRenderer():
-        add_markers(world, inverse_place=False)
+    if not args.record:
+        with LockRenderer():
+            add_markers(world, inverse_place=False)
     #wait_for_user()
 
-    #test_rays(point_from_pose(world_from_zed_left), world.get_body(entity_name))
-    #test_observation(world, entity_name='big_red_block0')
-    #return
+    test_observation(world, entity_name='big_red_block0')
+    return
 
     if args.defer:
         run_stochastic(task, args)
     else:
-        run_deteriministic(task, args)
+        run_deterministic(task, args)
     world.destroy()
 
 if __name__ == '__main__':

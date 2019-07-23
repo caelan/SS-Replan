@@ -23,8 +23,6 @@ from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ra
 from src.stream import get_stable_gen, test_supported, RelPose
 from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX
 
-Particle = namedtuple('Particle', ['sample', 'weight'])
-
 P_FALSE_POSITIVE = 0.0
 P_FALSE_NEGATIVE = 0.0 # 0.1
 POSITION_STD = 0.01
@@ -51,8 +49,13 @@ ORIENTATION_STD = np.pi / 8
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
 
+# TODO: symbol for elsewhere pose
+
 class PlacementDist(object):
-    pass
+    def __init__(self, world, name, particles):
+        self.world = world
+        self.name = name
+        self.particles = particles
 
 
 class BeliefState(object):
@@ -82,47 +85,39 @@ def are_visible(world, camera_pose):
     return {name for name, result in zip(ray_names, ray_results)
             if result.objectUniqueId == world.get_body(name)}
 
-def compute_normalization(particles):
-    return sum(particle.weight for particle in particles)
-
 def create_belief(world, entity_name, surface_dist, n=100):
-    # TODO: halton seqeunce
-    #unit_generator(d, use_halton=True)
-    particles = []
-    handles = []
     placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
-
+    handles = []
+    placements = []
     with BodySaver(world.get_body(entity_name)):
-        while len(particles) < n:
+        while len(placements) < n:
             surface_name = surface_dist.draw()
             #print(len(particles), surface_name)
             rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
             if rel_pose is None:
                 continue
-            particles.append(Particle(rel_pose, weight=1.0))
+            placements.append(rel_pose)
             #pose.assign()
             #wait_for_user()
             handles.extend(rel_pose.draw(color=RED))
-    return particles
+    return UniformDist(placements)
 
 ################################################################################
 
-def compute_detectable(particles, camera_pose):
-    ray_indices = set()
-    for index, particle in enumerate(particles):
-        world_pose = particle.sample.get_world_from_body()
-        point = point_from_pose(world_pose)
+def compute_detectable(poses, camera_pose):
+    detectable_poses = set()
+    for pose in poses:
+        point = point_from_pose(pose.get_world_from_body())
         if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
-            ray_indices.add(index)
-    return ray_indices
+            detectable_poses.add(pose)
+    return detectable_poses
 
-def compute_visible(particles, camera_pose, draw=True):
-    ray_indices = compute_detectable(particles, camera_pose)
+def compute_visible(placements, camera_pose, draw=True):
+    detectable_poses = list(compute_detectable(placements, camera_pose))
     rays = []
     camera_point = point_from_pose(camera_pose)
-    for i in ray_indices:
-        world_pose = particles[i].sample.get_world_from_body()
-        point = point_from_pose(world_pose)
+    for pose in detectable_poses:
+        point = point_from_pose(pose.get_world_from_body())
         rays.append(Ray(camera_point, point))
     ray_results = batch_ray_collision(rays)
     if draw:
@@ -130,16 +125,14 @@ def compute_visible(particles, camera_pose, draw=True):
             handles = []
             for ray, result in zip(rays, ray_results):
                 handles.extend(draw_ray(ray, result))
-    visible_indices = {index for index, result in zip(ray_indices, ray_results)
-                       if result.objectUniqueId == -1}
-    return visible_indices
+    return {pose for pose, result in zip(detectable_poses, ray_results)
+            if result.objectUniqueId == -1}
 
 ################################################################################
 
-def compute_density(particles, std=0.01):
-    weighted_points = [Particle(point_from_pose(particle.sample.get_world_from_body())[:2], particle.weight)
-                       for particle in particles]
-    points, weights = zip(*weighted_points)
+def compute_density(dist, poses, std=0.01):
+    points, weights = zip(*{point_from_pose(pose.get_world_from_body())[:2]: dist.prob(pose)
+                            for pose in poses if 0 < dist.prob(pose)}.items())
     # from sklearn.mixture import GaussianMixture
     # pip2 install -U --no-deps scikit-learn=0.20
 
@@ -258,7 +251,7 @@ def test_observation(world, entity_name, n=100):
     camera_pose = get_pose(camera_body)
     surface_dist = UniformDist(OPEN_SURFACES[1:2])
     with LockRenderer():
-        particles = create_belief(world, entity_name, surface_dist)
+        dist = create_belief(world, entity_name, surface_dist)
     #pose = random.choice(particles).sample
     # np.random.choice(elements, size=10, replace=True, p=probabilities)
     # random.choice(elements, k=10, weights=probabilities)
@@ -267,12 +260,11 @@ def test_observation(world, entity_name, n=100):
     # TODO: really want a piecewise distribution or something
     # The two observations do mimic how the examples are generated though
 
-    poses = [particle.sample for particle in particles]
+    poses = dist.support()
     samples_from_surface = {}
-    for index, pose in enumerate(poses):
-        samples_from_surface.setdefault(pose.support, set()).add(index)
+    for pose in poses:
+        samples_from_surface.setdefault(pose.support, set()).add(pose)
 
-    dist = DDist({i: particles[i].weight for i in range(len(poses))}).normalize()
     detections = observe_scene(world, camera_pose)
     has_detection = entity_name in detections
     pose_estimate = None
@@ -282,16 +274,17 @@ def test_observation(world, entity_name, n=100):
     print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
     #dist.conditionOnVar(index=1, has_detection=True)
 
-    field_of_view_indices = compute_detectable(particles, camera_pose)
-    visible_indices = compute_visible(particles, camera_pose)
-    #print(len(field_of_view_indices), len(visible_indices))
-    assert set(visible_indices) <= set(field_of_view_indices)
+    detectable_poses = compute_detectable(poses, camera_pose)
+    visible_poses = compute_visible(poses, camera_pose)
+    print('Total: {} | Detectable: {} | Visible: {}'.format(
+        len(poses), len(detectable_poses), len(visible_poses)))
+    assert set(visible_poses) <= set(detectable_poses)
     #obs_fn = get_observation_fn(surface)
     wait_for_user()
 
     print('Prior:', dist)
-    detection_fn = get_detection_fn(poses, visible_indices)
-    registration_fn = get_registration_fn(poses, visible_indices)
+    detection_fn = get_detection_fn(poses, visible_poses)
+    registration_fn = get_registration_fn(poses, visible_poses)
     #dist.obsUpdate(detection_fn, has_detection)
     dist.obsUpdates([detection_fn, registration_fn], [has_detection, pose_estimate])
     #dist = bayesEvidence(dist, detection_fn, has_detection) # projects out b and computes joint
@@ -301,10 +294,10 @@ def test_observation(world, entity_name, n=100):
     remove_all_debug()
     with LockRenderer():
         handles = []
-        for index in dist.support():
+        for pose in dist.support():
             # TODO: draw weights using color, length, or thickness
-            color = GREEN if index == dist.mode() else RED
-            handles.extend(poses[index].draw(color=color, width=1))
+            color = GREEN if pose == dist.mode() else RED
+            handles.extend(pose.draw(color=color, width=1))
     wait_for_user()
     remove_all_debug()
 
@@ -313,10 +306,9 @@ def test_observation(world, entity_name, n=100):
         #surface_particles = samples_from_surface[surface_name]
         #print(surface_name, compute_normalization(surface_particles) / norm_constant)
         surface_indices = samples_from_surface[surface_name] & set(dist.support())
-        surface_particles = [Particle(poses[index], dist.prob(index)) for index in surface_indices]
-        density = compute_density(surface_particles)
+        density = compute_density(dist, poses)
         predictions = list(islice(density_generator(
             world, entity_name, surface_name, density), n))
         wait_for_user()
 
-    return particles
+    return poses
