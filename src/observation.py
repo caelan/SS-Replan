@@ -20,7 +20,8 @@ from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator, get_aabb_area
+    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator, \
+    get_aabb_area, spaced_colors, WorldSaver, unit_pose
 from src.stream import get_stable_gen, test_supported, RelPose, compute_surface_aabb, Z_EPSILON
 from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_surface_attachment
 from src.database import get_surface_reference_pose
@@ -126,7 +127,6 @@ class PoseDist(object):
         if density is None:
             return None
         body = self.world.get_body(self.name)
-        handles = []
         while True:
             [sample] = density.sample(n_samples=1)
             # [score] = density.score_samples([sample])
@@ -135,7 +135,6 @@ class PoseDist(object):
             pose.assign()
             # TODO: additional obstacles
             if test_supported(self.world, body, surface):
-                handles.extend(pose.draw(color=RED))
                 return pose # TODO: return score?
     def sample_pose(self):
         surface = self.surface_dist.draw()
@@ -150,7 +149,7 @@ class PoseDist(object):
         poses = self.dist.support()
         # TODO: do these updates simultaneously for each object
         detectable_poses = compute_detectable(poses, observation.camera_pose)
-        visible_poses = compute_visible(poses, observation.camera_pose)
+        visible_poses = compute_visible(poses, observation.camera_pose, draw=False)
         if verbose:
             print('Total: {} | Detectable: {} | Visible: {}'.format(
                 len(poses), len(detectable_poses), len(visible_poses)))
@@ -179,12 +178,14 @@ class PoseDist(object):
             poses = [self.sample_pose() for _ in range(n)]
         new_dist = UniformDist(poses)
         return self.__class__(self.world, self.name, new_dist)
-    def draw(self):
+    def dump(self):
+        print(self.name, self.dist)
+    def draw(self, **kwargs):
         handles = []
         for pose in self.dist.support():
             # TODO: draw weights using color, length, or thickness
-            color = GREEN if pose == self.dist.mode() else RED
-            handles.extend(pose.draw(color=color, width=1))
+            #color = GREEN if pose == self.dist.mode() else RED
+            handles.extend(pose.draw(**kwargs))
         return handles
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.name, self.surface_dist)
@@ -194,13 +195,27 @@ class BeliefState(object):
         self.world = world
         self.pose_dists = pose_dists
         self.holding = holding
+        names = sorted(self.pose_dists)
+        self.color_from_name = dict(zip(names, spaced_colors(len(names))))
         # TODO: belief fluents
-
     def update(self, observation):
-        for pose_dist in self.pose_dists:
-            pose_dist.update(observation)
+        # Processing detected first
+        order = [name for name in observation.detections]
+        order.extend(set(self.pose_dists) - set(order))
+        self.pose_dists = {name: self.pose_dists[name].update(observation)
+                           for name in order}
+        return self
+    def dump(self):
+        print(self)
+        for i, name in enumerate(sorted(self.pose_dists)):
+            #self.pose_dists[name].dump()
+            print(i, name, self.pose_dists[name])
+    def draw(self, **kwargs):
+        with LockRenderer():
+            for name, pose_dist in self.pose_dists.items():
+                pose_dist.draw(color=self.color_from_name[name], **kwargs)
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__)
+        return '{}({})'.format(self.__class__.__name__, sorted(self.pose_dists))
 
 ################################################################################
 
@@ -217,22 +232,17 @@ def are_visible(world, camera_pose):
     return {name for name, result in zip(ray_names, ray_results)
             if result.objectUniqueId == world.get_body(name)}
 
-def create_belief(world, entity_name, surface_dist, n=NUM_PARTICLES):
+def create_surface_belief(world, entity_name, surface_dist, n=NUM_PARTICLES):
     placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
-    handles = []
-    placements = []
-    with BodySaver(world.get_body(entity_name)):
-        while len(placements) < n:
-            surface_name = surface_dist.draw()
-            #print(len(particles), surface_name)
-            rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
-            if rel_pose is None:
-                continue
-            placements.append(rel_pose)
-            #pose.assign()
-            #wait_for_user()
-            handles.extend(rel_pose.draw(color=RED))
-    dist = UniformDist(placements)
+    poses = []
+    with LockRenderer():
+        with BodySaver(world.get_body(entity_name)):
+            while len(poses) < n:
+                surface_name = surface_dist.draw()
+                rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
+                if rel_pose is not None:
+                    poses.append(rel_pose)
+    dist = UniformDist(poses)
     return PoseDist(world, entity_name, dist)
 
 ################################################################################
@@ -323,7 +333,7 @@ def get_registration_fn(poses, visible, pos_std=POSITION_STD):
         # P(obs point | state detect)
         if detection:
             # TODO: proportional weight in the event that no normalization
-            world_pose = poses[pose].get_world_from_body()
+            world_pose = pose.get_world_from_body()
             x, y, _ = point_from_pose(world_pose)
             return ProductDistribution([
                 GaussianDistribution(gmean=x, stdev=pos_std),
@@ -339,6 +349,7 @@ def get_registration_fn(poses, visible, pos_std=POSITION_STD):
 ################################################################################
 
 def test_observation(world, entity_name, n=NUM_PARTICLES):
+    saver = WorldSaver()
     [camera_name] = list(world.cameras)
     camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
     camera_pose = get_pose(camera_body)
@@ -349,27 +360,33 @@ def test_observation(world, entity_name, n=NUM_PARTICLES):
                      for surface in surfaces}
     print('Areas:', surface_areas)
     surface_dist = DDist(surface_areas)
+    #surface_dist = UniformDist(surfaces)
     print(surface_dist)
 
-    #surface_dist = UniformDist(surfaces)
-    with LockRenderer():
-        pose_dist = create_belief(world, entity_name, surface_dist)
-    #pose = random.choice(particles).sample
-    # np.random.choice(elements, size=10, replace=True, p=probabilities)
-    # random.choice(elements, k=10, weights=probabilities)
-    #pose.assign()
+    # TODO: sample states of the world
 
-    print(pose_dist)
+    belief = BeliefState(world, pose_dists={
+        name: create_surface_belief(world, name, surface_dist) for name in world.movable})
+    belief.dump()
+    belief.draw()
+    saver.restore()
+    #for name in world.movable:
+    #    set_pose(world.get_body(name), unit_pose())
+    wait_for_user()
+    remove_all_debug()
+
+    saver.restore()
     observation = observe_scene(world, camera_pose)
-    pose_dist = pose_dist.update(observation)
-    print(pose_dist)
+    belief = belief.update(observation)
 
-    remove_all_debug()
-    with LockRenderer():
-        pose_dist.draw()
+    belief.dump()
+    belief.draw()
+    saver.restore()
+    #for name in world.movable:
+    #    set_pose(world.get_body(name), unit_pose())
     wait_for_user()
     remove_all_debug()
 
-    pose_dist.resample(n=n)
-    wait_for_user()
-    return pose_dist
+    #pose_dist.resample(n=n)
+    #wait_for_user()
+    #return pose_dist

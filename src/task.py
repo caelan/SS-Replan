@@ -84,13 +84,13 @@ def open_all_doors(world):
 def detect_block(world, **kwargs):
     entity_name = add_block(world, idx=0)
     obstruction_name = add_box(world, idx=0)
-    other_name = add_box(world, idx=1)
+    #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:
         add_kinect(world, side)
     #initial_surface = 'indigo_tmp' # indigo_tmp | indigo_drawer_top
     #sample_placement(world, entity_name, initial_surface, learned=True)
-    sample_placement(world, other_name, 'hitman_tmp', learned=True)
+    #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     return Task(world, movable_base=True,
                 return_init_bq=True, # return_init_aq=False,
