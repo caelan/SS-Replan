@@ -6,12 +6,12 @@ import math
 import time
 
 from collections import namedtuple
-
+from scipy.stats import norm, truncnorm
 from sklearn.neighbors import KernelDensity
 
 #from pddlstream.utils import str_from_object
 from examples.discrete_belief.dist import UniformDist, DDist, GaussianDistribution, \
-    ProductDistribution, CUniformDist, DeltaDist, mixDDists
+    ProductDistribution, CUniformDist, DeltaDist, mixDDists, Distribution
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask
 
@@ -20,8 +20,7 @@ from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, get_aabb_area, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, \
-    randomize, draw_circle
+    pairwise_collision, elapsed_time, randomize, draw_circle, wrap_angle, circular_difference
 from src.stream import get_stable_gen, test_supported, Z_EPSILON
 from src.utils import compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose
 from src.database import get_surface_reference_pose
@@ -74,8 +73,8 @@ class PoseDist(object):
     def surface_prob(self, surface):
         return self.surface_dist.prob(surface)
     def point_from_pose(self, pose):
-        #return point_from_pose(pose.get_world_from_body())[:2]
-        return point_from_pose(pose.get_reference_from_body())[:2]
+        #return base_values_from_pose(pose.get_world_from_body())[:2]
+        return base_values_from_pose(pose.get_reference_from_body())[:2]
     def get_density(self, surface):
         if surface in self.density_from_surface:
             return self.density_from_surface[surface]
@@ -184,6 +183,7 @@ class PoseDist(object):
         # obs_fn = get_observation_fn(surface)
         #wait_for_user()
 
+        # TODO: could use an UKF to propagate a GMM
         new_dist = cfree_dist.copy()
         # cfree_dist.obsUpdate(detection_fn, has_detection)
         new_dist.obsUpdates([
@@ -355,15 +355,14 @@ class Observation(object):
         return '{}({})'.format(self.__class__.__name__, sorted(self.detections))
 
 def observe_scene(world, camera_pose):
-    # TODO: could use an UKF to propagate a GMM
     visible_entities = are_visible(world, camera_pose)
     detections = {}
     # TODO: randomize robot's pose
-    # TODO: false positives
     # TODO: probabilities based on whether in viewcone or not
     # TODO: sample from poses on table
     assert P_FALSE_POSITIVE == 0
     for name in visible_entities:
+        # TODO: false positives
         if random.random() < P_FALSE_NEGATIVE:
             continue
         body = world.get_body(name)
@@ -392,6 +391,27 @@ def observe_scene(world, camera_pose):
 
 # The two observations mimic how the examples are generated
 
+class SE2Distribution(Distribution):
+    def __init__(self, x=0., y=0., yaw=0.,
+                 pos_std=1., ori_std=1.):
+        self.x = x
+        self.y = y
+        self.yaw = wrap_angle(yaw)
+        self.pos_std = pos_std
+        self.ori_std = ori_std
+    def prob(self, sample):
+        x, y, yaw = sample
+        dx = x - self.x
+        dy = y - self.y
+        dyaw = circular_difference(yaw, self.yaw)
+        return norm.pdf(dx, scale=self.pos_std) * \
+               norm.pdf(dy, scale=self.pos_std) * \
+               truncnorm.pdf(dyaw, a=-np.pi, b=np.pi, scale=self.ori_std)
+    def __repr__(self):
+        return 'N({}, {})'.format(np.array([self.x, self.y, self.yaw]).round(3),
+                                  np.array([self.pos_std, self.pos_std, self.ori_std]).round(3)) # Square?
+
+
 def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
 
     def fn(pose):
@@ -402,7 +422,7 @@ def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
         return DDist({True: p_fp, False: 1 - p_fp})
     return fn
 
-def get_registration_fn(visible, pos_std=POSITION_STD):
+def get_registration_fn(visible):
     # TODO: clip probabilities so doesn't become zero
     # TODO: nearby objects that might cause miss detections
 
@@ -412,13 +432,12 @@ def get_registration_fn(visible, pos_std=POSITION_STD):
         if detection:
             # TODO: proportional weight in the event that no normalization
             x, y, yaw = base_values_from_pose(pose.get_reference_from_body())
-            #circular_difference
-            return ProductDistribution([
-                GaussianDistribution(gmean=x, stdev=pos_std),
-                GaussianDistribution(gmean=y, stdev=pos_std),
-                #GaussianDistribution(gmean=yaw, stdev=pos_std), # TODO: truncated Gaussian
-                CUniformDist(-np.pi, +np.pi),
-            ])
+            return SE2Distribution(x, y, yaw, pos_std=POSITION_STD, ori_std=ORIENTATION_STD)
+            #return ProductDistribution([
+            #    GaussianDistribution(gmean=x, stdev=pos_std),
+            #    GaussianDistribution(gmean=y, stdev=pos_std),
+            #    CUniformDist(-np.pi, +np.pi),
+            #])
             # Could also mix with uniform over the space
             #if not visible[index]: uniform over the space
         return DeltaDist(None)
