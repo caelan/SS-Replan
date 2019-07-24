@@ -88,6 +88,7 @@ def get_compute_detect(world, **kwargs):
             return None
         ray = Ray(camera_point, obj_point)
         detect = Detect(world, camera_name, obj_name, pose, [ray])
+        # TODO: how should doors be handled?
         if obstacles & detect.compute_occluding():
             return None
         #detect.draw()
