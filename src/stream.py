@@ -254,7 +254,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 body_pose_world = ([x+dx, y+dy, z+z_offset], quat)
                 # TODO: project onto the surface
             else:
-                # TODO: halton seqeunce
+                # TODO: halton sequence
                 # unit_generator(d, use_halton=True)
                 body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
             if body_pose_world is None:
