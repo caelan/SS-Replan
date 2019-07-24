@@ -22,7 +22,7 @@ from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator, \
-    get_aabb_area, spaced_colors, WorldSaver, unit_pose, pairwise_collision, elapsed_time
+    get_aabb_area, spaced_colors, WorldSaver, unit_pose, pairwise_collision, elapsed_time, randomize, draw_circle
 from src.stream import get_stable_gen, test_supported, RelPose, compute_surface_aabb, Z_EPSILON
 from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_surface_attachment
 from src.database import get_surface_reference_pose
@@ -33,6 +33,8 @@ P_FALSE_NEGATIVE = 0.01
 POSITION_STD = 0.01
 ORIENTATION_STD = np.pi / 8
 NUM_PARTICLES = 100
+
+NEARBY_RADIUS = 5e-2
 
 # TODO: symbol for elsewhere pose
 # TODO: prior on the number of false detections to ensure correlated
@@ -55,6 +57,8 @@ NUM_PARTICLES = 100
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
+
+Neighborhood = namedtuple('Neighborhood', ['poses', 'prob'])
 
 class PoseDist(object):
     def __init__(self, world, name, dist, std=0.01):
@@ -84,12 +88,9 @@ class PoseDist(object):
         # https://scikit-learn.org/stable/modules/density.html
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html#scipy.stats.gaussian_kde
         # https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.DistanceMetric.html#sklearn.neighbors.DistanceMetric
-        # KernelDensity kernel
-        # ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
-        # KDTree.valid_metrics
-        # ['chebyshev', 'euclidean', 'cityblock', 'manhattan', 'infinity', 'minkowski', 'p', 'l2', 'l1']
-        # BallTree.valid_metrics
-        # ['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
+        # KernelDensity kernel: ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
+        # KDTree.valid_metrics: ['chebyshev', 'euclidean', 'cityblock', 'manhattan', 'infinity', 'minkowski', 'p', 'l2', 'l1']
+        # BallTree.valid_metrics: ['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
         # 'braycurtis', 'russellrao', 'cityblock', 'manhattan', 'infinity', 'jaccard', 'seuclidean', 'sokalsneath',
         # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
         density = KernelDensity(bandwidth=self.std, algorithm='auto',
@@ -98,15 +99,34 @@ class PoseDist(object):
                                 metric_params={'p': 2, 'w': np.ones(2)})
         density.fit(X=points, sample_weight=1 * np.array(weights)) # Scaling doesn't seem to affect
         #print(weights)
-        #scores = density.score_samples(points)
-        #probabilities = np.exp(-scores)
-        #print(probabilities)
+        scores = density.score_samples(points)
+        probabilities = np.exp(-scores)
+        #print('Individual:', probabilities)
         #print(np.sum(probabilities))
+        total_score = density.score(points)
+        total_probability = np.exp(-total_score)
+        #print('Total:', total_probability) # total log probability density
+        #print(total_probability)
         # TODO: integrate to obtain a probability mass
         # from scipy.stats.kde import gaussian_kde
         # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
         self.density_from_surface[surface] = density
         return density
+    def get_nearby(self, target_pose, radius=NEARBY_RADIUS):
+        # TODO: could instead use the probability density
+        target_point = np.array(point_from_pose(target_pose.get_reference_from_body()))
+        draw_circle(target_point, radius, parent=target_pose.reference_body,
+                    parent_link=target_pose.reference_link)
+        poses = set()
+        for pose in self.dist.support():
+            if target_pose.support != pose.support:
+                continue
+            point = point_from_pose(pose.get_reference_from_body())
+            delta = target_point - point
+            if np.linalg.norm(delta[:2]) < radius:
+                poses.add(pose)
+        prob = sum(map(self.dist.prob, poses))
+        return Neighborhood(poses, prob)
     def pose_from_point(self, sample, surface):
         #assert surface in self.poses_from_surface
         #reference_pose = self.poses_from_surface[surface][0]
@@ -129,16 +149,17 @@ class PoseDist(object):
         body = self.world.get_body(self.name)
         while True:
             [sample] = density.sample(n_samples=1)
-            # [score] = density.score_samples([sample])
-            # prob = np.exp(-score)
+            [score] = density.score_samples([sample])
+            prob = np.exp(-score) # TODO: return prob?
             pose = self.pose_from_point(sample, surface)
             pose.assign()
             # TODO: additional obstacles
             if test_supported(self.world, body, surface):
-                return pose # TODO: return score?
-    def sample_pose(self):
-        surface = self.surface_dist.sample()
-        return self.sample_surface_pose(surface)
+                return pose
+    def sample(self):
+        return self.sample_surface_pose(self.surface_dist.sample())
+    def sample_support(self):
+        return self.dist.sample()
     def update_dist(self, observation, obstacles=[], verbose=False):
         # TODO: include collisions with obstacles
         has_detection = self.name in observation.detections
@@ -197,7 +218,7 @@ class PoseDist(object):
         if len(self.dist.support()) <= 1:
             return self
         with LockRenderer():
-            poses = [self.sample_pose() for _ in range(n)]
+            poses = [self.sample() for _ in range(n)]
         new_dist = UniformDist(poses)
         return self.__class__(self.world, self.name, new_dist)
     def dump(self):
@@ -237,8 +258,8 @@ class BeliefState(object):
     def sample(self):
         while True:
             poses = {}
-            for name, pose_dist in self.pose_dists.items():
-                pose = pose_dist.sample_pose()
+            for name, pose_dist in randomize(self.pose_dists.items()):
+                pose = pose_dist.sample()
                 pose.assign()
                 if any(pairwise_collision(self.world.get_body(name),
                                           self.world.get_body(other)) for other in poses):
@@ -440,10 +461,19 @@ def test_observation(world, entity_name, n=NUM_PARTICLES):
     belief.dump()
     belief.draw()
     saver.restore()
+    wait_for_user()
 
-    #for _ in range(10):
-    #    belief.sample()
-    #    wait_for_user()
+    for i in range(10):
+        name = entity_name
+        remove_all_debug()
+        pose_dist = belief.pose_dists[name]
+        target_pose = pose_dist.sample()
+        poses, prob = pose_dist.get_nearby(target_pose)
+        print('{}) {}, n={}, p={:.3f}'.format(i, name, len(poses), prob))
+        for pose in poses:
+            pose.draw(color=belief.color_from_name[name])
+        #belief.sample()
+        wait_for_user()
     #for name in world.movable:
     #    set_pose(world.get_body(name), unit_pose())
     wait_for_user()
