@@ -19,8 +19,8 @@ from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator
-from src.stream import get_stable_gen, test_supported, RelPose
+    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator, get_aabb_area
+from src.stream import get_stable_gen, test_supported, RelPose, compute_surface_aabb
 from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX
 
 P_FALSE_POSITIVE = 0.0
@@ -52,15 +52,76 @@ ORIENTATION_STD = np.pi / 8
 # TODO: symbol for elsewhere pose
 
 class PoseDist(object):
-    def __init__(self, world, name, dist):
+    def __init__(self, world, name, dist, std=0.01):
         self.world = world
         self.name = name
         self.dist = dist
-    def poses_from_surface(self):
-        poses_from_surface = {}
+        self.poses_from_surface = {}
         for pose in self.dist.support():
-            poses_from_surface.setdefault(pose.support, set()).add(pose)
-        return poses_from_surface
+            self.poses_from_surface.setdefault(pose.support, set()).add(pose)
+        self.surface_dist = self.dist.project(lambda p: p.support)
+        self.density_from_surface = {}
+        self.std = std
+    def surface_prob(self, surface):
+        return self.surface_dist.prob(surface)
+    def point_from_pose(self, pose):
+        return point_from_pose(pose.get_world_from_body())[:2]
+    def get_density(self, surface):
+        if surface in self.density_from_surface:
+            return self.density_from_surface[surface]
+        poses = [pose for pose in self.dist.support()] # if 0 < self.dist.prob(pose)]
+        if not poses:
+            return None
+        points, weights = zip(*[(self.point_from_pose(pose), self.dist.prob(pose)) for pose in poses])
+        # from sklearn.mixture import GaussianMixture
+        # pip2 install -U --no-deps scikit-learn=0.20
+        # https://scikit-learn.org/stable/modules/density.html
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html#scipy.stats.gaussian_kde
+        # https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.DistanceMetric.html#sklearn.neighbors.DistanceMetric
+        # KernelDensity kernel
+        # ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
+        # KDTree.valid_metrics
+        # ['chebyshev', 'euclidean', 'cityblock', 'manhattan', 'infinity', 'minkowski', 'p', 'l2', 'l1']
+        # BallTree.valid_metrics
+        # ['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
+        # 'braycurtis', 'russellrao', 'cityblock', 'manhattan', 'infinity', 'jaccard', 'seuclidean', 'sokalsneath',
+        # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
+
+        density = KernelDensity(bandwidth=self.std, algorithm='auto',
+                                kernel='gaussian', metric="wminkowski", atol=0, rtol=0,
+                                breadth_first=True, leaf_size=40, metric_params={'p': 2, 'w': np.ones(2)})
+        density.fit(X=points, sample_weight=1 * np.array(weights))  # Scaling doesn't seem to affect
+        # print(weights)
+        #scores = density.score_samples(points)
+        #probabilities = np.exp(-scores)
+        # print(probabilities)
+        # print(np.sum(probabilities))
+
+        # from scipy.stats.kde import gaussian_kde
+        # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
+        self.density_from_surface[surface] = density
+        return density
+    def surface_generator(self, surface):
+        density = self.get_density(surface)
+        if density is None:
+            return
+        entity_body = self.world.get_body(self.name)
+        surface_aabb = compute_surface_aabb(self.world, surface)
+        z = stable_z_on_aabb(entity_body, surface_aabb)
+        handles = []
+        while True:
+            [sample] = density.sample(n_samples=1)
+            # [score] = density.score_samples([sample])
+            # prob = np.exp(-score)
+            x, y = sample
+            point = Point(x, y, z)
+            theta = np.random.uniform(*CIRCULAR_LIMITS)
+            pose = Pose(point, Euler(yaw=theta))
+            set_pose(entity_body, pose)
+            # TODO: additional obstacles
+            if test_supported(self.world, entity_body, surface):
+                handles.extend(draw_point(point, color=RED))
+                yield pose # TODO: return score?
     def update(self, observation):
         has_detection = self.name in observation.detections
         pose_estimate = None
@@ -90,7 +151,9 @@ class PoseDist(object):
         print('Posterior:', new_dist)
         return self.__class__(self.world, self.name, new_dist)
     def resample(self):
-        pass
+        if len(self.dist.support()) <= 1:
+            return self
+        return self
     def draw(self):
         handles = []
         for pose in self.dist.support():
@@ -98,6 +161,8 @@ class PoseDist(object):
             color = GREEN if pose == self.dist.mode() else RED
             handles.extend(pose.draw(color=color, width=1))
         return handles
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__, self.name, self.surface_dist)
 
 class BeliefState(object):
     def __init__(self, world, pose_dists={}, holding=None):
@@ -173,56 +238,6 @@ def compute_visible(placements, camera_pose, draw=True):
 
 ################################################################################
 
-def compute_density(dist, poses, std=0.01):
-    points, weights = zip(*{point_from_pose(pose.get_world_from_body())[:2]: dist.prob(pose)
-                            for pose in poses if 0 < dist.prob(pose)}.items())
-    # from sklearn.mixture import GaussianMixture
-    # pip2 install -U --no-deps scikit-learn=0.20
-
-    # TODO: compute area of each surface and use to estimate the total area and the samples to cover the space
-
-    # https://scikit-learn.org/stable/modules/density.html
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html#scipy.stats.gaussian_kde
-    # https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.DistanceMetric.html#sklearn.neighbors.DistanceMetric
-    #KernelDensity kernel
-    # ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
-    #KDTree.valid_metrics
-    #['chebyshev', 'euclidean', 'cityblock', 'manhattan', 'infinity', 'minkowski', 'p', 'l2', 'l1']
-    #BallTree.valid_metrics
-    #['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
-    # 'braycurtis', 'russellrao', 'cityblock', 'manhattan', 'infinity', 'jaccard', 'seuclidean', 'sokalsneath',
-    # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
-
-    density = KernelDensity(bandwidth=std, algorithm='auto',
-                            kernel='gaussian', metric="wminkowski", atol=0, rtol=0,
-                            breadth_first=True, leaf_size=40, metric_params={'p': 2, 'w': np.ones(2)})
-    density.fit(X=points, sample_weight=weights)
-    # from scipy.stats.kde import gaussian_kde
-    # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
-    return density
-
-def density_generator(world, entity_name, surface_name, density):
-    entity_body = world.get_body(entity_name)
-    surface_aabb = compute_surface_aabb(world, surface_name)
-    z = stable_z_on_aabb(entity_body, surface_aabb)
-
-    handles = []
-    while True:
-        [sample] = density.sample(n_samples=1)
-        #[score] = density.score_samples([sample])
-        #prob = np.exp(-score)
-        x, y = sample
-        point = Point(x, y, z)
-        theta = np.random.uniform(*CIRCULAR_LIMITS)
-        pose = Pose(point, Euler(yaw=theta))
-        set_pose(entity_body, pose)
-        # TODO: additional obstacles
-        if test_supported(world, entity_body, surface_name):
-            handles.extend(draw_point(point, color=RED))
-            yield pose
-
-################################################################################
-
 class Observation(object):
     def __init__(self, camera_pose, detections):
         # TODO: camera name?
@@ -276,6 +291,7 @@ def get_registration_fn(poses, visible, pos_std=POSITION_STD):
     # TODO: nearby objects that might cause misdetections
 
     def fn(pose, detection):
+        # TODO: compare the surface for the detection
         # P(obs point | state detect)
         if detection:
             # TODO: proportional weight in the event that no normalization
@@ -298,7 +314,16 @@ def test_observation(world, entity_name, n=100):
     [camera_name] = list(world.cameras)
     camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
     camera_pose = get_pose(camera_body)
-    surface_dist = UniformDist(OPEN_SURFACES[1:2])
+
+    # TODO: estimate the fraction of the surface that is actually usable
+    surfaces = ['indigo_tmp', 'range']
+    surface_areas = {surface: get_aabb_area(compute_surface_aabb(world, surface))
+                     for surface in surfaces}
+    print('Areas:', surface_areas)
+    surface_dist = DDist(surface_areas)
+    print(surface_dist)
+
+    #surface_dist = UniformDist(surfaces)
     with LockRenderer():
         pose_dist = create_belief(world, entity_name, surface_dist)
     #pose = random.choice(particles).sample
@@ -309,8 +334,10 @@ def test_observation(world, entity_name, n=100):
     # TODO: really want a piecewise distribution or something
     # The two observations do mimic how the examples are generated though
 
+    print(pose_dist)
     observation = observe_scene(world, camera_pose)
     pose_dist = pose_dist.update(observation)
+    print(pose_dist)
 
     remove_all_debug()
     with LockRenderer():
@@ -318,14 +345,8 @@ def test_observation(world, entity_name, n=100):
     wait_for_user()
     remove_all_debug()
 
-    samples_from_surface = pose_dist.poses_from_surface()
-    for surface_name in samples_from_surface:
-        #surface_particles = samples_from_surface[surface_name]
-        #print(surface_name, compute_normalization(surface_particles) / norm_constant)
-        surface_poses = samples_from_surface[surface_name] & set(pose_dist.dist.support())
-        density = compute_density(pose_dist.dist, surface_poses)
-        predictions = list(islice(density_generator(
-            world, entity_name, surface_name, density), n))
+    for surface_name, poses in pose_dist.poses_from_surface.items():
+        predictions = list(islice(pose_dist.surface_generator(surface_name), n))
         wait_for_user()
 
     return pose_dist
