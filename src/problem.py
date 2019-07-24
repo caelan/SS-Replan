@@ -10,7 +10,8 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
     WorldSaver
 
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, create_surface_attachment
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, \
+    create_surface_attachment, create_relative_pose
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -223,9 +224,7 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
             ]
             continue
             #raise RuntimeError(obj_name, supporting)
-        attachment = create_surface_attachment(world, obj_name, surface_name)
-        rel_pose = RelPose(body, reference_body=attachment.parent, reference_link=attachment.parent_link,
-                           confs=[attachment], support=surface_name, init=True)
+        rel_pose = create_relative_pose(world, obj_name, surface_name, init=True)
         surface_pose = surface_poses[surface_name]
         world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
         init += [

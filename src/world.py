@@ -289,29 +289,37 @@ class World(object):
         set_pose(body, pose)
         step_simulation()
         return name
+    def fix_pose(self, name, pose=None):
+        body = self.get_body(name)
+        if pose is None:
+            pose = get_pose(body)
+        # TODO: can also drop in simulation
+        x, y, z = point_from_pose(pose)
+        roll, pitch, yaw = euler_from_quat(quat_from_pose(pose))
+        quat = quat_from_euler(Euler(yaw=yaw))
+        set_quat(body, quat)
+        surface_name = self.get_supporting(name)
+        if surface_name is None:
+            return None
+        surface_aabb = compute_surface_aabb(self, surface_name)
+        new_z = stable_z_on_aabb(body, surface_aabb)
+        point = Point(x, y, new_z)
+        set_point(body, point)
+        print('{}: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
+            name, roll, pitch, new_z - z))
+        return (point, quat)
     def fix_geometry(self):
         for name in self.movable:
-            body = self.get_body(name)
-            pose = get_pose(body)
-            # TODO: can also drop in simulation
-            x, y, z = point_from_pose(pose)
-            roll, pitch, yaw = euler_from_quat(quat_from_pose(pose))
-            set_quat(body, quat_from_euler(Euler(yaw=yaw)))
-            surface_name = self.get_supporting(name)
-            if surface_name is None:
-                continue
-            surface_aabb = compute_surface_aabb(self, surface_name)
-            new_z = stable_z_on_aabb(body, surface_aabb)
-            set_point(body, Point(x, y, new_z))
-            print('{}: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
-                name, roll, pitch, new_z - z))
+            fixed_pose = self.fix_pose(name)
+            if fixed_pose is not None:
+                set_pose(self.get_body(name), fixed_pose)
     def get_supporting(self, obj_name):
         # is_placed_on_aabb | is_center_on_aabb
         # Only want to generate stable placements, but can operate on initially unstable ones
         body = self.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
             body, compute_surface_aabb(self, surface),
-            above_epsilon=1e-2, below_epsilon=5e-2)]
+            above_epsilon=5e-2, below_epsilon=5e-2)]
         if len(supporting) != 1:
             print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
             return None

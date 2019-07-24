@@ -304,6 +304,12 @@ def create_surface_attachment(world, obj_name, surface_name):
     surface_link = link_from_name(world.kitchen, surface.link)
     return create_attachment(world.kitchen, surface_link, body)
 
+def create_relative_pose(world, name, surface, **kwargs):
+    attachment = create_surface_attachment(world, name, surface)
+    return RelPose(attachment.child, reference_body=attachment.parent,
+                   reference_link=attachment.parent_link, support=surface,
+                   confs=[attachment], **kwargs)
+
 class RelPose(object):
 #class RelPose(Pose):
     def __init__(self, body, #link=BASE_LINK,

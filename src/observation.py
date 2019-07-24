@@ -6,7 +6,6 @@ import math
 import time
 
 from collections import namedtuple
-from itertools import islice
 
 from sklearn.neighbors import KernelDensity
 
@@ -18,25 +17,25 @@ from examples.discrete_belief.dist import UniformDist, DDist, GaussianDistributi
 
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.pr2_utils import is_visible_point
-from pybullet_tools.pr2_primitives import Pose as WorldPose
-from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
+from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator, \
-    get_aabb_area, spaced_colors, WorldSaver, unit_pose, pairwise_collision, elapsed_time, randomize, draw_circle
-from src.stream import get_stable_gen, test_supported, RelPose, compute_surface_aabb, Z_EPSILON
-from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_surface_attachment
+    LockRenderer, multiply, remove_all_debug, base_values_from_pose, get_aabb_area, spaced_colors, WorldSaver, \
+    pairwise_collision, elapsed_time, \
+    randomize, draw_circle
+from src.stream import get_stable_gen, test_supported, Z_EPSILON
+from src.utils import compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose
 from src.database import get_surface_reference_pose
 
 P_FALSE_POSITIVE = 0.0
-#P_FALSE_NEGATIVE = 0.0 # 0.1
+#P_FALSE_NEGATIVE = 0.0
 P_FALSE_NEGATIVE = 0.01
 POSITION_STD = 0.01
 ORIENTATION_STD = np.pi / 8
 NUM_PARTICLES = 100
-
 NEARBY_RADIUS = 5e-2
 
-# TODO: symbol for elsewhere pose
+ELSEWHERE = None # symbol for elsewhere pose
+
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
 # TODO: use a proper probabilistic programming library rather than dist.py
@@ -59,6 +58,7 @@ NEARBY_RADIUS = 5e-2
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
 
 Neighborhood = namedtuple('Neighborhood', ['poses', 'prob'])
+
 
 class PoseDist(object):
     def __init__(self, world, name, dist, std=0.01):
@@ -99,12 +99,12 @@ class PoseDist(object):
                                 metric_params={'p': 2, 'w': np.ones(2)})
         density.fit(X=points, sample_weight=1 * np.array(weights)) # Scaling doesn't seem to affect
         #print(weights)
-        scores = density.score_samples(points)
-        probabilities = np.exp(-scores)
+        #scores = density.score_samples(points)
+        #probabilities = np.exp(-scores)
         #print('Individual:', probabilities)
         #print(np.sum(probabilities))
-        total_score = density.score(points)
-        total_probability = np.exp(-total_score)
+        #total_score = density.score(points)
+        #total_probability = np.exp(-total_score)
         #print('Total:', total_probability) # total log probability density
         #print(total_probability)
         # TODO: integrate to obtain a probability mass
@@ -139,9 +139,7 @@ class PoseDist(object):
         theta = np.random.uniform(*CIRCULAR_LIMITS)
         surface_from_body = Pose(point, Euler(yaw=theta))
         set_pose(body, multiply(world_from_surface, surface_from_body))
-        attachment = create_surface_attachment(self.world, self.name, surface)
-        return RelPose(attachment.child, reference_body=attachment.parent,
-                       reference_link=attachment.parent_link, support=surface, confs=[attachment])
+        return create_relative_pose(self.world, self.name, surface)
     def sample_surface_pose(self, surface): # TODO: timeout
         density = self.get_density(surface)
         if density is None:
@@ -163,11 +161,12 @@ class PoseDist(object):
     def update_dist(self, observation, obstacles=[], verbose=False):
         # TODO: include collisions with obstacles
         has_detection = self.name in observation.detections
-        pose_estimate = None
+        pose_estimate_2d = None
         if has_detection:
-            pose_estimate = base_values_from_pose(observation.detections[self.name][0])
+            [detected_pose] = observation.detections[self.name]
+            pose_estimate_2d = base_values_from_pose(detected_pose.get_reference_from_body())
         if verbose:
-            print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
+            print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate_2d))
         # cfree_dist.conditionOnVar(index=1, has_detection=True)
         body = self.world.get_body(self.name)
         all_poses = self.dist.support()
@@ -190,7 +189,7 @@ class PoseDist(object):
         new_dist.obsUpdates([
             get_detection_fn(visible_poses),
             get_registration_fn(visible_poses),
-        ], [has_detection, pose_estimate])
+        ], [has_detection, pose_estimate_2d])
         # cfree_dist = bayesEvidence(cfree_dist, detection_fn, has_detection) # projects out b and computes joint
         # joint_dist = JDist(cfree_dist, detection_fn, registration_fn)
         return new_dist
@@ -307,8 +306,7 @@ def create_surface_belief(world, entity_name, surface_dist, n=NUM_PARTICLES):
                 rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
                 if rel_pose is not None:
                     poses.append(rel_pose)
-    dist = UniformDist(poses)
-    return PoseDist(world, entity_name, dist)
+    return PoseDist(world, entity_name, UniformDist(poses))
 
 ################################################################################
 
@@ -365,10 +363,10 @@ def observe_scene(world, camera_pose):
     # TODO: probabilities based on whether in viewcone or not
     # TODO: sample from poses on table
     assert P_FALSE_POSITIVE == 0
-    for visible_name in visible_entities:
+    for name in visible_entities:
         if random.random() < P_FALSE_NEGATIVE:
             continue
-        body = world.get_body(visible_name)
+        body = world.get_body(name)
         pose = get_pose(body)
         dx, dy = np.random.multivariate_normal(
             mean=np.zeros(2), cov=math.pow(POSITION_STD, 2)*np.eye(2))
@@ -376,9 +374,14 @@ def observe_scene(world, camera_pose):
             mean=np.zeros(1), cov=math.pow(ORIENTATION_STD, 2)*np.eye(1))
         noise_pose = Pose(Point(x=dx, y=dy), Euler(yaw=dyaw))
         observed_pose = multiply(pose, noise_pose)
-        detections.setdefault(visible_name, []).append(observed_pose)
-        #wait_for_user()
-        #set_pose(body, observed_pose)
+        fixed_pose = world.fix_pose(name, observed_pose)
+        set_pose(body, fixed_pose)
+        support = world.get_supporting(name)
+        assert support is not None
+        relative_pose = create_relative_pose(world, name, support)
+        #rp.assign()
+        # Important to operate in relative pose land in case the drawer joint changes
+        detections.setdefault(name, []).append(relative_pose)
     return Observation(camera_pose, detections)
 
 ################################################################################
@@ -408,9 +411,8 @@ def get_registration_fn(visible, pos_std=POSITION_STD):
         # P(obs point | state detect)
         if detection:
             # TODO: proportional weight in the event that no normalization
-            # TODO: perform with respect to relative pose
-            world_pose = pose.get_world_from_body()
-            x, y, yaw = point_from_pose(world_pose)
+            x, y, yaw = base_values_from_pose(pose.get_reference_from_body())
+            #circular_difference
             return ProductDistribution([
                 GaussianDistribution(gmean=x, stdev=pos_std),
                 GaussianDistribution(gmean=y, stdev=pos_std),
@@ -419,13 +421,12 @@ def get_registration_fn(visible, pos_std=POSITION_STD):
             ])
             # Could also mix with uniform over the space
             #if not visible[index]: uniform over the space
-        else:
-            return DeltaDist(None)
+        return DeltaDist(None)
     return fn
 
 ################################################################################
 
-def test_observation(world, entity_name, n=NUM_PARTICLES):
+def test_observation(world, entity_name):
     saver = WorldSaver()
     [camera_name] = list(world.cameras)
     camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
@@ -439,8 +440,6 @@ def test_observation(world, entity_name, n=NUM_PARTICLES):
     surface_dist = DDist(surface_areas)
     #surface_dist = UniformDist(surfaces)
     print(surface_dist)
-
-    # TODO: sample states of the world
 
     belief = BeliefState(world, pose_dists={
         name: create_surface_belief(world, name, surface_dist) for name in world.movable})
@@ -463,6 +462,10 @@ def test_observation(world, entity_name, n=NUM_PARTICLES):
     saver.restore()
     wait_for_user()
 
+    #for i in range(10):
+    #    belief.sample()
+    #    wait_for_user()
+
     for i in range(10):
         name = entity_name
         remove_all_debug()
@@ -472,10 +475,8 @@ def test_observation(world, entity_name, n=NUM_PARTICLES):
         print('{}) {}, n={}, p={:.3f}'.format(i, name, len(poses), prob))
         for pose in poses:
             pose.draw(color=belief.color_from_name[name])
-        #belief.sample()
         wait_for_user()
-    #for name in world.movable:
-    #    set_pose(world.get_body(name), unit_pose())
+
     wait_for_user()
     remove_all_debug()
 

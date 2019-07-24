@@ -19,8 +19,8 @@ from src.database import load_placements, get_surface_reference_pose, load_place
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, \
-    CABINET_JOINTS, RelPose, FINGER_EXTENT, \
-    compute_surface_aabb, create_surface_attachment
+    CABINET_JOINTS, RelPose, FINGER_EXTENT, create_surface_attachment, \
+    compute_surface_aabb, create_relative_pose
 from src.visualization import GROW_BASE, GROW_PLACEMENT
 
 BASE_CONSTANT = 10
@@ -261,10 +261,8 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 break
             set_pose(obj_body, body_pose_world)
             if test_supported(world, obj_body, surface_name, collisions=collisions):
-                attachment = create_surface_attachment(world, obj_name, surface_name)
-                p = RelPose(attachment.child, reference_body=attachment.parent,
-                            reference_link=attachment.parent_link, support=surface_name, confs=[attachment])
-                yield (p,)
+                rp = create_relative_pose(world, obj_name, surface_name)
+                yield (rp,)
     return gen
 
 def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
