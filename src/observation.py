@@ -3,6 +3,7 @@ from __future__ import print_function
 import numpy as np
 import random
 import math
+import time
 
 from collections import namedtuple
 from itertools import islice
@@ -11,7 +12,7 @@ from sklearn.neighbors import KernelDensity
 
 #from pddlstream.utils import str_from_object
 from examples.discrete_belief.dist import UniformDist, DDist, GaussianDistribution, \
-    ProductDistribution, CUniformDist, DeltaDist
+    ProductDistribution, CUniformDist, DeltaDist, mixDDists
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask
 
@@ -21,7 +22,7 @@ from pybullet_tools.pr2_primitives import Pose as WorldPose
 from pybullet_tools.utils import point_from_pose, Ray, draw_point, RED, batch_ray_collision, draw_ray, wait_for_user, \
     CIRCULAR_LIMITS, stable_z_on_aabb, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, GREEN, unit_generator, \
-    get_aabb_area, spaced_colors, WorldSaver, unit_pose
+    get_aabb_area, spaced_colors, WorldSaver, unit_pose, pairwise_collision, elapsed_time
 from src.stream import get_stable_gen, test_supported, RelPose, compute_surface_aabb, Z_EPSILON
 from src.utils import OPEN_SURFACES, compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_surface_attachment
 from src.database import get_surface_reference_pose
@@ -33,15 +34,16 @@ POSITION_STD = 0.01
 ORIENTATION_STD = np.pi / 8
 NUM_PARTICLES = 100
 
-# Prior on the number of false detections to ensure correlated
-
-# TODO: could do open world or closed world
-# For open world, can sum independent probabilities
-
-# TODO: how to factor visibility observation costs such that the appropriate actions are selected
-# i.e. what to move out of the way
-
+# TODO: symbol for elsewhere pose
+# TODO: prior on the number of false detections to ensure correlated
+# TODO: could do open world or closed world. For open world, can sum independent probabilities
 # TODO: use a proper probabilistic programming library rather than dist.py
+
+# Detect preconditions and cost
+# * Most general would be conditioning the success prob on the full state via a cost
+# * Does not admit factoring though
+# * Instead, produce a detection for a subset of the region
+# * Preconditions involving the likelihood something is interfering
 
 ################################################################################
 
@@ -53,8 +55,6 @@ NUM_PARTICLES = 100
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
-
-# TODO: symbol for elsewhere pose
 
 class PoseDist(object):
     def __init__(self, world, name, dist, std=0.01):
@@ -137,39 +137,61 @@ class PoseDist(object):
             if test_supported(self.world, body, surface):
                 return pose # TODO: return score?
     def sample_pose(self):
-        surface = self.surface_dist.draw()
+        surface = self.surface_dist.sample()
         return self.sample_surface_pose(surface)
-    def update(self, observation, verbose=False):
+    def update_dist(self, observation, obstacles=[], verbose=False):
+        # TODO: include collisions with obstacles
         has_detection = self.name in observation.detections
         pose_estimate = None
         if has_detection:
             pose_estimate = base_values_from_pose(observation.detections[self.name][0])
-        print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
-        # dist.conditionOnVar(index=1, has_detection=True)
-        poses = self.dist.support()
-        # TODO: do these updates simultaneously for each object
-        detectable_poses = compute_detectable(poses, observation.camera_pose)
-        visible_poses = compute_visible(poses, observation.camera_pose, draw=False)
         if verbose:
-            print('Total: {} | Detectable: {} | Visible: {}'.format(
-                len(poses), len(detectable_poses), len(visible_poses)))
+            print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate))
+        # cfree_dist.conditionOnVar(index=1, has_detection=True)
+        body = self.world.get_body(self.name)
+        all_poses = self.dist.support()
+        #cfree_poses = all_poses
+        cfree_poses = compute_cfree(body, all_poses, obstacles)
+        #cfree_dist = self.cfree_dist
+        cfree_dist = DDist({pose: self.dist.prob(pose) for pose in cfree_poses})
+        # TODO: do these updates simultaneously for each object
+        detectable_poses = compute_detectable(cfree_poses, observation.camera_pose)
+        visible_poses = compute_visible(body, detectable_poses, observation.camera_pose, draw=False)
+        if verbose:
+            print('Total: {} | CFree: {} | Detectable: {} | Visible: {}'.format(
+                len(all_poses), len(cfree_poses), len(detectable_poses), len(visible_poses)))
         assert set(visible_poses) <= set(detectable_poses)
         # obs_fn = get_observation_fn(surface)
         #wait_for_user()
 
+        new_dist = cfree_dist.copy()
+        # cfree_dist.obsUpdate(detection_fn, has_detection)
+        new_dist.obsUpdates([
+            get_detection_fn(visible_poses),
+            get_registration_fn(visible_poses),
+        ], [has_detection, pose_estimate])
+        # cfree_dist = bayesEvidence(cfree_dist, detection_fn, has_detection) # projects out b and computes joint
+        # joint_dist = JDist(cfree_dist, detection_fn, registration_fn)
+        return new_dist
+    def update(self, belief, observation, n=10, verbose=False, **kwargs):
         if verbose:
             print('Prior:', self.dist)
-        detection_fn = get_detection_fn(poses, visible_poses)
-        registration_fn = get_registration_fn(poses, visible_poses)
-        new_dist = self.dist.copy()
-        # dist.obsUpdate(detection_fn, has_detection)
-        new_dist.obsUpdates([detection_fn, registration_fn], [has_detection, pose_estimate])
-        # dist = bayesEvidence(dist, detection_fn, has_detection) # projects out b and computes joint
-        # joint_dist = JDist(dist, detection_fn, registration_fn)
+        obstacles = [self.world.get_body(name) for name in belief.pose_dists if name != self.name]
+        dists = []
+        for _ in range(n):
+            belief.sample()
+            with BodySaver(self.world.get_body(self.name)):
+                new_dist = self.update_dist(observation, obstacles, **kwargs)
+                #new_pose_dist = self.__class__(self.world, self.name, new_dist).resample()
+            dists.append(new_dist)
+            #remove_all_debug()
+            #new_pose_dist.draw(color=belief.color_from_name[self.name])
+            #wait_for_user()
+        posterior = mixDDists({dist: 1./len(dists) for dist in dists})
         if verbose:
-            print('Posterior:', new_dist)
-        pose_dist = self.__class__(self.world, self.name, new_dist)
-        #return pose_dist.resample()
+            print('Posterior:', posterior)
+        pose_dist = self.__class__(self.world, self.name, posterior)
+        #return pose_dist
         return pose_dist.resample()
     def resample(self, n=NUM_PARTICLES):
         if len(self.dist.support()) <= 1:
@@ -198,13 +220,35 @@ class BeliefState(object):
         names = sorted(self.pose_dists)
         self.color_from_name = dict(zip(names, spaced_colors(len(names))))
         # TODO: belief fluents
-    def update(self, observation):
+    def update(self, observation, n=25):
         # Processing detected first
+        # Could simply sample from the set of worlds and update
+        # Would need to sample many worlds with name at different poses
+        # Instead, let the moving object take on different poses
+        start_time = time.time()
         order = [name for name in observation.detections]
         order.extend(set(self.pose_dists) - set(order))
-        self.pose_dists = {name: self.pose_dists[name].update(observation)
-                           for name in order}
+        with LockRenderer():
+            for name in order:
+                self.pose_dists[name] = self.pose_dists[name].update(self, observation, n=n)
+        print('Update time: {:.3f} sec for {} objects and {} samples'.format(
+            elapsed_time(start_time), len(order), n))
         return self
+    def sample(self):
+        while True:
+            poses = {}
+            for name, pose_dist in self.pose_dists.items():
+                pose = pose_dist.sample_pose()
+                pose.assign()
+                if any(pairwise_collision(self.world.get_body(name),
+                                          self.world.get_body(other)) for other in poses):
+                    break
+                poses[name] = pose
+            else:
+                return poses
+    def resample(self):
+        for pose_dist in self.pose_dists:
+            pose_dist.resample()
     def dump(self):
         print(self)
         for i, name in enumerate(sorted(self.pose_dists)):
@@ -238,7 +282,7 @@ def create_surface_belief(world, entity_name, surface_dist, n=NUM_PARTICLES):
     with LockRenderer():
         with BodySaver(world.get_body(entity_name)):
             while len(poses) < n:
-                surface_name = surface_dist.draw()
+                surface_name = surface_dist.sample()
                 rel_pose, = next(placement_gen(entity_name, surface_name), (None,))
                 if rel_pose is not None:
                     poses.append(rel_pose)
@@ -246,6 +290,14 @@ def create_surface_belief(world, entity_name, surface_dist, n=NUM_PARTICLES):
     return PoseDist(world, entity_name, dist)
 
 ################################################################################
+
+def compute_cfree(body, poses, obstacles=[]):
+    cfree_poses = set()
+    for pose in poses:
+        pose.assign()
+        if not any(pairwise_collision(body, obst) for obst in obstacles):
+            cfree_poses.add(pose)
+    return cfree_poses
 
 def compute_detectable(poses, camera_pose):
     detectable_poses = set()
@@ -255,11 +307,11 @@ def compute_detectable(poses, camera_pose):
             detectable_poses.add(pose)
     return detectable_poses
 
-def compute_visible(placements, camera_pose, draw=True):
-    detectable_poses = list(compute_detectable(placements, camera_pose))
+def compute_visible(body, poses, camera_pose, draw=True):
+    ordered_poses = list(poses)
     rays = []
     camera_point = point_from_pose(camera_pose)
-    for pose in detectable_poses:
+    for pose in ordered_poses:
         point = point_from_pose(pose.get_world_from_body())
         rays.append(Ray(camera_point, point))
     ray_results = batch_ray_collision(rays)
@@ -268,9 +320,10 @@ def compute_visible(placements, camera_pose, draw=True):
             handles = []
             for ray, result in zip(rays, ray_results):
                 handles.extend(draw_ray(ray, result))
-    # TODO: need to move objects out of the way
-    return {pose for pose, result in zip(detectable_poses, ray_results)
-            if result.objectUniqueId == -1}
+    # Blocking objects will likely be known with high probability
+    # TODO: move objects out of the way?
+    return {pose for pose, result in zip(ordered_poses, ray_results)
+            if result.objectUniqueId in (body, -1)}
 
 ################################################################################
 
@@ -279,6 +332,8 @@ class Observation(object):
         # TODO: camera name?
         self.camera_pose = camera_pose
         self.detections = detections
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, sorted(self.detections))
 
 def observe_scene(world, camera_pose):
     # TODO: could use an UKF to propagate a GMM
@@ -313,7 +368,7 @@ def observe_scene(world, camera_pose):
 
 # The two observations mimic how the examples are generated
 
-def get_detection_fn(poses, visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
+def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
 
     def fn(pose):
         # P(detect | s in visible)
@@ -323,21 +378,22 @@ def get_detection_fn(poses, visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIV
         return DDist({True: p_fp, False: 1 - p_fp})
     return fn
 
-def get_registration_fn(poses, visible, pos_std=POSITION_STD):
-    # use distance to z for placing on difference surfaces
+def get_registration_fn(visible, pos_std=POSITION_STD):
     # TODO: clip probabilities so doesn't become zero
-    # TODO: nearby objects that might cause misdetections
+    # TODO: nearby objects that might cause miss detections
 
     def fn(pose, detection):
         # TODO: compare the surface for the detection
         # P(obs point | state detect)
         if detection:
             # TODO: proportional weight in the event that no normalization
+            # TODO: perform with respect to relative pose
             world_pose = pose.get_world_from_body()
-            x, y, _ = point_from_pose(world_pose)
+            x, y, yaw = point_from_pose(world_pose)
             return ProductDistribution([
                 GaussianDistribution(gmean=x, stdev=pos_std),
                 GaussianDistribution(gmean=y, stdev=pos_std),
+                #GaussianDistribution(gmean=yaw, stdev=pos_std), # TODO: truncated Gaussian
                 CUniformDist(-np.pi, +np.pi),
             ])
             # Could also mix with uniform over the space
@@ -377,11 +433,17 @@ def test_observation(world, entity_name, n=NUM_PARTICLES):
 
     saver.restore()
     observation = observe_scene(world, camera_pose)
+    print(observation)
     belief = belief.update(observation)
+    #belief.resample()
 
     belief.dump()
     belief.draw()
     saver.restore()
+
+    #for _ in range(10):
+    #    belief.sample()
+    #    wait_for_user()
     #for name in world.movable:
     #    set_pose(world.get_body(name), unit_pose())
     wait_for_user()
