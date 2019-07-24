@@ -22,14 +22,14 @@ from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, draw
     LockRenderer, multiply, remove_all_debug, base_values_from_pose, get_aabb_area, spaced_colors, WorldSaver, \
     pairwise_collision, elapsed_time, randomize, draw_circle, wrap_angle, circular_difference
 from src.stream import get_stable_gen, test_supported, Z_EPSILON
-from src.utils import compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose
+from src.utils import compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, ALL_SURFACES
 from src.database import get_surface_reference_pose
 
 P_FALSE_POSITIVE = 0.0
 #P_FALSE_NEGATIVE = 0.0
 P_FALSE_NEGATIVE = 0.01
 POSITION_STD = 0.01
-ORIENTATION_STD = np.pi / 8
+ORIENTATION_STD = np.pi / 4
 NUM_PARTICLES = 100
 NEARBY_RADIUS = 5e-2
 
@@ -58,7 +58,6 @@ ELSEWHERE = None # symbol for elsewhere pose
 
 Neighborhood = namedtuple('Neighborhood', ['poses', 'prob'])
 
-
 class PoseDist(object):
     def __init__(self, world, name, dist, std=0.01):
         self.world = world
@@ -72,16 +71,31 @@ class PoseDist(object):
         self.std = std
     def surface_prob(self, surface):
         return self.surface_dist.prob(surface)
-    def point_from_pose(self, pose):
+    def pose2d_from_pose(self, pose):
         #return base_values_from_pose(pose.get_world_from_body())[:2]
-        return base_values_from_pose(pose.get_reference_from_body())[:2]
+        return base_values_from_pose(pose.get_reference_from_body()) # [:2]
+    def pose_from_pose2d(self, pose2d, surface):
+        #assert surface in self.poses_from_surface
+        #reference_pose = self.poses_from_surface[surface][0]
+        body = self.world.get_body(self.name)
+        surface_aabb = compute_surface_aabb(self.world, surface)
+        world_from_surface = get_surface_reference_pose(self.world.kitchen, surface)
+        #x, y = sample[:2]
+        #theta = np.random.uniform(*CIRCULAR_LIMITS)
+        x, y, yaw = pose2d
+        z = stable_z_on_aabb(body, surface_aabb) + Z_EPSILON - point_from_pose(world_from_surface)[2]
+        point = Point(x, y, z)
+        surface_from_body = Pose(point, Euler(yaw=yaw))
+        set_pose(body, multiply(world_from_surface, surface_from_body))
+        return create_relative_pose(self.world, self.name, surface)
     def get_density(self, surface):
         if surface in self.density_from_surface:
             return self.density_from_surface[surface]
         if surface not in self.poses_from_surface:
             return None
-        points, weights = zip(*[(self.point_from_pose(pose), self.dist.prob(pose))
+        points, weights = zip(*[(self.pose2d_from_pose(pose), self.dist.prob(pose))
                                 for pose in self.poses_from_surface[surface]])
+        #print(weights)
         # from sklearn.mixture import GaussianMixture
         # pip2 install -U --no-deps scikit-learn=0.20
         # https://scikit-learn.org/stable/modules/density.html
@@ -92,12 +106,14 @@ class PoseDist(object):
         # BallTree.valid_metrics: ['chebyshev', 'sokalmichener', 'canberra', 'haversine', 'rogerstanimoto', 'matching', 'dice', 'euclidean',
         # 'braycurtis', 'russellrao', 'cityblock', 'manhattan', 'infinity', 'jaccard', 'seuclidean', 'sokalsneath',
         # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
+        yaw_weight = 0.1*np.pi
+        metric_weights = np.array([1., 1., yaw_weight]) # TODO: wrap around and symmetry?
         density = KernelDensity(bandwidth=self.std, algorithm='auto',
                                 kernel='gaussian', metric="wminkowski", atol=0, rtol=0,
                                 breadth_first=True, leaf_size=40,
-                                metric_params={'p': 2, 'w': np.ones(2)})
+                                metric_params={'p': 2, 'w': metric_weights})
         density.fit(X=points, sample_weight=1 * np.array(weights)) # Scaling doesn't seem to affect
-        #print(weights)
+        self.density_from_surface[surface] = density
         #scores = density.score_samples(points)
         #probabilities = np.exp(-scores)
         #print('Individual:', probabilities)
@@ -109,7 +125,6 @@ class PoseDist(object):
         # TODO: integrate to obtain a probability mass
         # from scipy.stats.kde import gaussian_kde
         # density = gaussian_kde(points, weights=weights) # No weights in my scipy version
-        self.density_from_surface[surface] = density
         return density
     def get_nearby(self, target_pose, radius=NEARBY_RADIUS):
         # TODO: could instead use the probability density
@@ -126,19 +141,6 @@ class PoseDist(object):
                 poses.add(pose)
         prob = sum(map(self.dist.prob, poses))
         return Neighborhood(poses, prob)
-    def pose_from_point(self, sample, surface):
-        #assert surface in self.poses_from_surface
-        #reference_pose = self.poses_from_surface[surface][0]
-        body = self.world.get_body(self.name)
-        surface_aabb = compute_surface_aabb(self.world, surface)
-        world_from_surface = get_surface_reference_pose(self.world.kitchen, surface)
-        z = stable_z_on_aabb(body, surface_aabb) + Z_EPSILON - point_from_pose(world_from_surface)[2]
-        x, y = sample
-        point = Point(x, y, z)
-        theta = np.random.uniform(*CIRCULAR_LIMITS)
-        surface_from_body = Pose(point, Euler(yaw=theta))
-        set_pose(body, multiply(world_from_surface, surface_from_body))
-        return create_relative_pose(self.world, self.name, surface)
     def sample_surface_pose(self, surface): # TODO: timeout
         density = self.get_density(surface)
         if density is None:
@@ -148,7 +150,7 @@ class PoseDist(object):
             [sample] = density.sample(n_samples=1)
             [score] = density.score_samples([sample])
             prob = np.exp(-score) # TODO: return prob?
-            pose = self.pose_from_point(sample, surface)
+            pose = self.pose_from_pose2d(sample, surface)
             pose.assign()
             # TODO: additional obstacles
             if test_supported(self.world, body, surface):
@@ -160,10 +162,12 @@ class PoseDist(object):
     def update_dist(self, observation, obstacles=[], verbose=False):
         # TODO: include collisions with obstacles
         has_detection = self.name in observation.detections
+        detected_surface = None
         pose_estimate_2d = None
         if has_detection:
             [detected_pose] = observation.detections[self.name]
-            pose_estimate_2d = base_values_from_pose(detected_pose.get_reference_from_body())
+            detected_surface = detected_pose.support
+            pose_estimate_2d = self.pose2d_from_pose(detected_pose)
         if verbose:
             print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate_2d))
         # cfree_dist.conditionOnVar(index=1, has_detection=True)
@@ -189,7 +193,8 @@ class PoseDist(object):
         new_dist.obsUpdates([
             get_detection_fn(visible_poses),
             get_registration_fn(visible_poses),
-        ], [has_detection, pose_estimate_2d])
+        #], [has_detection, pose_estimate_2d])
+        ], [detected_surface, pose_estimate_2d])
         # cfree_dist = bayesEvidence(cfree_dist, detection_fn, has_detection) # projects out b and computes joint
         # joint_dist = JDist(cfree_dist, detection_fn, registration_fn)
         return new_dist
@@ -371,6 +376,7 @@ def observe_scene(world, camera_pose):
             mean=np.zeros(2), cov=math.pow(POSITION_STD, 2)*np.eye(2))
         dyaw, = np.random.multivariate_normal(
             mean=np.zeros(1), cov=math.pow(ORIENTATION_STD, 2)*np.eye(1))
+        print('{}: dx={:.3f}, dy={:.3f}, dyaw={:.5f}'.format(name, dx, dy, dyaw))
         noise_pose = Pose(Point(x=dx, y=dy), Euler(yaw=dyaw))
         observed_pose = multiply(pose, noise_pose)
         fixed_pose = world.fix_pose(name, observed_pose)
@@ -413,34 +419,37 @@ class SE2Distribution(Distribution):
 
 
 def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
+    # TODO: precompute visible here
+    # TODO: mixture over ALL_SURFACES
+    # Checking surfaces is important because incorrect surfaces may have similar relative poses
+    assert p_fp == 0
 
     def fn(pose):
         # P(detect | s in visible)
         # This could depend on the position as well
         if pose in visible:
-            return DDist({True: 1 - p_fn, False: p_fn})
-        return DDist({True: p_fp, False: 1 - p_fp})
+            return DDist({pose.support: 1. - p_fn, None: p_fn})
+        return DeltaDist(None)
     return fn
 
 def get_registration_fn(visible):
     # TODO: clip probabilities so doesn't become zero
     # TODO: nearby objects that might cause miss detections
 
-    def fn(pose, detection):
-        # TODO: compare the surface for the detection
+    def fn(pose, surface):
         # P(obs point | state detect)
-        if detection:
-            # TODO: proportional weight in the event that no normalization
-            x, y, yaw = base_values_from_pose(pose.get_reference_from_body())
-            return SE2Distribution(x, y, yaw, pos_std=POSITION_STD, ori_std=ORIENTATION_STD)
-            #return ProductDistribution([
-            #    GaussianDistribution(gmean=x, stdev=pos_std),
-            #    GaussianDistribution(gmean=y, stdev=pos_std),
-            #    CUniformDist(-np.pi, +np.pi),
-            #])
-            # Could also mix with uniform over the space
-            #if not visible[index]: uniform over the space
-        return DeltaDist(None)
+        if surface is None:
+            return DeltaDist(None)
+        # Weight can be proportional weight in the event taht the distribution can't be normalized
+        x, y, yaw = base_values_from_pose(pose.get_reference_from_body())
+        return SE2Distribution(x, y, yaw, pos_std=POSITION_STD, ori_std=ORIENTATION_STD)
+        #return ProductDistribution([
+        #    GaussianDistribution(gmean=x, stdev=pos_std),
+        #    GaussianDistribution(gmean=y, stdev=pos_std),
+        #    CUniformDist(-np.pi, +np.pi),
+        #])
+        # Could also mix with a uniform distribution over the space
+        #if not visible[index]: uniform over the space
     return fn
 
 ################################################################################
@@ -481,9 +490,9 @@ def test_observation(world, entity_name):
     saver.restore()
     wait_for_user()
 
-    #for i in range(10):
-    #    belief.sample()
-    #    wait_for_user()
+    for i in range(10):
+        belief.sample()
+        wait_for_user()
 
     for i in range(10):
         name = entity_name
