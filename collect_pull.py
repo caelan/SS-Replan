@@ -11,7 +11,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
-    get_joint_name, joint_from_name, get_date, SEPARATOR
+    get_joint_name, joint_from_name, get_date, SEPARATOR, safe_remove
 from src.utils import ALL_JOINTS
 from src.world import World
 from src.stream import get_pull_gen_fn
@@ -30,8 +30,10 @@ def collect_pull(world, joint_name, args):
     #handle_link, handle_grasp, _ = get_handle_grasp(world, joint)
 
     robot_name = get_body_name(world.robot)
+    filename = PULL_IR_FILENAME.format(robot_name=robot_name, joint_name=joint_name)
+    path = os.path.join(DATABASE_DIRECTORY, filename)
     print(SEPARATOR)
-    print('Robot name {} | Joint name: {}'.format(robot_name, joint_name))
+    print('Robot name {} | Joint name: {} | Filename: {}'.format(robot_name, joint_name, filename))
 
     entries = []
     failures = 0
@@ -61,6 +63,7 @@ def collect_pull(world, joint_name, args):
         if has_gui():
             wait_for_user()
     if not entries:
+        safe_remove(path)
         return None
     #visualize_database(joint_from_base_list)
 
@@ -76,10 +79,11 @@ def collect_pull(world, joint_name, args):
         'open_conf': open_conf.values,
         'closed_conf': closed_conf.values,
         'entries': entries,
+        'failures': failures,
+        'successes': len(entries),
+        'filename': filename,
     }
 
-    filename = PULL_IR_FILENAME.format(robot_name=robot_name, joint_name=joint_name)
-    path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
     print('Saved', path)
     return data

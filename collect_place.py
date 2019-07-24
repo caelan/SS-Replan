@@ -13,7 +13,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
-    RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR, dump_body
+    RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR, dump_body, safe_remove
 from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS
 from src.world import World
@@ -37,9 +37,12 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     grasps = list(grasp_gen_fn(object_name, grasp_type))
 
     robot_name = get_body_name(world.robot)
+    filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
+                                        grasp_type=grasp_type)
+    path = os.path.join(DATABASE_DIRECTORY, filename)
     print(SEPARATOR)
-    print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {}'.format(
-        robot_name, object_name, surface_name, grasp_type))
+    print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {} | Filename: {}'.format(
+        robot_name, object_name, surface_name, grasp_type, filename))
 
     entries = []
     start_time = time.time()
@@ -76,6 +79,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
             wait_for_user()
     #visualize_database(tool_from_base_list)
     if not entries:
+        safe_remove(path)
         return None
 
     # Assuming the kitchen is fixed but the objects might be open world
@@ -89,11 +93,11 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         'object_name': object_name,
         'grasp_type': grasp_type,
         'entries': entries,
+        'failures': failures,
+        'successes': len(entries),
+        'filename': filename,
     }
 
-    filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
-                                        grasp_type=grasp_type)
-    path = os.path.join(DATABASE_DIRECTORY, filename)
     write_json(path, data)
     print('Saved', path)
     return data
