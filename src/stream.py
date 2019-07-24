@@ -32,6 +32,7 @@ MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
+Z_EPSILON = 5e-3
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
@@ -221,10 +222,12 @@ def test_supported(world, body, surface_name, collisions=True):
     obstacles = world.static_obstacles | get_surface_obstacles(world, surface_name)
     if not collisions:
         obstacles = set()
+    #print([get_link_name(obst[0], list(obst[1])[0]) for obst in obstacles
+    #       if pairwise_collision(body, obst)])
     return not any(pairwise_collision(body, obst) for obst in obstacles)
 
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
-                   z_offset=5e-3, **kwargs):
+                   z_offset=Z_EPSILON, **kwargs):
 
     # TODO: remove fixed collisions with contained surfaces
     # TODO: place where currently standing
@@ -248,7 +251,7 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
                 theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
                 #yaw = np.random.uniform(*CIRCULAR_LIMITS)
                 quat = quat_from_euler(Euler(yaw=theta))
-                body_pose_world = (x+dx, y+dy, z+z_offset), quat
+                body_pose_world = ([x+dx, y+dy, z+z_offset], quat)
                 # TODO: project onto the surface
             else:
                 # TODO: halton seqeunce
