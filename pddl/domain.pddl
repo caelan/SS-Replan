@@ -20,6 +20,7 @@
     (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?aq ?at)
     (Detect ?o ?p ?r)
+    (DistSample ?rp1 ?rp2)
 
     (Grasp ?o ?g)
     (BTraj ?bt)
@@ -195,12 +196,16 @@
   )
 
   (:action detect
-    :parameters (?o ?p ?r)
-    :precondition (and (Detect ?o ?p ?r)
-                       (AtWorldPose ?o ?p)
+    :parameters (?o1 ?p1 ?rp1 ?p2 ?rp2 ?o ?p ?r)
+    :precondition (and (PoseKin ?o1 ?p1 ?rp1 ?o ?p) (PoseKin ?o1 ?p2 ?rp2 ?o ?p)
+                       (Detect ?o1 ?p2 ?r) (DistSample ?rp1 ?rp2)
+                       (AtWorldPose ?o1 ?p1) ; (AtRelPose ?o1 ?rp1 ?o2) (AtWorldPose ?o ?p)
                        (not (OccludedRay ?r))
                   )
     :effect (and (Detected ?o)
+                 (AtRelPose ?o1 ?rp2 ?o2) (AtWorldPose ?o1 ?p2)
+                 (not (AtRelPose ?o1 ?rp1 ?o2)) (not (AtWorldPose ?o1 ?p1))
+                 ; TODO: negate the poses of everything else
                  (increase (total-cost) (DetectCost)))
   )
 

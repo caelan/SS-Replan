@@ -203,19 +203,19 @@ def pdddlstream_from_problem(belief, **kwargs):
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         for conf in [init_conf, open_conf, closed_conf]:
             # TODO: return to initial poses?
-            pose, = compute_angle_kin(link_name, joint_name, conf)
+            world_pose, = compute_angle_kin(link_name, joint_name, conf)
             init.extend([
                 ('Joint', joint_name),
                 ('Angle', joint_name, conf),
                 ('Movable', link_name),
-                ('AngleKin', link_name, pose, joint_name, conf),
-                ('WorldPose', link_name, pose),
+                ('AngleKin', link_name, world_pose, joint_name, conf),
+                ('WorldPose', link_name, world_pose),
             ])
             if conf == init_conf:
-                surface_poses[link_name] = pose
+                surface_poses[link_name] = world_pose
                 init.extend([
                     ('AtAngle', joint_name, conf),
-                    ('AtWorldPose', link_name, pose),
+                    ('AtWorldPose', link_name, world_pose),
                 ])
 
     for surface_name in ALL_SURFACES:
@@ -227,15 +227,16 @@ def pdddlstream_from_problem(belief, **kwargs):
             #joint_name = get_joint_name(world.kitchen, parent_joint)
             init.append(('CheckNearby', surface_name))
         else:
-            pose = RelPose(world.kitchen, surface_link, init=True)
-            surface_poses[surface_name] = pose
+            world_pose = RelPose(world.kitchen, surface_link, init=True)
+            surface_poses[surface_name] = world_pose
             init += [
                 ('CheckNearby', surface_name),
-                #('RelPose', surface_name, pose, 'world'),
-                ('WorldPose', surface_name, pose),
-                #('AtRelPose', surface_name, pose, 'world'),
-                ('AtWorldPose', surface_name, pose),
-                ('Counter', surface_name, pose), # Fixed surface
+                #('RelPose', surface_name, world_pose, 'world'),
+                ('WorldPose', surface_name, world_pose),
+                #('AtRelPose', surface_name, world_pose, 'world'),
+                ('AtWorldPose', surface_name, world_pose),
+                ('Counter', surface_name, world_pose), # Fixed surface
+                ('Sample', world_pose),
             ]
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
@@ -267,6 +268,7 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ('Movable', obj_name), # TODO: misnomer
                 ('WorldPose', obj_name, world_pose),
                 ('AtWorldPose', obj_name, world_pose),
+                ('Sample', world_pose),
             ]
             #raise RuntimeError(obj_name, supporting)
         else:
@@ -280,6 +282,8 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ('AtRelPose', obj_name, rel_pose, surface_name),
                 ('WorldPose', obj_name, world_pose),
                 ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
+                ('Sample', rel_pose),
+                ('Sample', world_pose),
                 ('AtWorldPose', obj_name, world_pose),
                 ('On', obj_name, surface_name),
             ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
