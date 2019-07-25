@@ -34,6 +34,7 @@ OBS_POS_STD, OBS_ORI_STD = 0., 0.
 MODEL_POS_STD, MODEL_ORI_STD = 0.01, np.pi / 8
 #MODEL_POS_STD, MODEL_ORI_STD = OBS_POS_STD, OBS_ORI_STD
 
+BAYESIAN = False
 RESAMPLE = False
 DIM = 2
 assert DIM in (2, 3)
@@ -176,16 +177,6 @@ class PoseDist(object):
     def sample_support(self):
         return self.dist.sample()
     def update_dist(self, observation, obstacles=[], verbose=False):
-        # TODO: include collisions with obstacles
-        has_detection = self.name in observation.detections
-        detected_surface = None
-        pose_estimate_2d = None
-        if has_detection:
-            [detected_pose] = observation.detections[self.name]
-            detected_surface = detected_pose.support
-            pose_estimate_2d = self.pose2d_from_pose(detected_pose)
-        if verbose:
-            print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate_2d))
         # cfree_dist.conditionOnVar(index=1, has_detection=True)
         body = self.world.get_body(self.name)
         all_poses = self.dist.support()
@@ -202,18 +193,36 @@ class PoseDist(object):
         assert set(visible_poses) <= set(detectable_poses)
         # obs_fn = get_observation_fn(surface)
         #wait_for_user()
-
+        if BAYESIAN:
+            return self.bayesian_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
+        return self.multi_modal_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
+    def bayesian_belief_update(self, prior_dist, visible_poses, observation, verbose=False):
+        has_detection = self.name in observation.detections
+        detected_surface = None
+        pose_estimate_2d = None
+        if has_detection:
+            [detected_pose] = observation.detections[self.name]
+            detected_surface = detected_pose.support
+            pose_estimate_2d = self.pose2d_from_pose(detected_pose)
+        if verbose:
+            print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate_2d))
         # TODO: could use an UKF to propagate a GMM
-        new_dist = cfree_dist.copy()
+        new_dist = prior_dist.copy()
         # cfree_dist.obsUpdate(detection_fn, has_detection)
         new_dist.obsUpdates([
             get_detection_fn(visible_poses),
             get_registration_fn(visible_poses),
-        #], [has_detection, pose_estimate_2d])
+            # ], [has_detection, pose_estimate_2d])
         ], [detected_surface, pose_estimate_2d])
         # cfree_dist = bayesEvidence(cfree_dist, detection_fn, has_detection) # projects out b and computes joint
         # joint_dist = JDist(cfree_dist, detection_fn, registration_fn)
         return new_dist
+    def multi_modal_belief_update(self, prior_dist, visible_poses, observation, verbose=False):
+        if self.name in observation.detections:
+            # TODO: convert into a Multivariate Gaussian
+            [detected_pose] = observation.detections[self.name]
+            return DeltaDist(detected_pose)
+        return self.bayesian_belief_update(prior_dist, visible_poses, observation, verbose=verbose)
     def update(self, belief, observation, n=10, verbose=False, **kwargs):
         if verbose:
             print('Prior:', self.dist)
@@ -260,7 +269,8 @@ class PoseDist(object):
             handles.extend(pose.draw(color=fraction*np.array(color), **kwargs))
         return handles
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.name, self.surface_dist)
+        return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
+                                       self.surface_dist, len(self.dist.support()))
 
 class Belief(object):
     def __init__(self, world, pose_dists={}, grasped=None):
@@ -437,7 +447,8 @@ def transition_belief_update(belief, plan):
         return None
     # TODO: check that actually holding
     for action, params in plan:
-        if action in ['move_base', 'move_arm', 'move_gripper', 'pull', 'calibrate']:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pull',
+                      'calibrate', 'detect']:
             pass
         elif action == 'pick':
             o, p, g, rp = params[:4]

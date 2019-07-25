@@ -42,6 +42,7 @@ ACTION_COSTS = {
     'move_arm': 1,
     'move_gripper': 1,
     'calibrate': 1,
+    'detect': 1,
     'pick': 1,
     'place': 1,
     'pull': 1,

@@ -84,6 +84,7 @@
     (PlaceCost)
     (PullCost)
     (CookCost)
+    (DetectCost)
   )
 
   (:action move_base
@@ -199,7 +200,8 @@
                        (AtWorldPose ?o ?p)
                        (not (OccludedRay ?r))
                   )
-    :effect (Detected ?o)
+    :effect (and (Detected ?o)
+                 (increase (total-cost) (DetectCost)))
   )
 
 
