@@ -39,7 +39,7 @@ BAYESIAN = False
 RESAMPLE = False
 DIM = 2
 assert DIM in (2, 3)
-NUM_PARTICLES = 250
+NUM_PARTICLES = 100 # 100 | 250
 NEARBY_RADIUS = 5e-2
 
 ELSEWHERE = None # symbol for elsewhere pose
@@ -224,12 +224,12 @@ class PoseDist(object):
             [detected_pose] = observation.detections[self.name]
             return DeltaDist(detected_pose)
         return self.bayesian_belief_update(prior_dist, visible_poses, observation, verbose=verbose)
-    def update(self, belief, observation, n=10, verbose=False, **kwargs):
+    def update(self, belief, observation, n_samples=25, verbose=False, **kwargs):
         if verbose:
             print('Prior:', self.dist)
         obstacles = [self.world.get_body(name) for name in belief.pose_dists if name != self.name]
         dists = []
-        for _ in range(n):
+        for _ in range(n_samples):
             belief.sample()
             with BodySaver(self.world.get_body(self.name)):
                 new_dist = self.update_dist(observation, obstacles, **kwargs)
@@ -273,6 +273,8 @@ class PoseDist(object):
         return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
                                        self.surface_dist, len(self.dist.support()))
 
+# TODO: point estimates and confidence regions
+
 class Belief(object):
     def __init__(self, world, pose_dists={}, grasped=None):
         self.world = world
@@ -280,8 +282,10 @@ class Belief(object):
         self.grasped = grasped # grasped or holding?
         names = sorted(self.pose_dists)
         self.color_from_name = dict(zip(names, spaced_colors(len(names))))
+        self.observations = []
         # TODO: belief fluents
-    def update(self, observation, n=25):
+    def update(self, observation, n_samples=25):
+        self.observations.append(observation)
         # Processing detected first
         # Could simply sample from the set of worlds and update
         # Would need to sample many worlds with name at different poses
@@ -289,20 +293,22 @@ class Belief(object):
         start_time = time.time()
         order = [name for name in observation.detections]
         order.extend(set(self.pose_dists) - set(order))
-        with LockRenderer(True):
-            for name in order:
-                self.pose_dists[name] = self.pose_dists[name].update(self, observation, n=n)
+        with WorldSaver():
+            with LockRenderer():
+                for name in order:
+                    self.pose_dists[name] = self.pose_dists[name].update(
+                        self, observation, n_samples=n_samples)
         print('Update time: {:.3f} sec for {} objects and {} samples'.format(
-            elapsed_time(start_time), len(order), n))
+            elapsed_time(start_time), len(order), n_samples))
         return self
     def sample(self):
         while True:
             poses = {}
             for name, pose_dist in randomize(self.pose_dists.items()):
+                body = self.world.get_body(name)
                 pose = pose_dist.sample()
                 pose.assign()
-                if any(pairwise_collision(self.world.get_body(name),
-                                          self.world.get_body(other)) for other in poses):
+                if any(pairwise_collision(body, self.world.get_body(other)) for other in poses):
                     break
                 poses[name] = pose
             else:
@@ -316,9 +322,11 @@ class Belief(object):
             #self.pose_dists[name].dump()
             print(i, name, self.pose_dists[name])
     def draw(self, **kwargs):
+        handles = []
         with LockRenderer():
-            for name, pose_dist in self.pose_dists.items():
-                pose_dist.draw(color=self.color_from_name[name], **kwargs)
+            with WorldSaver():
+                for name, pose_dist in self.pose_dists.items():
+                    handles.extend(pose_dist.draw(color=self.color_from_name[name], **kwargs))
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, sorted(self.pose_dists))
 
@@ -334,9 +342,10 @@ def create_observable_pose_dist(world, obj_name):
     return PoseDist(world, obj_name, DeltaDist(pose))
 
 def create_observable_belief(world, **kwargs):
-    return Belief(world, pose_dists={
-        name: create_observable_pose_dist(world, name)
-        for name in world.movable}, **kwargs)
+    with WorldSaver():
+        return Belief(world, pose_dists={
+            name: create_observable_pose_dist(world, name)
+            for name in world.movable}, **kwargs)
 
 def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
     placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
@@ -351,9 +360,10 @@ def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
     return PoseDist(world, obj_name, UniformDist(poses))
 
 def create_surface_belief(world, surface_dist, **kwargs):
-    return Belief(world, pose_dists={
-        name: create_surface_pose_dist(world, name, surface_dist)
-        for name in world.movable}, **kwargs)
+    with WorldSaver():
+        return Belief(world, pose_dists={
+            name: create_surface_pose_dist(world, name, surface_dist)
+            for name in world.movable}, **kwargs)
 
 ################################################################################
 
@@ -394,12 +404,12 @@ def compute_visible(body, poses, camera_pose, draw=True):
 ################################################################################
 
 class Observation(object):
-    def __init__(self, camera_pose, detections):
-        # TODO: camera name?
+    def __init__(self, camera_name, camera_pose, detections):
+        self.camera_name = camera_name
         self.camera_pose = camera_pose
         self.detections = detections
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, sorted(self.detections))
+        return '{}({}, {})'.format(self.__class__.__name__, self.camera_name, sorted(self.detections))
 
 def are_visible(world, camera_pose):
     ray_names = []
@@ -414,7 +424,9 @@ def are_visible(world, camera_pose):
     return {name for name, result in zip(ray_names, ray_results)
             if result.objectUniqueId == world.get_body(name)}
 
-def observe_scene(world, camera_pose):
+def observe_with_camera(world, camera_name):
+    camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
+    camera_pose = get_pose(camera_body)
     visible_entities = are_visible(world, camera_pose)
     detections = {}
     # TODO: randomize robot's pose
@@ -441,7 +453,11 @@ def observe_scene(world, camera_pose):
         relative_pose = create_relative_pose(world, name, support, init=False)
         #relative_pose.assign()
         detections.setdefault(name, []).append(relative_pose)
-    return Observation(camera_pose, detections)
+    return Observation(camera_name, camera_pose, detections)
+
+def observe_all_cameras(world):
+    return {camera_name: observe_with_camera(world, camera_name)
+            for camera_name in world.cameras}
 
 def transition_belief_update(belief, plan):
     if plan is None:
@@ -531,14 +547,14 @@ def get_registration_fn(visible):
 
 ################################################################################
 
-ZED_SURFACES = ['indigo_tmp', 'range', 'indigo_drawer_top']
+# TODO: need a timeout in the event that cannot do
+ZED_SURFACES = ['indigo_tmp', 'range'] #, 'indigo_drawer_top']
 
 def test_observation(world, entity_name):
     world.open_door(joint_from_name(world.kitchen, 'indigo_drawer_top_joint'))
     saver = WorldSaver()
     [camera_name] = list(world.cameras)
-    camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
-    camera_pose = get_pose(camera_body)
+    print('Camera:', camera_name)
 
     # TODO: estimate the fraction of the surface that is actually usable
     surface_areas = {surface: get_aabb_area(compute_surface_aabb(world, surface))
@@ -559,7 +575,7 @@ def test_observation(world, entity_name):
 
     # TODO: record history of observations to recover point estimate of belief
     saver.restore()
-    observation = observe_scene(world, camera_pose)
+    observation = observe_with_camera(world, camera_name)
     print(observation)
     belief = belief.update(observation)
 

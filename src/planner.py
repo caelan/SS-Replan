@@ -68,36 +68,28 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
     skeletons = None if skeleton is None else [skeleton]
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
 
-    success_cost = 0 if args.optimal else INF
-    planner = 'ff-astar' if args.optimal else 'ff-wastar1'
+    success_cost = 0 if args.anytime else INF
+    planner = 'ff-astar' if args.anytime else 'ff-wastar1'
     search_sample_ratio = 1 # TODO: could try decreasing
     max_planner_time = 10
 
     pr = cProfile.Profile()
     pr.enable()
+    saver = WorldSaver()
     with LockRenderer(lock=not args.visualize):
-        saver = WorldSaver()
-        if args.algorithm == 'focused':
-            # TODO: option to only consider costs during local optimization
-            # effort_weight = 0 if args.optimal else 1
-            #effort_weight = 1e-3 if args.optimal else 1
-            effort_weight = 0
-            solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
-                                     replan_actions=replan_actions,
-                                     initial_complexity=5,
-                                     planner=planner, max_planner_time=max_planner_time,
-                                     unit_costs=args.unit, success_cost=success_cost,
-                                     max_time=args.max_time, verbose=True, debug=debug,
-                                     unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
-                                     # bind=True, max_skeletons=None,
-                                     search_sample_ratio=search_sample_ratio)
-        elif args.algorithm == 'incremental':
-            solution = solve_incremental(problem, constraints=constraints,
-                                         planner=planner, max_planner_time=max_planner_time,
-                                         unit_costs=args.unit, success_cost=success_cost,
-                                         max_time=args.max_time, verbose=True, debug=debug)
-        else:
-            raise ValueError(args.algorithm)
+        # TODO: option to only consider costs during local optimization
+        # effort_weight = 0 if args.anytime else 1
+        effort_weight = 1e-3 if args.anytime else 1
+        #effort_weight = 0
+        solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
+                                 replan_actions=replan_actions,
+                                 initial_complexity=5,
+                                 planner=planner, max_planner_time=max_planner_time,
+                                 unit_costs=args.unit, success_cost=success_cost,
+                                 max_time=args.max_time, verbose=True, debug=debug,
+                                 unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
+                                 # bind=True, max_skeletons=None,
+                                 search_sample_ratio=search_sample_ratio)
         saver.restore()
 
     # print([(s.cost, s.time) for s in SOLUTIONS])

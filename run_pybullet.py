@@ -13,7 +13,9 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, INF, LockRenderer
 from src.visualization import add_markers
-from src.observation import test_observation, create_observable_belief, transition_belief_update
+from src.observation import test_observation, create_observable_belief, \
+    transition_belief_update, create_surface_belief, UniformDist, ZED_SURFACES, \
+    observe_all_cameras
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -25,14 +27,14 @@ from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix
 
 def create_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-algorithm', default='focused', choices=['incremental', 'focused'],
-                        help='Specifies the planning algorithm that should be used')
+    parser.add_argument('-anytime', action='store_true',
+                        help='Runs in an anytime mode')
     parser.add_argument('-cfree', action='store_true',
                         help='When enabled, disables collision checking (for debugging).')
     parser.add_argument('-defer', action='store_true',
                         help='When enabled, defers evaluation of motion planning streams.')
-    parser.add_argument('-optimal', action='store_true',
-                        help='Runs in an anytime mode')
+    parser.add_argument('-observable', action='store_true',
+                        help='Treats the state as fully observable')
     parser.add_argument('-max_time', default=120, type=int,
                         help='The max computation time')
     parser.add_argument('-record', action='store_true',
@@ -54,7 +56,15 @@ def create_parser():
 def run_deterministic(task, args):
     world = task.world
     state = world.get_initial_state()
-    belief = create_observable_belief(world)
+    if args.observable:
+        belief = create_observable_belief(world)
+    else:
+        belief = create_surface_belief(world, UniformDist(ZED_SURFACES))
+    [observation] = observe_all_cameras(world).values()
+    belief.update(observation)
+    belief.draw()
+    wait_for_user('Start?')
+
     problem = pdddlstream_from_problem(belief,
         collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
