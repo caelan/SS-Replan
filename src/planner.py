@@ -9,6 +9,9 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.incremental import solve_incremental
 from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
+from pddlstream.language.rule import RULES
+from pddlstream.language.object import Object, OptimisticObject
+
 from pddlstream.utils import INF
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
 from src.command import Wait, iterate_plan
@@ -22,6 +25,9 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
     print('Init:', init)
     print('Goal:', goal)
     print('Streams:', stream_map.keys())
+    RULES[:] = []
+    Object.reset()
+    OptimisticObject.reset()
 
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {

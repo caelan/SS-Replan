@@ -18,7 +18,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
-    get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test
+    get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, get_sample_belief_gen
 from src.issac import load_calibrate_conf
 from src.database import has_place_database
 
@@ -80,6 +80,7 @@ def get_streams(world, debug=False, **kwargs):
         'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
         # 'compute-angle-kin': from_fn(compute_angle_kin),
         'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
+        'sample-belief': from_gen_fn(get_sample_belief_gen(world, **kwargs)),
 
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),

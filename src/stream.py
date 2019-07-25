@@ -139,6 +139,13 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
+def get_sample_belief_gen(world, **kwargs):
+    def gen(obj_name, pose_dist, surface_name):
+        # If we aren't resampling, can just sort by probability of success
+        # Could also sample according ot the distribution
+        pass
+    return
+
 ################################################################################
 
 def get_surface_obstacles(world, surface_name):

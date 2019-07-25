@@ -12,6 +12,7 @@ from sklearn.neighbors import KernelDensity
 #from pddlstream.utils import str_from_object
 from examples.discrete_belief.dist import UniformDist, DDist, GaussianDistribution, \
     ProductDistribution, CUniformDist, DeltaDist, mixDDists, Distribution
+#from examples.discrete_belief.run import continue_mdp_cost
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask
 

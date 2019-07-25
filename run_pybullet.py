@@ -78,6 +78,7 @@ def run_stochastic(task, args):
     world = task.world
     state = world.get_initial_state()
     belief = create_observable_belief(world)
+    # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
 
     last_skeleton = None
     last_cost = INF

@@ -18,11 +18,10 @@ FORCE = 100
 
 class State(object):
     # TODO: rename to be world state?
-    def __init__(self, world, savers=[], grasped=None, attachments=[]):
+    def __init__(self, world, savers=[], attachments=[]):
         # a part of the state separate from PyBullet
         self.world = world
         self.savers = tuple(savers)
-        self.grasped = grasped
         self.attachments = {attachment.child: attachment for attachment in attachments}
     @property
     def bodies(self):
@@ -34,7 +33,7 @@ class State(object):
             # TODO: topological sort
             attachment.assign()
     def copy(self):
-        return State(self.world, self.savers, self.grasped, self.attachments.values())
+        return State(self.world, self.savers, self.attachments.values())
         #return copy.deepcopy(self)
     def assign(self):
         for saver in self.savers:
@@ -242,8 +241,6 @@ class Attach(Command):
 
     def iterate(self, state):
         state.attachments[self.body] = self.attach()
-        if self.robot == self.world.robot:
-           state.grasped = self.grasp
         yield
 
     def execute(self, domain, moveit, observer, state):
@@ -284,8 +281,6 @@ class Detach(Command):
     def iterate(self, state):
         assert self.body in state.attachments
         del state.attachments[self.body]
-        if self.robot == self.world.robot:
-            state.grasped = None
         yield
 
     def execute(self, domain, moveit, observer, state):
