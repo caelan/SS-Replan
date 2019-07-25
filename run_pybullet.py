@@ -13,7 +13,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, INF, LockRenderer
 from src.visualization import add_markers
-from src.observation import test_observation, create_observable_belief
+from src.observation import test_observation, create_observable_belief, transition_belief_update
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -75,13 +75,15 @@ def run_stochastic(task, args):
     # Technically all values change upon each observation
     #last_cost = INF # TODO: update the remaining cost (removing attempted actions)
     # The nice thing about having a correct belief model is that you actually know what cost makes progress
-    last_skeleton = None
-    last_cost = INF
     world = task.world
     state = world.get_initial_state()
+    belief = create_observable_belief(world)
+
+    last_skeleton = None
+    last_cost = INF
     # TODO: make this a generic policy
     while True:
-        problem = pdddlstream_from_problem(state,
+        problem = pdddlstream_from_problem(belief,
             collisions=not args.cfree, teleport=args.teleport)
         plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
         # TODO: first attempt cheaper path
@@ -100,6 +102,8 @@ def run_stochastic(task, args):
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
         simulate_plan(state, commands, args)
+        transition_belief_update(belief, plan_prefix)
+
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
         #last_skeleton = make_exact_skeleton(plan_postfix)

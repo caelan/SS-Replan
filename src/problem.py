@@ -252,9 +252,9 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('AtGrasp', obj_name, grasp),
             ('Holding', obj_name),
         ]
-    for obj_name in world.movable:
+    for obj_name, pose_dist in belief.pose_dists.items():
         body = world.get_body(obj_name)
-        support = belief.pose_dists[obj_name].dist.support()
+        support = pose_dist.dist.support()
         assert len(support) == 1
         [rel_pose] = support
         surface_name = rel_pose.support

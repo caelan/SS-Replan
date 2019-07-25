@@ -432,6 +432,26 @@ def observe_scene(world, camera_pose):
         detections.setdefault(name, []).append(relative_pose)
     return Observation(camera_pose, detections)
 
+def transition_belief_update(belief, plan):
+    if plan is None:
+        return None
+    # TODO: check that actually holding
+    for action, params in plan:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pull', 'calibrate']:
+            pass
+        elif action == 'pick':
+            o, p, g, rp = params[:4]
+            del belief.pose_dists[o]
+            belief.grasped = g
+        elif action == 'place':
+            o, p, g, rp = params[:4]
+            belief.grasped = None
+            belief.pose_dists[o] = PoseDist(belief.world, o, DeltaDist(rp))
+        elif action == 'cook':
+            pass
+        else:
+            raise NotImplementedError(action)
+
 ################################################################################
 
 class SE2Distribution(Distribution):

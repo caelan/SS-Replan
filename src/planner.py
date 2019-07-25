@@ -9,11 +9,9 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.incremental import solve_incremental
 from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
-from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
-from src.command import Wait, State, iterate_plan
-from src.stream import BASE_CONSTANT
+from src.command import Wait, iterate_plan
 
 VIDEO_FILENAME = 'video.mp4'
 REPLAN_ACTIONS = {'calibrate'}
