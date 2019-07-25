@@ -262,11 +262,11 @@ class PoseDist(object):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.name, self.surface_dist)
 
-class BeliefState(object):
-    def __init__(self, world, pose_dists={}, holding=None):
+class Belief(object):
+    def __init__(self, world, pose_dists={}, grasped=None):
         self.world = world
         self.pose_dists = pose_dists
-        self.holding = holding
+        self.grasped = grasped # grasped or holding?
         names = sorted(self.pose_dists)
         self.color_from_name = dict(zip(names, spaced_colors(len(names))))
         # TODO: belief fluents
@@ -313,7 +313,7 @@ class BeliefState(object):
 
 ################################################################################
 
-def create_observable_belief(world, obj_name):
+def create_observable_pose_dist(world, obj_name):
     body = world.get_body(obj_name)
     surface_name = world.get_supporting(obj_name)
     if surface_name is None:
@@ -322,7 +322,12 @@ def create_observable_belief(world, obj_name):
         pose = create_relative_pose(world, obj_name, surface_name, init=True)
     return PoseDist(world, obj_name, DeltaDist(pose))
 
-def create_surface_belief(world, obj_name, surface_dist, n=NUM_PARTICLES):
+def create_observable_belief(world, **kwargs):
+    return Belief(world, pose_dists={
+        name: create_observable_pose_dist(world, name)
+        for name in world.movable}, **kwargs)
+
+def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
     placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
     poses = []
     with LockRenderer():
@@ -333,6 +338,11 @@ def create_surface_belief(world, obj_name, surface_dist, n=NUM_PARTICLES):
                 if rel_pose is not None:
                     poses.append(rel_pose)
     return PoseDist(world, obj_name, UniformDist(poses))
+
+def create_surface_belief(world, surface_dist, **kwargs):
+    return Belief(world, pose_dists={
+        name: create_surface_pose_dist(world, name, surface_dist)
+        for name in world.movable}, **kwargs)
 
 ################################################################################
 
@@ -506,9 +516,7 @@ def test_observation(world, entity_name):
     surface_dist = UniformDist(ZED_SURFACES)
     print(surface_dist)
 
-    belief = BeliefState(world, pose_dists={
-        name: create_surface_belief(world, name, surface_dist)
-        for name in world.movable})
+    belief = create_surface_belief(world, surface_dist)
     belief.dump()
     belief.draw()
     saver.restore()

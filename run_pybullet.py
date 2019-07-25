@@ -13,11 +13,11 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, INF, LockRenderer
 from src.visualization import add_markers
-from src.observation import test_observation
+from src.observation import test_observation, create_observable_belief
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
-from src.task import stow_block, detect_block
+from src.task import stow_block, detect_block, TASKS
 from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix
 
 
@@ -33,8 +33,6 @@ def create_parser():
                         help='When enabled, defers evaluation of motion planning streams.')
     parser.add_argument('-optimal', action='store_true',
                         help='Runs in an anytime mode')
-    #parser.add_argument('-problem', default='test_block',
-    #                    help='The name of the problem to solve.')
     parser.add_argument('-max_time', default=120, type=int,
                         help='The max computation time')
     parser.add_argument('-record', action='store_true',
@@ -56,7 +54,8 @@ def create_parser():
 def run_deterministic(task, args):
     world = task.world
     state = world.get_initial_state()
-    problem = pdddlstream_from_problem(state,
+    belief = create_observable_belief(world)
+    problem = pdddlstream_from_problem(belief,
         collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
     plan, cost, evaluations = solution
@@ -114,16 +113,20 @@ def run_stochastic(task, args):
 ################################################################################
 
 def main():
+    task_names = [fn.__name__ for fn in TASKS]
+    print('Tasks:', task_names)
     parser = create_parser()
+    parser.add_argument('-problem', default=task_names[0], choices=task_names,
+                        help='The name of the problem to solve.')
     args = parser.parse_args()
     #if args.seed is not None:
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
     world = World(use_gui=True)
+    task_fn_from_name = {fn.__name__: fn for fn in TASKS}
+    task_fn = task_fn_from_name[args.problem]
 
-    #task = stow_block(world)
-    task = detect_block(world)
-    #task = relocate_block(world)
+    task = task_fn(world)
     if not args.record:
         with LockRenderer():
             add_markers(world, inverse_place=False)
@@ -131,7 +134,6 @@ def main():
 
     #test_observation(world, entity_name='big_red_block0')
     #return
-
     if args.defer:
         run_stochastic(task, args)
     else:

@@ -93,8 +93,8 @@ def get_streams(world, debug=False, **kwargs):
         stream_map = DEBUG
     return stream_pddl, stream_map
 
-def pdddlstream_from_problem(state, **kwargs):
-    world = state.world # One world per state
+def pdddlstream_from_problem(belief, **kwargs):
+    world = belief.world # One world per state
     task = world.task # One task per world
     print(task)
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
@@ -239,22 +239,25 @@ def pdddlstream_from_problem(state, **kwargs):
             if has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 
+    if belief.grasped is not None:
+        obj_name = belief.grasped.body_name
+        assert obj_name not in belief.pose_dists
+        grasp = belief.grasped
+        init += [
+            ('Movable', obj_name),
+            ('Graspable', obj_name),
+            ('CheckNearby', obj_name),
+            ('Grasp', obj_name, grasp),
+            ('IsGraspType', obj_name, grasp, grasp.grasp_type),
+            ('AtGrasp', obj_name, grasp),
+            ('Holding', obj_name),
+        ]
     for obj_name in world.movable:
-        # TODO: raise above surface and simulate to exploit physics
         body = world.get_body(obj_name)
-        if (state.grasped is not None) and (state.grasped.body_name == obj_name):
-            grasp = state.grasped
-            init += [
-                ('Movable', obj_name),
-                ('Graspable', obj_name),
-                ('CheckNearby', obj_name),
-                ('Grasp', obj_name, grasp),
-                ('IsGraspType', obj_name, grasp, grasp.grasp_type),
-                ('AtGrasp', obj_name, grasp),
-                ('Holding', obj_name),
-            ]
-            continue
-        surface_name =  world.get_supporting(obj_name)
+        support = belief.pose_dists[obj_name].dist.support()
+        assert len(support) == 1
+        [rel_pose] = support
+        surface_name = rel_pose.support
         if surface_name is None:
             # Treats as obstacle
             world_pose = RelPose(body, init=True)
@@ -263,22 +266,21 @@ def pdddlstream_from_problem(state, **kwargs):
                 ('WorldPose', obj_name, world_pose),
                 ('AtWorldPose', obj_name, world_pose),
             ]
-            continue
             #raise RuntimeError(obj_name, supporting)
-        rel_pose = create_relative_pose(world, obj_name, surface_name, init=True)
-        surface_pose = surface_poses[surface_name]
-        world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
-        init += [
-            ('Movable', obj_name),
-            ('Graspable', obj_name),
-            ('CheckNearby', obj_name),
-            ('RelPose', obj_name, rel_pose, surface_name),
-            ('AtRelPose', obj_name, rel_pose, surface_name),
-            ('WorldPose', obj_name, world_pose),
-            ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
-            ('AtWorldPose', obj_name, world_pose),
-            ('On', obj_name, surface_name),
-        ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
+        else:
+            surface_pose = surface_poses[surface_name]
+            world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
+            init += [
+                ('Movable', obj_name),
+                ('Graspable', obj_name),
+                ('CheckNearby', obj_name),
+                ('RelPose', obj_name, rel_pose, surface_name),
+                ('AtRelPose', obj_name, rel_pose, surface_name),
+                ('WorldPose', obj_name, world_pose),
+                ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
+                ('AtWorldPose', obj_name, world_pose),
+                ('On', obj_name, surface_name),
+            ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
 
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
