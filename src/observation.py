@@ -26,16 +26,18 @@ from src.utils import compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_
     ALL_SURFACES, RelPose
 from src.database import get_surface_reference_pose
 
-P_FALSE_POSITIVE = 0.0
-P_FALSE_NEGATIVE = 0.0
-#P_FALSE_NEGATIVE = 0.01
+OBS_P_FP, OBS_P_FN = 0.0, 0.0
+MODEL_P_FP, MODEL_P_FN = 0.0, 0.01
 
 #OBS_POS_STD, OBS_ORI_STD = 0.01, np.pi / 8
 OBS_POS_STD, OBS_ORI_STD = 0., 0.
-MODEL_POS_STD, MODEL_ORI_STD = 0.005, np.pi / 8
+MODEL_POS_STD, MODEL_ORI_STD = 0.01, np.pi / 8
 #MODEL_POS_STD, MODEL_ORI_STD = OBS_POS_STD, OBS_ORI_STD
 
-NUM_PARTICLES = 100
+RESAMPLE = False
+DIM = 2
+assert DIM in (2, 3)
+NUM_PARTICLES = 250
 NEARBY_RADIUS = 5e-2
 
 ELSEWHERE = None # symbol for elsewhere pose
@@ -76,18 +78,26 @@ class PoseDist(object):
         self.std = std
     def surface_prob(self, surface):
         return self.surface_dist.prob(surface)
+    def prob(self, pose):
+        support = pose.support
+        density = self.get_density(support)
+        pose2d = self.pose2d_from_pose(pose)
+        [score] = density.score_samples([pose2d])
+        prob = np.exp(-score)
+        return self.surface_prob(support) * prob
     def pose2d_from_pose(self, pose):
-        #return base_values_from_pose(pose.get_world_from_body())[:2]
-        return base_values_from_pose(pose.get_reference_from_body()) # [:2]
+        return base_values_from_pose(pose.get_reference_from_body())[:DIM]
     def pose_from_pose2d(self, pose2d, surface):
         #assert surface in self.poses_from_surface
         #reference_pose = self.poses_from_surface[surface][0]
         body = self.world.get_body(self.name)
         surface_aabb = compute_surface_aabb(self.world, surface)
         world_from_surface = get_surface_reference_pose(self.world.kitchen, surface)
-        #x, y = sample[:2]
-        #theta = np.random.uniform(*CIRCULAR_LIMITS)
-        x, y, yaw = pose2d
+        if DIM == 2:
+            x, y = pose2d[:DIM]
+            yaw = np.random.uniform(*CIRCULAR_LIMITS)
+        else:
+            x, y, yaw = pose2d
         z = stable_z_on_aabb(body, surface_aabb) + Z_EPSILON - point_from_pose(world_from_surface)[2]
         point = Point(x, y, z)
         surface_from_body = Pose(point, Euler(yaw=yaw))
@@ -116,7 +126,7 @@ class PoseDist(object):
         density = KernelDensity(bandwidth=self.std, algorithm='auto',
                                 kernel='gaussian', metric="wminkowski", atol=0, rtol=0,
                                 breadth_first=True, leaf_size=40,
-                                metric_params={'p': 2, 'w': metric_weights})
+                                metric_params={'p': 2, 'w': metric_weights[:DIM]})
         density.fit(X=points, sample_weight=1 * np.array(weights)) # Scaling doesn't seem to affect
         self.density_from_surface[surface] = density
         #scores = density.score_samples(points)
@@ -222,8 +232,9 @@ class PoseDist(object):
         if verbose:
             print('Posterior:', posterior)
         pose_dist = self.__class__(self.world, self.name, posterior)
-        #return pose_dist
-        return pose_dist.resample()
+        if RESAMPLE:
+            pose_dist = pose_dist.resample()
+        return pose_dist
     def resample(self, n=NUM_PARTICLES):
         if len(self.dist.support()) <= 1:
             return self
@@ -233,12 +244,20 @@ class PoseDist(object):
         return self.__class__(self.world, self.name, new_dist)
     def dump(self):
         print(self.name, self.dist)
-    def draw(self, **kwargs):
+    def draw(self, color=(1, 0, 0), **kwargs):
+        # TODO: display heatmap of samples across the surfaces
+
+        poses = list(self.dist.support())
+        probs = list(map(self.dist.prob, poses))
+        max_prob = max(probs)
+        print('{}) max prob: {:.3f}'.format(self.name, max_prob))
         handles = []
-        for pose in self.dist.support():
+        for pose, prob in zip(poses, probs):
+            # TODO: could instead draw a circle
+            fraction = prob / max_prob
             # TODO: draw weights using color, length, or thickness
             #color = GREEN if pose == self.dist.mode() else RED
-            handles.extend(pose.draw(**kwargs))
+            handles.extend(pose.draw(color=fraction*np.array(color), **kwargs))
         return handles
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.name, self.surface_dist)
@@ -380,10 +399,10 @@ def observe_scene(world, camera_pose):
     # TODO: randomize robot's pose
     # TODO: probabilities based on whether in viewcone or not
     # TODO: sample from poses on table
-    assert P_FALSE_POSITIVE == 0
+    assert OBS_P_FP == 0
     for name in visible_entities:
         # TODO: false positives
-        if random.random() < P_FALSE_NEGATIVE:
+        if random.random() < OBS_P_FN:
             continue
         body = world.get_body(name)
         pose = get_pose(body)
@@ -431,7 +450,7 @@ class SE2Distribution(Distribution):
 
 # The two observations mimic how the examples are generated
 
-def get_detection_fn(visible, p_fp=P_FALSE_POSITIVE, p_fn=P_FALSE_NEGATIVE):
+def get_detection_fn(visible, p_fp=MODEL_P_FP, p_fn=MODEL_P_FN):
     # TODO: precompute visible here
     # TODO: mixture over ALL_SURFACES
     # Checking surfaces is important because incorrect surfaces may have similar relative poses
@@ -456,12 +475,14 @@ def get_registration_fn(visible):
             return DeltaDist(None)
         # Weight can be proportional weight in the event that the distribution can't be normalized
         x, y, yaw = base_values_from_pose(pose.get_reference_from_body())
-        return SE2Distribution(x, y, yaw, pos_std=MODEL_POS_STD, ori_std=MODEL_ORI_STD)
-        #return ProductDistribution([
-        #    GaussianDistribution(gmean=x, stdev=pos_std),
-        #    GaussianDistribution(gmean=y, stdev=pos_std),
-        #    CUniformDist(-np.pi, +np.pi),
-        #])
+        if DIM == 2:
+            return ProductDistribution([
+               GaussianDistribution(gmean=x, stdev=MODEL_POS_STD),
+               GaussianDistribution(gmean=y, stdev=MODEL_POS_STD),
+               #CUniformDist(-np.pi, +np.pi),
+            ])
+        else:
+            return SE2Distribution(x, y, yaw, pos_std=MODEL_POS_STD, ori_std=MODEL_ORI_STD)
         # Could also mix with a uniform distribution over the space
         #if not visible[index]: uniform over the space
     return fn
