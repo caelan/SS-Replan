@@ -104,11 +104,11 @@
   ;                  (CalibrateMotion ?bq @rest_aq ?at))
   ;)
   (:stream compute-detect
-    :inputs (?c ?o ?p)
-    :domain (and (Camera ?c) (WorldPose ?o ?p))
+    :inputs (?o ?p)
+    :domain (and (WorldPose ?o ?p))
     :outputs (?r)
     :certified (and (Ray ?r)
-                    (Detect ?c ?o ?p ?r))
+                    (Detect ?o ?p ?r))
   )
 
   (:stream compute-pose-kin

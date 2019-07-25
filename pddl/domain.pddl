@@ -19,7 +19,7 @@
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?aq ?at)
-    (Detect ?c ?o ?p ?r)
+    (Detect ?o ?p ?r)
 
     (Grasp ?o ?g)
     (BTraj ?bt)
@@ -194,8 +194,8 @@
   )
 
   (:action detect
-    :parameters (?c ?o ?p ?r)
-    :precondition (and (Detect ?c ?o ?p ?r)
+    :parameters (?o ?p ?r)
+    :precondition (and (Detect ?o ?p ?r)
                        (AtWorldPose ?o ?p)
                        (not (OccludedRay ?r))
                   )

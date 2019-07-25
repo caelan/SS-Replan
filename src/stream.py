@@ -77,24 +77,25 @@ def get_compute_angle_kin(world):
 def get_compute_detect(world, **kwargs):
     obstacles = world.static_obstacles
 
-    def fn(camera_name, obj_name, pose):
-        # TODO: search over all cameras instead?
+    def fn(obj_name, pose):
         # TODO: condition that the drawer is open
-        camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
-        camera_pose = get_pose(camera_body)
-        camera_point = point_from_pose(camera_pose)
-        # TODO: could sample multiple rays around the object
-        obj_point = point_from_pose(pose.get_world_from_body())
-        if not is_visible_point(camera_matrix, camera_depth, obj_point, camera_pose):
-            return None
-        ray = Ray(camera_point, obj_point)
-        detect = Detect(world, camera_name, obj_name, pose, [ray])
-        # TODO: how should doors be handled?
-        if obstacles & detect.compute_occluding():
-            return None
-        #detect.draw()
-        #wait_for_user()
-        return (detect,)
+        for camera_name in world.cameras:
+            camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
+            camera_pose = get_pose(camera_body)
+            camera_point = point_from_pose(camera_pose)
+            # TODO: could sample multiple rays around the object
+            obj_point = point_from_pose(pose.get_world_from_body())
+            if not is_visible_point(camera_matrix, camera_depth, obj_point, camera_pose):
+                continue
+            ray = Ray(camera_point, obj_point)
+            detect = Detect(world, camera_name, obj_name, pose, [ray])
+            # TODO: how should doors be handled?
+            if obstacles & detect.compute_occluding():
+                continue
+            #detect.draw()
+            #wait_for_user()
+            return (detect,)
+        return None
     return fn
 
 def move_occluding(world, ray, obj_name):

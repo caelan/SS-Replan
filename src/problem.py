@@ -153,8 +153,8 @@ def pdddlstream_from_problem(belief, **kwargs):
     init += [('Type', obj_name, 'stove') for obj_name in STOVES] + \
             [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Status', status) for status in DOOR_STATUSES] + \
-            [('Camera', name) for name in world.cameras] + \
             [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
+            #[('Camera', name) for name in world.cameras]
     if task.movable_base:
         init.append(('MovableBase',))
     #if task.fixed_base:
