@@ -51,12 +51,53 @@ ACTION_COSTS = {
 def title_from_snake(s):
     return ''.join(x.title() for x in s.split('_'))
 
-def pdddlstream_from_problem(state, debug=False, **kwargs):
+def get_streams(world, debug=False, **kwargs):
+    stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
+
+    stream_map = {
+        'test-door': from_test(get_door_test(world)),
+        'test-gripper': from_test(get_gripper_open_test(world)),
+
+        'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
+        'sample-grasp': from_gen_fn(get_grasp_gen(world)),
+        'sample-nearby-pose': from_gen_fn(get_nearby_stable_gen(world, **kwargs)),
+
+        'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
+        'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
+
+        'plan-base-motion': from_fn(get_base_motion_fn(world, **kwargs)),
+        'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
+        'plan-gripper-motion': from_fn(get_gripper_motion_gen(world, **kwargs)),
+        'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
+
+        'test-near-pose': from_test(get_test_near_pose(world, **kwargs)),
+        'test-near-joint': from_test(get_test_near_joint(world, **kwargs)),
+
+        'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
+        'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
+
+        'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
+        # 'compute-angle-kin': from_fn(compute_angle_kin),
+        'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
+
+        'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
+        'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
+        'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
+
+        'test-ofree-ray-pose': from_test(get_ofree_ray_pose_test(world, **kwargs)),
+        'test-ofree-ray-grasp': from_test(get_ofree_ray_grasp_test(world, **kwargs)),
+        # 'MoveCost': move_cost_fn,
+        # 'Distance': base_cost_fn,
+    }
+    if debug:
+        stream_map = DEBUG
+    return stream_pddl, stream_map
+
+def pdddlstream_from_problem(state, **kwargs):
     world = state.world # One world per state
     task = world.task # One task per world
     print(task)
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
-    stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
 
     init_bq = Conf(world.robot, world.base_joints)
     init_aq = Conf(world.robot, world.arm_joints)
@@ -245,43 +286,6 @@ def pdddlstream_from_problem(state, debug=False, **kwargs):
     #bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
 
     goal_formula = existential_quantification(goal_literals)
-
-    stream_map = {
-        'test-door': from_test(get_door_test(world)),
-        'test-gripper': from_test(get_gripper_open_test(world)),
-
-        'sample-pose': from_gen_fn(get_stable_gen(world, **kwargs)),
-        'sample-grasp': from_gen_fn(get_grasp_gen(world)),
-        'sample-nearby-pose': from_gen_fn(get_nearby_stable_gen(world, **kwargs)),
-
-        'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
-        'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
-
-        'plan-base-motion': from_fn(get_base_motion_fn(world, **kwargs)),
-        'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
-        'plan-gripper-motion': from_fn(get_gripper_motion_gen(world, **kwargs)),
-        'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
-
-        'test-near-pose': from_test(get_test_near_pose(world, **kwargs)),
-        'test-near-joint': from_test(get_test_near_joint(world, **kwargs)),
-
-        'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
-        'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
-
-        'compute-pose-kin': from_fn(compute_pose_kin),
-        #'compute-angle-kin': from_fn(compute_angle_kin),
-        'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
-
-        'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
-        'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
-        'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
-
-        'test-ofree-ray-pose': from_test(get_ofree_ray_pose_test(world, **kwargs)),
-        'test-ofree-ray-grasp': from_test(get_ofree_ray_grasp_test(world, **kwargs)),
-        # 'MoveCost': move_cost_fn,
-        # 'Distance': base_cost_fn,
-    }
-    if debug:
-        stream_map = DEBUG
+    stream_pddl, stream_map = get_streams(world, **kwargs)
 
     return PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)

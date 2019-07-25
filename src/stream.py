@@ -821,6 +821,7 @@ def get_gripper_open_test(world, tolerance=1e-2):
     return test
 
 def get_door_test(world, tolerance=1e-2):
+    # TODO: less strict threshold for open/closed
     def test(joint_name, conf, status):
         [joint] = conf.joints
         sign = world.get_door_sign(joint)

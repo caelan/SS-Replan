@@ -129,8 +129,8 @@ def main():
             add_markers(world, inverse_place=False)
     #wait_for_user()
 
-    test_observation(world, entity_name='big_red_block0')
-    return
+    #test_observation(world, entity_name='big_red_block0')
+    #return
 
     if args.defer:
         run_stochastic(task, args)
