@@ -14,7 +14,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, \
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
-    child_link_from_joint, is_placed_on_aabb, pairwise_collision
+    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link
 
 try:
     import trac_ik_python
@@ -90,11 +90,9 @@ OPEN_SURFACES = COUNTERS + STOVES
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
 
-CABINETS = [
-    'baker', 'chewie_left', 'chewie_right',
-    'dagger_left', 'dagger_right',
-    #'indigo_tmp_bottom',
-]
+LEFT_CABINETS = ['baker', 'chewie_left', 'chewie_right']
+RIGHT_CABINETS = ['dagger_left', 'dagger_right'] #'indigo_tmp_bottom',
+CABINETS = LEFT_CABINETS + RIGHT_CABINETS
 
 DRAWERS = [
     #'hitman_drawer_top', #'hitman_drawer_bottom',
@@ -507,3 +505,13 @@ def test_supported(world, body, surface_name, collisions=True):
     #print([get_link_name(obst[0], list(obst[1])[0]) for obst in obstacles
     #       if pairwise_collision(body, obst)])
     return not any(pairwise_collision(body, obst) for obst in obstacles)
+
+
+def get_link_obstacles(world, link_name):
+    if link_name in world.movable:
+        return flatten_links(world.get_body(link_name))
+    elif has_link(world.kitchen, link_name):
+        link = link_from_name(world.kitchen, link_name)
+        return flatten_links(world.kitchen, get_link_subtree(world.kitchen, link)) # subtree?
+    assert link_name in SURFACE_FROM_NAME
+    return set()
