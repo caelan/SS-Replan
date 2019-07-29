@@ -24,6 +24,7 @@ from isaac_bridge.carter import Carter, KitchenDemoCarter
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, wait_for_duration, Pose, Point, Euler
 
+from src.observation import create_observable_belief
 from src.visualization import add_markers
 from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot, \
     load_calibrate_conf, KEYPOINT_PATH, LOCALIZATION_ROSPATHS
@@ -137,7 +138,7 @@ def create_trial_args(**kwargs):
 
 ################################################################################
 
-def planning_loop(domain, observer, state, args, additional_init=[], additional_goals=[]):
+def planning_loop(domain, observer, state, belief, args, additional_init=[], additional_goals=[]):
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
     world = state.world # One world per state
@@ -147,6 +148,7 @@ def planning_loop(domain, observer, state, args, additional_init=[], additional_
     while True:
         # TODO: Isaac class for these things
         world_state = observer.update()
+        print(world_state)
         update_world(world, domain, observer, world_state, USE_OBJECTS)
         saver = WorldSaver()
 
@@ -283,6 +285,8 @@ def main():
     #localize_all(world_state)
     #wait_for_user()
     #print('Entities:', sorted(world_state.entities))
+    print(world_state)
+    print(observer)
     with LockRenderer():
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
@@ -299,8 +303,8 @@ def main():
         world.update_initial()
         add_markers(world, inverse_place=False)
     wait_for_duration(duration=0.1)
-    state = world.get_initial_state()
-    # TODO: initial robot base conf is in collision
+    state = world.get_initial_state() # TODO: carter is initially in collision
+    belief = create_observable_belief(world) # TODO: should state be part of belief?
 
     #wait_for_user()
     #return
@@ -308,7 +312,7 @@ def main():
     wait_for_user('Plan?')
     #return
 
-    success = planning_loop(domain, observer, state, args,
+    success = planning_loop(domain, observer, state, belief, args,
                             additional_init=additional_init,
                             additional_goals=additional_goals)
     print('Success:', success)

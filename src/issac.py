@@ -187,6 +187,7 @@ def update_world(world, domain, observer, world_state, objects=None):
     #print(world_state.get_frames())
     # Using state is nice because it applies noise
 
+    print(world_state)
     print('Entities:', sorted(world_state.entities))
     #world.reset()
     update_robot(world, domain, observer, world_state)
