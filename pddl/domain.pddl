@@ -85,7 +85,7 @@
     (PlaceCost)
     (PullCost)
     (CookCost)
-    (DetectCost)
+    (DetectCost ?rp1 ?rp2)
   )
 
   (:action move_base
@@ -196,17 +196,17 @@
   )
 
   (:action detect
-    :parameters (?o1 ?p1 ?rp1 ?p2 ?rp2 ?o ?p ?r)
-    :precondition (and (PoseKin ?o1 ?p1 ?rp1 ?o ?p) (PoseKin ?o1 ?p2 ?rp2 ?o ?p)
+    :parameters (?o1 ?p1 ?rp1 ?p2 ?rp2 ?o0 ?p0 ?r)
+    :precondition (and (PoseKin ?o1 ?p1 ?rp1 ?o0 ?p0) (PoseKin ?o1 ?p2 ?rp2 ?o0 ?p0)
                        (Detect ?o1 ?p2 ?r) (DistSample ?rp1 ?rp2)
-                       (AtWorldPose ?o1 ?p1) ; (AtRelPose ?o1 ?rp1 ?o2) (AtWorldPose ?o ?p)
+                       (AtWorldPose ?o1 ?p1) ; (AtRelPose ?o1 ?rp1 ?o0) ; (AtWorldPose ?o0 ?p0)
                        (not (OccludedRay ?r))
                   )
-    :effect (and (Detected ?o)
-                 (AtRelPose ?o1 ?rp2 ?o2) (AtWorldPose ?o1 ?p2)
-                 (not (AtRelPose ?o1 ?rp1 ?o2)) (not (AtWorldPose ?o1 ?p1))
+    :effect (and (Detected ?o1)
+                 (AtRelPose ?o1 ?rp2 ?o0) (AtWorldPose ?o1 ?p2)
+                 (not (AtRelPose ?o1 ?rp1 ?o0)) (not (AtWorldPose ?o1 ?p1))
                  ; TODO: negate the poses of everything else
-                 (increase (total-cost) (DetectCost)))
+                 (increase (total-cost) (DetectCost ?rp1 ?rp2)))
   )
 
 

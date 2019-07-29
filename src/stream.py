@@ -8,21 +8,23 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
     joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
-    Euler, quat_from_euler, set_pose, has_link, \
-    point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
+    Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
-    flatten_links, is_point_in_polygon, grow_polygon, Pose
+    is_point_in_polygon, grow_polygon, Pose, user_input
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
-    set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, \
-    RelPose, FINGER_EXTENT, create_surface_attachment, \
-    compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported
+    set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
+    compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, get_link_obstacles
 from src.visualization import GROW_BASE
+from src.belief import SurfaceDist
+from examples.discrete_belief.run import revisit_mdp_cost
 
-BASE_CONSTANT = 10
+DETECT_COST = 1
+
+BASE_CONSTANT = 1 # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 MAX_CONF_DISTANCE = 0.75
@@ -45,6 +47,15 @@ def trajectory_cost_fn(t):
     distance = t.distance(distance_fn=lambda q1, q2: get_distance(q1[:2], q2[:2]))
     return BASE_CONSTANT + distance / BASE_VELOCITY
 
+def detect_cost_fn(rp_dist, rp_sample):
+    # TODO: extend to continuous rp_sample controls using densities
+    prob = rp_dist.discrete_prob(rp_sample)
+    success_cost = DETECT_COST
+    failure_cost = success_cost
+    cost = revisit_mdp_cost(success_cost, failure_cost, prob)
+    user_input('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
+    return cost
+
 ################################################################################
 
 # TODO: more general forward kinematics
@@ -53,6 +64,9 @@ def get_compute_pose_kin(world):
     def fn(o1, rp, o2, p2):
         if o1 == o2:
             return None
+        if isinstance(rp, SurfaceDist):
+            p1 = rp.project(lambda x: fn(o1, x, o2, p2)[0])
+            return (p1,)
         #if np.allclose(p2.value, unit_pose()):
         #    return (rp,)
         #if np.allclose(rp.value, unit_pose()):
@@ -138,23 +152,19 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
-def get_sample_belief_gen(world, **kwargs):
+def get_sample_belief_gen(world, mlo=False, **kwargs):
+
     def gen(obj_name, pose_dist, surface_name):
         # If we aren't resampling, can just sort by probability of success
         # Could also sample according ot the distribution
-        pass
-    return
 
-################################################################################
-
-def get_link_obstacles(world, link_name):
-    if link_name in world.movable:
-        return flatten_links(world.get_body(link_name))
-    elif has_link(world.kitchen, link_name):
-        link = link_from_name(world.kitchen, link_name)
-        return flatten_links(world.kitchen, get_link_subtree(world.kitchen, link)) # subtree?
-    assert link_name in SURFACE_FROM_NAME
-    return set()
+        poses = sorted(pose_dist.dist.support(), key=pose_dist.discrete_prob, reverse=True)
+        if mlo:
+            poses = poses[:1]
+            print(pose_dist.prob(poses[0]))
+        for rp in poses:
+            yield (rp,)
+    return gen
 
 ################################################################################
 

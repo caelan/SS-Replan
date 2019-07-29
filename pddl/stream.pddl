@@ -181,6 +181,10 @@
     :certified (AngleWithin ?j ?a ?s)
   )
 
+  (:function (DetectCost ?rp1 ?rp2) ; TODO: could pass in risk level
+             (DistSample ?rp1 ?rp2)
+  )
+
   ;(:function (Distance ?bq1 ?bq2)
   ;  (and (BConf ?bq1) (BConf ?bq2))
   ;)

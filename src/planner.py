@@ -11,10 +11,12 @@ from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
 from pddlstream.language.rule import RULES
 from pddlstream.language.object import Object, OptimisticObject
-
+from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
+
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
 from src.command import Wait, iterate_plan
+from src.stream import DETECT_COST
 
 VIDEO_FILENAME = 'video.mp4'
 REPLAN_ACTIONS = {'calibrate'}
@@ -22,7 +24,7 @@ REPLAN_ACTIONS = {'calibrate'}
 
 def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
     _, _, _, stream_map, init, goal = problem
-    print('Init:', init)
+    print('Init:', sorted(init, key=lambda f: f[0]))
     print('Goal:', goal)
     print('Streams:', stream_map.keys())
     RULES[:] = []
@@ -37,8 +39,10 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
         'test-near-joint': StreamInfo(p_success=0, eager=True),
 
         # TODO: need to be careful about conditional effects
-        'compute-sample-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True), p_success=0.5, eager=True),
-        'compute-dist-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True), p_success=0.5, eager=True),
+        'compute-sample-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
+                                              p_success=0.5, eager=True),
+        'compute-dist-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
+                                            p_success=0.5, eager=True),
         #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
         #'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
         #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
@@ -60,6 +64,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
         'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True),
 
+        'DetectCost': FunctionInfo(lambda rp1, rp2: DETECT_COST),
         #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
         #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }

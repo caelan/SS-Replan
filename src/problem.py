@@ -19,7 +19,8 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
-    get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, get_sample_belief_gen
+    get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
+    get_sample_belief_gen, detect_cost_fn
 from src.issac import load_calibrate_conf
 from src.database import has_place_database
 
@@ -43,7 +44,7 @@ ACTION_COSTS = {
     'move_arm': 1,
     'move_gripper': 1,
     'calibrate': 1,
-    'detect': 1,
+    #'detect': 1,
     'pick': 1,
     'place': 1,
     'pull': 1,
@@ -90,7 +91,9 @@ def get_streams(world, debug=False, **kwargs):
 
         'test-ofree-ray-pose': from_test(get_ofree_ray_pose_test(world, **kwargs)),
         'test-ofree-ray-grasp': from_test(get_ofree_ray_grasp_test(world, **kwargs)),
-        # 'MoveCost': move_cost_fn,
+
+        'DetectCost': detect_cost_fn,
+        #'MoveCost': move_cost_fn,
         # 'Distance': base_cost_fn,
     }
     if debug:
@@ -238,7 +241,7 @@ def pdddlstream_from_problem(belief, **kwargs):
                 #('AtRelPose', surface_name, world_pose, 'world'),
                 ('AtWorldPose', surface_name, world_pose),
                 ('Counter', surface_name, world_pose), # Fixed surface
-                ('Sample', world_pose),
+                #('Sample', world_pose),
             ]
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
@@ -295,7 +298,7 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
                 poses = [rel_pose, world_pose]
 
-            init.extend(('Distribution', pose) if isinstance(pose, PoseDist) else
+            init.extend(('Dist', pose) if isinstance(pose, PoseDist) else
                         ('Sample', pose) for pose in poses)
 
     #for body, ty in problem.body_types:

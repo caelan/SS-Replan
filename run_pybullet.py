@@ -60,8 +60,8 @@ def run_deterministic(task, args):
         belief = create_observable_belief(world)
     else:
         belief = create_surface_belief(world, UniformDist(ZED_SURFACES))
-    [observation] = observe_all_cameras(world).values()
-    belief.update(observation)
+        #[observation] = observe_all_cameras(world).values()
+        #belief.update(observation)
     belief.draw()
     wait_for_user('Start?')
 

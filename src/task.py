@@ -83,7 +83,7 @@ def open_all_doors(world):
 
 def detect_block(world, **kwargs):
     entity_name = add_block(world, idx=0)
-    obstruction_name = add_box(world, idx=0)
+    #obstruction_name = add_box(world, idx=0)
     #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:
@@ -93,7 +93,7 @@ def detect_block(world, **kwargs):
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     return Task(world, movable_base=True,
-                return_init_bq=True, # return_init_aq=False,
+                return_init_bq=False, return_init_aq=False,
                 goal_detected=[entity_name],
                 **kwargs)
 
