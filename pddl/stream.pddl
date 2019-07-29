@@ -105,7 +105,7 @@
   ;                  (CalibrateMotion ?bq @rest_aq ?at))
   ;)
 
-  ; TODO: rule defined for sample vs distribution?
+
   (:stream sample-belief
     :inputs (?o1 ?rp1 ?o2)
     :domain (and (RelPose ?o1 ?rp1 ?o2) (Dist ?rp1)) ; PoseDist
@@ -122,13 +122,20 @@
                     (Detect ?o ?p ?r))
   )
 
-  (:stream compute-pose-kin
+  (:stream compute-sample-pose-kin
     :inputs (?o1 ?rp ?o2 ?p2)
     :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2) (Sample ?rp))
     :outputs (?p1)
     :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Sample ?p1))
     ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation?
   )
+  (:stream compute-dist-pose-kin ; TODO: rule that does this instead?
+    :inputs (?o1 ?rp ?o2 ?p2)
+    :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2) (Dist ?rp))
+    :outputs (?p1)
+    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Dist ?p1))
+  )
+
   ;(:stream compute-angle-kin
   ;  :inputs (?o ?j ?a)
   ;  :domain (and (Connected ?o ?j) (Angle ?j ?a))

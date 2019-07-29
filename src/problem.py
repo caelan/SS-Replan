@@ -10,6 +10,7 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
     WorldSaver
 
+from src.observation import PoseDist
 from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, \
     create_surface_attachment, create_relative_pose
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
@@ -77,7 +78,8 @@ def get_streams(world, debug=False, **kwargs):
         'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
 
-        'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
+        'compute-sample-pose-kin': from_fn(get_compute_pose_kin(world)),
+        'compute-dist-pose-kin': from_fn(get_compute_pose_kin(world)),
         # 'compute-angle-kin': from_fn(compute_angle_kin),
         'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
         'sample-belief': from_gen_fn(get_sample_belief_gen(world, **kwargs)),
@@ -258,9 +260,13 @@ def pdddlstream_from_problem(belief, **kwargs):
     for obj_name, pose_dist in belief.pose_dists.items():
         body = world.get_body(obj_name)
         support = pose_dist.dist.support()
-        assert len(support) == 1
-        [rel_pose] = support
-        surface_name = rel_pose.support
+        if len(support) == 1:
+            [rel_pose] = support
+            surface_name = rel_pose.support
+        else:
+            rel_pose = pose_dist
+            surface_name = support[0].support
+
         if surface_name is None:
             # Treats as obstacle
             world_pose = RelPose(body, init=True)
@@ -268,8 +274,8 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ('Movable', obj_name), # TODO: misnomer
                 ('WorldPose', obj_name, world_pose),
                 ('AtWorldPose', obj_name, world_pose),
-                ('Sample', world_pose),
             ]
+            poses = [world_pose]
             #raise RuntimeError(obj_name, supporting)
         else:
             surface_pose = surface_poses[surface_name]
@@ -282,11 +288,16 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ('AtRelPose', obj_name, rel_pose, surface_name),
                 ('WorldPose', obj_name, world_pose),
                 ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
-                ('Sample', rel_pose),
-                ('Sample', world_pose),
+
                 ('AtWorldPose', obj_name, world_pose),
                 ('On', obj_name, surface_name),
             ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
+            poses = [rel_pose, world_pose]
+        for pose in poses:
+            if isinstance(pose, PoseDist):
+                init.append(('Distribution', pose))
+            else:
+                init.append(('Sample', pose))
 
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]

@@ -68,7 +68,8 @@ ELSEWHERE = None # symbol for elsewhere pose
 Neighborhood = namedtuple('Neighborhood', ['poses', 'prob'])
 
 class PoseDist(object):
-    def __init__(self, world, name, dist, std=0.01):
+    # TODO: maintain one of these for each surface instead?
+    def __init__(self, world, name, dist, weight=1.0, bandwidth=0.01):
         self.world = world
         self.name = name
         self.dist = dist
@@ -77,9 +78,13 @@ class PoseDist(object):
             self.poses_from_surface.setdefault(pose.support, []).append(pose)
         self.surface_dist = self.dist.project(lambda p: p.support)
         self.density_from_surface = {}
-        self.std = std
+        self.weight = weight
+        self.bandwidth = bandwidth
+
     def surface_prob(self, surface):
-        return self.surface_dist.prob(surface)
+        return self.weight * self.surface_dist.prob(surface)
+    def discrete_prob(self, pose):
+        return self.weight * self.dist.prob(pose)
     def prob(self, pose):
         support = pose.support
         density = self.get_density(support)
@@ -87,6 +92,7 @@ class PoseDist(object):
         [score] = density.score_samples([pose2d])
         prob = np.exp(-score)
         return self.surface_prob(support) * prob
+
     def pose2d_from_pose(self, pose):
         return base_values_from_pose(pose.get_reference_from_body())[:DIM]
     def pose_from_pose2d(self, pose2d, surface):
@@ -105,6 +111,7 @@ class PoseDist(object):
         surface_from_body = Pose(point, Euler(yaw=yaw))
         set_pose(body, multiply(world_from_surface, surface_from_body))
         return create_relative_pose(self.world, self.name, surface)
+
     def get_density(self, surface):
         if surface in self.density_from_surface:
             return self.density_from_surface[surface]
@@ -125,7 +132,7 @@ class PoseDist(object):
         # 'kulsinski', 'minkowski', 'mahalanobis', 'p', 'l2', 'hamming', 'l1', 'wminkowski', 'pyfunc']
         yaw_weight = 0.01*np.pi
         metric_weights = np.array([1., 1., yaw_weight]) # TODO: wrap around and symmetry?
-        density = KernelDensity(bandwidth=self.std, algorithm='auto',
+        density = KernelDensity(bandwidth=self.bandwidth, algorithm='auto',
                                 kernel='gaussian', metric="wminkowski", atol=0, rtol=0,
                                 breadth_first=True, leaf_size=40,
                                 metric_params={'p': 2, 'w': metric_weights[:DIM]})
@@ -156,9 +163,10 @@ class PoseDist(object):
             delta = target_point - point
             if np.linalg.norm(delta[:2]) < radius:
                 poses.add(pose)
-        prob = sum(map(self.dist.prob, poses))
+        prob = sum(map(self.discrete_prob, poses))
         #poses = {target_pose}
         return Neighborhood(poses, prob)
+
     def sample_surface_pose(self, surface): # TODO: timeout
         density = self.get_density(surface)
         if density is None:
@@ -173,10 +181,29 @@ class PoseDist(object):
             # TODO: additional obstacles
             if test_supported(self.world, body, surface):
                 return pose # TODO: return prob?
-    def sample(self):
-        return self.sample_surface_pose(self.surface_dist.sample())
-    def sample_support(self):
+    def sample_surface(self):
+        return self.surface_dist.sample()
+    def sample_discrete(self):
         return self.dist.sample()
+    def sample(self):
+        return self.sample_surface_pose(self.sample_surface())
+    def resample(self, n=NUM_PARTICLES):
+        if len(self.dist.support()) <= 1:
+            return self
+        with LockRenderer():
+            poses = [self.sample() for _ in range(n)]
+        new_dist = UniformDist(poses)
+        return self.__class__(self.world, self.name, new_dist)
+
+    def decompose(self):
+        if len(self.dist.support()) == 1:
+            return self.dist.support()
+        pose_dists = []
+        for surface_name in self.surface_dist.support():
+            dist = DDist({pose: self.discrete_prob(pose) for pose in self.poses_from_surface[surface_name]})
+            pose_dists.append(SurfaceDist(self.world, self.name, surface_name,
+                                          self.surface_prob(surface_name), dist))
+        return pose_dists
     def update_dist(self, observation, obstacles=[], verbose=False):
         # cfree_dist.conditionOnVar(index=1, has_detection=True)
         body = self.world.get_body(self.name)
@@ -245,13 +272,7 @@ class PoseDist(object):
         if RESAMPLE:
             pose_dist = pose_dist.resample()
         return pose_dist
-    def resample(self, n=NUM_PARTICLES):
-        if len(self.dist.support()) <= 1:
-            return self
-        with LockRenderer():
-            poses = [self.sample() for _ in range(n)]
-        new_dist = UniformDist(poses)
-        return self.__class__(self.world, self.name, new_dist)
+
     def dump(self):
         print(self.name, self.dist)
     def draw(self, color=(1, 0, 0), **kwargs):
@@ -273,7 +294,17 @@ class PoseDist(object):
         return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
                                        self.surface_dist, len(self.dist.support()))
 
-# TODO: point estimates and confidence regions
+class SurfaceDist(PoseDist):
+    def __init__(self, world, name, surface_name, weight, dist):
+        super(SurfaceDist, self).__init__(world, name, dist, weight=weight)
+        self.surface_name = surface_name
+    def __repr__(self):
+        return '{}({}, {} ,{}, {})'.format(self.__class__.__name__, self.name, self.surface_name,
+                                           self.surface_dist, len(self.dist.support()))
+
+################################################################################
+
+# TODO: point estimates and confidence intervals/regions
 
 class Belief(object):
     def __init__(self, world, pose_dists={}, grasped=None):
