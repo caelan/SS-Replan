@@ -10,18 +10,17 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
     Euler, quat_from_euler, set_pose, has_link, \
     point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
-    stable_z_on_aabb, is_placed_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
-    is_center_on_aabb, Ray, batch_ray_collision, wait_for_user, \
-    get_distance_fn, get_unit_vector, unit_quat, child_link_from_joint, Point, set_configuration, \
-    flatten_links, is_point_in_polygon, grow_polygon, Pose, wait_if_unlocked
+    stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
+    Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
+    flatten_links, is_point_in_polygon, grow_polygon, Pose
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, SURFACE_FROM_NAME, \
-    CABINET_JOINTS, RelPose, FINGER_EXTENT, create_surface_attachment, \
-    compute_surface_aabb, create_relative_pose
-from src.visualization import GROW_BASE, GROW_PLACEMENT
+    RelPose, FINGER_EXTENT, create_surface_attachment, \
+    compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported
+from src.visualization import GROW_BASE
 
 BASE_CONSTANT = 10
 BASE_VELOCITY = 0.25
@@ -32,7 +31,7 @@ MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
-Z_EPSILON = 5e-3
+
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
@@ -148,19 +147,6 @@ def get_sample_belief_gen(world, **kwargs):
 
 ################################################################################
 
-def get_surface_obstacles(world, surface_name):
-    surface = surface_from_name(surface_name)
-    obstacles = set()
-    for joint_name in surface.joints:
-        joint = joint_from_name(world.kitchen, joint_name)
-        if joint_name in CABINET_JOINTS:
-            # TODO: remove this mechanic in the future
-            world.open_door(joint)
-        link = child_link_from_joint(joint)
-        obstacles.update(get_descendant_obstacles(world.kitchen, link)) # subtree?
-    # Be careful to call this before each check
-    return obstacles
-
 def get_link_obstacles(world, link_name):
     if link_name in world.movable:
         return flatten_links(world.get_body(link_name))
@@ -220,19 +206,6 @@ def get_test_near_joint(world, **kwargs):
     return test
 
 ################################################################################
-
-def test_supported(world, body, surface_name, collisions=True):
-    # TODO: is_center_on_aabb or is_placed_on_aabb
-    surface_aabb = compute_surface_aabb(world, surface_name)
-    # TODO: epsilon thresholds?
-    if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
-        return False
-    obstacles = world.static_obstacles | get_surface_obstacles(world, surface_name)
-    if not collisions:
-        obstacles = set()
-    #print([get_link_name(obst[0], list(obst[1])[0]) for obst in obstacles
-    #       if pairwise_collision(body, obst)])
-    return not any(pairwise_collision(body, obst) for obst in obstacles)
 
 def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=Z_EPSILON, **kwargs):

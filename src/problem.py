@@ -10,7 +10,7 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
     WorldSaver
 
-from src.observation import PoseDist
+from src.belief import PoseDist
 from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, \
     create_surface_attachment, create_relative_pose
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
@@ -110,7 +110,7 @@ def pdddlstream_from_problem(belief, **kwargs):
     carry_aq = world.carry_conf
     calibrate_aq = world.calibrate_conf
     # TODO: order goals for serialization
-    # TODO: return set of facts that support the previous plan
+    # TODO: return set of facts that dist_support the previous plan
     # TODO: repackage stream outputs to avoid recomputation
 
     constant_map = {
@@ -257,47 +257,46 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('AtGrasp', obj_name, grasp),
             ('Holding', obj_name),
         ]
+
+    # TODO: track poses over time to produce estimates
     for obj_name, pose_dist in belief.pose_dists.items():
         body = world.get_body(obj_name)
-        support = pose_dist.dist.support()
-        if len(support) == 1:
-            [rel_pose] = support
+        dist_support = pose_dist.dist.support()
+        if len(dist_support) == 1:
+            rel_poses = dist_support
+        else:
+            rel_poses = pose_dist.decompose() # Could also fully decompose into points (but many samples)
+        for rel_pose in rel_poses:
             surface_name = rel_pose.support
-        else:
-            rel_pose = pose_dist
-            surface_name = support[0].support
-
-        if surface_name is None:
-            # Treats as obstacle
-            world_pose = RelPose(body, init=True)
-            init += [
-                ('Movable', obj_name), # TODO: misnomer
-                ('WorldPose', obj_name, world_pose),
-                ('AtWorldPose', obj_name, world_pose),
-            ]
-            poses = [world_pose]
-            #raise RuntimeError(obj_name, supporting)
-        else:
-            surface_pose = surface_poses[surface_name]
-            world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
-            init += [
-                ('Movable', obj_name),
-                ('Graspable', obj_name),
-                ('CheckNearby', obj_name),
-                ('RelPose', obj_name, rel_pose, surface_name),
-                ('AtRelPose', obj_name, rel_pose, surface_name),
-                ('WorldPose', obj_name, world_pose),
-                ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
-
-                ('AtWorldPose', obj_name, world_pose),
-                ('On', obj_name, surface_name),
-            ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
-            poses = [rel_pose, world_pose]
-        for pose in poses:
-            if isinstance(pose, PoseDist):
-                init.append(('Distribution', pose))
+            if surface_name is None:
+                # Treats as obstacle
+                world_pose = RelPose(body, init=True)
+                init += [
+                    ('Movable', obj_name), # TODO: misnomer
+                    ('WorldPose', obj_name, world_pose),
+                    ('AtWorldPose', obj_name, world_pose),
+                ]
+                poses = [world_pose]
+                #raise RuntimeError(obj_name, supporting)
             else:
-                init.append(('Sample', pose))
+                surface_pose = surface_poses[surface_name]
+                world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
+                init += [
+                    ('Movable', obj_name),
+                    ('Graspable', obj_name),
+                    ('CheckNearby', obj_name),
+                    ('RelPose', obj_name, rel_pose, surface_name),
+                    ('AtRelPose', obj_name, rel_pose, surface_name),
+                    ('WorldPose', obj_name, world_pose),
+                    ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
+
+                    ('AtWorldPose', obj_name, world_pose),
+                    ('On', obj_name, surface_name),
+                ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
+                poses = [rel_pose, world_pose]
+
+            init.extend(('Distribution', pose) if isinstance(pose, PoseDist) else
+                        ('Sample', pose) for pose in poses)
 
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]

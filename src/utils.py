@@ -11,9 +11,10 @@ from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_unti
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, \
     unit_pose, BodySaver, multiply, Pose, \
     get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
-    set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, get_moving_links, \
+    set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, \
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
-    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point
+    apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
+    child_link_from_joint, is_placed_on_aabb, pairwise_collision
 
 try:
     import trac_ik_python
@@ -475,3 +476,34 @@ def get_descendant_obstacles(body, link=BASE_LINK):
     # TODO: deprecate?
     return {(body, frozenset([link]))
             for link in get_link_subtree(body, link)}
+
+################################################################################
+
+Z_EPSILON = 5e-3
+
+def get_surface_obstacles(world, surface_name):
+    surface = surface_from_name(surface_name)
+    obstacles = set()
+    for joint_name in surface.joints:
+        joint = joint_from_name(world.kitchen, joint_name)
+        if joint_name in CABINET_JOINTS:
+            # TODO: remove this mechanic in the future
+            world.open_door(joint)
+        link = child_link_from_joint(joint)
+        obstacles.update(get_descendant_obstacles(world.kitchen, link)) # subtree?
+    # Be careful to call this before each check
+    return obstacles
+
+
+def test_supported(world, body, surface_name, collisions=True):
+    # TODO: is_center_on_aabb or is_placed_on_aabb
+    surface_aabb = compute_surface_aabb(world, surface_name)
+    # TODO: epsilon thresholds?
+    if not is_placed_on_aabb(body, surface_aabb):  # , above_epsilon=z_offset+1e-3):
+        return False
+    obstacles = world.static_obstacles | get_surface_obstacles(world, surface_name)
+    if not collisions:
+        obstacles = set()
+    #print([get_link_name(obst[0], list(obst[1])[0]) for obst in obstacles
+    #       if pairwise_collision(body, obst)])
+    return not any(pairwise_collision(body, obst) for obst in obstacles)
