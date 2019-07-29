@@ -25,6 +25,11 @@ TEMPLATE = '%s_1'
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
 
+def update_observer(observer):
+    import rospy
+    while not observer.update():
+        rospy.sleep(0.1)
+    return observer.current_state
 
 def kill_lula():
     # Kill Lula
@@ -95,7 +100,8 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     world_from_model = multiply(world_from_entity, entity_from_model)
     return world_from_model
 
-def update_robot(world, domain, observer, world_state):
+def update_robot(world, domain, observer):
+    world_state = observer.current_state
     entity = world_state.entities[domain.robot]
     # Update joint positions
     carter_values = entity.carter_pos
@@ -190,7 +196,7 @@ def update_world(world, domain, observer, world_state, objects=None):
     print(world_state)
     print('Entities:', sorted(world_state.entities))
     #world.reset()
-    update_robot(world, domain, observer, world_state)
+    update_robot(world, domain, observer)
     for name, entity in world_state.entities.items():
         #entity.obj_type
         #entity.semantic_frames

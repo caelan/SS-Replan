@@ -8,7 +8,6 @@ import rospy
 import traceback
 import numpy as np
 import math
-import pickle
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
@@ -17,24 +16,20 @@ from brain_ros.kitchen_domain import KitchenDomain
 #from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain # from grasps import *
 from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
-from brain_ros.lula_policies import LulaInitializeDart
-from lula_dartpy.object_administrator import ObjectAdministrator
-from isaac_bridge.carter import Carter, KitchenDemoCarter
+from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
     wait_for_user, wait_for_duration, Pose, Point, Euler
 
 from src.observation import create_observable_belief
 from src.visualization import add_markers
-from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_isaac_robot, \
-    load_calibrate_conf, KEYPOINT_PATH, LOCALIZATION_ROSPATHS
+from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_observer
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.problem import pdddlstream_from_problem
-from src.task import Task, close_all_doors
+from src.task import Task
 from src.replan import get_plan_postfix, make_wild_skeleton
-from src.execution import base_control
 
 from pddlstream.language.constants import Not, And
 
@@ -147,8 +142,7 @@ def planning_loop(domain, observer, state, belief, args, additional_init=[], add
     last_skeleton = None
     while True:
         # TODO: Isaac class for these things
-        world_state = observer.update()
-        print(world_state)
+        world_state = update_observer(observer)
         update_world(world, domain, observer, world_state, USE_OBJECTS)
         saver = WorldSaver()
 
@@ -197,6 +191,8 @@ def localize_all(world_state):
         #obj.administrator.detect()
         #print(obj.pose[:3, 3])
     wait_for_duration(1.0)
+
+################################################################################
 
 def main():
     parser = create_parser()
@@ -259,6 +255,7 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world, goal_on={SPAM: TOP_DRAWER},
+                    goal_closed=['indigo_drawer_top_joint'], #, 'indigo_drawer_bottom_joint'],
                     movable_base=not args.fixed)
     else:
         #trial_args = parse.parse_kitchen_args()
@@ -281,18 +278,15 @@ def main():
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
-    world_state = observer.update() # domain.root
+    world_state = update_observer(observer)
     #localize_all(world_state)
     #wait_for_user()
     #print('Entities:', sorted(world_state.entities))
-    print(world_state)
-    print(observer)
     with LockRenderer():
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
         update_world(world, domain, observer, world_state, USE_OBJECTS)
-        world_state = observer.update()
-        # observer.update() observer.current_state
+        world_state = update_observer(observer)
         localize_all(world_state)
         update_world(world, domain, observer, world_state, USE_OBJECTS)
         #close_all_doors(world)
