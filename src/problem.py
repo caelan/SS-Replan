@@ -1,5 +1,8 @@
 from __future__ import print_function
 
+import numpy as np
+import math
+
 from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, \
     And, Equal, PDDLProblem
 from pddlstream.language.stream import DEBUG
@@ -8,7 +11,7 @@ from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    WorldSaver
+    WorldSaver, get_distance_fn, get_difference
 
 from src.belief import PoseDist
 from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, \
@@ -195,9 +198,15 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('AConf', goal_bq, carry_aq),
             ('CloseTo', goal_bq, goal_bq),
         ])
+        if np.less_equal(np.abs(get_difference(init_bq.values, goal_bq.values)),
+                         [0.05, 0.05, math.radians(10)]).all():
+            init.append(('CloseTo', init_bq, goal_bq))
         goal_literals.append(Exists(['?bq'], And(
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
         if task.return_init_aq:
+            if np.less_equal(np.abs(get_difference(init_aq.values, goal_aq.values)),
+                             math.radians(10)*np.ones(len(world.arm_joints))).all():
+                init.append(('CloseTo', init_aq, goal_aq))
             init.extend([
                 ('AConf', goal_bq, goal_aq),
                 ('CloseTo', goal_aq, goal_aq),
