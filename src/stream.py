@@ -177,6 +177,8 @@ def get_sample_belief_gen(world, min_prob=0.01, mlo=False, **kwargs):
                 #print(obj_name, surface_name, prob)
                 #user_input('Continue?')
                 yield (rp,)
+            else:
+                break # Works if sorted
     return gen
 
 ################################################################################

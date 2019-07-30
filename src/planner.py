@@ -58,12 +58,16 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
         'plan-arm-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e2, defer=True),
         #'plan-gripper-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
 
-        'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True),
-        'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True),
-        'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True),
-
-        'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True),
-        'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True),
+        'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True,
+                                           verbose_success=False),
+        'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True,
+                                           verbose_success=False),
+        'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True,
+                                           verbose_success=False),
+        'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True,
+                                           verbose_success=False),
+        'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True,
+                                           verbose_success=False),
 
         'DetectCost': FunctionInfo(opt_detect_cost_fn),
         #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),

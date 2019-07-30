@@ -19,7 +19,7 @@
   )
   (:stream sample-nearby-pose
     :inputs (?o1 ?o2 ?p2 ?bq)
-    :domain (and (Stackable ?o1 ?o2) (NearPose ?o2 ?p2 ?bq)) ; TODO: ensure open?
+    :domain (and (NearPose ?o2 ?p2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure open?
     :outputs (?p1 ?rp)
     :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
                     (Sample ?p1) (Sample ?rp)
@@ -29,7 +29,7 @@
   ; Movable base
   (:stream plan-pick
     :inputs (?o ?p ?g) ; ?aq0)
-    :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (Sample ?p) (MovableBase)) ; (RestAConf ?aq0))
+    :domain (and (MovableBase) (WorldPose ?o ?p) (Sample ?p) (Grasp ?o ?g)) ; (RestAConf ?aq0))
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
@@ -39,7 +39,7 @@
   )
   (:stream plan-pull
     :inputs (?j ?a1 ?a2) ; ?aq0)
-    :domain (and (Angle ?j ?a1) (Angle ?j ?a2) (MovableBase)) ; (RestAConf ?aq0))
+    :domain (and (MovableBase) (Angle ?j ?a1) (Angle ?j ?a2)) ; (RestAConf ?aq0))
     :outputs (?bq ?aq1 ?aq2 ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
@@ -57,7 +57,7 @@
   )
   (:stream fixed-plan-pick
     :inputs (?o ?p ?g ?bq)
-    :domain (and (WorldPose ?o ?p) (Grasp ?o ?g) (Sample ?p) (NearPose ?o ?p ?bq))
+    :domain (and (NearPose ?o ?p ?bq) (WorldPose ?o ?p) (Sample ?p) (Grasp ?o ?g))
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at))
@@ -78,7 +78,7 @@
   (:stream plan-base-motion
     :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
     :inputs (?bq1 ?bq2 ?aq) ; TODO: just rest_aq?
-    :domain (and (AConf ?bq1 ?aq) (AConf ?bq2 ?aq) (MovableBase))
+    :domain (and (MovableBase) (AConf ?bq1 ?aq) (AConf ?bq2 ?aq))
     :outputs (?bt)
     :certified (BaseMotion ?bq1 ?bq2 ?aq ?bt)
   )
@@ -124,14 +124,14 @@
 
   (:stream compute-sample-pose-kin
     :inputs (?o1 ?rp ?o2 ?p2)
-    :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2) (Sample ?rp))
+    :domain (and (RelPose ?o1 ?rp ?o2) (Sample ?rp) (WorldPose ?o2 ?p2))
     :outputs (?p1)
     :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Sample ?p1))
     ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation?
   )
   (:stream compute-dist-pose-kin ; TODO: rule that does this instead?
     :inputs (?o1 ?rp ?o2 ?p2)
-    :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2) (Dist ?rp))
+    :domain (and (RelPose ?o1 ?rp ?o2) (Dist ?rp) (WorldPose ?o2 ?p2))
     :outputs (?p1)
     :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Dist ?p1))
   )

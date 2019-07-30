@@ -151,6 +151,8 @@ def main():
         with LockRenderer():
             add_markers(world, inverse_place=False)
     #wait_for_user()
+    # TODO: FD instantiation is slightly slow to a deepcopy
+    # TODO: check collisions between base/arm confs and doors
 
     #test_observation(world, entity_name='big_red_block0')
     #return

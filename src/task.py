@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
@@ -8,7 +9,7 @@ from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
     KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb
-#from examples.discrete_belief.dist import DDist, UniformDist
+from examples.discrete_belief.dist import DDist, UniformDist
 
 
 class Task(object):
@@ -95,14 +96,17 @@ def detect_block(world, **kwargs):
     set_all_static()
     for side in CAMERAS[:1]:
         add_kinect(world, side)
-    #initial_surface = 'indigo_tmp' # indigo_tmp | indigo_drawer_top
-    #sample_placement(world, entity_name, initial_surface, learned=True)
+    initial_distribution = UniformDist(['indigo_drawer_top']) # indigo_tmp
+    initial_surface = initial_distribution.sample()
+    if random.random() < 0.5:
+        sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     return Task(world, movable_base=True,
-                return_init_bq=True, return_init_aq=False,
+                return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
-                goal_holding=[entity_name],
+                #goal_holding=[entity_name],
+                goal_on={entity_name: 'indigo_drawer_top'},
                 **kwargs)
 
 ################################################################################
@@ -136,7 +140,7 @@ def stow_block(world, **kwargs):
     add_kinect(world)  # TODO: this needs to be after set_all_static
 
     #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    initial_surface = 'hitman_tmp'
+    initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
     #initial_surface = 'indigo_drawer_top'
     goal_surface = 'indigo_drawer_top' # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)

@@ -231,7 +231,6 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ('Movable', link_name),
                 ('AngleKin', link_name, world_pose, joint_name, conf),
                 ('WorldPose', link_name, world_pose),
-                #('Localized', link_name),
             ])
             if conf == init_conf:
                 surface_poses[link_name] = world_pose
@@ -247,20 +246,22 @@ def pdddlstream_from_problem(belief, **kwargs):
         if parent_joint in world.kitchen_joints:
             assert surface_name in surface_poses
             #joint_name = get_joint_name(world.kitchen, parent_joint)
-            init.append(('CheckNearby', surface_name))
+            world_pose = surface_poses[surface_name]
         else:
             world_pose = RelPose(world.kitchen, surface_link, init=True)
             surface_poses[surface_name] = world_pose
             init += [
-                ('CheckNearby', surface_name),
+                ('Counter', surface_name, world_pose),  # Fixed surface
                 #('RelPose', surface_name, world_pose, 'world'),
                 ('WorldPose', surface_name, world_pose),
                 #('AtRelPose', surface_name, world_pose, 'world'),
                 ('AtWorldPose', surface_name, world_pose),
-                ('Counter', surface_name, world_pose), # Fixed surface
-                #('Localized', surface_name),
-                #('Sample', world_pose),
             ]
+        init.extend([
+            ('CheckNearby', surface_name),
+            ('Localized', surface_name),
+            ('Sample', world_pose),
+        ])
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
@@ -313,16 +314,17 @@ def pdddlstream_from_problem(belief, **kwargs):
                 surface_pose = surface_poses[surface_name]
                 world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
                 init += [
+                    # Static
                     ('RelPose', obj_name, rel_pose, surface_name),
-                    ('AtRelPose', obj_name, rel_pose, surface_name),
                     ('WorldPose', obj_name, world_pose),
                     ('PoseKin', obj_name, world_pose, rel_pose, surface_name, surface_pose),
-
+                    # Fluent
+                    ('AtRelPose', obj_name, rel_pose, surface_name),
                     ('AtWorldPose', obj_name, world_pose),
-                    ('On', obj_name, surface_name),
                 ]
+                if localized:
+                    init.append(('On', obj_name, surface_name))
                 poses = [rel_pose, world_pose]
-
             init.extend(('Dist', pose) if isinstance(pose, PoseDist) else
                         ('Sample', pose) for pose in poses)
 
