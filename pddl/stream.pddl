@@ -170,6 +170,7 @@
     :certified (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
   )
 
+  ; TODO: these could also just be populated in the initial state
   (:stream test-gripper
     :inputs (?gq)
     :domain (GConf ?gq)

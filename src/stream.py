@@ -844,23 +844,30 @@ CLOSED = 'closed'
 DOOR_STATUSES = [OPEN, CLOSED]
 # TODO: retrieve from entity
 
-def get_gripper_open_test(world, tolerance=1e-2):
-    open_gq = world.open_gq.values - tolerance * np.ones(len(world.open_gq.joints))
+def get_gripper_open_test(world, percent=1e-1): #, tolerance=1e-2
+    open_gq = percent*np.array(world.closed_gq.values) + \
+              (1-percent)*np.array(world.open_gq.values)
+    #open_gq = world.open_gq.values - tolerance * np.ones(len(world.gripper_joints))
     def test(gq):
         return np.less_equal(open_gq, gq.values).all()
     return test
 
-def get_door_test(world, tolerance=1e-2):
-    # TODO: less strict threshold for open/closed
+def get_door_test(world, percent=1e-1): #, tolerance=1e-2):
     def test(joint_name, conf, status):
         [joint] = conf.joints
         sign = world.get_door_sign(joint)
+        #print(joint_name, world.closed_conf(joint), conf.values[0],
+        #      world.open_conf(joint), status)
         position = sign*conf.values[0]
         if status == OPEN:
-            open_position = sign * world.open_conf(joint) - tolerance
+            open_position = sign * (percent * world.closed_conf(joint) +
+                                    (1-percent) * world.open_conf(joint))
+            #open_position = sign * world.open_conf(joint) - tolerance
             return open_position <= position
         elif status == CLOSED:
-            closed_position = sign * world.closed_conf(joint) + tolerance
+            closed_position = sign * ((1-percent) * world.closed_conf(joint) +
+                                      percent * world.open_conf(joint))
+            #closed_position = sign * world.closed_conf(joint) + tolerance
             return position <= closed_position
         raise NotImplementedError(status)
     return test
