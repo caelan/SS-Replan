@@ -22,9 +22,9 @@ from src.visualization import GROW_BASE
 from src.belief import SurfaceDist
 from examples.discrete_belief.run import revisit_mdp_cost
 
-DETECT_COST = 1
+DETECT_COST = 1.
 
-BASE_CONSTANT = 1 # 1 | 10
+BASE_CONSTANT = 1. # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 MAX_CONF_DISTANCE = 0.75

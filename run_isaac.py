@@ -141,6 +141,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
     #task = world.task # One task per world
     last_skeleton = None
     while True:
+        # The difference in state is that this one is only used for visualization
         state = world.get_initial_state() # TODO: create from belief for holding
         problem = pdddlstream_from_problem(belief, collisions=not args.cfree, teleport=args.teleport)
         problem[-2].extend(additional_init)
