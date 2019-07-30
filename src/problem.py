@@ -175,9 +175,12 @@ def pdddlstream_from_problem(belief, **kwargs):
     goal_literals = []
     goal_literals += [('Holding', name) for name in task.goal_holding] + \
                      [('On', name, surface) for name, surface in task.goal_on.items()] + \
-                     [('DoorStatus', joint_name, CLOSED) for joint_name in task.goal_closed] + \
                      [('Cooked', name) for name in task.goal_cooked] + \
-                     [('Localized', name) for name in task.goal_detected]
+                     [('Localized', name) for name in task.goal_detected] + \
+                     [Exists(['?a'], And(('AngleWithin', joint_name, '?a', CLOSED),
+                                         ('AtAngle', joint_name, '?a')))
+                      for joint_name in task.goal_closed]
+
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
     if task.return_init_bq:
@@ -190,12 +193,17 @@ def pdddlstream_from_problem(belief, **kwargs):
         init.extend([
             ('BConf', goal_bq),
             ('AConf', goal_bq, carry_aq),
-            ('AConf', goal_bq, calibrate_aq),
+            ('CloseTo', goal_bq, goal_bq),
         ])
-        goal_literals.append(('AtBConf', goal_bq))
+        goal_literals.append(Exists(['?bq'], And(
+            ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
         if task.return_init_aq:
-            init.append(('AConf', goal_bq, goal_aq))
-            goal_literals.append(('AtAConf', goal_aq))
+            init.extend([
+                ('AConf', goal_bq, goal_aq),
+                ('CloseTo', goal_aq, goal_aq),
+            ])
+            goal_literals.append(Exists(['?aq'], And(
+                ('CloseTo', '?aq', goal_aq), ('AtAConf', '?aq'))))
 
     surface_poses = {}
     for joint in world.kitchen_joints:

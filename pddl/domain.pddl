@@ -68,6 +68,7 @@
     (UnsafeATraj ?at)
     (UnsafeBTraj ?bt)
     (OccludedRay ?r)
+    (CloseTo ?q1 ?q2)
 
     (RelPose ?o1 ?rp ?o2)
     (WorldPose ?o ?p)
@@ -235,15 +236,16 @@
                        (AtGConf ?gq)))
   )
 
-  (:derived (DoorStatus ?j ?s)
-    (exists (?a) (and (AngleWithin ?j ?a ?s)
-                      (AtAngle ?j ?a)))
-  )
   (:derived (Accessible ?o ?p) (or
     (Counter ?o ?p)
     (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
                          (AtAngle ?j ?a))))
   )
+
+  ;(:derived (DoorStatus ?j ?s)
+  ;  (exists (?a) (and (AngleWithin ?j ?a ?s)
+  ;                    (AtAngle ?j ?a)))
+  ;)
   ;(:derived (AdmitsGrasp ?o ?g ?o2) ; Static fact
   ;  (exists (?gty) (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty)))
   ;)
