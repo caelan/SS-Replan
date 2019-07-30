@@ -8,7 +8,7 @@ from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, 
     multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree, get_aabb_extent, \
     load_pybullet, set_joint_position, get_all_links, get_center_extent, joint_from_name, WorldSaver, get_aabb_area, \
     remove_all_debug
-from src.observation import ZED_SURFACES, create_surface_belief, observe_with_camera
+from src.observation import ZED_SURFACES, create_surface_belief, observe_scene
 from src.utils import get_grasps, compute_surface_aabb
 
 
@@ -229,7 +229,7 @@ def test_observation(world, entity_name):
 
     # TODO: record history of observations to recover point estimate of belief
     saver.restore()
-    observation = observe_with_camera(world, camera_name)
+    observation = observe_scene(world)
     print(observation)
     belief = belief.update(observation)
 

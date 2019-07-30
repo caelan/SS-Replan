@@ -5,7 +5,7 @@ import random
 import math
 import time
 
-#from pddlstream.utils import str_from_object
+from pddlstream.utils import str_from_object
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.discrete_belief.run import continue_mdp_cost
 #from examples.pybullet.pr2_belief.primitives import get_observation_fn
@@ -15,7 +15,7 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize
+    pairwise_collision, elapsed_time, randomize, remove_handles
 from src.belief import NUM_PARTICLES, PoseDist
 from src.stream import get_stable_gen
 from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
@@ -59,25 +59,33 @@ class Belief(object):
         self.world = world
         self.pose_dists = pose_dists
         self.grasped = grasped # grasped or holding?
-        names = sorted(self.pose_dists)
-        self.color_from_name = dict(zip(names, spaced_colors(len(names))))
+        self.color_from_name = dict(zip(self.names, spaced_colors(len(self.names))))
         self.observations = []
+        self.handles = []
         # TODO: belief fluents
+    @property
+    def names(self):
+        return sorted(self.pose_dists)
+    @property
+    def holding(self):
+        if self.grasped is None:
+            return None
+        return self.grasped.body_name
     def update(self, observation, n_samples=25):
-        self.observations.append(observation)
+        start_time = time.time()
+        detections = fix_detections(self, observation)
+        self.observations.append(detections)
         # Processing detected first
         # Could simply sample from the set of worlds and update
         # Would need to sample many worlds with name at different poses
         # Instead, let the moving object take on different poses
-        # TODO: prune if grasped
-        start_time = time.time()
-        order = [name for name in observation.detections] # Detected
+        order = [name for name in detections] # Detected
         order.extend(set(self.pose_dists) - set(order)) # Not detected
         with WorldSaver():
             with LockRenderer():
                 for name in order:
                     self.pose_dists[name] = self.pose_dists[name].update(
-                        self, observation, n_samples=n_samples)
+                        self, detections, n_samples=n_samples)
         print('Update time: {:.3f} sec for {} objects and {} samples'.format(
             elapsed_time(start_time), len(order), n_samples))
         return self
@@ -103,11 +111,15 @@ class Belief(object):
             print(i, name, self.pose_dists[name])
     def draw(self, **kwargs):
         with LockRenderer():
+            remove_handles(self.handles)
+            self.handles = []
             with WorldSaver():
                 for name, pose_dist in self.pose_dists.items():
-                    pose_dist.draw(color=self.color_from_name[name], **kwargs)
+                    self.handles.extend(pose_dist.draw(
+                            color=self.color_from_name[name], **kwargs))
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, sorted(self.pose_dists))
+        return '{}({})'.format(self.__class__.__name__, str_from_object(
+            {name: self.pose_dists[name].surface_dist for name in self.names}))
 
 ################################################################################
 
@@ -162,31 +174,23 @@ def compute_cfree(body, poses, obstacles=[]):
 
 ################################################################################
 
-class Observation(object):
-    def __init__(self, camera_name, camera_pose, detections):
-        self.camera_name = camera_name
-        self.camera_pose = camera_pose
-        self.detections = detections
-    def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.camera_name, sorted(self.detections))
-
-def are_visible(world, camera_pose):
+def are_visible(world):
     ray_names = []
     rays = []
-    camera_point = point_from_pose(camera_pose)
     for name in world.movable:
-        point = point_from_pose(get_pose(world.get_body(name)))
-        if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
-            ray_names.append(name)
-            rays.append(Ray(camera_point, point))
+        for camera, info in world.cameras.items():
+            camera_pose = get_pose(info.body)
+            camera_point = point_from_pose(camera_pose)
+            point = point_from_pose(get_pose(world.get_body(name)))
+            if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
+                ray_names.append(name)
+                rays.append(Ray(camera_point, point))
     ray_results = batch_ray_collision(rays)
     return {name for name, result in zip(ray_names, ray_results)
             if result.objectUniqueId == world.get_body(name)}
 
-def observe_with_camera(world, camera_name):
-    camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
-    camera_pose = get_pose(camera_body)
-    visible_entities = are_visible(world, camera_pose)
+def observe_scene(world):
+    visible_entities = are_visible(world)
     detections = {}
     # TODO: randomize robot's pose
     # TODO: probabilities based on whether in viewcone or not
@@ -205,20 +209,31 @@ def observe_with_camera(world, camera_name):
         print('{}: dx={:.3f}, dy={:.3f}, dyaw={:.5f}'.format(name, dx, dy, dyaw))
         noise_pose = Pose(Point(x=dx, y=dy), Euler(yaw=dyaw))
         observed_pose = multiply(pose, noise_pose)
-        fixed_pose = world.fix_pose(name, observed_pose)
-        set_pose(body, fixed_pose)
-        support = world.get_supporting(name)
-        if support is None:
-            continue
-        assert support is not None
-        relative_pose = create_relative_pose(world, name, support, init=False)
-        #relative_pose.assign()
-        detections.setdefault(name, []).append(relative_pose)
-    return Observation(camera_name, camera_pose, detections)
+        #world.get_body_type(name)
+        detections.setdefault(name, []).append(observed_pose) # TODO: use type instead
+    return detections
 
-def observe_all_cameras(world):
-    return {camera_name: observe_with_camera(world, camera_name)
-            for camera_name in world.cameras}
+################################################################################
+
+def fix_detections(belief, detections):
+    # TODO: move directly to belief?
+    world = belief.world
+    fixed_detections = {}
+    for name in detections:
+        if name == belief.holding:
+            continue
+        body = world.get_body(name)
+        for observed_pose in detections[name]:
+            fixed_pose = world.fix_pose(name, observed_pose)
+            set_pose(body, fixed_pose)
+            support = world.get_supporting(name)
+            if support is None:
+                continue # Could also fix as relative to the world
+            assert support is not None
+            relative_pose = create_relative_pose(world, name, support, init=False)
+            fixed_detections.setdefault(name, []).append(relative_pose)
+            # relative_pose.assign()
+    return fixed_detections
 
 def transition_belief_update(belief, plan):
     if plan is None:

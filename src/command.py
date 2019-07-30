@@ -307,6 +307,10 @@ class Detect(Command):
         self.rays = tuple(rays)
         # TODO: could instead use cones for full detection
 
+    @property
+    def surface_name(self):
+        return self.pose.support
+
     def ray_collision(self):
         return batch_ray_collision(self.rays)
 
@@ -331,7 +335,8 @@ class Detect(Command):
         pass
 
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.camera, self.name)
+        return '{}({}, {}, {})'.format(
+            self.__class__.__name__, self.camera, self.name, self.surface_name)
 
 class Wait(Command):
     def __init__(self, world, steps):

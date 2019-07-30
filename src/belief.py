@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 from collections import namedtuple
 from scipy.stats import norm, truncnorm
 
@@ -9,7 +10,7 @@ from examples.discrete_belief.dist import UniformDist, DDist, DeltaDist, mixDDis
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import base_values_from_pose, CIRCULAR_LIMITS, stable_z_on_aabb, point_from_pose, Point, Pose, \
     Euler, set_pose, multiply, draw_circle, LockRenderer, BodySaver, Ray, batch_ray_collision, draw_ray, wrap_angle, \
-    circular_difference, remove_handles
+    circular_difference, remove_handles, get_pose
 from src.database import get_surface_reference_pose
 from src.utils import compute_surface_aabb, create_relative_pose, CAMERA_MATRIX, KINECT_DEPTH, Z_EPSILON, test_supported
 
@@ -157,6 +158,8 @@ class PoseDist(object):
             poses = [self.sample() for _ in range(n)]
         new_dist = UniformDist(poses)
         return self.__class__(self.world, self.name, new_dist)
+    def copy(self):
+        return self.__class__(self.world, self.name, self.dist.copy())
 
     def decompose(self):
         if len(self.dist.support()) == 1:
@@ -177,8 +180,11 @@ class PoseDist(object):
         cfree_dist = DDist({pose: self.dist.prob(pose) for pose in cfree_poses})
         # TODO: do these updates simultaneously for each object
         # TODO: check all camera poses
-        detectable_poses = compute_detectable(cfree_poses, observation.camera_pose)
-        visible_poses = compute_visible(body, detectable_poses, observation.camera_pose, draw=False)
+        [camera] = self.world.cameras.keys()
+        info = self.world.cameras[camera]
+        camera_pose = get_pose(info.body)
+        detectable_poses = compute_detectable(cfree_poses, camera_pose)
+        visible_poses = compute_visible(body, detectable_poses, camera_pose, draw=False)
         if verbose:
             print('Total: {} | CFree: {} | Detectable: {} | Visible: {}'.format(
                 len(all_poses), len(cfree_poses), len(detectable_poses), len(visible_poses)))
@@ -189,11 +195,11 @@ class PoseDist(object):
             return self.bayesian_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
         return self.multi_modal_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
     def bayesian_belief_update(self, prior_dist, visible_poses, observation, verbose=False):
-        has_detection = self.name in observation.detections
+        has_detection = self.name in observation
         detected_surface = None
         pose_estimate_2d = None
         if has_detection:
-            [detected_pose] = observation.detections[self.name]
+            [detected_pose] = observation[self.name]
             detected_surface = detected_pose.support
             pose_estimate_2d = self.pose2d_from_pose(detected_pose)
         if verbose:
@@ -210,9 +216,9 @@ class PoseDist(object):
         # joint_dist = JDist(cfree_dist, detection_fn, registration_fn)
         return new_dist
     def multi_modal_belief_update(self, prior_dist, visible_poses, observation, verbose=False):
-        if self.name in observation.detections:
+        if self.name in observation:
             # TODO: convert into a Multivariate Gaussian
-            [detected_pose] = observation.detections[self.name]
+            [detected_pose] = observation[self.name]
             return DeltaDist(detected_pose)
         return self.bayesian_belief_update(prior_dist, visible_poses, observation, verbose=verbose)
     def update(self, belief, observation, n_samples=25, verbose=False, **kwargs):
@@ -240,13 +246,17 @@ class PoseDist(object):
     def dump(self):
         print(self.name, self.dist)
     def draw(self, color=(1, 0, 0), **kwargs):
-        # TODO: display heatmap of samples across the surfaces
-
+        #if self.handles:
+        #    return
         poses = list(self.dist.support())
-        probs = list(map(self.dist.prob, poses))
+        probs = list(map(self.discrete_prob, poses))
+        alphas = np.linspace(0.0, 1.0, num=11, endpoint=True)
+        percentiles = np.array([scipy.stats.scoreatpercentile(
+            probs, 100 * p, interpolation_method='lower') for p in alphas])  # numpy.percentile
         max_prob = max(probs)
-        print('{}) max prob: {:.3f}'.format(self.name, max_prob))
-        remove_handles(self.handles)
+        #print('{}) max prob: {:.3f}'.format(self.name, max_prob))
+        print('{}) #poses: {} | percentiles: {}'.format(self.name, len(poses), percentiles.round(3)))
+        #remove_handles(self.handles)
         self.handles = []
         for pose, prob in zip(poses, probs):
             # TODO: could instead draw a circle

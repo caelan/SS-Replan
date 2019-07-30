@@ -29,6 +29,7 @@ BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 MAX_CONF_DISTANCE = 0.75
 
+PRINT_FAILURES = False
 MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
@@ -153,7 +154,7 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
-def get_sample_belief_gen(world, min_prob=0.001, mlo=False, **kwargs):
+def get_sample_belief_gen(world, min_prob=0.01, mlo=False, **kwargs):
 
     def gen(obj_name, pose_dist, surface_name):
         # If we aren't resampling, can just sort by probability of success
@@ -164,6 +165,8 @@ def get_sample_belief_gen(world, min_prob=0.001, mlo=False, **kwargs):
         for rp in poses:
             prob = pose_dist.discrete_prob(rp)
             if min_prob <= prob:
+                #print(obj_name, surface_name, prob)
+                #user_input('Continue?')
                 yield (rp,)
     return gen
 
@@ -312,7 +315,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
                 yield (bq,)
                 break
         else:
-            print('Failed after {} IR attempts:'.format(max_attempts))
+            if PRINT_FAILURES: print('Failed after {} IR attempts:'.format(max_attempts))
             return
 
 def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
@@ -328,19 +331,19 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
     # TODO: could extract out collision function
     full_approach_conf = world.solve_inverse_kinematics(approach_pose)
     if full_approach_conf is None: # TODO: | {obj}
-        print('Pregrasp kinematic failure')
+        if PRINT_FAILURES: print('Pregrasp kinematic failure')
         return None
     moving_links = get_moving_links(world.robot, world.arm_joints)
     robot_obstacle = (world.robot, frozenset(moving_links))
     #robot_obstacle = world.robot
     if any(pairwise_collision(robot_obstacle, b) for b in obstacles): # TODO: | {obj}
-        print('Pregrasp collision failure')
+        if PRINT_FAILURES: print('Pregrasp collision failure')
         return None
     approach_conf = get_joint_positions(world.robot, world.arm_joints)
     if teleport:
         return [aq.values, approach_conf, grasp_conf]
     if MAX_CONF_DISTANCE < distance_fn(grasp_conf, approach_conf):
-        print('Pregrasp proximity failure')
+        if PRINT_FAILURES: print('Pregrasp proximity failure')
         return None
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
@@ -350,7 +353,7 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                                           disabled_collisions=world.disabled_collisions,
                                           custom_limits=world.custom_limits, resolutions=resolutions / 4.)
     if grasp_path is None:
-        print('Pregrasp path failure')
+        if PRINT_FAILURES: print('Pregrasp path failure')
         return None
     if not approach_path:
         return grasp_path
@@ -365,7 +368,7 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                                       custom_limits=world.custom_limits, resolutions=resolutions,
                                       restarts=2, iterations=25, smooth=25)
     if approach_path is None:
-        print('Approach path failure')
+        if PRINT_FAILURES: print('Approach path failure')
         return None
     return approach_path + grasp_path
 
@@ -401,14 +404,14 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
     full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
     if full_grasp_conf is None:
-        print('Grasp kinematic failure')
+        if PRINT_FAILURES: print('Grasp kinematic failure')
         return
     moving_links = get_moving_links(world.robot, world.arm_joints)
     robot_obstacle = (world.robot, frozenset(moving_links))
     #robot_obstacle = get_descendant_obstacles(world.robot, child_link_from_joint(world.arm_joints[0]))
     #robot_obstacle = world.robot
     if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-        print('Grasp collision failure')
+        if PRINT_FAILURES: print('Grasp collision failure')
         return
     approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
     approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
@@ -450,7 +453,7 @@ def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
             if ik_outputs is not None:
                 yield ik_outputs
                 return
-        print('Fixed pick failure')
+        if PRINT_FAILURES: print('Fixed pick failure')
     return gen
 
 def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwargs):
@@ -483,7 +486,7 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
                     yield (base_conf,) + ik_outputs
                     break
             else:
-                print('Pick failure')
+                if PRINT_FAILURES: print('Pick failure')
                 yield None
     return gen
 
@@ -642,7 +645,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
             if ik_outputs is not None:
                 yield ik_outputs
                 return
-        print('Fixed pull failure')
+        if PRINT_FAILURES: print('Fixed pull failure')
     return gen
 
 def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, learned=True, **kwargs):
@@ -679,7 +682,7 @@ def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, lea
                     yield (base_conf,) + ik_outputs
                     break
             else:
-                print('Pull failure')
+                if PRINT_FAILURES: print('Pull failure')
                 yield None
     return gen
 
@@ -734,7 +737,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                                             reversible=True, self_collisions=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
-                print('Failed to find a base motion plan!')
+                if PRINT_FAILURES: print('Failed to find a base motion plan!')
                 #for bq in [bq1, bq2]:
                 #    bq.assign()
                 #    wait_for_user()
@@ -782,7 +785,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      custom_limits=world.custom_limits, resolutions=resolutions,
                                      restarts=2, iterations=25, smooth=25)
             if path is None:
-                print('Failed to find an arm motion plan!')
+                if PRINT_FAILURES: print('Failed to find an arm motion plan!')
                 return None
         cmd = Sequence(State(world, savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),

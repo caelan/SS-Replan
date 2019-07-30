@@ -15,7 +15,7 @@ from pybullet_tools.utils import wait_for_user, INF, LockRenderer
 from src.visualization import add_markers
 from src.observation import create_observable_belief, \
     transition_belief_update, create_surface_belief, UniformDist, ZED_SURFACES, \
-    observe_all_cameras
+    observe_scene
 from src.debug import test_observation
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
@@ -58,14 +58,7 @@ def run_deterministic(task, args):
     world = task.world
     state = world.get_initial_state()
     belief = create_observable_belief(world)
-    if args.observable:
-        belief = create_observable_belief(world)
-    else:
-        belief = create_surface_belief(world, UniformDist(ZED_SURFACES))
-        #[observation] = observe_all_cameras(world).values()
-        #belief.update(observation)
-    belief.draw()
-    wait_for_user('Start?')
+    #wait_for_user('Start?')
 
     problem = pdddlstream_from_problem(belief,
         collisions=not args.cfree, teleport=args.teleport)
@@ -94,13 +87,15 @@ def run_stochastic(task, args):
     else:
         belief = create_surface_belief(world, UniformDist(ZED_SURFACES))
     # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
+    print('Prior:', belief)
 
     last_skeleton = None
     #last_cost = INF
     # TODO: make this a generic policy
     while True:
-        [observation] = observe_all_cameras(world).values()
+        observation = observe_scene(world)
         belief.update(observation)
+        print('Belief:', belief)
         belief.draw()
         #wait_for_user('Plan?')
         problem = pdddlstream_from_problem(belief,

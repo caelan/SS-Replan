@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from collections import namedtuple
 
 from ikfast.ik import sample_tool_ik
@@ -335,6 +336,11 @@ class World(object):
         return name
     def get_body(self, name):
         return self.body_from_name[name]
+    def get_body_path(self, name):
+        return self.path_from_name[name]
+    def get_body_type(self, name):
+        filename, _ = os.path.splitext(os.path.basename(self.get_body_path(name)))
+        return filename
     def get_name(self, name):
         inverse = {v: k for k, v in self.body_from_name.items()}
         return inverse.get(name, None)
