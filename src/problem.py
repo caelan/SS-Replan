@@ -177,7 +177,7 @@ def pdddlstream_from_problem(belief, **kwargs):
                      [('On', name, surface) for name, surface in task.goal_on.items()] + \
                      [('DoorStatus', joint_name, CLOSED) for joint_name in task.goal_closed] + \
                      [('Cooked', name) for name in task.goal_cooked] + \
-                     [('Detected', name) for name in task.goal_detected]
+                     [('Localized', name) for name in task.goal_detected]
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
     if task.return_init_bq:
@@ -215,6 +215,7 @@ def pdddlstream_from_problem(belief, **kwargs):
                 ('Movable', link_name),
                 ('AngleKin', link_name, world_pose, joint_name, conf),
                 ('WorldPose', link_name, world_pose),
+                #('Localized', link_name),
             ])
             if conf == init_conf:
                 surface_poses[link_name] = world_pose
@@ -241,6 +242,7 @@ def pdddlstream_from_problem(belief, **kwargs):
                 #('AtRelPose', surface_name, world_pose, 'world'),
                 ('AtWorldPose', surface_name, world_pose),
                 ('Counter', surface_name, world_pose), # Fixed surface
+                #('Localized', surface_name),
                 #('Sample', world_pose),
             ]
         for grasp_type in GRASP_TYPES:
@@ -252,24 +254,28 @@ def pdddlstream_from_problem(belief, **kwargs):
         assert obj_name not in belief.pose_dists
         grasp = belief.grasped
         init += [
+            # Static
             ('Movable', obj_name),
             ('Graspable', obj_name),
             ('CheckNearby', obj_name),
             ('Grasp', obj_name, grasp),
             ('IsGraspType', obj_name, grasp, grasp.grasp_type),
+            # Fluent
             ('AtGrasp', obj_name, grasp),
             ('Holding', obj_name),
+            ('Localized', obj_name),
         ]
 
     # TODO: track poses over time to produce estimates
     for obj_name, pose_dist in belief.pose_dists.items():
         body = world.get_body(obj_name)
         dist_support = pose_dist.dist.support()
-        if len(dist_support) == 1:
-            rel_poses = dist_support
-        else:
-            rel_poses = pose_dist.decompose() # Could also fully decompose into points (but many samples)
-        for rel_pose in rel_poses:
+        localized = (len(dist_support) == 1)
+        if localized:
+            init.append(('Localized', obj_name))
+        # Could also fully decompose into points (but many samples)
+        # Could immediately add likely points for collision checking
+        for rel_pose in (dist_support if localized else pose_dist.decompose()):
             surface_name = rel_pose.support
             if surface_name is None:
                 # Treats as obstacle

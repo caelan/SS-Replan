@@ -51,7 +51,7 @@
     (CanMoveGripper)
     (Cooked ?o)
     (Calibrated)
-    (Detected ?o)
+    (Localized ?o)
 
     (OpenGripper)
     (OpenGConf ?gq)
@@ -152,7 +152,8 @@
                  (CanMoveBase) (CanMoveArm)
                  (Holding ?o1) (not (On ?o1 ?o2))
                  (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?p1))
-                 (not (HandEmpty)) (not (Detected ?o1))
+                 (not (HandEmpty))
+                 ; (not (Localized ?o1))
                  (increase (total-cost) (PickCost)))
   )
   (:action place
@@ -170,6 +171,7 @@
                  (On ?o1 ?o2) (not (Holding ?o1))
                  (CanMoveBase) (CanMoveArm)
                  (not (AtGrasp ?o1 ?g))
+                 ;(not (Localized ?o1))
                  (increase (total-cost) (PlaceCost)))
   )
   (:action pull
@@ -202,7 +204,7 @@
                        (AtWorldPose ?o1 ?p1) ; (AtRelPose ?o1 ?rp1 ?o0) ; (AtWorldPose ?o0 ?p0)
                        (not (OccludedRay ?r))
                   )
-    :effect (and (Detected ?o1)
+    :effect (and (Localized ?o1)
                  (AtRelPose ?o1 ?rp2 ?o0) (AtWorldPose ?o1 ?p2)
                  (not (AtRelPose ?o1 ?rp1 ?o0)) (not (AtWorldPose ?o1 ?p1))
                  ; TODO: negate the poses of everything else

@@ -99,11 +99,10 @@ def detect_block(world, **kwargs):
 
 ################################################################################
 
-def relocate_block(world, **kwargs):
+def hold_block(world, **kwargs):
     #open_all_doors(world)
     entity_name = add_block(world, idx=0)
-    initial_surface = 'hitman_tmp'
-    goal_surface = 'indigo_tmp'
+    initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
     set_all_static()
     add_kinect(world)
     sample_placement(world, entity_name, initial_surface, learned=True)
@@ -111,7 +110,6 @@ def relocate_block(world, **kwargs):
     return Task(world, movable_base=True,
                 return_init_bq=True, # return_init_aq=False,
                 goal_holding=[entity_name],
-                #goal_on={entity_name: goal_surface},
                 #goal_closed=ALL_JOINTS,
                 **kwargs)
 
@@ -146,6 +144,6 @@ def stow_block(world, **kwargs):
 
 TASKS = [
     detect_block,
-    relocate_block,
+    hold_block,
     stow_block,
 ]

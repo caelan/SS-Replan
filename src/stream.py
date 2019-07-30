@@ -54,7 +54,7 @@ def detect_cost_fn(rp_dist, rp_sample):
     success_cost = DETECT_COST
     failure_cost = success_cost
     cost = revisit_mdp_cost(success_cost, failure_cost, prob)
-    user_input('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
+    print('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
     return cost
 
 ################################################################################
@@ -692,6 +692,8 @@ def parse_fluents(world, fluents, obstacles):
             # obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
         elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
             b, p = args
+            if isinstance(p, SurfaceDist):
+                continue
             p.assign()
             obstacles.update(get_link_obstacles(world, b))
         elif predicate == 'AtGrasp'.lower():
@@ -850,6 +852,8 @@ def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
     def test(o1, rp1, o2, rp2, s):
         if not collisions or (o1 == o2):
             return True
+        if isinstance(rp1, SurfaceDist) or isinstance(rp2, SurfaceDist):
+            return True # TODO: perform this probabilistically
         rp1.assign()
         rp2.assign()
         return not pairwise_collision(world.get_body(o1), world.get_body(o2))
@@ -860,6 +864,8 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
         # o1 will always be a movable object
         if not collisions or (o1 == o2):
             return True
+        if isinstance(p2, SurfaceDist):
+            return True # TODO: perform this probabilistically
         body = world.get_body(o1)
         p2.assign()
         obstacles = get_link_obstacles(world, o2) # - {body}
@@ -880,6 +886,8 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
             return True
         # TODO: check door collisions
         # TODO: still need to check static links at least once
+        if isinstance(p, SurfaceDist):
+            return True # TODO: perform this probabilistically
         p.assign()
         state = at.context.copy()
         state.assign()
