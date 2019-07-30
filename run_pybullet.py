@@ -13,9 +13,10 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, INF, LockRenderer
 from src.visualization import add_markers
-from src.observation import test_observation, create_observable_belief, \
+from src.observation import create_observable_belief, \
     transition_belief_update, create_surface_belief, UniformDist, ZED_SURFACES, \
     observe_all_cameras
+from src.debug import test_observation
 from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -128,8 +129,8 @@ def run_stochastic(task, args):
         #last_skeleton = make_exact_skeleton(plan_postfix)
         #last_cost = compute_plan_cost(plan_postfix)
         #assert compute_plan_cost(plan_prefix) + last_cost == cost
-        if not plan_postfix:
-            break
+        #if not plan_postfix:
+        #    break
     print('Success')
     return True
 

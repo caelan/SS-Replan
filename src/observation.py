@@ -13,13 +13,12 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.pr2_utils import is_visible_point
-from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, wait_for_user, \
-    Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, remove_all_debug, get_aabb_area, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, joint_from_name
+from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
+    LockRenderer, multiply, spaced_colors, WorldSaver, \
+    pairwise_collision, elapsed_time, randomize
 from src.belief import NUM_PARTICLES, PoseDist
 from src.stream import get_stable_gen
-from src.utils import compute_surface_aabb, KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
+from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
     RelPose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
@@ -27,6 +26,7 @@ OBS_P_FP, OBS_P_FN = 0.0, 0.0
 #OBS_POS_STD, OBS_ORI_STD = 0.01, np.pi / 8
 OBS_POS_STD, OBS_ORI_STD = 0., 0.
 
+ZED_SURFACES = ['indigo_tmp', 'range', 'indigo_drawer_top']
 ELSEWHERE = None # symbol for elsewhere pose
 
 # TODO: prior on the number of false detections to ensure correlated
@@ -69,9 +69,10 @@ class Belief(object):
         # Could simply sample from the set of worlds and update
         # Would need to sample many worlds with name at different poses
         # Instead, let the moving object take on different poses
+        # TODO: prune if grasped
         start_time = time.time()
-        order = [name for name in observation.detections]
-        order.extend(set(self.pose_dists) - set(order))
+        order = [name for name in observation.detections] # Detected
+        order.extend(set(self.pose_dists) - set(order)) # Not detected
         with WorldSaver():
             with LockRenderer():
                 for name in order:
@@ -126,16 +127,21 @@ def create_observable_belief(world, **kwargs):
             for name in world.movable}, **kwargs)
 
 def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
-    placement_gen = get_stable_gen(world, learned=True, pos_scale=1e-3, rot_scale=1e-2)
+    placement_gen = get_stable_gen(world, max_attempts=100, learned=True,
+                                   pos_scale=1e-3, rot_scale=1e-2)
     poses = []
     with LockRenderer():
         with BodySaver(world.get_body(obj_name)):
             while len(poses) < n:
                 surface_name = surface_dist.sample()
-                rel_pose, = next(placement_gen(obj_name, surface_name), (None,))
-                if rel_pose is not None:
+                result = next(placement_gen(obj_name, surface_name), None)
+                if result is None:
+                    surface_dist = surface_dist.condition(lambda s: s != surface_name)
+                else:
+                    (rel_pose,) = result
                     poses.append(rel_pose)
-    return PoseDist(world, obj_name, UniformDist(poses))
+    pose_dist = PoseDist(world, obj_name, UniformDist(poses))
+    return pose_dist
 
 def create_surface_belief(world, surface_dist, **kwargs):
     with WorldSaver():
@@ -202,6 +208,8 @@ def observe_with_camera(world, camera_name):
         fixed_pose = world.fix_pose(name, observed_pose)
         set_pose(body, fixed_pose)
         support = world.get_supporting(name)
+        if support is None:
+            continue
         assert support is not None
         relative_pose = create_relative_pose(world, name, support, init=False)
         #relative_pose.assign()
@@ -232,65 +240,3 @@ def transition_belief_update(belief, plan):
             pass
         else:
             raise NotImplementedError(action)
-
-################################################################################
-
-# TODO: need a timeout in the event that cannot do
-ZED_SURFACES = ['indigo_tmp', 'range'] #, 'indigo_drawer_top']
-
-def test_observation(world, entity_name):
-    world.open_door(joint_from_name(world.kitchen, 'indigo_drawer_top_joint'))
-    saver = WorldSaver()
-    [camera_name] = list(world.cameras)
-    print('Camera:', camera_name)
-
-    # TODO: estimate the fraction of the surface that is actually usable
-    surface_areas = {surface: get_aabb_area(compute_surface_aabb(world, surface))
-                     for surface in ZED_SURFACES}
-    print('Areas:', surface_areas)
-    #surface_dist = DDist(surface_areas)
-    surface_dist = UniformDist(ZED_SURFACES)
-    print(surface_dist)
-
-    belief = create_surface_belief(world, surface_dist)
-    belief.dump()
-    belief.draw()
-    saver.restore()
-    #for name in world.movable:
-    #    set_pose(world.get_body(name), unit_pose())
-    wait_for_user()
-    remove_all_debug()
-
-    # TODO: record history of observations to recover point estimate of belief
-    saver.restore()
-    observation = observe_with_camera(world, camera_name)
-    print(observation)
-    belief = belief.update(observation)
-
-    belief.dump()
-    belief.draw()
-    saver.restore()
-    wait_for_user()
-
-    for i in range(10):
-        print('Sample {}'.format(i))
-        belief.sample()
-        wait_for_user()
-
-    for i in range(10):
-        name = entity_name
-        remove_all_debug()
-        pose_dist = belief.pose_dists[name]
-        target_pose = pose_dist.sample()
-        poses, prob = pose_dist.get_nearby(target_pose)
-        print('{}) {}, n={}, p={:.3f}'.format(i, name, len(poses), prob))
-        for pose in poses:
-            pose.draw(color=belief.color_from_name[name])
-        wait_for_user()
-
-    wait_for_user()
-    remove_all_debug()
-
-    #pose_dist.resample(n=n)
-    #wait_for_user()
-    #return pose_dist

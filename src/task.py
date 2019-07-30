@@ -67,8 +67,7 @@ def sample_placement(world, entity_name, surface_name, **kwargs):
     # TODO: check for collisions
     with WorldSaver():
         placement_gen = get_stable_gen(world, pos_scale=1e-3, rot_scale=1e-2, **kwargs)
-        pose, = next(placement_gen(entity_name, surface_name), (None,))
-    assert pose is not None
+        pose, = next(placement_gen(entity_name, surface_name))
     pose.assign()
 
 def close_all_doors(world):
@@ -83,7 +82,7 @@ def open_all_doors(world):
 
 def detect_block(world, **kwargs):
     entity_name = add_block(world, idx=0)
-    #obstruction_name = add_box(world, idx=0)
+    obstruction_name = add_box(world, idx=0)
     #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:

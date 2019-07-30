@@ -176,6 +176,7 @@ class PoseDist(object):
         #cfree_dist = self.cfree_dist
         cfree_dist = DDist({pose: self.dist.prob(pose) for pose in cfree_poses})
         # TODO: do these updates simultaneously for each object
+        # TODO: check all camera poses
         detectable_poses = compute_detectable(cfree_poses, observation.camera_pose)
         visible_poses = compute_visible(body, detectable_poses, observation.camera_pose, draw=False)
         if verbose:

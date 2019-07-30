@@ -1,12 +1,15 @@
 import numpy as np
 
+from examples.discrete_belief.dist import UniformDist
 from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, add_text, wait_for_user, remove_debug, \
     link_from_name, get_joints, get_sample_fn, set_joint_positions, sample_placement, set_pose, get_pose, draw_pose, \
     BASE_LINK, get_aabb_center, approximate_as_prism, set_point, Point, pairwise_link_collision, get_link_descendants, \
     set_color, get_collision_data, read_obj, spaced_colors, get_link_pose, aabb_from_points, get_data_pose, tform_mesh, \
     multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree, get_aabb_extent, \
-    load_pybullet, set_joint_position, get_all_links, get_center_extent
-from src.utils import get_grasps
+    load_pybullet, set_joint_position, get_all_links, get_center_extent, joint_from_name, WorldSaver, get_aabb_area, \
+    remove_all_debug
+from src.observation import ZED_SURFACES, create_surface_belief, observe_with_camera
+from src.utils import get_grasps, compute_surface_aabb
 
 
 # Top row: from left right
@@ -198,3 +201,62 @@ def compare_kitchens(world):
         center2, extent2 = get_center_extent(kitchen2, link=link)
         print(get_link_name(world.kitchen, link), center2 - center1, extent2 - extent1)
     wait_for_user()
+
+################################################################################
+
+def test_observation(world, entity_name):
+    world.open_door(joint_from_name(world.kitchen, 'indigo_drawer_top_joint'))
+    saver = WorldSaver()
+    [camera_name] = list(world.cameras)
+    print('Camera:', camera_name)
+
+    # TODO: estimate the fraction of the surface that is actually usable
+    surface_areas = {surface: get_aabb_area(compute_surface_aabb(world, surface))
+                     for surface in ZED_SURFACES}
+    print('Areas:', surface_areas)
+    #surface_dist = DDist(surface_areas)
+    surface_dist = UniformDist(ZED_SURFACES)
+    print(surface_dist)
+
+    belief = create_surface_belief(world, surface_dist)
+    belief.dump()
+    belief.draw()
+    saver.restore()
+    #for name in world.movable:
+    #    set_pose(world.get_body(name), unit_pose())
+    wait_for_user()
+    remove_all_debug()
+
+    # TODO: record history of observations to recover point estimate of belief
+    saver.restore()
+    observation = observe_with_camera(world, camera_name)
+    print(observation)
+    belief = belief.update(observation)
+
+    belief.dump()
+    belief.draw()
+    saver.restore()
+    wait_for_user()
+
+    for i in range(10):
+        print('Sample {}'.format(i))
+        belief.sample()
+        wait_for_user()
+
+    for i in range(10):
+        name = entity_name
+        remove_all_debug()
+        pose_dist = belief.pose_dists[name]
+        target_pose = pose_dist.sample()
+        poses, prob = pose_dist.get_nearby(target_pose)
+        print('{}) {}, n={}, p={:.3f}'.format(i, name, len(poses), prob))
+        for pose in poses:
+            pose.draw(color=belief.color_from_name[name])
+        wait_for_user()
+
+    wait_for_user()
+    remove_all_debug()
+
+    #pose_dist.resample(n=n)
+    #wait_for_user()
+    #return pose_dist

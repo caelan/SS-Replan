@@ -153,18 +153,18 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
-def get_sample_belief_gen(world, mlo=False, **kwargs):
+def get_sample_belief_gen(world, min_prob=0.001, mlo=False, **kwargs):
 
     def gen(obj_name, pose_dist, surface_name):
         # If we aren't resampling, can just sort by probability of success
         # Could also sample according ot the distribution
-
         poses = sorted(pose_dist.dist.support(), key=pose_dist.discrete_prob, reverse=True)
         if mlo:
             poses = poses[:1]
-            print(pose_dist.prob(poses[0]))
         for rp in poses:
-            yield (rp,)
+            prob = pose_dist.discrete_prob(rp)
+            if min_prob <= prob:
+                yield (rp,)
     return gen
 
 ################################################################################
@@ -218,7 +218,9 @@ def get_test_near_joint(world, **kwargs):
 
 ################################################################################
 
-def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_scale=np.pi/16,
+def get_stable_gen(world, max_attempts=100,
+                   learned=True, collisions=True,
+                   pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=Z_EPSILON, **kwargs):
 
     # TODO: remove fixed collisions with contained surfaces
@@ -227,34 +229,39 @@ def get_stable_gen(world, learned=True, collisions=True, pos_scale=0.01, rot_sca
         obj_body = world.get_body(obj_name)
         surface_aabb = compute_surface_aabb(world, surface_name)
         learned_poses = None
+        if learned:
+            learned_poses = load_placements(world, surface_name)
+            if not learned_poses:
+                return
         while True:
-            if learned:
-                if learned_poses is None:
-                    learned_poses = load_placements(world, surface_name)
-                if not learned_poses:
+            for _ in range(max_attempts):
+                if learned:
+                    surface_pose_world = get_surface_reference_pose(world.kitchen, surface_name)
+                    sampled_pose_surface = multiply(surface_pose_world, random.choice(learned_poses))
+                    [x, y, _] = point_from_pose(sampled_pose_surface)
+                    _, _, yaw = euler_from_quat(quat_from_pose(sampled_pose_surface))
+                    dx, dy = np.random.normal(scale=pos_scale, size=2)
+                    # TODO: avoid reloading
+                    z = stable_z_on_aabb(obj_body, surface_aabb)
+                    theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
+                    #yaw = np.random.uniform(*CIRCULAR_LIMITS)
+                    quat = quat_from_euler(Euler(yaw=theta))
+                    body_pose_world = ([x+dx, y+dy, z+z_offset], quat)
+                    # TODO: project onto the surface
+                else:
+                    # TODO: halton sequence
+                    # unit_generator(d, use_halton=True)
+                    body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
+                    if body_pose_world is None:
+                        continue # return?
+                set_pose(obj_body, body_pose_world)
+                # TODO: make sure the surface is open when doing this
+                if test_supported(world, obj_body, surface_name, collisions=collisions):
+                    rp = create_relative_pose(world, obj_name, surface_name)
+                    yield (rp,)
                     break
-                surface_pose_world = get_surface_reference_pose(world.kitchen, surface_name)
-                sampled_pose_surface = multiply(surface_pose_world, random.choice(learned_poses))
-                [x, y, _] = point_from_pose(sampled_pose_surface)
-                _, _, yaw = euler_from_quat(quat_from_pose(sampled_pose_surface))
-                dx, dy = np.random.normal(scale=pos_scale, size=2)
-                # TODO: avoid reloading
-                z = stable_z_on_aabb(obj_body, surface_aabb)
-                theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
-                #yaw = np.random.uniform(*CIRCULAR_LIMITS)
-                quat = quat_from_euler(Euler(yaw=theta))
-                body_pose_world = ([x+dx, y+dy, z+z_offset], quat)
-                # TODO: project onto the surface
             else:
-                # TODO: halton sequence
-                # unit_generator(d, use_halton=True)
-                body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
-            if body_pose_world is None:
-                break
-            set_pose(obj_body, body_pose_world)
-            if test_supported(world, obj_body, surface_name, collisions=collisions):
-                rp = create_relative_pose(world, obj_name, surface_name)
-                yield (rp,)
+                yield None
     return gen
 
 def get_nearby_stable_gen(world, max_attempts=25, **kwargs):

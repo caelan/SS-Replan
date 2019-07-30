@@ -19,7 +19,7 @@ from src.command import Wait, iterate_plan
 from src.stream import DETECT_COST
 
 VIDEO_FILENAME = 'video.mp4'
-REPLAN_ACTIONS = {'calibrate'}
+REPLAN_ACTIONS = {'calibrate', 'detect'}
 
 
 def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
