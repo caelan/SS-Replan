@@ -11,7 +11,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
-    is_point_in_polygon, grow_polygon, Pose, user_input
+    is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, child_link_from_joint
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -33,6 +33,7 @@ MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
+P_RANDOMIZE = 0.0 # 0.5
 
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
@@ -319,14 +320,20 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
 
     # TODO: could extract out collision function
     full_approach_conf = world.solve_inverse_kinematics(approach_pose)
-    if (full_approach_conf is None) or \
-            any(pairwise_collision(world.robot, b) for b in obstacles): # TODO: | {obj}
-        # print('Approach IK failure', approach_conf)
+    if full_approach_conf is None: # TODO: | {obj}
+        print('Pregrasp kinematic failure')
+        return None
+    moving_links = get_moving_links(world.robot, world.arm_joints)
+    robot_obstacle = (world.robot, frozenset(moving_links))
+    #robot_obstacle = world.robot
+    if any(pairwise_collision(robot_obstacle, b) for b in obstacles): # TODO: | {obj}
+        print('Pregrasp collision failure')
         return None
     approach_conf = get_joint_positions(world.robot, world.arm_joints)
     if teleport:
         return [aq.values, approach_conf, grasp_conf]
     if MAX_CONF_DISTANCE < distance_fn(grasp_conf, approach_conf):
+        print('Pregrasp proximity failure')
         return None
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
@@ -336,7 +343,7 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                                           disabled_collisions=world.disabled_collisions,
                                           custom_limits=world.custom_limits, resolutions=resolutions / 4.)
     if grasp_path is None:
-        print('Grasp path failure')
+        print('Pregrasp path failure')
         return None
     if not approach_path:
         return grasp_path
@@ -386,7 +393,15 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     world_from_body = pose.get_world_from_body()
     gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
     full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
-    if (full_grasp_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
+    if full_grasp_conf is None:
+        print('Grasp kinematic failure')
+        return
+    moving_links = get_moving_links(world.robot, world.arm_joints)
+    robot_obstacle = (world.robot, frozenset(moving_links))
+    #robot_obstacle = get_descendant_obstacles(world.robot, child_link_from_joint(world.arm_joints[0]))
+    #robot_obstacle = world.robot
+    if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
+        print('Grasp collision failure')
         return
     approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
     approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
@@ -424,7 +439,7 @@ def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
         for i in range(max_attempts):
             randomize = (i != 0)
             ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
-                                        randomize=randomize), None)
+                                        randomize=randomize, **kwargs), None)
             if ik_outputs is not None:
                 yield ik_outputs
                 return
@@ -454,9 +469,9 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
                     base_conf, = next(safe_base_generator)
                 except StopIteration:
                     return
-                randomize = (random.random() < 0.5)
+                randomize = (random.random() < P_RANDOMIZE)
                 ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
-                                            randomize=randomize), None)
+                                            randomize=randomize, **kwargs), None)
                 if ik_outputs is not None:
                     yield (base_conf,) + ik_outputs
                     break
@@ -533,9 +548,12 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     world.carry_conf.assign()
     robot_saver = BodySaver(world.robot) # TODO: door_saver?
 
+    moving_links = get_moving_links(world.robot, world.arm_joints)
+    robot_obstacle = (world.robot, frozenset(moving_links))
+    #robot_obstacle = world.robot
     for door_conf in [door_path[0], door_path[-1]]:
         set_joint_positions(world.kitchen, [door_joint], door_conf)
-        if any(pairwise_collision(world.robot, b) for b in obstacles):
+        if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
             return
 
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
@@ -549,7 +567,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         set_joint_positions(world.kitchen, [door_joint], door_path[i])
         full_arm_conf = world.solve_inverse_kinematics(tool_pose)
         # TODO: only check moving links
-        if (full_arm_conf is None) or any(pairwise_collision(world.robot, b) for b in obstacles):
+        if (full_arm_conf is None) or any(pairwise_collision(robot_obstacle, b) for b in obstacles):
             # print('Approach IK failure', approach_conf)
             return
         arm_conf = get_joint_positions(world.robot, world.arm_joints)
@@ -647,7 +665,7 @@ def get_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, lea
                     base_conf, = next(safe_base_generator)
                 except StopIteration:
                     return
-                randomize = (random.random() < 0.5)
+                randomize = (random.random() < P_RANDOMIZE)
                 ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
                                             randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
                 if ik_outputs is not None:

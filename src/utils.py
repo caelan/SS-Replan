@@ -413,7 +413,10 @@ class Grasp(object):
 TOP_GRASP = 'top'
 SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
 UNDER_GRASP = 'under' # TODO: for franka_carter
-GRASP_TYPES = [TOP_GRASP, SIDE_GRASP]
+GRASP_TYPES = [
+    TOP_GRASP,
+    SIDE_GRASP,
+]
 
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER
@@ -425,8 +428,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs)
         if grasp_type == TOP_GRASP:
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
-
-            generator = get_top_grasps(body, under=False, tool_pose=unit_pose(),
+            generator = get_top_grasps(body, under=True, tool_pose=unit_pose(),
                                        grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf, **kwargs)
         elif grasp_type == SIDE_GRASP:
             x, z = pre_distance * get_unit_vector([3, -1])

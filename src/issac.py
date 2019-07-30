@@ -10,7 +10,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
     BASE_LINK, LockRenderer, base_values_from_pose, \
-    pose_from_base_values, INF
+    pose_from_base_values, INF, wait_for_user
 from src.utils import CAMERAS, LEFT_CAMERA
 from src.utils import get_ycb_obj_path
 
@@ -187,13 +187,13 @@ def display_kinect(world, observer):
         "/sim/{}_{}_camera/camera_info".format('left', 'color'), # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
 
-def update_world(world, domain, observer, world_state, objects=None):
+def update_world(world, domain, observer, objects=None):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
     # Using state is nice because it applies noise
 
-    print(world_state)
+    world_state = update_observer(observer)
     print('Entities:', sorted(world_state.entities))
     #world.reset()
     update_robot(world, domain, observer)
@@ -236,8 +236,9 @@ def update_world(world, domain, observer, world_state, objects=None):
     display_kinect(world, observer)
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
-    #wait_for_user()
+    #wait_for_user('Raw observations')
     world.fix_geometry()
+    #wait_for_user('Fixed observations')
 
 ################################################################################
 

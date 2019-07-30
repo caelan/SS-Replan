@@ -133,23 +133,20 @@ def create_trial_args(**kwargs):
 
 ################################################################################
 
-def planning_loop(domain, observer, state, belief, args, additional_init=[], additional_goals=[]):
+def planning_loop(domain, observer, world, args, additional_init=[], additional_goals=[]):
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-    world = state.world # One world per state
-    #task = world.task # One task per world
 
+    belief = create_observable_belief(world)
+    #task = world.task # One task per world
     last_skeleton = None
     while True:
-        # TODO: Isaac class for these things
-        world_state = update_observer(observer)
-        update_world(world, domain, observer, world_state, USE_OBJECTS)
-        saver = WorldSaver()
-
-        problem = pdddlstream_from_problem(state, collisions=not args.cfree, teleport=args.teleport)
+        state = world.get_initial_state() # TODO: create from belief for holding
+        problem = pdddlstream_from_problem(belief, collisions=not args.cfree, teleport=args.teleport)
         problem[-2].extend(additional_init)
         problem = problem[:-1] + (And(problem[-1], *additional_goals),)
 
+        #wait_for_user('Plan?')
         plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
         if (plan is None) and (last_skeleton is not None):
             plan, cost, evaluations = solve_pddlstream(problem, args)
@@ -162,7 +159,7 @@ def planning_loop(domain, observer, state, belief, args, additional_init=[], add
             simulate_plan(state.copy(), commands, args) # TODO: operate on real state
         wait_for_user()
 
-        saver.restore()
+        state.assign()
         if (commands is None) or args.teleport:
             return False
         if not commands:
@@ -173,6 +170,9 @@ def planning_loop(domain, observer, state, belief, args, additional_init=[], add
             command.execute(domain, moveit, observer, state)
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
+        localize_all(observer)
+        update_world(world, domain, observer, USE_OBJECTS)
+
 
 ################################################################################
 
@@ -182,15 +182,18 @@ class Interface(object):
         self.observer = observer
         self.sim_manager = sim_manager
 
-def localize_all(world_state):
+def localize_all(observer):
+    world_state = observer.current_state
     for name in USE_OBJECTS:
         obj = world_state.entities[name]
         #wait_for_duration(1.0)
         obj.localize()
         obj.detect()
+        print(world_state.entities[name])
         #obj.administrator.detect()
         #print(obj.pose[:3, 3])
-    wait_for_duration(1.0)
+    wait_for_duration(2.0)
+    print('Localized:', USE_OBJECTS)
 
 ################################################################################
 
@@ -254,8 +257,11 @@ def main():
         observer = RosObserver(domain)
         sim_manager = None
         additional_init, additional_goals = [], []
-        task = Task(world, goal_on={SPAM: TOP_DRAWER},
-                    goal_closed=['indigo_drawer_top_joint'], #, 'indigo_drawer_bottom_joint'],
+        task = Task(world,
+                    #goal_holding=[SPAM],
+                    goal_on={SPAM: TOP_DRAWER},
+                    #goal_closed=[],
+                    #goal_closed=['indigo_drawer_top_joint'], #, 'indigo_drawer_bottom_joint'],
                     movable_base=not args.fixed)
     else:
         #trial_args = parse.parse_kitchen_args()
@@ -278,17 +284,15 @@ def main():
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
-    world_state = update_observer(observer)
     #localize_all(world_state)
     #wait_for_user()
     #print('Entities:', sorted(world_state.entities))
-    with LockRenderer():
+    with LockRenderer(lock=True):
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
-        update_world(world, domain, observer, world_state, USE_OBJECTS)
-        world_state = update_observer(observer)
-        localize_all(world_state)
-        update_world(world, domain, observer, world_state, USE_OBJECTS)
+        update_world(world, domain, observer, USE_OBJECTS)
+        localize_all(observer)
+        update_world(world, domain, observer, USE_OBJECTS)
         #close_all_doors(world)
         if (sim_manager is not None) and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
@@ -296,17 +300,11 @@ def main():
             update_isaac_sim(domain, observer, sim_manager, world)
         world.update_initial()
         add_markers(world, inverse_place=False)
-    wait_for_duration(duration=0.1)
-    state = world.get_initial_state() # TODO: carter is initially in collision
-    belief = create_observable_belief(world) # TODO: should state be part of belief?
 
-    #wait_for_user()
-    #return
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
-    wait_for_user('Plan?')
     #return
 
-    success = planning_loop(domain, observer, state, belief, args,
+    success = planning_loop(domain, observer, world, args,
                             additional_init=additional_init,
                             additional_goals=additional_goals)
     print('Success:', success)

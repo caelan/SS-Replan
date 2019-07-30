@@ -15,7 +15,7 @@ from pddlstream.utils import Verbose
 
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 
-ARM_SPEED = 0.5*np.pi
+ARM_SPEED = 1.0*np.pi
 
 def ROSPose(pose):
     point, quat = pose
