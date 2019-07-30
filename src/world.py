@@ -94,8 +94,8 @@ class World(object):
                                             for pair in DISABLED_FRANKA_COLLISIONS)
 
         self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
-        self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
-        #self.calibrate_conf = self.carry_conf # TODO: doesn't work
+        #self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
+        self.calibrate_conf = Conf(self.robot, self.arm_joints, self.default_conf) # Must differ from carry_conf
         self.special_confs = [self.carry_conf, self.calibrate_conf]
         self.open_gq = Conf(self.robot, self.gripper_joints,
                             get_max_limits(self.robot, self.gripper_joints))

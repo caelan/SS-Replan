@@ -56,6 +56,7 @@ def create_parser():
 def run_deterministic(task, args):
     world = task.world
     state = world.get_initial_state()
+    belief = create_observable_belief(world)
     if args.observable:
         belief = create_observable_belief(world)
     else:
@@ -87,13 +88,20 @@ def run_stochastic(task, args):
     # The nice thing about having a correct belief model is that you actually know what cost makes progress
     world = task.world
     state = world.get_initial_state()
-    belief = create_observable_belief(world)
+    if args.observable:
+        belief = create_observable_belief(world)
+    else:
+        belief = create_surface_belief(world, UniformDist(ZED_SURFACES))
     # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
 
     last_skeleton = None
-    last_cost = INF
+    #last_cost = INF
     # TODO: make this a generic policy
     while True:
+        [observation] = observe_all_cameras(world).values()
+        belief.update(observation)
+        belief.draw()
+        #wait_for_user('Plan?')
         problem = pdddlstream_from_problem(belief,
             collisions=not args.cfree, teleport=args.teleport)
         plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
@@ -118,8 +126,8 @@ def run_stochastic(task, args):
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
         #last_skeleton = make_exact_skeleton(plan_postfix)
-        last_cost = compute_plan_cost(plan_postfix)
-        assert compute_plan_cost(plan_prefix) + last_cost == cost
+        #last_cost = compute_plan_cost(plan_postfix)
+        #assert compute_plan_cost(plan_prefix) + last_cost == cost
         if not plan_postfix:
             break
     print('Success')
@@ -149,10 +157,10 @@ def main():
 
     #test_observation(world, entity_name='big_red_block0')
     #return
-    if args.defer:
-        run_stochastic(task, args)
-    else:
+    if args.observable:
         run_deterministic(task, args)
+    else:
+        run_stochastic(task, args)
     world.destroy()
 
 if __name__ == '__main__':

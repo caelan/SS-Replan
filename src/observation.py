@@ -101,11 +101,10 @@ class Belief(object):
             #self.pose_dists[name].dump()
             print(i, name, self.pose_dists[name])
     def draw(self, **kwargs):
-        handles = []
         with LockRenderer():
             with WorldSaver():
                 for name, pose_dist in self.pose_dists.items():
-                    handles.extend(pose_dist.draw(color=self.color_from_name[name], **kwargs))
+                    pose_dist.draw(color=self.color_from_name[name], **kwargs)
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, sorted(self.pose_dists))
 

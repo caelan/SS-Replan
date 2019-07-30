@@ -9,7 +9,7 @@ from examples.discrete_belief.dist import UniformDist, DDist, DeltaDist, mixDDis
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import base_values_from_pose, CIRCULAR_LIMITS, stable_z_on_aabb, point_from_pose, Point, Pose, \
     Euler, set_pose, multiply, draw_circle, LockRenderer, BodySaver, Ray, batch_ray_collision, draw_ray, wrap_angle, \
-    circular_difference
+    circular_difference, remove_handles
 from src.database import get_surface_reference_pose
 from src.utils import compute_surface_aabb, create_relative_pose, CAMERA_MATRIX, KINECT_DEPTH, Z_EPSILON, test_supported
 
@@ -42,6 +42,7 @@ class PoseDist(object):
         self.density_from_surface = {}
         self.weight = weight
         self.bandwidth = bandwidth
+        self.handles = []
 
     def surface_prob(self, surface):
         return self.weight * self.surface_dist.prob(surface)
@@ -244,14 +245,15 @@ class PoseDist(object):
         probs = list(map(self.dist.prob, poses))
         max_prob = max(probs)
         print('{}) max prob: {:.3f}'.format(self.name, max_prob))
-        handles = []
+        remove_handles(self.handles)
+        self.handles = []
         for pose, prob in zip(poses, probs):
             # TODO: could instead draw a circle
             fraction = prob / max_prob
             # TODO: draw weights using color, length, or thickness
             #color = GREEN if pose == self.dist.mode() else RED
-            handles.extend(pose.draw(color=fraction*np.array(color), **kwargs))
-        return handles
+            self.handles.extend(pose.draw(color=fraction*np.array(color), **kwargs))
+        return self.handles
     def __repr__(self):
         return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
                                        self.surface_dist, len(self.dist.support()))

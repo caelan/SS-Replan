@@ -133,7 +133,8 @@ def commands_from_plan(world, plan):
             commands.extend(params[-1].reverse().commands)
         elif action in ['cook', 'calibrate']:
             # TODO: calibrate action that uses fixed_base_suppressor
-            steps = int(math.ceil(2.0 / DEFAULT_TIME_STEP))
+            #steps = int(math.ceil(2.0 / DEFAULT_TIME_STEP))
+            steps = 0
             commands.append(Wait(world, steps=steps))
         else:
             raise NotImplementedError(action)
