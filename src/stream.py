@@ -748,7 +748,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                                             reversible=True, self_collisions=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
-                if PRINT_FAILURES: print('Failed to find a base motion plan!')
+                print('Failed to find a base motion plan!')
                 #print(fluents)
                 #for bq in [bq1, bq2]:
                 #    bq.assign()
@@ -797,7 +797,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      custom_limits=world.custom_limits, resolutions=resolutions,
                                      restarts=2, iterations=25, smooth=25)
             if path is None:
-                if PRINT_FAILURES: print('Failed to find an arm motion plan!')
+                print('Failed to find an arm motion plan!')
                 #print(fluents)
                 #for bq in [aq1, aq2]:
                 #    bq.assign()
@@ -890,6 +890,19 @@ def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
         rp1.assign()
         rp2.assign()
         return not pairwise_collision(world.get_body(o1), world.get_body(o2))
+    return test
+
+def get_cfree_bconf_pose_test(world, collisions=True, **kwargs):
+    def test(bq, o2, p2):
+        if not collisions:
+            return True
+        if isinstance(p2, SurfaceDist):
+            return True # TODO: perform this probabilistically
+        bq.assign()
+        world.carry_conf.assign()
+        p2.assign()
+        obstacles = get_link_obstacles(world, o2)
+        return not any(pairwise_collision(world.robot, obst) for obst in obstacles)
     return test
 
 def get_cfree_approach_pose_test(world, collisions=True, **kwargs):

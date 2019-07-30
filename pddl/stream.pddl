@@ -153,6 +153,11 @@
     :domain (and (WorldPose ?o1 ?p1) (Grasp ?o1 ?g1) (WorldPose ?o2 ?p2))
     :certified (CFreeApproachPose ?o1 ?p1 ?g1 ?o2 ?p2)
   )
+  (:stream test-cfree-bconf-pose
+    :inputs (?bq ?o2 ?p2)
+    :domain (and (BConf ?bq) (WorldPose ?o2 ?p2))
+    :certified (CFreeBConfPose ?bq ?o2 ?p2)
+  )
   (:stream test-cfree-traj-pose
     :inputs (?at ?o2 ?p2)
     :domain (and (ATraj ?at) (WorldPose ?o2 ?p2))

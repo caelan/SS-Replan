@@ -60,10 +60,13 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
 
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True,
                                            verbose_success=False),
+        'test-cfree-bconf-pose': StreamInfo(p_success=1e-3, negate=True,
+                                            verbose_success=False),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True,
                                            verbose_success=False),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True,
                                            verbose_success=False),
+
         'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True,
                                            verbose_success=False),
         'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True,
