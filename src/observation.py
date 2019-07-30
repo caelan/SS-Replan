@@ -118,7 +118,7 @@ class Belief(object):
                     self.handles.extend(pose_dist.draw(
                             color=self.color_from_name[name], **kwargs))
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, str_from_object(
+        return '{}(holding={}, placed={})'.format(self.__class__.__name__, self.holding, str_from_object(
             {name: self.pose_dists[name].surface_dist for name in self.names}))
 
 ################################################################################

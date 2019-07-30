@@ -2,11 +2,13 @@ import numpy as np
 
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
-    apply_alpha, RED, step_simulation, joint_from_name, set_all_static, WorldSaver
+    apply_alpha, RED, step_simulation, joint_from_name, set_all_static, \
+    WorldSaver, stable_z_on_aabb
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
-    KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS
+    KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb
+#from examples.discrete_belief.dist import DDist, UniformDist
 
 
 class Task(object):
@@ -34,27 +36,33 @@ class Task(object):
 
 ################################################################################
 
+def pose2d_on_surface(world, entity_name, surface_name, pose2d):
+    x, y, yaw = pose2d
+    body = world.get_body(entity_name)
+    surface_aabb = compute_surface_aabb(world, surface_name)
+    z = stable_z_on_aabb(body, surface_aabb)
+    #z = stable_z(body, world.kitchen, link_from_name(world.kitchen, surface_name))
+    pose = Pose(Point(x, y, z), Euler(yaw=yaw))
+    set_pose(body, pose)
+    return pose
+
 def add_block(world, x=0.1, y=1.15, yaw=0, idx=0):
     # TODO: automatically produce a unique name
-    entity_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], idx)
-    entity_path = get_block_path(entity_name)
-    #entity_name = 'potted_meat_can'
-    #entity_path = get_ycb_obj_path(entity_name)
-    world.add_body(entity_name, entity_path)
-    entity_body = world.get_body(entity_name)
-    z = stable_z(entity_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(entity_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
-    return entity_name
+    name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], idx)
+    entity_path = get_block_path(name)
+    #name = 'potted_meat_can'
+    #entity_path = get_ycb_obj_path(name)
+    world.add_body(name, entity_path)
+    pose2d_on_surface(world, name, COUNTERS[0], (x, y, yaw))
+    return name
 
 def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
     ycb_type = 'cracker_box'
-    obstruction_name = '{}{}'.format(ycb_type, idx)
+    name = '{}{}'.format(ycb_type, idx)
     obstruction_path = get_ycb_obj_path(ycb_type)
-    world.add_body(obstruction_name, obstruction_path, color=np.ones(4))
-    obstruction_body = world.get_body(obstruction_name)
-    z = stable_z(obstruction_body, world.kitchen, link_from_name(world.kitchen, COUNTERS[0]))
-    set_pose(obstruction_body, Pose(Point(x, y, z), Euler(yaw=yaw)))
-    return obstruction_name
+    world.add_body(name, obstruction_path, color=np.ones(4))
+    pose2d_on_surface(world, name, COUNTERS[0], (x, y, yaw))
+    return name
 
 def add_kinect(world, camera_name=LEFT_CAMERA):
     # TODO: could intersect convex with half plane
@@ -92,8 +100,9 @@ def detect_block(world, **kwargs):
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     return Task(world, movable_base=True,
-                return_init_bq=False, return_init_aq=False,
-                goal_detected=[entity_name],
+                return_init_bq=True, return_init_aq=False,
+                #goal_detected=[entity_name],
+                goal_holding=[entity_name],
                 **kwargs)
 
 ################################################################################

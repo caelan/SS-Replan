@@ -9,7 +9,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
     joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
     Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
-    stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, \
+    stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, child_link_from_joint
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
@@ -747,6 +747,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
                 if PRINT_FAILURES: print('Failed to find a base motion plan!')
+                #print(fluents)
                 #for bq in [bq1, bq2]:
                 #    bq.assign()
                 #    wait_for_user()
@@ -795,6 +796,10 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      restarts=2, iterations=25, smooth=25)
             if path is None:
                 if PRINT_FAILURES: print('Failed to find an arm motion plan!')
+                #print(fluents)
+                #for bq in [aq1, aq2]:
+                #    bq.assign()
+                #    wait_for_user()
                 return None
         cmd = Sequence(State(world, savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),

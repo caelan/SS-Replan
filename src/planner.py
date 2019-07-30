@@ -23,7 +23,7 @@ VIDEO_TEMPLATE = '{}.mp4'
 REPLAN_ACTIONS = {'calibrate', 'detect'}
 
 
-def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
+def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
     _, _, _, stream_map, init, goal = problem
     print('Init:', sorted(init, key=lambda f: f[0]))
     print('Goal:', goal)
@@ -76,8 +76,8 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
 
     success_cost = 0 if args.anytime else INF
-    planner = 'ff-astar' if args.anytime else 'ff-wastar1'
-    search_sample_ratio = 1 # TODO: could try decreasing
+    planner = 'ff-astar' if args.anytime else 'ff-wastar2'
+    search_sample_ratio = 0.5 # TODO: could try decreasing
     max_planner_time = 10
 
     pr = cProfile.Profile()
@@ -93,7 +93,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
                                  initial_complexity=5,
                                  planner=planner, max_planner_time=max_planner_time,
                                  unit_costs=args.unit, success_cost=success_cost,
-                                 max_time=args.max_time, verbose=True, debug=debug,
+                                 max_time=args.max_time, verbose=True, debug=False,
                                  unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
                                  # bind=True, max_skeletons=None,
                                  search_sample_ratio=search_sample_ratio)

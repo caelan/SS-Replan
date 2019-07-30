@@ -147,7 +147,6 @@ def pdddlstream_from_problem(belief, **kwargs):
         ('GConf', world.open_gq),
         ('GConf', world.closed_gq),
 
-        ('HandEmpty',),
         ('Grasp', None, None),
         ('AtGrasp', None, None),
 
@@ -266,15 +265,14 @@ def pdddlstream_from_problem(belief, **kwargs):
             if has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 
-    if belief.grasped is not None:
+    if belief.grasped is None:
+        init.append(('HandEmpty',))
+    else:
         obj_name = belief.grasped.body_name
         assert obj_name not in belief.pose_dists
         grasp = belief.grasped
         init += [
             # Static
-            ('Movable', obj_name),
-            ('Graspable', obj_name),
-            ('CheckNearby', obj_name),
             ('Grasp', obj_name, grasp),
             ('IsGraspType', obj_name, grasp, grasp.grasp_type),
             # Fluent
@@ -282,6 +280,13 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('Holding', obj_name),
             ('Localized', obj_name),
         ]
+
+    for obj_name in world.movable:
+        init += [
+            ('Movable', obj_name),
+            ('Graspable', obj_name),
+            ('CheckNearby', obj_name),
+        ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
 
     # TODO: track poses over time to produce estimates
     for obj_name, pose_dist in belief.pose_dists.items():
@@ -308,9 +313,6 @@ def pdddlstream_from_problem(belief, **kwargs):
                 surface_pose = surface_poses[surface_name]
                 world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
                 init += [
-                    ('Movable', obj_name),
-                    ('Graspable', obj_name),
-                    ('CheckNearby', obj_name),
                     ('RelPose', obj_name, rel_pose, surface_name),
                     ('AtRelPose', obj_name, rel_pose, surface_name),
                     ('WorldPose', obj_name, world_pose),
@@ -318,7 +320,7 @@ def pdddlstream_from_problem(belief, **kwargs):
 
                     ('AtWorldPose', obj_name, world_pose),
                     ('On', obj_name, surface_name),
-                ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
+                ]
                 poses = [rel_pose, world_pose]
 
             init.extend(('Dist', pose) if isinstance(pose, PoseDist) else
