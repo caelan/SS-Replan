@@ -17,7 +17,7 @@ from src.observation import create_observable_belief, \
     transition_belief_update, create_surface_belief, UniformDist, ZED_SURFACES, \
     observe_scene
 from src.debug import test_observation
-from src.planner import VIDEO_FILENAME, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
+from src.planner import VIDEO_TEMPLATE, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block, detect_block, TASKS
@@ -39,7 +39,8 @@ def create_parser():
     parser.add_argument('-max_time', default=120, type=int,
                         help='The max computation time')
     parser.add_argument('-record', action='store_true',
-                        help='When enabled, records and saves a video ({})'.format(VIDEO_FILENAME))
+                        help='When enabled, records and saves a video at {}'.format(
+                            VIDEO_TEMPLATE.format('<problem>')))
     parser.add_argument('-seed', default=None,
                         help='The random seed to use.')
     parser.add_argument('-teleport', action='store_true',

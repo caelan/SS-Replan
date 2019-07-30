@@ -200,6 +200,7 @@
     :precondition (and (PoseKin ?o1 ?p1 ?rp1 ?o0 ?p0) (PoseKin ?o1 ?p2 ?rp2 ?o0 ?p0)
                        (Detect ?o1 ?p2 ?r) (DistSample ?rp1 ?rp2)
                        (AtWorldPose ?o1 ?p1) ; (AtRelPose ?o1 ?rp1 ?o0) ; (AtWorldPose ?o0 ?p0)
+                       (Accessible ?o0 ?p0)
                        (not (OccludedRay ?r))
                   )
     :effect (and (Localized ?o1)

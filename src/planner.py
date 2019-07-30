@@ -4,6 +4,7 @@ import cProfile
 import pstats
 import math
 
+from examples.discrete_belief.run import MAX_COST
 from pddlstream.algorithms.constraints import PlanConstraints
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.incremental import solve_incremental
@@ -16,9 +17,9 @@ from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
 from src.command import Wait, iterate_plan
-from src.stream import DETECT_COST
+from src.stream import opt_detect_cost_fn
 
-VIDEO_FILENAME = 'video.mp4'
+VIDEO_TEMPLATE = '{}.mp4'
 REPLAN_ACTIONS = {'calibrate', 'detect'}
 
 
@@ -64,13 +65,14 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF, debug=False):
         'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True),
         'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True),
 
-        'DetectCost': FunctionInfo(lambda rp1, rp2: DETECT_COST),
+        'DetectCost': FunctionInfo(opt_detect_cost_fn),
         #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
         #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
     #print(set(stream_map) - set(stream_info))
     replan_actions = REPLAN_ACTIONS if args.defer else set()
     skeletons = None if skeleton is None else [skeleton]
+    max_cost = min(max_cost, MAX_COST)
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
 
     success_cost = 0 if args.anytime else INF
@@ -148,7 +150,9 @@ def simulate_plan(state, commands, args, time_step=DEFAULT_TIME_STEP):
         return
     time_step = None if args.teleport else time_step
     if args.record:
-        with VideoSaver(VIDEO_FILENAME):
+        video_path = VIDEO_TEMPLATE.format(args.problem)
+        with VideoSaver(video_path):
             iterate_plan(state, commands, time_step=time_step)
+        print('Saved', video_path)
     else:
         iterate_plan(state, commands, time_step=time_step)

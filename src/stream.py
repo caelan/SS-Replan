@@ -20,7 +20,7 @@ from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, get_link_obstacles
 from src.visualization import GROW_BASE
 from src.belief import SurfaceDist
-from examples.discrete_belief.run import revisit_mdp_cost
+from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
 
 DETECT_COST = 1.
 
@@ -49,14 +49,22 @@ def trajectory_cost_fn(t):
     distance = t.distance(distance_fn=lambda q1, q2: get_distance(q1[:2], q2[:2]))
     return BASE_CONSTANT + distance / BASE_VELOCITY
 
-def detect_cost_fn(rp_dist, rp_sample):
-    # TODO: extend to continuous rp_sample controls using densities
-    prob = rp_dist.discrete_prob(rp_sample)
+def compute_detect_cost(prob):
     success_cost = DETECT_COST
     failure_cost = success_cost
     cost = revisit_mdp_cost(success_cost, failure_cost, prob)
     print('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
     return cost
+
+def opt_detect_cost_fn(rp_dist, rp_sample):
+    prob = rp_dist.surface_prob(rp_dist.surface_name)
+    #print(rp_dist.surface_name, prob)
+    return clip_cost(compute_detect_cost(prob))
+
+def detect_cost_fn(rp_dist, rp_sample):
+    # TODO: extend to continuous rp_sample controls using densities
+    prob = rp_dist.discrete_prob(rp_sample)
+    return compute_detect_cost(prob)
 
 ################################################################################
 
@@ -164,7 +172,8 @@ def get_sample_belief_gen(world, min_prob=0.01, mlo=False, **kwargs):
             poses = poses[:1]
         for rp in poses:
             prob = pose_dist.discrete_prob(rp)
-            if min_prob <= prob:
+            cost = detect_cost_fn(pose_dist, rp)
+            if (min_prob <= prob) and (cost <= MAX_COST):
                 #print(obj_name, surface_name, prob)
                 #user_input('Continue?')
                 yield (rp,)
