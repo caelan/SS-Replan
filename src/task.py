@@ -32,8 +32,8 @@ class Task(object):
         self.goal_closed = set(goal_closed)
         self.goal_cooked = set(goal_cooked)
     def __repr__(self):
-        return '{}{}'.format(self.__class__.__name__, {key: value for key, value in self.__dict__.items()
-                                                       if value not in [self.world]})
+        return '{}{}'.format(self.__class__.__name__, {
+            key: value for key, value in self.__dict__.items() if value not in [self.world]})
 
 ################################################################################
 
@@ -99,6 +99,7 @@ def detect_block(world, **kwargs):
     initial_distribution = UniformDist(['indigo_drawer_top']) # indigo_tmp
     initial_surface = initial_distribution.sample()
     if random.random() < 0.5:
+        # TODO: sometimes base/arm failure causes the planner to freeze
         sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 

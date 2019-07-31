@@ -186,8 +186,9 @@
                        (AtWorldPose ?o ?p1)
                        (AtBConf ?bq) (Calibrated)
                        (AtAConf ?aq1) (OpenGripper)
-                       ; TODO: ensure the final conf is safe
                        (not (UnsafeATraj ?at))
+                       ;(not (UnsafeBConf ?bq))
+                       ;(CFreeBConfPose ?bq ?o2 ?p2)
                   )
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?p2) (AtAConf ?aq2)
                  (CanMoveBase) (CanMoveArm)

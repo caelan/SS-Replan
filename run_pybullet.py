@@ -11,11 +11,12 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user, INF, LockRenderer
+from pybullet_tools.utils import wait_for_user, INF, LockRenderer, \
+    get_random_seed, get_numpy_seed, set_numpy_seed, set_random_seed, print_separator
 from src.visualization import add_markers
 from src.observation import create_observable_belief, \
-    transition_belief_update, create_surface_belief, UniformDist, ZED_SURFACES, \
-    observe_scene
+    transition_belief_update, create_surface_belief, UniformDist, observe_scene
+from src.utils import ZED_LEFT_SURFACES
 from src.debug import test_observation
 from src.planner import VIDEO_TEMPLATE, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
@@ -86,7 +87,7 @@ def run_stochastic(task, args):
     if args.observable:
         belief = create_observable_belief(world)
     else:
-        belief = create_surface_belief(world, UniformDist(ZED_SURFACES))
+        belief = create_surface_belief(world, UniformDist(ZED_LEFT_SURFACES))
     # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
     print('Prior:', belief)
 
@@ -94,6 +95,7 @@ def run_stochastic(task, args):
     #last_cost = INF
     # TODO: make this a generic policy
     while True:
+        print_separator(n=50)
         observation = observe_scene(world)
         belief.update(observation)
         print('Belief:', belief)
@@ -101,6 +103,7 @@ def run_stochastic(task, args):
         #wait_for_user('Plan?')
         problem = pdddlstream_from_problem(belief,
             collisions=not args.cfree, teleport=args.teleport)
+        print_separator(n=25)
         plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
         # TODO: first attempt cheaper path
         # TODO: store history of stream evaluations
@@ -108,12 +111,15 @@ def run_stochastic(task, args):
             #print('Failure')
             #return False
             #wait_for_user('Failure')
+            # TODO: could reusing the same problem be troublesome?
+            print_separator(n=25)
             plan, cost, evaluations = solve_pddlstream(problem, args)
         if plan is None:
             print('Failure')
             return False
         if not plan:
             break
+        print_separator(n=25)
         plan_prefix = extract_plan_prefix(plan, defer=args.defer)
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
@@ -141,6 +147,11 @@ def main():
     args = parser.parse_args()
     #if args.seed is not None:
     #    set_seed(args.seed)
+    #set_random_seed(None) # Doesn't ensure deterministic
+    #set_numpy_seed(None)
+    print('Random seed:', get_random_seed())
+    print('Numpy seed:', get_numpy_seed())
+
     np.set_printoptions(precision=3, suppress=True)
     world = World(use_gui=True)
     task_fn_from_name = {fn.__name__: fn for fn in TASKS}

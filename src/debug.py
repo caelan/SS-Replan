@@ -8,8 +8,8 @@ from pybullet_tools.utils import get_links, get_link_name, draw_aabb, get_aabb, 
     multiply, draw_mesh, get_ray, Ray, get_point, ray_collision, draw_ray, get_link_subtree, get_aabb_extent, \
     load_pybullet, set_joint_position, get_all_links, get_center_extent, joint_from_name, WorldSaver, get_aabb_area, \
     remove_all_debug
-from src.observation import ZED_SURFACES, create_surface_belief, observe_scene
-from src.utils import get_grasps, compute_surface_aabb
+from src.observation import create_surface_belief, observe_scene
+from src.utils import get_grasps, compute_surface_aabb, ZED_LEFT_SURFACES
 
 
 # Top row: from left right
@@ -212,10 +212,10 @@ def test_observation(world, entity_name):
 
     # TODO: estimate the fraction of the surface that is actually usable
     surface_areas = {surface: get_aabb_area(compute_surface_aabb(world, surface))
-                     for surface in ZED_SURFACES}
+                     for surface in ZED_LEFT_SURFACES}
     print('Areas:', surface_areas)
     #surface_dist = DDist(surface_areas)
-    surface_dist = UniformDist(ZED_SURFACES)
+    surface_dist = UniformDist(ZED_LEFT_SURFACES)
     print(surface_dist)
 
     belief = create_surface_belief(world, surface_dist)

@@ -11,7 +11,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
-    is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, child_link_from_joint
+    is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, \
+    child_link_from_joint, set_renderer
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -313,7 +314,8 @@ def inverse_reachability(world, base_generator, obstacles=set(),
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
             if not all_between(lower_limits, base_conf, upper_limits):
                 continue
-            #pose.assign() # TODO: obj in obstacles?
+            # TODO: account for doors and placed-object collisions here
+            #pose.assign()
             bq = Conf(world.robot, world.base_joints, base_conf)
             bq.assign()
             for conf in world.special_confs:
@@ -569,14 +571,15 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     world.carry_conf.assign()
     robot_saver = BodySaver(world.robot) # TODO: door_saver?
 
-    moving_links = get_moving_links(world.robot, world.arm_joints)
-    robot_obstacle = (world.robot, frozenset(moving_links))
-    #robot_obstacle = world.robot
     for door_conf in [door_path[0], door_path[-1]]:
+        # TODO: check the whole door trajectory
         set_joint_positions(world.kitchen, [door_joint], door_conf)
-        if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
+        if any(pairwise_collision(world.robot, b) for b in obstacles):
             return
 
+    # Assuming that pairs of fixed things aren't in collision at this point
+    moving_links = get_moving_links(world.robot, world.arm_joints)
+    robot_obstacle = (world.robot, frozenset(moving_links))
     distance_fn = get_distance_fn(world.robot, world.arm_joints)
     if randomize:
         sample_fn = get_sample_fn(world.robot, world.arm_joints)
@@ -749,10 +752,12 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
                 print('Failed to find a base motion plan!')
+                set_renderer(enable=True)
                 #print(fluents)
-                #for bq in [bq1, bq2]:
-                #    bq.assign()
-                #    wait_for_user()
+                for bq in [bq1, bq2]:
+                    bq.assign()
+                    wait_for_user()
+                set_renderer(enable=False)
                 return None
         # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(world, savers=[initial_saver]), commands=[
@@ -798,10 +803,12 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      restarts=2, iterations=25, smooth=25)
             if path is None:
                 print('Failed to find an arm motion plan!')
+                set_renderer(enable=True)
                 #print(fluents)
-                #for bq in [aq1, aq2]:
-                #    bq.assign()
-                #    wait_for_user()
+                for bq in [aq1, aq2]:
+                    bq.assign()
+                    wait_for_user()
+                set_renderer(enable=False)
                 return None
         cmd = Sequence(State(world, savers=[initial_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),

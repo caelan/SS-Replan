@@ -11,11 +11,10 @@ from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    WorldSaver, get_distance_fn, get_difference
+    WorldSaver, get_difference_fn
 
 from src.belief import PoseDist
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, \
-    create_surface_attachment, create_relative_pose
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -24,7 +23,6 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
     get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test
-from src.issac import load_calibrate_conf
 from src.database import has_place_database
 
 
@@ -198,14 +196,16 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('AConf', goal_bq, carry_aq),
             ('CloseTo', goal_bq, goal_bq),
         ])
-        if np.less_equal(np.abs(get_difference(init_bq.values, goal_bq.values)),
+        if np.less_equal(np.abs(get_difference_fn(world.body, world.base_joints)(init_bq.values, goal_bq.values)),
                          [0.05, 0.05, math.radians(10)]).all():
+            print('Close to goal base configuration')
             init.append(('CloseTo', init_bq, goal_bq))
         goal_literals.append(Exists(['?bq'], And(
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
         if task.return_init_aq:
-            if np.less_equal(np.abs(get_difference(init_aq.values, goal_aq.values)),
+            if np.less_equal(np.abs(get_difference_fn(world.body, world.arm_joints)(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
+                print('Close to goal arm configuration')
                 init.append(('CloseTo', init_aq, goal_aq))
             init.extend([
                 ('AConf', goal_bq, goal_aq),
@@ -336,5 +336,9 @@ def pdddlstream_from_problem(belief, **kwargs):
 
     goal_formula = existential_quantification(goal_literals)
     stream_pddl, stream_map = get_streams(world, **kwargs)
+
+    print('Init:', sorted(init, key=lambda f: f[0]))
+    print('Goal:', goal_formula)
+    print('Streams:', stream_map.keys())
 
     return PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)

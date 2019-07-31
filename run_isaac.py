@@ -46,7 +46,6 @@ SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
 
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-
 USE_OBJECTS = [CHEEZIT, SPAM, SUGAR]  # , TOMATO_SOUP]
 
 TOP_DRAWER = 'indigo_drawer_top'

@@ -26,7 +26,6 @@ OBS_P_FP, OBS_P_FN = 0.0, 0.0
 #OBS_POS_STD, OBS_ORI_STD = 0.01, np.pi / 8
 OBS_POS_STD, OBS_ORI_STD = 0., 0.
 
-ZED_SURFACES = ['indigo_tmp', 'range', 'indigo_drawer_top']
 ELSEWHERE = None # symbol for elsewhere pose
 
 # TODO: prior on the number of false detections to ensure correlated

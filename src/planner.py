@@ -7,11 +7,10 @@ import math
 from examples.discrete_belief.run import MAX_COST
 from pddlstream.algorithms.constraints import PlanConstraints
 from pddlstream.algorithms.focused import solve_focused
-from pddlstream.algorithms.incremental import solve_incremental
+from pddlstream.algorithms.algorithm import reset_globals
+
 from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
-from pddlstream.language.rule import RULES
-from pddlstream.language.object import Object, OptimisticObject
 from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 
@@ -22,16 +21,8 @@ from src.stream import opt_detect_cost_fn
 VIDEO_TEMPLATE = '{}.mp4'
 REPLAN_ACTIONS = {'calibrate', 'detect'}
 
-
 def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
-    _, _, _, stream_map, init, goal = problem
-    print('Init:', sorted(init, key=lambda f: f[0]))
-    print('Goal:', goal)
-    print('Streams:', stream_map.keys())
-    RULES[:] = []
-    Object.reset()
-    OptimisticObject.reset()
-
+    reset_globals()
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
         'test-gripper': StreamInfo(p_success=0, eager=True),
