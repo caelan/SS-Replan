@@ -21,7 +21,7 @@ from src.stream import opt_detect_cost_fn
 VIDEO_TEMPLATE = '{}.mp4'
 REPLAN_ACTIONS = {'calibrate', 'detect'}
 
-def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
+def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
     reset_globals()
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
@@ -63,7 +63,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
         'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True,
                                            verbose_success=False),
 
-        'DetectCost': FunctionInfo(opt_detect_cost_fn),
+        'DetectCost': FunctionInfo(opt_detect_cost_fn, eager=True),
         #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
         #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
@@ -75,7 +75,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
 
     success_cost = 0 if args.anytime else INF
     planner = 'ff-astar' if args.anytime else 'ff-wastar2'
-    search_sample_ratio = 0.5 # TODO: could try decreasing
+    search_sample_ratio = 1.0 # 0.5
     max_planner_time = 10
 
     pr = cProfile.Profile()
@@ -91,7 +91,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_cost=INF):
                                  initial_complexity=5,
                                  planner=planner, max_planner_time=max_planner_time,
                                  unit_costs=args.unit, success_cost=success_cost,
-                                 max_time=args.max_time, verbose=True, debug=False,
+                                 max_time=max_time, verbose=True, debug=False,
                                  unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
                                  # bind=True, max_skeletons=None,
                                  search_sample_ratio=search_sample_ratio)

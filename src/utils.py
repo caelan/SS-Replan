@@ -99,7 +99,8 @@ DRAWERS = [
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
-ZED_LEFT_SURFACES = ['indigo_tmp', 'range', 'indigo_drawer_top']
+ZED_LEFT_SURFACES = ['indigo_tmp', # 'range',
+                     'indigo_drawer_top']
 
 Surface = namedtuple('Surface', ['link', 'shape', 'joints'])
 

@@ -196,14 +196,16 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('AConf', goal_bq, carry_aq),
             ('CloseTo', goal_bq, goal_bq),
         ])
-        if np.less_equal(np.abs(get_difference_fn(world.body, world.base_joints)(init_bq.values, goal_bq.values)),
+        base_difference_fn = get_difference_fn(world.robot, world.base_joints)
+        if np.less_equal(np.abs(base_difference_fn(init_bq.values, goal_bq.values)),
                          [0.05, 0.05, math.radians(10)]).all():
             print('Close to goal base configuration')
             init.append(('CloseTo', init_bq, goal_bq))
         goal_literals.append(Exists(['?bq'], And(
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
         if task.return_init_aq:
-            if np.less_equal(np.abs(get_difference_fn(world.body, world.arm_joints)(init_aq.values, goal_aq.values)),
+            arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
+            if np.less_equal(np.abs(arm_distance_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
                 print('Close to goal arm configuration')
                 init.append(('CloseTo', init_aq, goal_aq))

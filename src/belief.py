@@ -17,7 +17,7 @@ from src.utils import compute_surface_aabb, create_relative_pose, CAMERA_MATRIX,
 BAYESIAN = False
 RESAMPLE = False
 
-MODEL_P_FP, MODEL_P_FN = 0.0, 0.01
+MODEL_P_FP, MODEL_P_FN = 0.0, 1e-3
 MODEL_POS_STD, MODEL_ORI_STD = 0.01, np.pi / 8
 #MODEL_POS_STD, MODEL_ORI_STD = OBS_POS_STD, OBS_ORI_STD
 

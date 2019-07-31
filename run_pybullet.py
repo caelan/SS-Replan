@@ -104,16 +104,20 @@ def run_stochastic(task, args):
         problem = pdddlstream_from_problem(belief,
             collisions=not args.cfree, teleport=args.teleport)
         print_separator(n=25)
-        plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
+        plan = None
+        if last_skeleton is not None:
+            # The search my get stuck otherwise
+            plan, cost, evaluations = solve_pddlstream(problem, args,
+                                                       max_time=15, skeleton=last_skeleton)
         # TODO: first attempt cheaper path
         # TODO: store history of stream evaluations
-        if (plan is None) and (last_skeleton is not None):
+        if plan is None:
             #print('Failure')
             #return False
             #wait_for_user('Failure')
             # TODO: could reusing the same problem be troublesome?
             print_separator(n=25)
-            plan, cost, evaluations = solve_pddlstream(problem, args)
+            plan, cost, evaluations = solve_pddlstream(problem, args, max_time=args.max_time)
         if plan is None:
             print('Failure')
             return False
@@ -163,7 +167,6 @@ def main():
             add_markers(world, inverse_place=False)
     #wait_for_user()
     # TODO: FD instantiation is slightly slow to a deepcopy
-    # TODO: check collisions between base/arm confs and doors
 
     #test_observation(world, entity_name='big_red_block0')
     #return

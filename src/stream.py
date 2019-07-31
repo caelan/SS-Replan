@@ -30,7 +30,7 @@ BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 MAX_CONF_DISTANCE = 0.75
 
-PRINT_FAILURES = False
+PRINT_FAILURES = True
 MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
@@ -54,18 +54,25 @@ def compute_detect_cost(prob):
     success_cost = DETECT_COST
     failure_cost = success_cost
     cost = revisit_mdp_cost(success_cost, failure_cost, prob)
-    print('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
     return cost
-
-def opt_detect_cost_fn(rp_dist, rp_sample):
-    prob = rp_dist.surface_prob(rp_dist.surface_name)
-    #print(rp_dist.surface_name, prob)
-    return clip_cost(compute_detect_cost(prob))
 
 def detect_cost_fn(rp_dist, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
     prob = rp_dist.discrete_prob(rp_sample)
-    return compute_detect_cost(prob)
+    cost = compute_detect_cost(prob)
+    print('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
+    return cost
+
+def opt_detect_cost_fn(rp_dist, rp_sample):
+    if isinstance(rp_sample, SurfaceDist):
+        # This shouldn't be needed if eager=True
+        return detect_cost_fn(rp_dist, rp_sample)
+    prob = rp_dist.surface_prob(rp_dist.surface_name)
+    #print(rp_dist.surface_name, prob)
+    cost = clip_cost(compute_detect_cost(prob))
+    print('Opt Detect Prob: {:.3f} | Opt Detect Cost: {:.3f} | Type: {}'.format(
+        prob, cost, rp_sample.__class__.__name__))
+    return cost
 
 ################################################################################
 
@@ -461,6 +468,8 @@ def get_fixed_pick_gen_fn(world, max_attempts=5, collisions=True, **kwargs):
             return
         for i in range(max_attempts):
             randomize = (i != 0)
+            if randomize and (P_RANDOMIZE == 0):
+                break
             ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
                                         randomize=randomize, **kwargs), None)
             if ik_outputs is not None:
@@ -654,6 +663,8 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
         door_path, handle_path, tool_path = door_outputs
         for i in range(max_attempts):
             randomize = (i != 0)
+            if randomize and (P_RANDOMIZE == 0):
+                break
             ik_outputs = next(plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
                               randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
             if ik_outputs is not None:
@@ -733,8 +744,8 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
 
     def fn(bq1, bq2, aq, fluents=[]):
-        if bq1 == bq2:
-            return None
+        #if bq1 == bq2:
+        #    return None
         bq1.assign()
         aq.assign()
         obstacles = set(world.static_obstacles)
@@ -783,8 +794,8 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
 
     def fn(bq, aq1, aq2, fluents=[]):
-        if aq1 == aq2:
-            return None
+        #if aq1 == aq2:
+        #    return None
         bq.assign()
         aq1.assign()
         obstacles = set(world.static_obstacles)
@@ -820,8 +831,8 @@ def get_gripper_motion_gen(world, teleport=False, **kwargs):
     resolutions = GRIPPER_RESOLUTION * np.ones(len(world.gripper_joints))
 
     def fn(gq1, gq2):
-        if gq1 == gq2:
-            return None
+        #if gq1 == gq2:
+        #    return None
         if teleport:
             path = [gq1.values, gq2.values]
         else:
