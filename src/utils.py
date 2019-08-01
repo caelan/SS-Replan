@@ -14,7 +14,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, \
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
-    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link
+    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input
 
 try:
     import trac_ik_python
@@ -261,7 +261,9 @@ def get_tool_from_root(robot):
                     get_link_pose(robot, root_link))
 
 def set_tool_pose(world, tool_pose):
-    root_from_urdf = multiply(invert(get_link_pose(world.gripper, 0)), get_pose(world.gripper))
+    #root_from_urdf = multiply(invert(get_pose(world.gripper, BASE_LINK)), # Previously 0?
+    #                          get_pose(world.gripper))
+    root_from_urdf = unit_pose()
     tool_from_root = get_tool_from_root(world.robot)
     set_pose(world.gripper, multiply(tool_pose, tool_from_root, root_from_urdf))
 
@@ -293,13 +295,17 @@ def get_tool_link(robot):
     raise ValueError(robot_name)
 
 def create_gripper(robot, visual=False):
-    #dump_body(robot)
-    links = get_link_descendants(robot, link_from_name(robot, get_gripper_link(robot))) # get_link_subtree
+    gripper_link = link_from_name(robot, get_gripper_link(robot))
+    links = get_link_descendants(robot, gripper_link) # get_link_descendants | get_link_subtree
     with LockRenderer():
+        # Actually uses the parent of the first link
         gripper = clone_body(robot, links=links, visual=False, collision=True)  # TODO: joint limits
         if not visual:
             for link in get_all_links(gripper):
                 set_color(gripper, np.zeros(4), link)
+    #dump_body(robot)
+    #dump_body(gripper)
+    #user_input()
     return gripper
 
 ################################################################################

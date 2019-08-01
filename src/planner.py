@@ -40,10 +40,12 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
         #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
         #'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
 
+        'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-2),
+
         'plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
-        #'fixed-plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'fixed-plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
-        #'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         #'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
         'plan-base-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e3, defer=True),
         'plan-arm-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e2, defer=True),

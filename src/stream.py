@@ -12,7 +12,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, \
-    child_link_from_joint, set_renderer
+    child_link_from_joint, set_renderer, apply_alpha, get_all_links, set_color, \
+    get_max_limits, dump_body, get_movable_joints
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -339,6 +340,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
         else:
             if PRINT_FAILURES: print('Failed after {} IR attempts:'.format(max_attempts))
             return
+            #yield None # Break or yield none?
 
 def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                   teleport=False, switches_only=False,
@@ -400,10 +402,15 @@ def is_approach_safe(world, obj_name, pose, grasp, obstacles):
     assert pose.support is not None
     obj_body = world.get_body(obj_name)
     pose.assign()  # May set the drawer confs as well
+    set_joint_positions(world.gripper, get_movable_joints(world.gripper), world.open_gq.values)
+    #set_renderer(enable=True)
     for _ in iterate_approach_path(world, pose, grasp, body=obj_body):
+        #for link in get_all_links(world.gripper):
+        #    set_color(world.gripper, apply_alpha(np.zeros(3)), link)
+        #wait_for_user()
         if any(pairwise_collision(world.gripper, obst) # or pairwise_collision(obj_body, obst)
                for obst in obstacles):
-            return True
+            return False
     return True
 
 def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True, **kwargs):
@@ -434,6 +441,9 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     #robot_obstacle = world.robot
     if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
         if PRINT_FAILURES: print('Grasp collision failure')
+        #set_renderer(enable=True)
+        #wait_for_user()
+        #set_renderer(enable=False)
         return
     approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
     approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
