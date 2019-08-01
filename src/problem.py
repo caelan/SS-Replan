@@ -231,7 +231,7 @@ def pdddlstream_from_problem(belief, **kwargs):
             init.extend([
                 ('Joint', joint_name),
                 ('Angle', joint_name, conf),
-                ('Movable', link_name),
+                ('Obstacle', link_name),
                 ('AngleKin', link_name, world_pose, joint_name, conf),
                 ('WorldPose', link_name, world_pose),
             ])
@@ -262,6 +262,7 @@ def pdddlstream_from_problem(belief, **kwargs):
             ]
         init.extend([
             ('CheckNearby', surface_name),
+            #('InitPose', world_pose),
             ('Localized', surface_name),
             ('Sample', world_pose),
         ])
@@ -287,7 +288,7 @@ def pdddlstream_from_problem(belief, **kwargs):
 
     for obj_name in world.movable:
         init += [
-            ('Movable', obj_name),
+            ('Obstacle', obj_name),
             ('Graspable', obj_name),
             ('CheckNearby', obj_name),
         ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
@@ -307,7 +308,6 @@ def pdddlstream_from_problem(belief, **kwargs):
                 # Treats as obstacle
                 world_pose = RelPose(body, init=True)
                 init += [
-                    ('Movable', obj_name), # TODO: misnomer
                     ('WorldPose', obj_name, world_pose),
                     ('AtWorldPose', obj_name, world_pose),
                 ]

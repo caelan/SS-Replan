@@ -20,7 +20,7 @@ from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, get_link_obstacles
 from src.visualization import GROW_BASE
-from src.belief import SurfaceDist
+from src.belief import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
 
 DETECT_COST = 1.
@@ -35,7 +35,8 @@ MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
-P_RANDOMIZE = 0.0 # 0.5
+P_RANDOMIZE = 0.5 # 0.0 | 0.5
+# TODO: trackik might not be deterministic in which case it might make sense to try a few
 
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
@@ -59,12 +60,12 @@ def compute_detect_cost(prob):
 def detect_cost_fn(rp_dist, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
     prob = rp_dist.discrete_prob(rp_sample)
-    cost = compute_detect_cost(prob)
+    cost = clip_cost(compute_detect_cost(prob))
     print('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
     return cost
 
 def opt_detect_cost_fn(rp_dist, rp_sample):
-    if isinstance(rp_sample, SurfaceDist):
+    if isinstance(rp_sample, RelPose):
         # This shouldn't be needed if eager=True
         return detect_cost_fn(rp_dist, rp_sample)
     prob = rp_dist.surface_prob(rp_dist.surface_name)
@@ -170,7 +171,8 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
-def get_sample_belief_gen(world, min_prob=0.01, mlo=False, **kwargs):
+def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES, # TODO: relative instead?
+                          mlo=False, **kwargs):
 
     def gen(obj_name, pose_dist, surface_name):
         # If we aren't resampling, can just sort by probability of success
@@ -584,6 +586,7 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
         # TODO: check the whole door trajectory
         set_joint_positions(world.kitchen, [door_joint], door_conf)
         if any(pairwise_collision(world.robot, b) for b in obstacles):
+            if PRINT_FAILURES: print('Door start/end failure')
             return
 
     # Assuming that pairs of fixed things aren't in collision at this point
@@ -599,13 +602,16 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     for i, tool_pose in enumerate(tool_path):
         set_joint_positions(world.kitchen, [door_joint], door_path[i])
         full_arm_conf = world.solve_inverse_kinematics(tool_pose)
-        # TODO: only check moving links
-        if (full_arm_conf is None) or any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-            # print('Approach IK failure', approach_conf)
+        if full_arm_conf is None:
+            if PRINT_FAILURES: print('Door kinematic failure')
+            return
+        if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
+            if PRINT_FAILURES: print('Door collision failure')
             return
         arm_conf = get_joint_positions(world.robot, world.arm_joints)
         if arm_path and not teleport:
             if MAX_CONF_DISTANCE < distance_fn(arm_path[-1], arm_conf):
+                if PRINT_FAILURES: print('Door proximity failure')
                 return
         arm_path.append(arm_conf)
         # wait_for_user()
@@ -653,8 +659,8 @@ def get_fixed_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
         obstacles = set()
 
     def gen(joint_name, door_conf1, door_conf2, base_conf):
-        if door_conf1 == door_conf2:
-            return
+        #if door_conf1 == door_conf2:
+        #    return
         # TODO: check if within database convex hull
         door_joint = joint_from_name(world.kitchen, joint_name)
         door_outputs = compute_door_path(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)

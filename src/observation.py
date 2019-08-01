@@ -15,7 +15,7 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, remove_handles
+    pairwise_collision, elapsed_time, randomize, remove_handles, add_line, BLUE, has_gui, wait_for_duration
 from src.belief import NUM_PARTICLES, PoseDist
 from src.stream import get_stable_gen
 from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
@@ -185,8 +185,16 @@ def are_visible(world):
                 ray_names.append(name)
                 rays.append(Ray(camera_point, point))
     ray_results = batch_ray_collision(rays)
-    return {name for name, result in zip(ray_names, ray_results)
-            if result.objectUniqueId == world.get_body(name)}
+    visible_indices = [idx for idx, (name, result) in enumerate(zip(ray_names, ray_results))
+                       if result.objectUniqueId == world.get_body(name)]
+    visible_names = {ray_names[idx] for idx in visible_indices}
+    print('Detected:', sorted(visible_names))
+    if has_gui():
+        handles = [add_line(rays[idx].start, rays[idx].end, color=BLUE)
+                   for idx in visible_indices]
+        wait_for_duration(1.0)
+        remove_handles(handles)
+    return visible_names
 
 def observe_scene(world):
     visible_entities = are_visible(world)

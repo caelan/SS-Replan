@@ -105,9 +105,10 @@ def detect_block(world, **kwargs):
 
     return Task(world, movable_base=True,
                 return_init_bq=True, return_init_aq=True,
-                goal_detected=[entity_name],
+                #goal_detected=[entity_name],
                 #goal_holding=[entity_name],
-                #goal_on={entity_name: 'indigo_drawer_top'},
+                goal_on={entity_name: 'indigo_drawer_top'},
+                # goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################

@@ -97,6 +97,7 @@ def run_stochastic(task, args):
     while True:
         print_separator(n=50)
         observation = observe_scene(world)
+        print('Observation:', observation)
         belief.update(observation)
         print('Belief:', belief)
         belief.draw()
