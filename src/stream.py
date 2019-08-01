@@ -62,7 +62,8 @@ def detect_cost_fn(rp_dist, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
     prob = rp_dist.discrete_prob(rp_sample)
     cost = clip_cost(compute_detect_cost(prob))
-    print('Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(prob, cost))
+    print('{}) Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(
+        rp_dist.surface_name, prob, cost))
     return cost
 
 def opt_detect_cost_fn(rp_dist, rp_sample):
@@ -72,8 +73,8 @@ def opt_detect_cost_fn(rp_dist, rp_sample):
     prob = rp_dist.surface_prob(rp_dist.surface_name)
     #print(rp_dist.surface_name, prob)
     cost = clip_cost(compute_detect_cost(prob))
-    print('Opt Detect Prob: {:.3f} | Opt Detect Cost: {:.3f} | Type: {}'.format(
-        prob, cost, rp_sample.__class__.__name__))
+    print('{}) Opt Detect Prob: {:.3f} | Opt Detect Cost: {:.3f} | Type: {}'.format(
+        rp_dist.surface_name, prob, cost, rp_sample.__class__.__name__))
     return cost
 
 ################################################################################
@@ -93,15 +94,17 @@ def get_compute_pose_kin(world):
         #    return (p2,)
         # TODO: assert that the links align?
         body = world.get_body(o1)
-        p1 = RelPose(body, reference_body=p2.reference_body, reference_link=p2.reference_link,
-                     support=rp.support, confs=(p2.confs + rp.confs), init=(rp.init and p2.init))
+        p1 = RelPose(body, #reference_body=p2.reference_body, reference_link=p2.reference_link,
+                     support=rp.support, confs=(p2.confs + rp.confs),
+                     init=(rp.init and p2.init))
         return (p1,)
     return fn
 
 def get_compute_angle_kin(world):
     def fn(o, j, a):
         link = link_from_name(world.kitchen, o) # link not surface
-        p = RelPose(world.kitchen, link, confs=[a], init=a.init)
+        p = RelPose(world.kitchen, # link,
+                    confs=[a], init=a.init)
         return (p,)
     return fn
 
