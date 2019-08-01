@@ -98,7 +98,7 @@ def detect_block(world, **kwargs):
         add_kinect(world, side)
     initial_distribution = UniformDist(['indigo_drawer_top']) # indigo_tmp
     initial_surface = initial_distribution.sample()
-    if random.random() < 0.0:
+    if random.random() < 0.5:
         # TODO: sometimes base/arm failure causes the planner to freeze
         sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
@@ -108,7 +108,7 @@ def detect_block(world, **kwargs):
                 #goal_detected=[entity_name],
                 #goal_holding=[entity_name],
                 goal_on={entity_name: 'indigo_drawer_top'},
-                # goal_closed=ALL_JOINTS,
+                goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################

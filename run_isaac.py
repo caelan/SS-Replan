@@ -156,7 +156,8 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         commands = commands_from_plan(world, plan_prefix)
         print('Commands:', commands)
         if args.watch or args.record:
-            simulate_plan(state.copy(), commands, args) # TODO: operate on real state
+            # TODO: operate on real state
+            simulate_plan(state.copy(), commands, args, record=args.record)
         wait_for_user()
 
         state.assign()

@@ -96,7 +96,7 @@
     ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     ;                   (AtBConf ?bq1) (AtAConf ?aq)
     :parameters (?bq1 ?bq2 ?bt)
-    :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt)
+    :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt) ; (not (= ?bq1 ?bq2))
                        (AtBConf ?bq1) (AtAConf @rest_aq)
                        (Calibrated) (CanMoveBase)
                        (not (UnsafeBConf ?bq2)))
@@ -111,7 +111,7 @@
   )
   (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
-    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at)
+    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at) ; (not (= ?aq1 ?aq2))
                        (AtBConf ?bq) (AtAConf ?aq1)
                        ; (Calibrated) ; TODO: require calibration?
                        (CanMoveArm))

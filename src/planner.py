@@ -40,7 +40,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
         #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
         #'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
 
-        'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-2),
+        'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-3),
 
         'plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         'fixed-plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
@@ -144,12 +144,12 @@ def commands_from_plan(world, plan):
 
 ################################################################################
 
-def simulate_plan(state, commands, args, time_step=DEFAULT_TIME_STEP):
+def simulate_plan(state, commands, args, record=False, time_step=DEFAULT_TIME_STEP):
     wait_for_user()
     if commands is None:
         return
     time_step = None if args.teleport else time_step
-    if args.record:
+    if record:
         video_path = VIDEO_TEMPLATE.format(args.problem)
         with VideoSaver(video_path):
             iterate_plan(state, commands, time_step=time_step)

@@ -365,6 +365,8 @@ class Wait(Command):
 ################################################################################s
 
 def iterate_plan(state, commands, time_step=None):
+    if commands is None:
+        return
     for i, command in enumerate(commands):
         print('\nCommand {:2}: {}'.format(i, command))
         # TODO: skip to end

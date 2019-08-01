@@ -12,13 +12,15 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, INF, LockRenderer, \
-    get_random_seed, get_numpy_seed, set_numpy_seed, set_random_seed, print_separator
+    get_random_seed, get_numpy_seed, set_numpy_seed, set_random_seed, print_separator, \
+    VideoSaver
 from src.visualization import add_markers
 from src.observation import create_observable_belief, \
     transition_belief_update, create_surface_belief, UniformDist, observe_scene
 from src.utils import ZED_LEFT_SURFACES
 from src.debug import test_observation
-from src.planner import VIDEO_TEMPLATE, solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
+from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_plan, \
+    solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block, detect_block, TASKS
@@ -37,7 +39,7 @@ def create_parser():
                         help='When enabled, defers evaluation of motion planning streams.')
     parser.add_argument('-observable', action='store_true',
                         help='Treats the state as fully observable')
-    parser.add_argument('-max_time', default=120, type=int,
+    parser.add_argument('-max_time', default=3*60, type=int,
                         help='The max computation time')
     parser.add_argument('-record', action='store_true',
                         help='When enabled, records and saves a video at {}'.format(
@@ -68,7 +70,7 @@ def run_deterministic(task, args):
     plan, cost, evaluations = solution
     plan_prefix = extract_plan_prefix(plan, defer=args.defer)
     commands = commands_from_plan(world, plan_prefix)
-    simulate_plan(state, commands, args)
+    simulate_plan(state, commands, args, record=args.record)
     wait_for_user()
 
 ################################################################################
@@ -90,6 +92,10 @@ def run_stochastic(task, args):
         belief = create_surface_belief(world, UniformDist(ZED_LEFT_SURFACES))
     # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
     print('Prior:', belief)
+    video = None
+    if args.record:
+        wait_for_user('Start?')
+        video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
 
     last_skeleton = None
     #last_cost = INF
@@ -128,7 +134,10 @@ def run_stochastic(task, args):
         plan_prefix = extract_plan_prefix(plan, defer=args.defer)
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
-        simulate_plan(state, commands, args)
+        if not video:
+            wait_for_user()
+        iterate_plan(state, commands, time_step=DEFAULT_TIME_STEP)
+        #simulate_plan(state, commands, args)
         transition_belief_update(belief, plan_prefix)
 
         plan_postfix = get_plan_postfix(plan, plan_prefix)
@@ -139,6 +148,8 @@ def run_stochastic(task, args):
         #if not plan_postfix:
         #    break
     print('Success')
+    if video:
+        video.restore()
     return True
 
 ################################################################################
