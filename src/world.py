@@ -77,6 +77,7 @@ class World(object):
             # limit effort and velocities are required
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                                 timeout=0.005, epsilon=1e-5, solve_type="Speed",
+                                #timeout=0.01, epsilon=1e-5, solve_type="Distance",
                                 urdf_string=read(urdf_path)) # Speed, Distance, Manipulation1, Manipulation2
             #print(self.ik_solver.joint_names, self.ik_solver.link_names)
             # https://bitbucket.org/traclabs/trac_ik/src/master/trac_ik_python/
@@ -224,6 +225,7 @@ class World(object):
                 return conf
             set_joint_positions(self.robot, joints, conf)
             return get_configuration(self.robot)
+
         conf = sample_tool_ik(self.robot, world_from_tool, max_attempts=100)
         if conf is None:
             return conf

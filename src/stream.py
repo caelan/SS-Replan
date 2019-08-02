@@ -13,14 +13,14 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, \
     child_link_from_joint, set_renderer, apply_alpha, get_all_links, set_color, \
-    get_max_limits, dump_body, get_movable_joints
+    get_max_limits, dump_body, get_movable_joints, add_segments, draw_pose
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, get_link_obstacles
-from src.visualization import GROW_BASE
+from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.belief import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
 
@@ -37,7 +37,7 @@ ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
 P_RANDOMIZE = 0.5 # 0.0 | 0.5
-# TODO: trackik might not be deterministic in which case it might make sense to try a few
+# TODO: TracIK might not be deterministic in which case it might make sense to try a few
 
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
@@ -198,7 +198,7 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES, # TODO: relative i
 ################################################################################
 
 def get_test_near_pose(world, **kwargs):
-    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=0.)
+    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=GROW_FORWARD_RADIUS)
     vertices_from_surface = {}
     # TODO: alternatively, distance to hull
 
@@ -207,7 +207,7 @@ def get_test_near_pose(world, **kwargs):
             surface_name = object_name
             if surface_name not in vertices_from_surface:
                 vertices_from_surface[surface_name] = grow_polygon(
-                    map(point_from_pose, load_inverse_placements(world, surface_name)), radius=0.0)
+                    map(point_from_pose, load_inverse_placements(world, surface_name)), radius=GROW_INVERSE_BASE)
             if not vertices_from_surface[surface_name]:
                 return False
             base_conf.assign()
@@ -216,6 +216,12 @@ def get_test_near_pose(world, **kwargs):
             world_from_surface = get_link_pose(world.kitchen, link_from_name(world.kitchen, surface.link))
             world_from_base = get_link_pose(world.robot, world.base_link)
             surface_from_base = multiply(invert(world_from_surface), world_from_base)
+            #result = is_point_in_polygon(point_from_pose(surface_from_base), vertices_from_surface[surface_name])
+            #if not result:
+            #    draw_pose(surface_from_base)
+            #    points = [Point(x, y, 0) for x, y, in vertices_from_surface[surface_name]]
+            #    add_segments(points, closed=True)
+            #    wait_for_user()
             return is_point_in_polygon(point_from_pose(surface_from_base), vertices_from_surface[surface_name])
         else:
             if not base_from_objects:
@@ -234,7 +240,7 @@ def get_test_near_joint(world, **kwargs):
     def test(joint_name, base_conf):
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
-            vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_BASE)
+            vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_INVERSE_BASE)
         if not vertices_from_joint[joint_name]:
             return False
         # TODO: can't open hitman_drawer_top_joint any more
@@ -258,7 +264,7 @@ def get_stable_gen(world, max_attempts=100,
         surface_aabb = compute_surface_aabb(world, surface_name)
         learned_poses = None
         if learned:
-            learned_poses = load_placements(world, surface_name)
+            learned_poses = load_placements(world, surface_name) # TODO: GROW_PLACEMENT
             if not learned_poses:
                 return
         while True:
@@ -369,8 +375,9 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
     approach_conf = get_joint_positions(world.robot, world.arm_joints)
     if teleport:
         return [aq.values, approach_conf, grasp_conf]
-    if MAX_CONF_DISTANCE < distance_fn(grasp_conf, approach_conf):
-        if PRINT_FAILURES: print('Pregrasp proximity failure')
+    distance = distance_fn(grasp_conf, approach_conf)
+    if MAX_CONF_DISTANCE < distance:
+        if PRINT_FAILURES: print('Pregrasp proximity failure (distance={:.5f}'.format(distance))
         return None
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
@@ -623,8 +630,9 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
             return
         arm_conf = get_joint_positions(world.robot, world.arm_joints)
         if arm_path and not teleport:
-            if MAX_CONF_DISTANCE < distance_fn(arm_path[-1], arm_conf):
-                if PRINT_FAILURES: print('Door proximity failure')
+            distance = distance_fn(arm_path[-1], arm_conf)
+            if MAX_CONF_DISTANCE < distance:
+                if PRINT_FAILURES: print('Door proximity failure (distance={:.5f})'.format(distance))
                 return
         arm_path.append(arm_conf)
         # wait_for_user()
@@ -893,6 +901,8 @@ def get_gripper_open_test(world, percent=1e-1): #, tolerance=1e-2
               (1-percent)*np.array(world.open_gq.values)
     #open_gq = world.open_gq.values - tolerance * np.ones(len(world.gripper_joints))
     def test(gq):
+        #if gq == world.open_gq:
+        #    print('Initial grasp:', gq)
         return np.less_equal(open_gq, gq.values).all()
     return test
 

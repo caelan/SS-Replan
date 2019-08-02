@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 from __future__ import print_function
 
@@ -46,9 +46,11 @@ SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
 
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-USE_OBJECTS = [CHEEZIT, SPAM, SUGAR]  # , TOMATO_SOUP]
+#USE_OBJECTS = [CHEEZIT, SPAM, SUGAR]  # , TOMATO_SOUP]
+USE_OBJECTS = [SPAM]
 
 TOP_DRAWER = 'indigo_drawer_top'
+JOINT_TEMPLATE = '{}_joint'
 
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 
@@ -146,7 +148,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         problem[-2].extend(additional_init)
         problem = problem[:-1] + (And(problem[-1], *additional_goals),)
 
-        #wait_for_user('Plan?')
+        wait_for_user('Plan?')
         plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
         if (plan is None) and (last_skeleton is not None):
             plan, cost, evaluations = solve_pddlstream(problem, args)
@@ -217,22 +219,24 @@ def main():
     #if args.seed is not None:
     #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
-    use_lula = args.execute or args.lula
+    use_lula = args.lula # args.execute or args.lula
     args.watch |= args.execute
 
+    # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/brain/src/brain_ros/lula_policies.py#L464
     rospy.init_node("STRIPStream")
     #with HideOutput():
     #if args.execute:
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
     #else:
     domain = KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
-    if args.execute:
+    if args.execute and not args.fixed:
         # TODO: only seems to work in simulation
         carter = Carter(goal_threshold_tra=0.10,
                         goal_threshold_rot=math.radians(15.),
                         vel_threshold_lin=0.01,
                         vel_threshold_ang=math.radians(1.0))
         domain.get_robot().carter_interface = carter
+        #domain.get_robot().unsuppress_fixed_bases()
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
@@ -259,11 +263,13 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world,
-                    #goal_holding=[SPAM],
-                    goal_on={SPAM: TOP_DRAWER},
+                    goal_holding=[SPAM],
+                    #goal_on={SPAM: TOP_DRAWER},
                     #goal_closed=[],
-                    #goal_closed=['indigo_drawer_top_joint'], #, 'indigo_drawer_bottom_joint'],
-                    movable_base=not args.fixed)
+                    #goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
+                    #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
+                    movable_base=not args.fixed,
+                    return_init_bq=True, return_init_aq=True)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()

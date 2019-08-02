@@ -10,7 +10,8 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
     BASE_LINK, LockRenderer, base_values_from_pose, \
-    pose_from_base_values, INF, wait_for_user
+    pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
+    set_renderer, draw_pose
 from src.utils import CAMERAS, LEFT_CAMERA
 from src.utils import get_ycb_obj_path
 
@@ -120,6 +121,17 @@ def update_robot(world, domain, observer):
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
     print('Initial base:', base_values)
+
+    violation = False
+    for i, joint in enumerate(arm_joints):
+        if violates_limit(world.robot, joint, entity.q[i]):
+            print('Joint {} violates limits: index={}, position={}, range={}'.format(
+                entity.joints[i], i, entity.q[i], get_joint_limits(world.robot, joint)))
+            violation = True
+            # TODO: change the link's color
+    if violation:
+       set_renderer(enable=True)
+       wait_for_user()
 
     #map_from_carter = pose_from_pose2d(carter_values)
     #world_from_carter = pose_from_pose2d(base_values)

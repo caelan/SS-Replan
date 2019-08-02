@@ -17,7 +17,7 @@ class Task(object):
                  movable_base=True, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
-                 goal_on={}, goal_closed=[], goal_cooked=[]):
+                 goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[]):
         self.world = world
         world.task = self
         self.skeletons = list(skeletons)
@@ -29,6 +29,7 @@ class Task(object):
         self.goal_holding = set(goal_holding)
         self.goal_on = dict(goal_on)
         self.goal_detected = set(goal_detected)
+        self.goal_open = set(goal_open)
         self.goal_closed = set(goal_closed)
         self.goal_cooked = set(goal_cooked)
     def __repr__(self):

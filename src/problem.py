@@ -57,7 +57,8 @@ def title_from_snake(s):
 
 def get_streams(world, debug=False, **kwargs):
     stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
-
+    if debug:
+        return stream_pddl, DEBUG
     stream_map = {
         'test-door': from_test(get_door_test(world)),
         'test-gripper': from_test(get_gripper_open_test(world)),
@@ -98,8 +99,6 @@ def get_streams(world, debug=False, **kwargs):
         #'MoveCost': move_cost_fn,
         # 'Distance': base_cost_fn,
     }
-    if debug:
-        stream_map = DEBUG
     return stream_pddl, stream_map
 
 def pdddlstream_from_problem(belief, **kwargs):
@@ -180,7 +179,10 @@ def pdddlstream_from_problem(belief, **kwargs):
                      [('Localized', name) for name in task.goal_detected] + \
                      [Exists(['?a'], And(('AngleWithin', joint_name, '?a', CLOSED),
                                          ('AtAngle', joint_name, '?a')))
-                      for joint_name in task.goal_closed]
+                      for joint_name in task.goal_closed] + \
+                     [Exists(['?a'], And(('AngleWithin', joint_name, '?a', OPEN),
+                                         ('AtAngle', joint_name, '?a')))
+                      for joint_name in task.goal_open]
 
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
@@ -219,11 +221,14 @@ def pdddlstream_from_problem(belief, **kwargs):
     surface_poses = {}
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
+        #joint_name = str(joint_name.decode('UTF-8'))
         link = child_link_from_joint(joint)
         # Relies on the fact that drawers have identical surface and link names
         link_name = get_link_name(world.kitchen, link)
+        #link_name = str(link_name.decode('UTF-8'))
         init_conf = Conf(world.kitchen, [joint], init=True)
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
+        #init_conf = open_conf
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         for conf in [init_conf, open_conf, closed_conf]:
             # TODO: return to initial poses?
@@ -291,7 +296,7 @@ def pdddlstream_from_problem(belief, **kwargs):
             ('Obstacle', obj_name),
             ('Graspable', obj_name),
             ('CheckNearby', obj_name),
-        ] + [('Stackable', obj_name, counter) for counter in COUNTERS]
+        ] + [('Stackable', obj_name, counter) for counter in set(ALL_SURFACES) & set(COUNTERS)]
 
     # TODO: track poses over time to produce estimates
     for obj_name, pose_dist in belief.pose_dists.items():
@@ -341,6 +346,6 @@ def pdddlstream_from_problem(belief, **kwargs):
 
     print('Init:', sorted(init, key=lambda f: f[0]))
     print('Goal:', goal_formula)
-    print('Streams:', stream_map.keys())
+    #print('Streams:', stream_map.keys()) # DEBUG
 
     return PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)

@@ -7,7 +7,8 @@ from src.database import load_pull_base_poses, get_surface_reference_pose, load_
 from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_grasps, surface_from_name
 
 GROW_PLACEMENT = 0.05
-GROW_BASE = 0.05
+GROW_INVERSE_BASE = 0.05
+GROW_FORWARD_RADIUS = 0.0
 
 def get_floor_z(world, floor_z=0.005):
     return get_point(world.floor)[2] + floor_z
@@ -19,7 +20,7 @@ def visualize_base_confs(world, name, base_confs, **kwargs):
     z = get_floor_z(world)
     # for x, y in base_points:
     #    handles.extend(draw_point(Point(x, y, z), color=color))
-    vertices = grow_polygon(base_confs, radius=GROW_BASE)
+    vertices = grow_polygon(base_confs, radius=GROW_INVERSE_BASE)
     points = [Point(x, y, z) for x, y, in vertices]
     handles.extend(add_segments(points, closed=True, **kwargs))
     cx, cy = convex_centroid(vertices)
@@ -51,7 +52,7 @@ def add_markers(world, placements=True, forward_place=True, pull_bases=True, inv
                     #continue
                     #_, _, z = np.average(base_points, axis=0)
                     z = get_floor_z(world) - surface_point[2]
-                    base_points = [Point(x, y, z) for x, y in grow_polygon(base_points, radius=GROW_BASE)]
+                    base_points = [Point(x, y, z) for x, y in grow_polygon(base_points, radius=GROW_INVERSE_BASE)]
                     handles.extend(add_segments(base_points, color=color, closed=True,
                                                 parent=world.kitchen, parent_link=surface_link))
 
@@ -60,7 +61,7 @@ def add_markers(world, placements=True, forward_place=True, pull_bases=True, inv
         robot_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         #z = 0.
         z = get_floor_z(world) - robot_point[2]
-        object_points = [Point(x, y, z) for x, y in grow_polygon(object_points, radius=0.0)]
+        object_points = [Point(x, y, z) for x, y in grow_polygon(object_points, radius=GROW_FORWARD_RADIUS)]
         handles.extend(add_segments(object_points, color=GREEN, closed=True,
                                     parent=world.robot, parent_link=world.base_link))
 
