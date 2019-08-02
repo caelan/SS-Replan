@@ -396,7 +396,7 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
         return [aq.values, approach_conf, grasp_conf]
     distance = distance_fn(grasp_conf, approach_conf)
     if MAX_CONF_DISTANCE < distance:
-        if PRINT_FAILURES: print('Pregrasp proximity failure (distance={:.5f}'.format(distance))
+        if PRINT_FAILURES: print('Pregrasp proximity failure (distance={:.5f})'.format(distance))
         return None
 
     resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))

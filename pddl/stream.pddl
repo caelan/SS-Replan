@@ -33,7 +33,7 @@
     :domain (and (NearPose ?o2 ?p2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure open?
     :outputs (?p1 ?rp)
     :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
-                    (Sample ?p1) (Sample ?rp)
+                    (Value ?p1) (Sample ?p1) (Value ?rp) (Sample ?rp)
                     (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)))
 
   ; Movable base

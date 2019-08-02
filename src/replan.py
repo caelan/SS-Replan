@@ -6,6 +6,12 @@ from src.problem import ACTION_COSTS
 
 
 def make_wild_skeleton(plan):
+    # Can always constrain grasps and selected poses
+    # Could store previous values to suggest new ones
+    # Recover skeleton
+    # Save parameters that shouldn't change
+    # And keep their evaluations
+    # If all args the same
     skeleton = []
     for name, args in plan:
         new_args = [arg if isinstance(arg, str) and not arg.startswith(OPT_PREFIX) else WILD

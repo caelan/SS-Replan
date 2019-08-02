@@ -76,7 +76,6 @@ def run_deterministic(task, args):
 ################################################################################
 
 def run_stochastic(task, args):
-    # TODO: relax hard constraints threshold after some time
     # Soft constraints tell you when you succeed
     # Hard constraints are nice because they allow the solver to prune
     # Constrain to use the previous plan skeleton
@@ -123,6 +122,7 @@ def run_stochastic(task, args):
             #return False
             #wait_for_user('Failure')
             # TODO: could reusing the same problem be troublesome?
+            # TODO: could require that this run be done without fixed base
             print_separator(n=25)
             plan, cost, evaluations = solve_pddlstream(problem, args, max_time=args.max_time)
         if plan is None:

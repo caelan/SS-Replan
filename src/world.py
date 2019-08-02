@@ -76,6 +76,7 @@ class World(object):
             tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
             # limit effort and velocities are required
             # solve_type: Speed, Distance, Manipulation1, Manipulation2
+            # TODO: fast solver and slow solver
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                                 timeout=0.01, epsilon=1e-5, solve_type="Speed",
                                 urdf_string=read(urdf_path))
