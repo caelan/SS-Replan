@@ -10,8 +10,8 @@ from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
     euler_from_quat, quat_from_pose, dump_body, circular_difference, \
     joints_from_names, get_max_velocity, get_distance, get_angle, INF, \
-    waypoints_from_path, HideOutput, elapsed_time, get_closest_angle_fn, \
-    pose_from_base_values, wait_for_user, draw_pose, remove_handles, get_link_pose, BodySaver
+    waypoints_from_path, HideOutput, elapsed_time, get_closest_angle_fn, clip, \
+    pose_from_base_values, wait_for_user, draw_pose, remove_handles, get_link_pose, BodySaver, get_difference
 from src.utils import WHEEL_JOINTS
 from pddlstream.utils import Verbose
 
@@ -40,7 +40,7 @@ from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction,
 
 ################################################################################s
 
-ARM_SPEED = 0.05*np.pi
+ARM_SPEED = 0.1*np.pi
 
 def ROSPose(pose):
     point, quat = pose
@@ -114,32 +114,51 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     client.wait_for_server()
     client.cancel_all_goals()
     print('Finished', action_topic)
-    # TODO: create this joint once
+    # TODO: create this action client once
+
+    # Moveit's trajectories
+    # rostopic echo /execute_trajectory/goal
+    # About 1 waypoint per second
+    # Start and end velocities are zero
+    # Accelerations are about zero (except at the start and end)
+
+    # Slow down distance or time
+    fraction = 0.1
+    ramp_duration = 3
+    #path = waypoints_from_path(path) # Neither moveit or lula benefit from this
+    #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
+
+    distance_fn = get_distance_fn(robot, joints)
+    mid_distances = [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
+    distances = [0] + mid_distances
+    time_from_starts = np.cumsum(distances) / speed
+    mid_times_from_starts = [np.average(pair) for pair in
+                             zip(time_from_starts[:-1], time_from_starts[1:])]
+    new_time_from_starts = [0]
+    for mid_time_from_start, distance in zip(mid_times_from_starts, mid_distances):
+        up_fraction = clip((mid_time_from_start - time_from_starts[0]) / ramp_duration,
+                           min_value=fraction, max_value=1.)
+        down_fraction = clip((time_from_starts[-1] - mid_time_from_start) / ramp_duration,
+                             min_value=fraction, max_value=1.)
+        new_speed = speed * min(up_fraction, down_fraction)
+        duration = distance / new_speed
+        new_time_from_starts.append(new_time_from_starts[-1] + duration)
+    # print(time_from_starts)
+    # print(new_time_from_starts)
+    # raw_input('Continue?)
+    #time_from_starts = new_time_from_starts
 
     trajectory = JointTrajectory()
     trajectory.header.frame_id = ISSAC_FRANKA_FRAME
     trajectory.header.stamp = rospy.Time(0)
     trajectory.joint_names = get_joint_names(robot, joints)
-    #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
-
-    # Moveit
-    # About 1 waypoint per second
-    # Start and end velocities are zero
-    # Accelerations are about zero
-
-
-    #path = waypoints_from_path(path) # Neither moveit or lula benefit from this
-    distance_fn = get_distance_fn(robot, joints)
-    distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
-    time_from_starts = np.cumsum(distances) / speed
-
-    for i in range(1, len(path)):
+    for i in range(len(path)):
         point = JointTrajectoryPoint()
         point.positions = list(path[i])
         # Don't need velocities, accelerations, or efforts
-        vector = np.array(path[i]) - np.array(path[i-1])
-        duration = (time_from_starts[i] - time_from_starts[i-1])
-        point.velocities = list(vector / duration)
+        #vector = np.array(path[i]) - np.array(path[i-1])
+        #duration = (time_from_starts[i] - time_from_starts[i-1])
+        #point.velocities = list(vector / duration)
         #point.accelerations = list(np.ones(len(joints)))
         #point.effort = list(np.ones(len(joints)))
         point.time_from_start = rospy.Duration(time_from_starts[i])
@@ -147,11 +166,10 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
 
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), time_from_starts[-1]))
-
-    goal = FollowJointTrajectoryGoal(trajectory=trajectory)
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
 
+    goal = FollowJointTrajectoryGoal(trajectory=trajectory)
     start_time = time.time()
     client.send_goal_and_wait(goal) # send_goal_and_wait
     client.get_result()
