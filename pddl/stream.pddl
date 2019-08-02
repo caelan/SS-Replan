@@ -2,8 +2,20 @@
   (:rule
     :inputs (?o ?g ?gty ?o2)
     :domain (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty))
-    :certified (AdmitsGrasp ?o ?g ?o2)
-  )
+    :certified (AdmitsGrasp ?o ?g ?o2))
+  (:rule
+    :inputs (?o1 ?p1 ?rp ?o2 ?p2)
+    :domain (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Value ?rp))
+    :certified (Value ?p1))
+  (:rule
+    :inputs (?o1 ?p1 ?rp ?o2 ?p2)
+    :domain (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Sample ?rp))
+    :certified (Sample ?p1))
+  (:rule
+    :inputs (?o1 ?p1 ?rp ?o2 ?p2)
+    :domain (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Dist ?rp))
+    :certified (Dist ?p1))
+
   (:stream sample-grasp
     :inputs (?o ?gty)
     :domain (and (Graspable ?o) (GraspType ?gty))
@@ -15,7 +27,7 @@
     :inputs (?o ?r)
     :domain (Stackable ?o ?r)
     :outputs (?rp)
-    :certified (and (RelPose ?o ?rp ?r) (Sample ?rp))
+    :certified (and (RelPose ?o ?rp ?r) (Value ?rp) (Sample ?rp))
   )
   (:stream sample-nearby-pose
     :inputs (?o1 ?o2 ?p2 ?bq)
@@ -121,19 +133,12 @@
     :certified (and (Ray ?r)
                     (Detect ?o ?p ?r))
   )
-
-  (:stream compute-sample-pose-kin
+  (:stream compute-pose-kin
     :inputs (?o1 ?rp ?o2 ?p2)
-    :domain (and (RelPose ?o1 ?rp ?o2) (Sample ?rp) (WorldPose ?o2 ?p2))
+    :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2))
     :outputs (?p1)
-    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Sample ?p1))
+    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
     ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation?
-  )
-  (:stream compute-dist-pose-kin ; TODO: rule that does this instead?
-    :inputs (?o1 ?rp ?o2 ?p2)
-    :domain (and (RelPose ?o1 ?rp ?o2) (Dist ?rp) (WorldPose ?o2 ?p2))
-    :outputs (?p1)
-    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Dist ?p1))
   )
 
   ;(:stream compute-angle-kin

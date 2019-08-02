@@ -19,7 +19,9 @@
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
     (CalibrateMotion ?bq ?aq ?at)
+
     (Detect ?o ?p ?r)
+    (Value ?p)
     (DistSample ?rp1 ?rp2)
 
     (Grasp ?o ?g)
@@ -162,7 +164,7 @@
   )
   (:action place
     :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?aq ?at)
-    :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
+    :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Value ?p1)
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
                        (AtBConf ?bq) (Calibrated)
                        (AtAConf ?aq) ; (AtGConf @closed_gq)

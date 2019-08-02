@@ -81,8 +81,7 @@ def get_streams(world, debug=False, **kwargs):
         'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
 
-        'compute-sample-pose-kin': from_fn(get_compute_pose_kin(world)),
-        'compute-dist-pose-kin': from_fn(get_compute_pose_kin(world)),
+        'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
         # 'compute-angle-kin': from_fn(compute_angle_kin),
         'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
         'sample-belief': from_gen_fn(get_sample_belief_gen(world, **kwargs)),
@@ -270,6 +269,7 @@ def pdddlstream_from_problem(belief, **kwargs):
             #('InitPose', world_pose),
             ('Localized', surface_name),
             ('Sample', world_pose),
+            ('Value', world_pose),
         ])
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
@@ -333,8 +333,11 @@ def pdddlstream_from_problem(belief, **kwargs):
                 if localized:
                     init.append(('On', obj_name, surface_name))
                 poses = [rel_pose, world_pose]
-            init.extend(('Dist', pose) if isinstance(pose, PoseDist) else
-                        ('Sample', pose) for pose in poses)
+            for pose in poses:
+                if isinstance(pose, PoseDist):
+                    init.append(('Dist', pose))
+                else:
+                    init.extend([('Sample', pose), ('Value', pose)])
 
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]

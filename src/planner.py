@@ -31,10 +31,8 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
         'test-near-joint': StreamInfo(p_success=0, eager=True),
 
         # TODO: need to be careful about conditional effects
-        'compute-sample-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
-                                              p_success=0.5, eager=True),
-        'compute-dist-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
-                                            p_success=0.5, eager=True),
+        'compute-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
+                                       p_success=0.5, eager=True),
         #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
         #'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
         #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
