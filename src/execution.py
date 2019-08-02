@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import time
 import math
@@ -15,7 +17,30 @@ from pddlstream.utils import Verbose
 
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 
-ARM_SPEED = 1.0*np.pi
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Header
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from moveit_msgs.msg import RobotTrajectory
+from rospy import Publisher
+
+import rospy
+import moveit_msgs.msg
+
+from actionlib import SimpleActionClient
+#from actionlib_msgs.msg import GoalStatus
+from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction, \
+    FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, JointTrajectoryActionGoal, JointTrajectoryGoal
+
+# control_msgs/GripperCommandAction
+# control_msgs/JointTrajectoryAction
+# control_msgs/SingleJointPositionAction
+# franka_gripper/MoveAction
+# moveit_msgs/ExecuteTrajectoryAction
+# moveit_msgs/MoveGroupAction
+
+################################################################################s
+
+ARM_SPEED = 0.05*np.pi
 
 def ROSPose(pose):
     point, quat = pose
@@ -25,12 +50,12 @@ def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
             for joint in joints]
 
+################################################################################s
+
 def joint_state_control(robot, joints, path, domain, moveit, observer,
                         threshold=0.01, timeout=1.0):
     # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
-    from sensor_msgs.msg import JointState
-    import rospy
     #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
     #max_forces = np.array([get_max_force(robot, joint) for joint in joints])
     joint_names = get_joint_names(robot, joints)
@@ -67,7 +92,6 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
 ################################################################################s
 
 def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
-    import moveit_msgs.msg
     trajectory_start = moveit.robot.get_current_state()
     display_trajectory = moveit_msgs.msg.DisplayTrajectory()
     display_trajectory.trajectory_start = trajectory_start
@@ -76,20 +100,33 @@ def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
     moveit.display_trajectory_publisher.publish(display_trajectory)
 
 def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
-    from trajectory_msgs.msg import JointTrajectoryPoint
-    from moveit_msgs.msg import RobotTrajectory
-    import rospy
-
+    #path = waypoints_from_path(path)
     #if moveit.use_lula:
     #    speed = 0.5*speed
 
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
-    # Only position, time_from_start, and velocity are used
-    plan = RobotTrajectory()
-    plan.joint_trajectory.header.frame_id = ISSAC_FRANKA_FRAME
-    plan.joint_trajectory.header.stamp = rospy.Time(0)
-    plan.joint_trajectory.joint_names = get_joint_names(robot, joints)
+    # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
+    action_topic = 'position_joint_trajectory_controller/follow_joint_trajectory'
+    # /move_base_simple/goal
+    # /execute_trajectory/goal
+    # /position_joint_trajectory_controller/command
+    client = SimpleActionClient(action_topic, FollowJointTrajectoryAction)
+    print('Starting', action_topic)
+    client.wait_for_server()
+    client.cancel_all_goals()
+    print('Finished', action_topic)
+    # TODO: create this joint once
+
+    trajectory = JointTrajectory()
+    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
+    trajectory.header.stamp = rospy.Time(0)
+    trajectory.joint_names = get_joint_names(robot, joints)
     #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
+
+    # Moveit
+    # About 1 waypoint per second
+    # Start and end velocities are zero
+    # Accelerations are about zero
+
 
     #path = waypoints_from_path(path) # Neither moveit or lula benefit from this
     distance_fn = get_distance_fn(robot, joints)
@@ -100,16 +137,30 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
         point = JointTrajectoryPoint()
         point.positions = list(path[i])
         # Don't need velocities, accelerations, or efforts
-        #vector = np.array(path[i]) - np.array(path[i-1])
-        #duration = (time_from_starts[i] - time_from_starts[i-1])
-        #point.velocities = list(vector / duration)
+        vector = np.array(path[i]) - np.array(path[i-1])
+        duration = (time_from_starts[i] - time_from_starts[i-1])
+        point.velocities = list(vector / duration)
         #point.accelerations = list(np.ones(len(joints)))
         #point.effort = list(np.ones(len(joints)))
         point.time_from_start = rospy.Duration(time_from_starts[i])
-        plan.joint_trajectory.points.append(point)
+        trajectory.points.append(point)
 
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), time_from_starts[-1]))
+
+    goal = FollowJointTrajectoryGoal(trajectory=trajectory)
+    # path_tolerance, goal_tolerance, goal_time_tolerance
+    # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
+
+    start_time = time.time()
+    client.send_goal_and_wait(goal) # send_goal_and_wait
+    client.get_result()
+    print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
+    return
+
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
+    # Only position, time_from_start, and velocity are used
+    plan = RobotTrajectory(joint_trajectory=trajectory)
     if moveit.use_lula:
         world_state = update_observer(observer)
         suppress_all(world_state)
@@ -156,9 +207,6 @@ def base_control(world, goal_values, moveit, observer,
                  timeout=30, sleep=1.0, verbose=False):
     # https://github.mit.edu/caelan/ROS/blob/4f375489a4b3bac7c7a0451fe30e35ba02e6302f/base_navigation.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain_msgs/msg/Goal.msg
-    from sensor_msgs.msg import JointState
-    from std_msgs.msg import Header
-    import rospy
     #joints = joints_from_names(world.robot, WHEEL_JOINTS)
     #max_velocities = np.array([get_max_velocity(world.robot, joint) for joint in joints])
     assert len(goal_values) == 3
@@ -279,7 +327,6 @@ def base_control(world, goal_values, moveit, observer,
     return False
 
 def follow_base_trajectory(world, path, moveit, observer, **kwargs):
-    from rospy import Publisher
     path = waypoints_from_path(path)
     goal_pub = Publisher("~base_goal", PoseStamped, queue_size=1)
     handles = []
@@ -311,8 +358,6 @@ def open_gripper(robot, moveit, effort=20, sleep=1.0):
     # update_robot(self.world, domain, observer.observe())
     # time.sleep(1.0)
     #moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
-    from sensor_msgs.msg import JointState
-    import rospy
     joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.open_positions)
     if effort is not None:
         gripper_joint = joint_from_name(robot, moveit.gripper.joints[0])
@@ -336,8 +381,6 @@ def close_gripper(robot, moveit, effort=20, sleep=1.0):
     # time.sleep(1.0)
     # TODO: only sleep is used by close_gripper and open_gripper...
     #moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
-    from sensor_msgs.msg import JointState
-    import rospy
     joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.closed_positions)
     if effort is not None:
         gripper_joint = joint_from_name(robot, moveit.gripper.joints[0])
