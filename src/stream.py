@@ -13,7 +13,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, \
     child_link_from_joint, set_renderer, apply_alpha, get_all_links, set_color, \
-    get_max_limits, dump_body, get_movable_joints, add_segments, draw_pose
+    get_max_limits, dump_body, get_movable_joints, add_segments, draw_pose, \
+    get_difference, INF
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -37,8 +38,23 @@ ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
 P_RANDOMIZE = 0.5 # 0.0 | 0.5
-# TODO: TracIK might not be deterministic in which case it might make sense to try a few
 
+NEARBY_APPROACH = 0.5
+NEARBY_PULL = 0.25
+
+# TODO: TracIK might not be deterministic in which case it might make sense to try a few
+# http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/trac_ik/trac_ik_tutorial.html
+# http://wiki.ros.org/trac_ik
+# https://traclabs.com/projects/trac-ik/
+# https://bitbucket.org/traclabs/trac_ik/src/master/
+# https://bitbucket.org/traclabs/trac_ik/src/master/trac_ik_lib/
+# Speed: returns very quickly the first solution found
+# Distance: runs for the full timeout_in_secs, then returns the solution that minimizes SSE from the seed
+# Manip1: runs for full timeout, returns solution that maximizes sqrt(det(J*J^T))
+# Manip2: runs for full timeout, returns solution that minimizes cond(J) = |J|*|J^-1|
+
+
+# ik_solver.set_joint_limits([0.0]* ik_solver.number_of_joints, upper_bound)
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
 
@@ -362,7 +378,9 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
         return [aq.values, grasp_conf]
 
     # TODO: could extract out collision function
-    full_approach_conf = world.solve_inverse_kinematics(approach_pose)
+    # TODO: track the full approach motion
+    full_approach_conf = world.solve_inverse_kinematics(
+        approach_pose, nearby_tolerance=NEARBY_APPROACH)
     if full_approach_conf is None: # TODO: | {obj}
         if PRINT_FAILURES: print('Pregrasp kinematic failure')
         return None
@@ -621,7 +639,8 @@ def plan_pull(world, door_joint, door_path, handle_path, tool_path, base_conf,
     arm_path = []
     for i, tool_pose in enumerate(tool_path):
         set_joint_positions(world.kitchen, [door_joint], door_path[i])
-        full_arm_conf = world.solve_inverse_kinematics(tool_pose)
+        tolerance = INF if i == 0 else NEARBY_PULL
+        full_arm_conf = world.solve_inverse_kinematics(tool_pose, nearby_tolerance=tolerance)
         if full_arm_conf is None:
             if PRINT_FAILURES: print('Door kinematic failure')
             return

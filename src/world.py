@@ -13,7 +13,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
-    set_quat, quat_from_euler
+    set_quat, quat_from_euler, INF, get_difference
 from src.issac import load_calibrate_conf
 from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
@@ -205,9 +205,11 @@ class World(object):
         self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
         self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)
         return self.custom_limits
-    def solve_inverse_kinematics(self, world_from_tool, use_track_ik=True, **kwargs):
+    def solve_inverse_kinematics(self, world_from_tool, use_track_ik=True,
+                                 nearby_tolerance=INF, **kwargs):
         if use_track_ik:
             assert self.ik_solver is not None
+            init_lower, init_upper = self.ik_solver.get_joint_limits()
             base_link = link_from_name(self.robot, self.ik_solver.base_link)
             world_from_base = get_link_pose(self.robot, base_link)
             tip_link = link_from_name(self.robot, self.ik_solver.tip_link)
@@ -218,11 +220,21 @@ class World(object):
             joints = joints_from_names(self.robot, self.ik_solver.joint_names)
             seed_state = get_joint_positions(self.robot, joints)
             #seed_state = [0.0] * self.ik_solver.number_of_joints
+
+            lower, upper = init_lower, init_upper
+            if nearby_tolerance < INF:
+                tolerance = nearby_tolerance*np.ones(len(joints))
+                lower = np.maximum(lower, seed_state - tolerance)
+                upper = np.minimum(upper, seed_state + tolerance)
+            self.ik_solver.set_joint_limits(lower, upper)
+
             (x, y, z), (rx, ry, rz, rw) = base_from_tip
             # TODO: can also adjust tolerances
             conf = self.ik_solver.get_ik(seed_state, x, y, z, rx, ry, rz, rw)
+            self.ik_solver.set_joint_limits(init_lower, init_upper)
             if conf is None:
                 return conf
+            #print(get_difference(seed_state, conf).round(3))
             set_joint_positions(self.robot, joints, conf)
             return get_configuration(self.robot)
 
