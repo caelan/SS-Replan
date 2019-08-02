@@ -31,7 +31,7 @@ DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py#L59
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L52
 
-CABINET_OPEN_ANGLE = 4 * np.pi / 9
+CABINET_OPEN_ANGLE = 4 * np.pi / 9 # out of np.pi / 2
 DRAWER_OPEN_FRACTION = 0.75
 
 Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
@@ -75,13 +75,10 @@ class World(object):
             base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
             tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
             # limit effort and velocities are required
+            # solve_type: Speed, Distance, Manipulation1, Manipulation2
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
-                                timeout=0.005, epsilon=1e-5, solve_type="Speed",
-                                #timeout=0.01, epsilon=1e-5, solve_type="Distance",
-                                urdf_string=read(urdf_path)) # Speed, Distance, Manipulation1, Manipulation2
-            #print(self.ik_solver.joint_names, self.ik_solver.link_names)
-            # https://bitbucket.org/traclabs/trac_ik/src/master/trac_ik_python/
-            #self.ik_solver.set_joint_limits([0.0] * self.ik_solver.number_of_joints, upper_bound)
+                                timeout=0.01, epsilon=1e-5, solve_type="Speed",
+                                urdf_string=read(urdf_path))
         else:
             self.ik_solver = None
         self.body_from_name = {}
@@ -217,7 +214,7 @@ class World(object):
                                      get_link_pose(self.robot, tip_link))
             world_from_tip = multiply(world_from_tool, tool_from_tip)
             base_from_tip = multiply(invert(world_from_base), world_from_tip)
-            joints = joints_from_names(self.robot, self.ik_solver.joint_names)
+            joints = joints_from_names(self.robot, self.ik_solver.joint_names) # self.ik_solver.link_names
             seed_state = get_joint_positions(self.robot, joints)
             #seed_state = [0.0] * self.ik_solver.number_of_joints
 
