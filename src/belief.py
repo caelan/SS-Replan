@@ -56,6 +56,8 @@ class PoseDist(object):
         [score] = density.score_samples([pose2d])
         prob = np.exp(-score)
         return self.surface_prob(support) * prob
+    #def support(self):
+    #    return self.dist.support()
 
     def pose2d_from_pose(self, pose):
         return base_values_from_pose(pose.get_reference_from_body())[:DIM]
@@ -168,7 +170,7 @@ class PoseDist(object):
         for surface_name in self.surface_dist.support():
             dist = DDist({pose: self.discrete_prob(pose) for pose in self.poses_from_surface[surface_name]})
             weight = self.surface_prob(surface_name)
-            pose_dists.append(SurfaceDist(self.world, self.name, weight, dist))
+            pose_dists.append(SurfaceDist(self, weight, dist))
         return pose_dists
     def update_dist(self, observation, obstacles=[], verbose=False):
         # cfree_dist.conditionOnVar(index=1, has_detection=True)
@@ -272,14 +274,15 @@ class PoseDist(object):
 ################################################################################
 
 class SurfaceDist(PoseDist):
-    def __init__(self, world, name, weight, dist):
-        super(SurfaceDist, self).__init__(world, name, dist, weight=weight)
+    def __init__(self, parent, weight, dist):
+        super(SurfaceDist, self).__init__(parent.world, parent.world, dist, weight=weight)
+        #self.parent = parent # No point if it evolves
         self.surface_name = self.dist.support()[0].support
     @property
     def support(self):
         return self.surface_name
     def project(self, fn):
-        return self.__class__(self.world, self.name, self.weight, self.dist.project(fn))
+        return self.__class__(self, self.weight, self.dist.project(fn))
     def __repr__(self):
         #return '{}({}, {})'.format(self.__class__.__name__, self.name, self.surface_name)
         return 'sd({})'.format(self.surface_name)

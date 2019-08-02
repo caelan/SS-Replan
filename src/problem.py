@@ -100,7 +100,7 @@ def get_streams(world, debug=False, **kwargs):
     }
     return stream_pddl, stream_map
 
-def pdddlstream_from_problem(belief, **kwargs):
+def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
     world = belief.world # One world per state
     task = world.task # One task per world
     print(task)
@@ -151,7 +151,7 @@ def pdddlstream_from_problem(belief, **kwargs):
         ('CanMoveBase',),
         ('CanMoveArm',),
         ('CanMoveGripper',),
-    ]
+    ] + list(additional_init)
     for action_name, cost in ACTION_COSTS.items():
         function_name = '{}Cost'.format(title_from_snake(action_name))
         function = (function_name,)

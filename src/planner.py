@@ -42,7 +42,7 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
 
         'plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         'fixed-plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
-        'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False), # TODO: why can't I defer this
         'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         #'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
         'plan-base-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e3, defer=True),
@@ -106,14 +106,14 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
 
 ################################################################################
 
-def extract_plan_prefix(plan, defer=False):
+def extract_plan_prefix(plan):
     if plan is None:
         return None
     prefix = []
     for action in plan:
         name, args = action
         prefix.append(action)
-        if defer and (name in REPLAN_ACTIONS):
+        if name in REPLAN_ACTIONS:
             break
     return prefix
 

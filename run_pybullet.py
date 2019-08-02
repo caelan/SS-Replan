@@ -24,7 +24,7 @@ from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_plan, \
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block, detect_block, TASKS
-from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix
+from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix, reuse_facts
 
 
 #from src.debug import dump_link_cross_sections, test_rays
@@ -68,8 +68,7 @@ def run_deterministic(task, args):
         collisions=not args.cfree, teleport=args.teleport)
     solution = solve_pddlstream(problem, args)
     plan, cost, evaluations = solution
-    plan_prefix = extract_plan_prefix(plan, defer=args.defer)
-    commands = commands_from_plan(world, plan_prefix)
+    commands = commands_from_plan(world, plan)
     simulate_plan(state, commands, args, record=args.record)
     wait_for_user()
 
@@ -96,6 +95,7 @@ def run_stochastic(task, args):
         wait_for_user('Start?')
         video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
 
+    previous_facts = []
     last_skeleton = None
     #last_cost = INF
     # TODO: make this a generic policy
@@ -112,15 +112,19 @@ def run_stochastic(task, args):
         print_separator(n=25)
         plan = None
         if last_skeleton is not None:
+            print('Skeleton:', last_skeleton)
+            print('Reused facts:', previous_facts)
             # The search my get stuck otherwise
-            plan, cost, evaluations = solve_pddlstream(problem, args,
-                                                       max_time=15, skeleton=last_skeleton)
+            plan, cost, evaluations = solve_pddlstream(
+                problem, args, max_time=15, skeleton=last_skeleton)
+            if plan is None:
+                wait_for_user('Failed to adhere to plan')
+
         # TODO: first attempt cheaper path
         # TODO: store history of stream evaluations
         if plan is None:
             #print('Failure')
             #return False
-            #wait_for_user('Failure')
             # TODO: could reusing the same problem be troublesome?
             # TODO: could require that this run be done without fixed base
             print_separator(n=25)
@@ -131,7 +135,7 @@ def run_stochastic(task, args):
         if not plan:
             break
         print_separator(n=25)
-        plan_prefix = extract_plan_prefix(plan, defer=args.defer)
+        plan_prefix = extract_plan_prefix(plan)
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
         if not video:
@@ -144,6 +148,7 @@ def run_stochastic(task, args):
         last_skeleton = make_wild_skeleton(plan_postfix)
         #last_skeleton = make_exact_skeleton(plan_postfix)
         #last_cost = compute_plan_cost(plan_postfix)
+        previous_facts = reuse_facts(problem, evaluations, last_skeleton)
         #assert compute_plan_cost(plan_prefix) + last_cost == cost
         #if not plan_postfix:
         #    break

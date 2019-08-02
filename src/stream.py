@@ -196,20 +196,23 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES, # TODO: relative i
                           mlo=False, **kwargs):
 
     def gen(obj_name, pose_dist, surface_name):
-        # If we aren't resampling, can just sort by probability of success
-        # Could also sample according ot the distribution
-        poses = sorted(pose_dist.dist.support(), key=pose_dist.discrete_prob, reverse=True)
-        if mlo:
-            poses = poses[:1]
-        for rp in poses:
+        valid_samples = { }
+        for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)
             cost = detect_cost_fn(pose_dist, rp)
             if (min_prob <= prob) and (cost <= MAX_COST):
+                valid_samples[rp] = prob
                 #print(obj_name, surface_name, prob)
                 #user_input('Continue?')
+        if not valid_samples:
+            return
+        if mlo:
+            rp = max(valid_samples, key=valid_samples.__getitem__)
+            yield (rp,)
+        else:
+            # TODO: random sample without replacement
+            for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
                 yield (rp,)
-            else:
-                break # Works if sorted
     return gen
 
 ################################################################################

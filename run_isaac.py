@@ -153,7 +153,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         if (plan is None) and (last_skeleton is not None):
             plan, cost, evaluations = solve_pddlstream(problem, args)
 
-        plan_prefix = extract_plan_prefix(plan, defer=args.defer)
+        plan_prefix = extract_plan_prefix(plan)
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
         print('Commands:', commands)
