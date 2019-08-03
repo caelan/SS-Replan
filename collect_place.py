@@ -44,6 +44,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {} | Filename: {}'.format(
         robot_name, object_name, surface_name, grasp_type, filename))
 
+    # TODO: ensure pose is in view of cameras
     entries = []
     start_time = time.time()
     failures = 0

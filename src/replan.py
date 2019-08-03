@@ -6,6 +6,11 @@ from pddlstream.algorithms.algorithm import parse_domain
 from pddlstream.utils import INF, implies, hash_or_id
 from src.problem import ACTION_COSTS
 
+REUSE_ARGUMENTS = {
+    # This should really be done by type instead
+    'pick': [2],  # ?o1 ?g ?rp ?o2
+    'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
+}
 
 def make_wild_skeleton(plan):
     # Can always constrain grasps and selected poses
@@ -16,27 +21,29 @@ def make_wild_skeleton(plan):
     # If all args the same
     skeleton = []
     for name, args in plan:
-        if name == 'place':
-            indices = [0, 2, 3, 4] # ?o1 ?g ?rp ?o2
-        else:
-            indices = []
+        indices = REUSE_ARGUMENTS.get(name, [])
         new_args = [arg if ((index in indices) or isinstance(arg, str)) and
                            not (isinstance(arg, str) and arg.startswith(OPT_PREFIX)) else WILD
                     for index, arg in enumerate(args)]
         skeleton.append(Action(name, new_args))
     return skeleton
 
-def reuse_facts(problem, evaluations, skeleton):
+def reuse_facts(problem, certificate, skeleton):
     # TODO: extract facts in the preimage of the plan
     # TODO: repackage streams
+    # TODO: recover the full axiom + action plan
+    # TODO: recover the plan preimage annotated with use time
+    # Some supporting args are quantified out and thus lack some facts
+    evaluations = certificate.all_facts # preimage_facts
+    return evaluations
     new_facts = []
     if skeleton is None:
         return new_facts
-    obj_from_id = set()
+    reuse_objs = set()
     for action, args in skeleton:
         for arg in args:
             if (arg != WILD) and not is_parameter(arg):
-                obj_from_id.add(hash_or_id(arg))
+                reuse_objs.add(hash_or_id(arg))
     domain = parse_domain(problem.domain_pddl)
     fluents = get_fluents(domain)
     for fact in evaluations:
@@ -44,7 +51,8 @@ def reuse_facts(problem, evaluations, skeleton):
         if (predicate == EQ) or (predicate in fluents):
             # Could technically evaluate functions as well
             continue
-        if all(map(obj_from_id.__contains__, get_args(fact))):
+        if all(isinstance(arg, str) or (hash_or_id(arg) in reuse_objs)
+               for arg in get_args(fact)):
             new_facts.append(fact)
     return new_facts
 

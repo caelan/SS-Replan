@@ -96,8 +96,8 @@ def run_stochastic(task, args):
         video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
 
     previous_facts = []
-    last_skeleton = None
-    #last_cost = INF
+    previous_skeleton = None
+    #previous_cost = INF
     # TODO: make this a generic policy
     while True:
         print_separator(n=50)
@@ -107,16 +107,16 @@ def run_stochastic(task, args):
         print('Belief:', belief)
         belief.draw()
         #wait_for_user('Plan?')
-        problem = pdddlstream_from_problem(belief,
+        problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
             collisions=not args.cfree, teleport=args.teleport)
         print_separator(n=25)
         plan = None
-        if last_skeleton is not None:
-            print('Skeleton:', last_skeleton)
+        if previous_skeleton is not None:
+            print('Skeleton:', previous_skeleton)
             print('Reused facts:', previous_facts)
             # The search my get stuck otherwise
-            plan, cost, evaluations = solve_pddlstream(
-                problem, args, max_time=15, skeleton=last_skeleton)
+            plan, cost, certificate = solve_pddlstream(
+                problem, args, max_time=15, skeleton=previous_skeleton)
             if plan is None:
                 wait_for_user('Failed to adhere to plan')
 
@@ -128,7 +128,8 @@ def run_stochastic(task, args):
             # TODO: could reusing the same problem be troublesome?
             # TODO: could require that this run be done without fixed base
             print_separator(n=25)
-            plan, cost, evaluations = solve_pddlstream(problem, args, max_time=args.max_time)
+            plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time)
+        print('Preimage:', sorted(certificate.preimage_facts, key=lambda f: f[0]))
         if plan is None:
             print('Failure')
             return False
@@ -138,17 +139,17 @@ def run_stochastic(task, args):
         plan_prefix = extract_plan_prefix(plan)
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
-        if not video:
+        if not video: # Video doesn't include planning time
             wait_for_user()
         iterate_plan(state, commands, time_step=DEFAULT_TIME_STEP)
         #simulate_plan(state, commands, args)
         transition_belief_update(belief, plan_prefix)
 
         plan_postfix = get_plan_postfix(plan, plan_prefix)
-        last_skeleton = make_wild_skeleton(plan_postfix)
-        #last_skeleton = make_exact_skeleton(plan_postfix)
+        previous_skeleton = make_wild_skeleton(plan_postfix)
+        #previous_skeleton = make_exact_skeleton(plan_postfix)
         #last_cost = compute_plan_cost(plan_postfix)
-        previous_facts = reuse_facts(problem, evaluations, last_skeleton)
+        previous_facts = reuse_facts(problem, certificate, previous_skeleton)
         #assert compute_plan_cost(plan_prefix) + last_cost == cost
         #if not plan_postfix:
         #    break
