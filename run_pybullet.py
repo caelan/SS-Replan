@@ -149,7 +149,9 @@ def run_stochastic(task, args):
         previous_skeleton = make_wild_skeleton(plan_postfix)
         #previous_skeleton = make_exact_skeleton(plan_postfix)
         #last_cost = compute_plan_cost(plan_postfix)
-        previous_facts = reuse_facts(problem, certificate, previous_skeleton)
+        previous_facts = []
+        #previous_facts = certificate.preimage_facts
+        #previous_facts = reuse_facts(problem, certificate, previous_skeleton)
         #assert compute_plan_cost(plan_prefix) + last_cost == cost
         #if not plan_postfix:
         #    break

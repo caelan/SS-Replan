@@ -8,8 +8,9 @@ from src.problem import ACTION_COSTS
 
 REUSE_ARGUMENTS = {
     # This should really be done by type instead
-    'pick': [2],  # ?o1 ?g ?rp ?o2
-    'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
+    #'pick': [0, 2],  # ?o1 ?g
+    #'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
+    # TODO: unable to adhere to place actions for some reason...
 }
 
 def make_wild_skeleton(plan):
@@ -29,13 +30,10 @@ def make_wild_skeleton(plan):
     return skeleton
 
 def reuse_facts(problem, certificate, skeleton):
-    # TODO: extract facts in the preimage of the plan
     # TODO: repackage streams
     # TODO: recover the full axiom + action plan
     # TODO: recover the plan preimage annotated with use time
     # Some supporting args are quantified out and thus lack some facts
-    evaluations = certificate.all_facts # preimage_facts
-    return evaluations
     new_facts = []
     if skeleton is None:
         return new_facts
@@ -44,9 +42,10 @@ def reuse_facts(problem, certificate, skeleton):
         for arg in args:
             if (arg != WILD) and not is_parameter(arg):
                 reuse_objs.add(hash_or_id(arg))
+
     domain = parse_domain(problem.domain_pddl)
     fluents = get_fluents(domain)
-    for fact in evaluations:
+    for fact in certificate.preimage_facts:
         predicate = get_prefix(fact)
         if (predicate == EQ) or (predicate in fluents):
             # Could technically evaluate functions as well

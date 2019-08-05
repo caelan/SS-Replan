@@ -150,10 +150,10 @@ def stow_block(world, **kwargs):
     sample_placement(world, entity_name, initial_surface)
 
     return Task(world, movable_base=True,
-                goal_holding=[entity_name],
-                #goal_on={entity_name: goal_surface},
-                return_init_bq=False, return_init_aq=False,
-                #goal_closed=ALL_JOINTS,
+                #goal_holding=[entity_name],
+                goal_on={entity_name: goal_surface},
+                return_init_bq=True, return_init_aq=True,
+                goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################

@@ -8,7 +8,7 @@ from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_grasps, surface
 
 GROW_PLACEMENT = 0.05
 GROW_INVERSE_BASE = 0.05
-GROW_FORWARD_RADIUS = 0.0
+GROW_FORWARD_RADIUS = 0.05
 
 def get_floor_z(world, floor_z=0.005):
     return get_point(world.floor)[2] + floor_z
