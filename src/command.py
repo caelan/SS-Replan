@@ -1,4 +1,4 @@
-from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, follow_base_trajectory
+from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, follow_base_trajectory, time_parameterization
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, remove_handles, \
     get_max_limit, get_joint_limits, waypoints_from_path, link_from_name, batch_ray_collision, draw_ray
@@ -107,6 +107,9 @@ class Trajectory(Command):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
 
     def iterate(self, state):
+        time_parameterization(self.robot, self.joints, self.path)
+
+
         for positions in self.path:
             set_joint_positions(self.robot, self.joints, positions)
             yield
@@ -162,6 +165,7 @@ class Trajectory(Command):
                 moveit_control(self.robot, self.joints, self.path, moveit, observer)
             time.sleep(DEFAULT_SLEEP)
         else:
+            # TODO: use the spline controller here
             status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         time.sleep(DEFAULT_SLEEP)
         #return status

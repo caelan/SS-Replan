@@ -58,6 +58,7 @@ def time_parameterization(robot, joints, path, speed=ARM_SPEED):
     # https://docs.scipy.org/doc/scipy-0.18.0/reference/interpolate.html
 
     # BPoly.from_derivatives
+    # PPoly.from_spline # PPoly.from_bernstein_basis
     distance_fn = get_distance_fn(robot, joints)
     distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
     time_from_starts = np.cumsum(distances) / speed
@@ -70,6 +71,7 @@ def time_parameterization(robot, joints, path, speed=ARM_SPEED):
     for i, t in enumerate(time_from_starts):
         print(i, t, path[i], positions(t), velocities(t), accelerations(t))
 
+    # https://github.com/scipy/scipy/blob/v1.3.0/scipy/interpolate/_cubic.py#L75-L158
     trajectory = JointTrajectory()
     trajectory.header.frame_id = ISSAC_FRANKA_FRAME
     trajectory.header.stamp = rospy.Time(0)
