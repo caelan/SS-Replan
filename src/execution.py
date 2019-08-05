@@ -30,6 +30,7 @@ from actionlib import SimpleActionClient
 #from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction, \
     FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, JointTrajectoryActionGoal, JointTrajectoryGoal
+from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
 # control_msgs/GripperCommandAction
 # control_msgs/JointTrajectoryAction
@@ -38,9 +39,52 @@ from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction,
 # moveit_msgs/ExecuteTrajectoryAction
 # moveit_msgs/MoveGroupAction
 
+ARM_SPEED = 0.1*np.pi
+
 ################################################################################s
 
-ARM_SPEED = 0.1*np.pi
+def time_parameterization(robot, joints, path, speed=ARM_SPEED):
+    # TODO: could interpolate each DOF independently
+    # Univariate interpolation just means that the input is one dimensional (aka time)
+    # The output can be arbitrary dimension
+    # Bivariate interpolation has a 2D input space
+
+    # Was initially using scipy 0.17.0
+    # https://docs.scipy.org/doc/scipy-0.17.0/reference/interpolate.html
+    # https://docs.scipy.org/doc/scipy-0.17.0/reference/tutorial/interpolate.html
+
+    # Upgraded to scipy 0.18.0 to use the CubicSpline method
+    # sudo pip2 install scipy==0.18.0
+    # https://docs.scipy.org/doc/scipy-0.18.0/reference/interpolate.html
+
+    # BPoly.from_derivatives
+    distance_fn = get_distance_fn(robot, joints)
+    distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
+    time_from_starts = np.cumsum(distances) / speed
+
+    positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
+                         extrapolate=False) # bc_type=((1, 0), (1, 0))
+    velocities = positions.derivative(nu=1)
+    accelerations = velocities.derivative(nu=1)
+
+    for i, t in enumerate(time_from_starts):
+        print(i, t, path[i], positions(t), velocities(t), accelerations(t))
+
+    trajectory = JointTrajectory()
+    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
+    trajectory.header.stamp = rospy.Time(0)
+    trajectory.joint_names = get_joint_names(robot, joints)
+    for t in time_from_starts:
+        point = JointTrajectoryPoint()
+        point.positions = positions(t)
+        point.velocities = velocities(t)
+        point.accelerations = accelerations(t)
+        #point.effort = list(np.ones(len(joints)))
+        point.time_from_start = rospy.Duration(t)
+        trajectory.points.append(point)
+    return trajectory
+
+################################################################################s
 
 def ROSPose(pose):
     point, quat = pose
