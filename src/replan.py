@@ -27,6 +27,7 @@ def make_wild_skeleton(plan):
                            not (isinstance(arg, str) and arg.startswith(OPT_PREFIX)) else WILD
                     for index, arg in enumerate(args)]
         skeleton.append(Action(name, new_args))
+        #print(len(skeleton), skeleton[-1])
     return skeleton
 
 def reuse_facts(problem, certificate, skeleton):
@@ -43,6 +44,8 @@ def reuse_facts(problem, certificate, skeleton):
             if (arg != WILD) and not is_parameter(arg):
                 reuse_objs.add(hash_or_id(arg))
 
+    # The reuse relpose omission is due to the fact that the initial pose was selected
+    # (which is populated in the initial state)
     order_predicate = ORDER_PREDICATE.format('')
     domain = parse_domain(problem.domain_pddl)
     fluents = get_fluents(domain)

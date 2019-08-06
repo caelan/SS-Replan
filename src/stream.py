@@ -165,6 +165,9 @@ def get_ofree_ray_pose_test(world, **kwargs):
     def test(ray, obj_name, pose):
         if ray.name == obj_name:
             return True
+        # TODO: test whether they physically are in collision
+        # TODO: some of the rays clip the top of objects for some reason?
+        # If so, reject
         ray.pose.assign()
         pose.assign()
         move_occluding(world, ray, obj_name)
@@ -577,8 +580,9 @@ def get_handle_grasps(world, joint, pre_distance=0.1):
     return grasps
 
 def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, teleport=False):
+    door_paths = []
     if door_conf1 == door_conf2:
-        return None
+        return door_paths
     door_joint = joint_from_name(world.kitchen, joint_name)
     door_joints = [door_joint]
     # TODO: could unify with grasp path
@@ -588,7 +592,6 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, tel
         door_path = [door_conf1.values, door_conf2.values]
 
     # door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
-    door_paths = []
     for handle_grasp in get_handle_grasps(world, door_joint):
         link, grasp, pregrasp = handle_grasp
         handle_path = []

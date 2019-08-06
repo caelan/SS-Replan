@@ -68,6 +68,7 @@
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at)))
+
   (:stream test-near-joint
     :inputs (?j ?bq)
     :domain (and (Joint ?j) (InitBConf ?bq))

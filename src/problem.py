@@ -100,7 +100,7 @@ def get_streams(world, debug=False, **kwargs):
     }
     return stream_pddl, stream_map
 
-def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
+def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwargs):
     world = belief.world # One world per state
     task = world.task # One task per world
     print(task)
@@ -163,8 +163,8 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
             #[('Camera', name) for name in world.cameras]
     if task.movable_base:
         init.append(('MovableBase',))
-    #if task.fixed_base:
-    init.append(('InitBConf', init_bq))
+    if fixed_base:
+        init.append(('InitBConf', init_bq))
     if task.noisy_base:
         init.append(('NoisyBase',))
 
@@ -269,7 +269,7 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
             #('InitPose', world_pose),
             ('Localized', surface_name),
             ('Sample', world_pose),
-            ('Value', world_pose),
+            #('Value', world_pose),
         ])
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
@@ -337,7 +337,7 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
                 if isinstance(pose, PoseDist):
                     init.append(('Dist', pose))
                 else:
-                    init.extend([('Sample', pose), ('Value', pose)])
+                    init.extend([('Sample', pose)]) #, ('Value', pose)])
 
     #for body, ty in problem.body_types:
     #    init += [('Type', body, ty)]
@@ -347,6 +347,7 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
     goal_formula = existential_quantification(goal_literals)
     stream_pddl, stream_map = get_streams(world, **kwargs)
 
+    print('Constants:', constant_map)
     print('Init:', sorted(init, key=lambda f: f[0]))
     print('Goal:', goal_formula)
     #print('Streams:', stream_map.keys()) # DEBUG

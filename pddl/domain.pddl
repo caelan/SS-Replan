@@ -102,7 +102,8 @@
     :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt) ; (not (= ?bq1 ?bq2))
                        (AtBConf ?bq1) (AtAConf @rest_aq)
                        (Calibrated) (CanMoveBase)
-                       (not (UnsafeBConf ?bq2)))
+                       (not (UnsafeBConf ?bq2))
+                  )
     :effect (and (AtBConf ?bq2)
                  (CanMoveArm)
                  (not (AtBConf ?bq1))
@@ -176,7 +177,7 @@
                   )
     :effect (and (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                  (On ?o1 ?o2) (not (Holding ?o1))
-                 (AtGConf @open_gq)
+                 (not (AtGConf @closed_gq)) (AtGConf @open_gq) ; TODO: change the grasp conf for pick
                  (CanMoveBase) (CanMoveArm)
                  (not (AtGrasp ?o1 ?g))
                  ;(not (Localized ?o1))
@@ -269,6 +270,7 @@
   ;          (AtAngle ?j ?a))) ; TODO: could compose arbitrary chains
   ;))
 
+  ; TODO: general unsafe condition to disable these
   (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
     (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Graspable ?o2) (not (= ?o1 ?o2))
                             (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))

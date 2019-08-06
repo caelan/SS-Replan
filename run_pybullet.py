@@ -107,32 +107,30 @@ def run_stochastic(task, args):
         print('Belief:', belief)
         belief.draw()
         #wait_for_user('Plan?')
-        problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
-            collisions=not args.cfree, teleport=args.teleport)
+        problem = pdddlstream_from_problem(belief, additional_init=previous_facts, fixed_base=True,
+                                           collisions=not args.cfree, teleport=args.teleport)
         print_separator(n=25)
         plan = None
         if previous_skeleton is not None:
             print('Skeleton:', previous_skeleton)
-            print('Reused facts:', previous_facts)
+            print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
             # The search my get stuck otherwise
             plan, cost, certificate = solve_pddlstream(
                 problem, args, max_time=15, skeleton=previous_skeleton)
             if plan is None:
                 wait_for_user('Failed to adhere to plan')
 
-        # TODO: first attempt cheaper path
         # TODO: store history of stream evaluations
         if plan is None:
-            #print('Failure')
-            #return False
             # TODO: could reusing the same problem be troublesome?
             # TODO: could require that this run be done without fixed base
             print_separator(n=25)
-            plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time)
-        print('Preimage:', sorted(certificate.preimage_facts, key=lambda f: f[0]))
+            cost = INF # Attempt to find a cheaper plan
+            plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time, max_cost=cost)
         if plan is None:
             print('Failure')
             return False
+        print('Preimage:', sorted(certificate.preimage_facts, key=lambda f: f[0]))
         if not plan:
             break
         print_separator(n=25)
@@ -151,7 +149,7 @@ def run_stochastic(task, args):
         #last_cost = compute_plan_cost(plan_postfix)
 
         #previous_facts = []
-        #previous_facts = certificate.preimage_facts
+        #previous_facts = certificate.preimage_facts # includes fluents!
         previous_facts = reuse_facts(problem, certificate, previous_skeleton)
         #assert compute_plan_cost(plan_prefix) + last_cost == cost
         #if not plan_postfix:
