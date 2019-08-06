@@ -1,4 +1,4 @@
-from pddlstream.algorithms.constraints import WILD
+from pddlstream.algorithms.constraints import WILD, ORDER_PREDICATE
 from pddlstream.language.constants import Action, EQ, get_prefix, get_args, is_cost, is_parameter
 from pddlstream.language.object import OPT_PREFIX
 from pddlstream.algorithms.downward import get_fluents
@@ -8,8 +8,8 @@ from src.problem import ACTION_COSTS
 
 REUSE_ARGUMENTS = {
     # This should really be done by type instead
-    #'pick': [0, 2],  # ?o1 ?g
-    #'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
+    'pick': [0, 2],  # ?o1 ?g
+    'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
     # TODO: unable to adhere to place actions for some reason...
 }
 
@@ -43,11 +43,12 @@ def reuse_facts(problem, certificate, skeleton):
             if (arg != WILD) and not is_parameter(arg):
                 reuse_objs.add(hash_or_id(arg))
 
+    order_predicate = ORDER_PREDICATE.format('')
     domain = parse_domain(problem.domain_pddl)
     fluents = get_fluents(domain)
     for fact in certificate.preimage_facts:
         predicate = get_prefix(fact)
-        if (predicate == EQ) or (predicate in fluents):
+        if (predicate in {order_predicate, EQ}) or (predicate in fluents):
             # Could technically evaluate functions as well
             continue
         if all(isinstance(arg, str) or (hash_or_id(arg) in reuse_objs)

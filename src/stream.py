@@ -619,10 +619,20 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, tel
             door_paths.append(DoorPath(door_path, handle_path, handle_grasp, tool_path))
     return door_paths
 
-def plan_pull(world, door_joint, door_path, base_conf,
+def is_pull_safe(world, door_joint, door_plan, obstacles):
+    door_path, handle_path, handle_plan, tool_path = door_plan
+    for door_conf in [door_path[0], door_path[-1]]:
+        # TODO: check the whole door trajectory
+        set_joint_positions(world.kitchen, [door_joint], door_conf)
+        if any(pairwise_collision(world.robot, b) for b in obstacles):
+            if PRINT_FAILURES: print('Door start/end failure')
+            return False
+    return True
+
+def plan_pull(world, door_joint, door_plan, base_conf,
               randomize=True, collisions=True, teleport=False, **kwargs):
-    door_path, handle_path, handle_grasp, tool_path = door_path
-    handle_link, handle_grasp, handle_pregrasp = handle_grasp
+    door_path, handle_path, handle_plan, tool_path = door_plan
+    handle_link, handle_grasp, handle_pregrasp = handle_plan
     # TODO: could push if the goal is to be fully closed
 
     door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) if collisions else set()
@@ -632,13 +642,8 @@ def plan_pull(world, door_joint, door_path, base_conf,
     world.open_gripper()
     world.carry_conf.assign()
     robot_saver = BodySaver(world.robot) # TODO: door_saver?
-
-    for door_conf in [door_path[0], door_path[-1]]:
-        # TODO: check the whole door trajectory
-        set_joint_positions(world.kitchen, [door_joint], door_conf)
-        if any(pairwise_collision(world.robot, b) for b in obstacles):
-            if PRINT_FAILURES: print('Door start/end failure')
-            return
+    if not is_pull_safe(world, door_joint, door_plan, obstacles):
+        return
 
     # Assuming that pairs of fixed things aren't in collision at this point
     moving_links = get_moving_links(world.robot, world.arm_joints)
@@ -707,20 +712,23 @@ def plan_pull(world, door_joint, door_path, base_conf,
 ################################################################################
 
 def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, **kwargs):
-    obstacles = world.static_obstacles
-    if not collisions:
-        obstacles = set()
 
     def gen(joint_name, door_conf1, door_conf2, base_conf):
         #if door_conf1 == door_conf2:
         #    return
         # TODO: check if within database convex hull
         door_joint = joint_from_name(world.kitchen, joint_name)
-        door_paths = compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
-        if not door_paths:
+        obstacles = (world.static_obstacles | get_descendant_obstacles(
+            world.kitchen, door_joint)) if collisions else set()
+
+        base_conf.assign()
+        door_plans = [door_plan for door_plan in compute_door_paths(
+            world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
+                      if is_pull_safe(world, door_joint, door_plan, obstacles)]
+        if not door_plans:
             return
         for i in range(max_attempts):
-            door_path = random.choice(door_paths)
+            door_path = random.choice(door_plans)
             # TracIK is itself stochastic
             randomize = (random.random() < P_RANDOMIZE_IK)
             ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,
@@ -812,7 +820,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
         if not collisions:
             obstacles = set()
         initial_saver = BodySaver(world.robot)
-        if teleport:
+        if (bq1 == bq2) or teleport:
             path = [bq1.values, bq2.values]
         else:
             # It's important that the extend function is reversible to avoid getting trapped

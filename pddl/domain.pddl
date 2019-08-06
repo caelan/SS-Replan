@@ -93,6 +93,7 @@
     (DetectCost ?rp1 ?rp2)
   )
 
+  ; TODO: prevent the robot from moving to the same spot?
   (:action move_base
     ;:parameters (?bq1 ?bq2 ?aq ?bt)
     ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
@@ -123,7 +124,7 @@
   )
   (:action move_gripper
     :parameters (?gq1 ?gq2 ?gt)
-    :precondition (and (GripperMotion ?gq1 ?gq2 ?gt)
+    :precondition (and (GripperMotion ?gq1 ?gq2 ?gt) ; (not (= ?gq1 ?gq2))
                        (AtGConf ?gq1)) ; (CanMoveGripper))
     :effect (and (AtGConf ?gq2)
                  (not (AtGConf ?gq1)) (not (CanMoveGripper))
@@ -175,6 +176,7 @@
                   )
     :effect (and (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                  (On ?o1 ?o2) (not (Holding ?o1))
+                 (AtGConf @open_gq)
                  (CanMoveBase) (CanMoveArm)
                  (not (AtGrasp ?o1 ?g))
                  ;(not (Localized ?o1))
