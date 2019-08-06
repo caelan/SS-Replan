@@ -5,13 +5,13 @@ import time
 import math
 
 from src.issac import update_robot, ISSAC_FRANKA_FRAME, lookup_pose, \
-    ISSAC_PREFIX, ISSAC_WORLD_FRAME, CONTROL_TOPIC, ISSAC_CARTER_FRAME, update_observer
+    ISSAC_PREFIX, ISSAC_WORLD_FRAME, ISSAC_CARTER_FRAME, update_observer
 from pybullet_tools.utils import get_distance_fn, get_joint_name, \
     get_max_force, joint_from_name, point_from_pose, wrap_angle, \
-    euler_from_quat, quat_from_pose, dump_body, circular_difference, \
-    joints_from_names, get_max_velocity, get_distance, get_angle, INF, \
-    waypoints_from_path, HideOutput, elapsed_time, get_closest_angle_fn, clip, \
-    pose_from_base_values, wait_for_user, draw_pose, remove_handles, get_link_pose, BodySaver, get_difference
+    euler_from_quat, quat_from_pose, circular_difference, \
+    get_angle, INF, \
+    waypoints_from_path, elapsed_time, get_closest_angle_fn, clip, \
+    wait_for_user, draw_pose, remove_handles, get_link_pose
 from src.utils import WHEEL_JOINTS
 from pddlstream.utils import Verbose
 
@@ -28,9 +28,8 @@ import moveit_msgs.msg
 
 from actionlib import SimpleActionClient
 #from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction, \
-    FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, JointTrajectoryActionGoal, JointTrajectoryGoal
-from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
+from scipy.interpolate import CubicSpline  # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
 # control_msgs/GripperCommandAction
 # control_msgs/JointTrajectoryAction
@@ -61,15 +60,19 @@ def time_parameterization(robot, joints, path, speed=ARM_SPEED):
     # PPoly.from_spline # PPoly.from_bernstein_basis
     distance_fn = get_distance_fn(robot, joints)
     distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
-    time_from_starts = np.cumsum(distances) / speed
+    #time_from_starts = np.cumsum(distances) / speed
+    time_from_starts = slow_trajectory(robot, joints, path, speed=speed)
 
+    #positions = interp1d(time_from_starts, path, kind='linear')
     positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
-                         extrapolate=False) # bc_type=((1, 0), (1, 0))
+                            extrapolate=False) # bc_type=((1, 0), (1, 0))
+    #positions = CubicHermiteSpline(time_from_starts, path, extrapolate=False)
     velocities = positions.derivative(nu=1)
     accelerations = velocities.derivative(nu=1)
 
-    for i, t in enumerate(time_from_starts):
-        print(i, t, path[i], positions(t), velocities(t), accelerations(t))
+    #for i, t in enumerate(time_from_starts):
+    #    print(i, t, path[i], positions(t), velocities(t), accelerations(t))
+    #wait_for_user('Continue?')
 
     # https://github.com/scipy/scipy/blob/v1.3.0/scipy/interpolate/_cubic.py#L75-L158
     trajectory = JointTrajectory()
@@ -145,7 +148,39 @@ def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
     display_trajectory.trajectory[0].joint_trajectory.header.frame_id = frame
     moveit.display_trajectory_publisher.publish(display_trajectory)
 
-def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
+def slow_trajectory(robot, joints, path, speed=ARM_SPEED):
+    # Slow down distance or time
+    fraction = 0.1 # percentage
+    ramp_duration = 1.0 # seconds
+    # path = waypoints_from_path(path) # Neither moveit or lula benefit from this
+    # max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
+
+    distance_fn = get_distance_fn(robot, joints)
+    mid_distances = [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
+    distances = [0] + mid_distances
+    time_from_starts = np.cumsum(distances) / speed
+    # TODO: make this a separate function?
+
+    mid_times_from_starts = [np.average(pair) for pair in
+                             zip(time_from_starts[:-1], time_from_starts[1:])]
+    # https://en.wikipedia.org/wiki/Finite_difference
+    new_time_from_starts = [0]
+    for mid_time_from_start, distance in zip(mid_times_from_starts, mid_distances):
+        up_fraction = clip((mid_time_from_start - time_from_starts[0]) / ramp_duration,
+                           min_value=fraction, max_value=1.)
+        down_fraction = clip((time_from_starts[-1] - mid_time_from_start) / ramp_duration,
+                             min_value=fraction, max_value=1.)
+        new_speed = speed * min(up_fraction, down_fraction)
+        print(distance, new_speed)
+        duration = distance / new_speed
+        new_time_from_starts.append(new_time_from_starts[-1] + duration)
+    # print(time_from_starts)
+    # print(new_time_from_starts)
+    # raw_input('Continue?)
+    # time_from_starts = new_time_from_starts
+    return new_time_from_starts
+
+def moveit_control(robot, joints, path, moveit, observer, **kwargs):
     #path = waypoints_from_path(path)
     #if moveit.use_lula:
     #    speed = 0.5*speed
@@ -168,32 +203,7 @@ def moveit_control(robot, joints, path, moveit, observer, speed=ARM_SPEED):
     # Start and end velocities are zero
     # Accelerations are about zero (except at the start and end)
 
-    # Slow down distance or time
-    fraction = 0.1
-    ramp_duration = 3
-    #path = waypoints_from_path(path) # Neither moveit or lula benefit from this
-    #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
-
-    distance_fn = get_distance_fn(robot, joints)
-    mid_distances = [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
-    distances = [0] + mid_distances
-    time_from_starts = np.cumsum(distances) / speed
-    mid_times_from_starts = [np.average(pair) for pair in
-                             zip(time_from_starts[:-1], time_from_starts[1:])]
-    new_time_from_starts = [0]
-    for mid_time_from_start, distance in zip(mid_times_from_starts, mid_distances):
-        up_fraction = clip((mid_time_from_start - time_from_starts[0]) / ramp_duration,
-                           min_value=fraction, max_value=1.)
-        down_fraction = clip((time_from_starts[-1] - mid_time_from_start) / ramp_duration,
-                             min_value=fraction, max_value=1.)
-        new_speed = speed * min(up_fraction, down_fraction)
-        duration = distance / new_speed
-        new_time_from_starts.append(new_time_from_starts[-1] + duration)
-    # print(time_from_starts)
-    # print(new_time_from_starts)
-    # raw_input('Continue?)
-    #time_from_starts = new_time_from_starts
-
+    time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
     trajectory = JointTrajectory()
     trajectory.header.frame_id = ISSAC_FRANKA_FRAME
     trajectory.header.stamp = rospy.Time(0)
