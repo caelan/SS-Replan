@@ -249,7 +249,7 @@ def update_world(world, domain, observer, objects=None):
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
     #wait_for_user('Raw observations')
-    world.fix_geometry()
+    #world.fix_geometry()
     #wait_for_user('Fixed observations')
 
 ################################################################################

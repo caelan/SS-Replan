@@ -1,4 +1,5 @@
-from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, follow_base_trajectory, time_parameterization
+from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, \
+    follow_base_trajectory, move_gripper, time_parameterization
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, remove_handles, \
     get_max_limit, get_joint_limits, waypoints_from_path, link_from_name, batch_ray_collision, draw_ray
@@ -107,9 +108,7 @@ class Trajectory(Command):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
 
     def iterate(self, state):
-        time_parameterization(self.robot, self.joints, self.path)
-
-
+        #time_parameterization(self.robot, self.joints, self.path)
         for positions in self.path:
             set_joint_positions(self.robot, self.joints, positions)
             yield
@@ -251,6 +250,7 @@ class Attach(Command):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
+            move_gripper(moveit.gripper.closed_positions[0], effort=20)
             moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
         else:
             return close_gripper(self.robot, moveit)
@@ -291,6 +291,7 @@ class Detach(Command):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
+            move_gripper(moveit.gripper.open_positions[0], effort=20)
             moveit.open_gripper()
         else:
             return open_gripper(self.robot, moveit)

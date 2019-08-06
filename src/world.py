@@ -232,7 +232,11 @@ class World(object):
             self.ik_solver.set_joint_limits(init_lower, init_upper)
             if conf is None:
                 return conf
-            #print(get_difference(seed_state, conf).round(3))
+            #if nearby_tolerance < INF:
+            #    print(lower.round(3))
+            #    print(upper.round(3))
+            #    print(conf)
+            #    print(get_difference(seed_state, conf).round(3))
             set_joint_positions(self.robot, joints, conf)
             return get_configuration(self.robot)
 

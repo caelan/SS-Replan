@@ -28,8 +28,12 @@ import moveit_msgs.msg
 
 from actionlib import SimpleActionClient
 #from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
-from scipy.interpolate import CubicSpline  # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
+from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction, \
+    FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, JointTrajectoryActionGoal, \
+    JointTrajectoryGoal, GripperCommandActionGoal, GripperCommandAction, GripperCommandGoal
+from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
+
+from lula_controller_msgs.msg import JointPosVelAccCommand
 
 # control_msgs/GripperCommandAction
 # control_msgs/JointTrajectoryAction
@@ -41,6 +45,29 @@ from scipy.interpolate import CubicSpline  # LinearNDInterpolator, NearestNDInte
 ARM_SPEED = 0.1*np.pi
 
 ################################################################################s
+
+def old_parameterization(robot, joints, path, speed=ARM_SPEED):
+    distance_fn = get_distance_fn(robot, joints)
+    distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
+    time_from_starts = np.cumsum(distances) / speed
+
+    # https://en.wikipedia.org/wiki/Finite_difference
+    trajectory = JointTrajectory()
+    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
+    trajectory.header.stamp = rospy.Time(0)
+    trajectory.joint_names = get_joint_names(robot, joints)
+    for i in range(len(path)):
+       point = JointTrajectoryPoint()
+       point.positions = list(path[i])
+       # Don't need velocities, accelerations, or efforts
+       #vector = np.array(path[i]) - np.array(path[i-1])
+       #duration = (time_from_starts[i] - time_from_starts[i-1])
+       #point.velocities = list(vector / duration)
+       #point.accelerations = list(np.ones(len(joints)))
+       #point.effort = list(np.ones(len(joints)))
+       point.time_from_start = rospy.Duration(time_from_starts[i])
+       trajectory.points.append(point)
+    return trajectory
 
 def time_parameterization(robot, joints, path, speed=ARM_SPEED):
     # TODO: could interpolate each DOF independently
@@ -58,17 +85,19 @@ def time_parameterization(robot, joints, path, speed=ARM_SPEED):
 
     # BPoly.from_derivatives
     # PPoly.from_spline # PPoly.from_bernstein_basis
-    distance_fn = get_distance_fn(robot, joints)
-    distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
-    #time_from_starts = np.cumsum(distances) / speed
+    path = list(path)
     time_from_starts = slow_trajectory(robot, joints, path, speed=speed)
-
+    for i in reversed(range(1, len(path))):
+        if time_from_starts[i-1] == time_from_starts[i]:
+            path.pop(i)
+            time_from_starts.pop(i)
     #positions = interp1d(time_from_starts, path, kind='linear')
     positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
                             extrapolate=False) # bc_type=((1, 0), (1, 0))
     #positions = CubicHermiteSpline(time_from_starts, path, extrapolate=False)
     velocities = positions.derivative(nu=1)
     accelerations = velocities.derivative(nu=1)
+    # Could resample at this point
 
     #for i, t in enumerate(time_from_starts):
     #    print(i, t, path[i], positions(t), velocities(t), accelerations(t))
@@ -149,7 +178,6 @@ def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
     moveit.display_trajectory_publisher.publish(display_trajectory)
 
 def slow_trajectory(robot, joints, path, speed=ARM_SPEED):
-    # Slow down distance or time
     fraction = 0.1 # percentage
     ramp_duration = 1.0 # seconds
     # path = waypoints_from_path(path) # Neither moveit or lula benefit from this
@@ -161,19 +189,20 @@ def slow_trajectory(robot, joints, path, speed=ARM_SPEED):
     time_from_starts = np.cumsum(distances) / speed
     # TODO: make this a separate function?
 
+    # TODO: ensure that times are strictly increasing
     mid_times_from_starts = [np.average(pair) for pair in
                              zip(time_from_starts[:-1], time_from_starts[1:])]
-    # https://en.wikipedia.org/wiki/Finite_difference
-    new_time_from_starts = [0]
+    new_time_from_starts = [0.]
     for mid_time_from_start, distance in zip(mid_times_from_starts, mid_distances):
+        # TODO: slow down based on distance or time
         up_fraction = clip((mid_time_from_start - time_from_starts[0]) / ramp_duration,
                            min_value=fraction, max_value=1.)
         down_fraction = clip((time_from_starts[-1] - mid_time_from_start) / ramp_duration,
                              min_value=fraction, max_value=1.)
         new_speed = speed * min(up_fraction, down_fraction)
-        print(distance, new_speed)
-        duration = distance / new_speed
-        new_time_from_starts.append(new_time_from_starts[-1] + duration)
+        new_duration = distance / new_speed
+        print(new_time_from_starts[-1], up_fraction, down_fraction, new_duration)
+        new_time_from_starts.append(new_time_from_starts[-1] + new_duration)
     # print(time_from_starts)
     # print(new_time_from_starts)
     # raw_input('Continue?)
@@ -185,8 +214,30 @@ def moveit_control(robot, joints, path, moveit, observer, **kwargs):
     #if moveit.use_lula:
     #    speed = 0.5*speed
 
+    # /robot/right_gripper/joint_command
+    publisher = Publisher("/lula/robot/limb/right/joint_command", JointPosVelAccCommand, queue_size=1)
+    trajectory = time_parameterization(robot, joints, path, **kwargs)
+    print('Following {} waypoints in {:.3f} seconds'.format(
+        len(path), trajectory.points[-1].time_from_start.to_sec()))
+
+    dialation = 1.0
+    for point in trajectory.points:
+        command = JointPosVelAccCommand()
+        command.header.frame_id = ISSAC_FRANKA_FRAME
+        command.header.stamp = rospy.Time(0)
+        command.joint_names = get_joint_names(robot, joints)
+        command.id = 0
+        command.period = point.time_from_start
+        #command.t = None # secs, nsecs
+        command.q = point.positions
+        command.qd = point.velocities
+        command.qdd = point.accelerations
+        publisher.publish(command)
+        rospy.sleep(dialation*point.time_from_start)
+    return
+
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
-    action_topic = 'position_joint_trajectory_controller/follow_joint_trajectory'
+    action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
     # /move_base_simple/goal
     # /execute_trajectory/goal
     # /position_joint_trajectory_controller/command
@@ -203,32 +254,17 @@ def moveit_control(robot, joints, path, moveit, observer, **kwargs):
     # Start and end velocities are zero
     # Accelerations are about zero (except at the start and end)
 
-    time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
-    trajectory = JointTrajectory()
-    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
-    trajectory.header.stamp = rospy.Time(0)
-    trajectory.joint_names = get_joint_names(robot, joints)
-    for i in range(len(path)):
-        point = JointTrajectoryPoint()
-        point.positions = list(path[i])
-        # Don't need velocities, accelerations, or efforts
-        #vector = np.array(path[i]) - np.array(path[i-1])
-        #duration = (time_from_starts[i] - time_from_starts[i-1])
-        #point.velocities = list(vector / duration)
-        #point.accelerations = list(np.ones(len(joints)))
-        #point.effort = list(np.ones(len(joints)))
-        point.time_from_start = rospy.Duration(time_from_starts[i])
-        trajectory.points.append(point)
-
+    trajectory = time_parameterization(robot, joints, path, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
-        len(path), time_from_starts[-1]))
+        len(path), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
+    wait_for_user('Continue?')
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
     start_time = time.time()
     client.send_goal_and_wait(goal) # send_goal_and_wait
-    client.get_result()
+    #client.get_result()
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
     return
 
@@ -422,6 +458,28 @@ def follow_base_trajectory(world, path, moveit, observer, **kwargs):
 
 #FINGER_EFFORT_LIMIT = 20
 #FINGER_VELOCITY_LIMIT = 0.2
+
+def move_gripper(position, effort=20):
+    # /franka_gripper/grasp
+    action_topic = '/franka_gripper/gripper_action'
+    client = SimpleActionClient(action_topic, GripperCommandAction)
+    print('Starting', action_topic)
+    client.wait_for_server()
+    client.cancel_all_goals()
+    print('Finished', action_topic)
+
+    #goal = GripperCommandActionGoal()
+    #goal.header.frame_id = ISSAC_FRANKA_FRAME
+    #goal.header.stamp = rospy.Time(0)
+    #goal.goal.command.position = position
+    #goal.goal.command.max_effort = effort
+
+    goal = GripperCommandGoal()
+    print(dir(goal))
+    goal.command.position = position
+    goal.command.max_effort = effort
+    client.send_goal_and_wait(goal) # send_goal_and_wait
+    #client.get_result()
 
 def open_gripper(robot, moveit, effort=20, sleep=1.0):
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L155

@@ -311,12 +311,27 @@ def main():
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
 
+    # Adjusting impedance thresholds to allow contact
+    # /franka_control/set_cartesian_impedance
+    # /franka_control/set_force_torque_collision_behavior
+    # /franka_control/set_full_collision_behavior
+    # /franka_control/set_joint_impedance
+
+    # 3 control options:
+    # 1) LULA + RMP
+    # 2) Position joint trajectory controller
+    # 3) LULA backend directly
+
+    # franka_backend
+    # roslaunch franka_controllers lula_control.launch
+
     success = planning_loop(domain, observer, world, args,
                             additional_init=additional_init,
                             additional_goals=additional_goals)
     print('Success:', success)
     world.destroy()
     # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
+    # roslaunch panda_moveit_config start_moveit.launch
 
 if __name__ == '__main__':
     #main()
