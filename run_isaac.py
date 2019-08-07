@@ -190,15 +190,24 @@ def localize_all(observer):
     for name in USE_OBJECTS:
         obj = world_state.entities[name]
         #wait_for_duration(1.0)
-        obj.localize()
-        obj.detect()
-        print(world_state.entities[name])
+        obj.localize() # Needed to ensure detectable
+        print('Localizing', name)
+        rospy.sleep(0.1)
+        obj.detect() # Actually applies the blue model
+        print('Detecting', name)
+        #print(world_state.entities[name])
         #obj.administrator.detect()
         #print(obj.pose[:3, 3])
-    wait_for_duration(2.0)
+    rospy.sleep(5.0)
+    #wait_for_duration(2.0)
     print('Localized:', USE_OBJECTS)
+    # TODO: wait until the variance in estimates is low
 
 ################################################################################
+
+#   File "/home/cpaxton/srl_system/workspace/src/brain/src/brain_ros/ros_world_state.py", line 397, in update_msg
+#     self.gripper = msg.get_positions([self.gripper_joint])[0]
+# TypeError: 'NoneType' object has no attribute '__getitem__'
 
 def main():
     parser = create_parser()
@@ -263,11 +272,11 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world,
-                    goal_holding=[SPAM],
+                    #goal_holding=[SPAM],
                     #goal_on={SPAM: TOP_DRAWER},
                     #goal_closed=[],
                     #goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
-                    #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
+                    goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
                     return_init_bq=True, return_init_aq=True)
     else:

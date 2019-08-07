@@ -1,5 +1,7 @@
 from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, \
-    follow_base_trajectory, move_gripper, time_parameterization
+    move_gripper
+from src.retime import spline_parameterization
+from src.base import follow_base_trajectory
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, remove_handles, \
     get_max_limit, get_joint_limits, waypoints_from_path, link_from_name, batch_ray_collision, draw_ray

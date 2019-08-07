@@ -80,6 +80,9 @@ class World(object):
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                                 timeout=0.01, epsilon=1e-5, solve_type="Speed",
                                 urdf_string=read(urdf_path))
+            lower, upper = self.ik_solver.get_joint_limits()
+            buffer = 0.1*np.ones(len(self.ik_solver.joint_names))
+            self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
         else:
             self.ik_solver = None
         self.body_from_name = {}
@@ -218,6 +221,7 @@ class World(object):
             joints = joints_from_names(self.robot, self.ik_solver.joint_names) # self.ik_solver.link_names
             seed_state = get_joint_positions(self.robot, joints)
             #seed_state = [0.0] * self.ik_solver.number_of_joints
+            # TODO: adjust the joint limits here instead of the URDF
 
             lower, upper = init_lower, init_upper
             if nearby_tolerance < INF:

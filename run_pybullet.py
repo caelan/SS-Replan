@@ -175,6 +175,7 @@ def main():
     #set_numpy_seed(None)
     print('Random seed:', get_random_seed())
     print('Numpy seed:', get_numpy_seed())
+    # TODO: adjust camera
 
     np.set_printoptions(precision=3, suppress=True)
     world = World(use_gui=True)
