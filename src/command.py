@@ -16,8 +16,8 @@ import copy
 import math
 
 MOVEIT = True
-DEFAULT_SLEEP = 1.0
-FORCE = 100
+DEFAULT_SLEEP = 0.5
+FORCE = 50 # 20 | 50 | 100
 
 class State(object):
     # TODO: rename to be world state?
@@ -156,13 +156,15 @@ class Trajectory(Command):
         if MOVEIT:
             if self.joints == self.world.gripper_joints:
                 position = self.path[-1][0]
-                move_gripper_action(position)
-                #joint = self.joints[0]
-                #average = np.average(get_joint_limits(self.robot, joint))
-                #if position < average:
-                #    moveit.close_gripper(force=FORCE)
-                #else:
-                #    moveit.open_gripper()
+                #move_gripper_action(position)
+                joint = self.joints[0]
+                average = np.average(get_joint_limits(self.robot, joint))
+                if position < average:
+                    close_gripper_action(moveit)
+                    #moveit.close_gripper(force=FORCE)
+                else:
+                    open_gripper_action(moveit)
+                    #moveit.open_gripper()
             else:
                 moveit_control(self.robot, self.joints, self.path, moveit, observer)
             time.sleep(DEFAULT_SLEEP)

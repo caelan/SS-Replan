@@ -199,12 +199,14 @@ def display_kinect(world, observer):
         "/sim/{}_{}_camera/camera_info".format('left', 'color'), # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
 
-def update_world(world, domain, observer, objects=None):
+def update_world(world, domain, observer):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
     # Using state is nice because it applies noise
 
+    task = world.task
+    objects = task.objects
     world_state = update_observer(observer)
     print('Entities:', sorted(world_state.entities))
     #world.reset()
@@ -215,7 +217,7 @@ def update_world(world, domain, observer, objects=None):
         if isinstance(entity, RobotArm):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
-            if (objects is not None) and (name not in objects):
+            if name not in objects:
                 continue
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)

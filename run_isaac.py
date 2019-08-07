@@ -46,8 +46,6 @@ SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
 
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-#USE_OBJECTS = [CHEEZIT, SPAM, SUGAR]  # , TOMATO_SOUP]
-USE_OBJECTS = [SPAM]
 
 TOP_DRAWER = 'indigo_drawer_top'
 JOINT_TEMPLATE = '{}_joint'
@@ -139,7 +137,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
 
     belief = create_observable_belief(world)
-    #task = world.task # One task per world
+    task = world.task # One task per world
     last_skeleton = None
     while True:
         # The difference in state is that this one is only used for visualization
@@ -171,10 +169,11 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         #wait_for_user()
         for command in commands:
             command.execute(domain, moveit, observer, state)
+
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
-        localize_all(observer)
-        update_world(world, domain, observer, USE_OBJECTS)
+        localize_all(task, observer)
+        update_world(world, domain, observer)
 
 
 ################################################################################
@@ -185,9 +184,9 @@ class Interface(object):
         self.observer = observer
         self.sim_manager = sim_manager
 
-def localize_all(observer):
+def localize_all(task, observer):
     world_state = observer.current_state
-    for name in USE_OBJECTS:
+    for name in task.objects:
         obj = world_state.entities[name]
         #wait_for_duration(1.0)
         obj.localize() # Needed to ensure detectable
@@ -200,7 +199,7 @@ def localize_all(observer):
         #print(obj.pose[:3, 3])
     rospy.sleep(5.0)
     #wait_for_duration(2.0)
-    print('Localized:', USE_OBJECTS)
+    print('Localized:', task.objects)
     # TODO: wait until the variance in estimates is low
 
 ################################################################################
@@ -272,13 +271,14 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world,
+                    objects=[SPAM, CHEEZIT],
                     #goal_holding=[SPAM],
-                    #goal_on={SPAM: TOP_DRAWER},
+                    goal_on={SPAM: TOP_DRAWER},
                     #goal_closed=[],
                     #goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
-                    goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
+                    #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
-                    return_init_bq=True, return_init_aq=True)
+                    return_init_bq=False, return_init_aq=True)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
@@ -306,9 +306,9 @@ def main():
     with LockRenderer(lock=True):
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
-        update_world(world, domain, observer, USE_OBJECTS)
-        localize_all(observer)
-        update_world(world, domain, observer, USE_OBJECTS)
+        update_world(world, domain, observer)
+        localize_all(task, observer)
+        update_world(world, domain, observer)
         #close_all_doors(world)
         if (sim_manager is not None) and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
@@ -333,6 +333,9 @@ def main():
 
     # franka_backend
     # roslaunch franka_controllers lula_control.launch
+
+    # 1) roslaunch franka_controllers lula_control.launch
+    # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
 
     success = planning_loop(domain, observer, world, args,
                             additional_init=additional_init,

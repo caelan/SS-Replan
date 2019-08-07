@@ -185,11 +185,10 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
 
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
-    if task.return_init_bq:
+    if not task.movable_base or task.return_init_bq:
         with WorldSaver():
             world.initial_saver.restore()
             goal_bq = Conf(world.robot, world.base_joints)
-            goal_aq = Conf(world.robot, world.arm_joints)
         if not task.movable_base:
             goal_bq = init_bq
         init.extend([
@@ -204,7 +203,11 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
             init.append(('CloseTo', init_bq, goal_bq))
         goal_literals.append(Exists(['?bq'], And(
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
+
         if task.return_init_aq:
+            with WorldSaver():
+                world.initial_saver.restore()
+                goal_aq = Conf(world.robot, world.arm_joints)
             arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
             if np.less_equal(np.abs(arm_distance_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():

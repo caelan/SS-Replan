@@ -21,6 +21,8 @@ from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction,
     JointTrajectoryGoal, GripperCommandActionGoal, GripperCommandAction, GripperCommandGoal
 from lula_controller_msgs.msg import JointPosVelAccCommand
 
+from lula_franka.franka import FrankaGripper
+
 # control_msgs/GripperCommandAction
 # control_msgs/JointTrajectoryAction
 # control_msgs/SingleJointPositionAction
@@ -202,6 +204,11 @@ def lula_control(world, path, domain, observer, world_state):
 #FINGER_VELOCITY_LIMIT = 0.2
 
 def move_gripper_action(position, effort=20):
+    gripper = FrankaGripper(is_physical_robot=True)
+    gripper.commander.move(position, speed=.03, wait=True)
+
+    # Should be the same as the following:
+    # /home/cpaxton/srl_system/packages/external/lula_franka/lula_franka/franka_gripper_commander.py
     # /franka_gripper/grasp
     action_topic = '/franka_gripper/gripper_action'
     client = SimpleActionClient(action_topic, GripperCommandAction)
@@ -217,17 +224,22 @@ def move_gripper_action(position, effort=20):
     #goal.goal.command.max_effort = effort
 
     goal = GripperCommandGoal()
-    print(dir(goal))
     goal.command.position = position
     goal.command.max_effort = effort
-    client.send_goal_and_wait(goal) # send_goal_and_wait
+    client.send_goal(goal) # send_goal | send_goal_and_wait
     #client.get_result()
+    #rospy.sleep(1.0)
 
 def open_gripper_action(moveit, **kwargs):
-    return move_gripper_action(moveit.gripper.open_positions[0], **kwargs)
+    gripper = FrankaGripper(is_physical_robot=True)
+    return gripper.open(speed=0.1, wait=True)
+    #return move_gripper_action(moveit.gripper.open_positions[0], **kwargs)
 
-def close_gripper_action(moveit, **kwargs):
-    return move_gripper_action(moveit.gripper.closed_positions[0], **kwargs)
+def close_gripper_action(moveit):
+    gripper = FrankaGripper(is_physical_robot=True)
+    return gripper.close(attach_obj=None, speed=0.1, force=40, actuate_gripper=True, wait=True)
+    #return move_gripper_action(moveit.gripper.closed_positions[0], effort=50)
+
 ################################################################################
 
 def move_gripper(robot, moveit, position, effort=20, sleep=1.0):

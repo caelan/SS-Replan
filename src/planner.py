@@ -15,7 +15,7 @@ from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
-from src.command import Wait, iterate_plan
+from src.command import Wait, iterate_plan, Trajectory
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
@@ -119,6 +119,20 @@ def extract_plan_prefix(plan):
 
 DEFAULT_TIME_STEP = 0.02
 
+def combine_commands(commands):
+    combined_commands = []
+    for command in commands:
+        if not combined_commands:
+            combined_commands.append(command)
+            continue
+        prev_command = combined_commands[-1]
+        if isinstance(prev_command, Trajectory) and isinstance(command, Trajectory) and \
+                (prev_command.joints == command.joints):
+            prev_command.path = (prev_command.path + command.path)
+        else:
+            combined_commands.append(command)
+    return combined_commands
+
 def commands_from_plan(world, plan):
     if plan is None:
         return None
@@ -138,7 +152,7 @@ def commands_from_plan(world, plan):
             commands.append(Wait(world, steps=steps))
         else:
             raise NotImplementedError(action)
-    return commands
+    return combine_commands(commands)
 
 ################################################################################
 

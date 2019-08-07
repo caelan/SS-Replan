@@ -13,13 +13,14 @@ from examples.discrete_belief.dist import DDist, UniformDist
 
 
 class Task(object):
-    def __init__(self, world, skeletons=[],
+    def __init__(self, world, objects=[], skeletons=[],
                  movable_base=True, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[]):
         self.world = world
         world.task = self
+        self.objects = tuple(objects)
         self.skeletons = list(skeletons)
         self.movable_base = movable_base
         self.noisy_base = noisy_base
