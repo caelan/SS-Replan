@@ -221,7 +221,6 @@ class World(object):
             joints = joints_from_names(self.robot, self.ik_solver.joint_names) # self.ik_solver.link_names
             seed_state = get_joint_positions(self.robot, joints)
             #seed_state = [0.0] * self.ik_solver.number_of_joints
-            # TODO: adjust the joint limits here instead of the URDF
 
             lower, upper = init_lower, init_upper
             if nearby_tolerance < INF:

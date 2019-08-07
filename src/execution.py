@@ -201,7 +201,7 @@ def lula_control(world, path, domain, observer, world_state):
 #FINGER_EFFORT_LIMIT = 20
 #FINGER_VELOCITY_LIMIT = 0.2
 
-def move_gripper(position, effort=20):
+def move_gripper_action(position, effort=20):
     # /franka_gripper/grasp
     action_topic = '/franka_gripper/gripper_action'
     client = SimpleActionClient(action_topic, GripperCommandAction)
@@ -223,7 +223,14 @@ def move_gripper(position, effort=20):
     client.send_goal_and_wait(goal) # send_goal_and_wait
     #client.get_result()
 
-def open_gripper(robot, moveit, effort=20, sleep=1.0):
+def open_gripper_action(moveit, **kwargs):
+    return move_gripper_action(moveit.gripper.open_positions[0], **kwargs)
+
+def close_gripper_action(moveit, **kwargs):
+    return move_gripper_action(moveit.gripper.closed_positions[0], **kwargs)
+################################################################################
+
+def move_gripper(robot, moveit, position, effort=20, sleep=1.0):
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L155
     # robot_entity = domain.get_robot()
     # franka = robot_entity.robot
@@ -232,7 +239,7 @@ def open_gripper(robot, moveit, effort=20, sleep=1.0):
     # update_robot(self.world, domain, observer.observe())
     # time.sleep(1.0)
     #moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
-    joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.open_positions)
+    joint_state = JointState(name=moveit.gripper.joints, position=position)
     if effort is not None:
         gripper_joint = joint_from_name(robot, moveit.gripper.joints[0])
         max_effort = get_max_force(robot, gripper_joint)
@@ -243,25 +250,18 @@ def open_gripper(robot, moveit, effort=20, sleep=1.0):
         rospy.sleep(sleep)
     return None
 
-def close_gripper(robot, moveit, effort=20, sleep=1.0):
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L218
-    # controllable_object is not needed for joint positions
-    # TODO: attach_obj
+def open_gripper(robot, moveit, **kwargs):
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L155
+    # gripper.open(speed=.2, actuate_gripper=True, wait=True)
     # robot_entity = domain.get_robot()
     # franka = robot_entity.robot
     # gripper = franka.end_effector.gripper
-    # gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
-    # update_robot(self.world, domain, observer, observer.observe())
-    # time.sleep(1.0)
     # TODO: only sleep is used by close_gripper and open_gripper...
+    #moveit.open_gripper(speed=0.1, sleep=0.2, wait=True)
+    return move_gripper(robot, moveit, moveit.gripper.open_positions, **kwargs)
+
+def close_gripper(robot, moveit, **kwargs):
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L218
+    # gripper.close(attach_obj=None, speed=.2, force=40., actuate_gripper=True, wait=True)
     #moveit.close_gripper(controllable_object=None, speed=0.1, force=40., sleep=0.2, wait=True)
-    joint_state = JointState(name=moveit.gripper.joints, position=moveit.gripper.closed_positions)
-    if effort is not None:
-        gripper_joint = joint_from_name(robot, moveit.gripper.joints[0])
-        max_effort = get_max_force(robot, gripper_joint)
-        effort = max(0, min(effort, max_effort))
-        joint_state.effort = [effort] * len(moveit.gripper.joints)
-    moveit.joint_cmd_pub.publish(joint_state)
-    if 0. < sleep:
-        rospy.sleep(sleep)
-    return None
+    return move_gripper(robot, moveit, moveit.gripper.closed_positions, **kwargs)
