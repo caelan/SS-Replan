@@ -137,7 +137,7 @@ def stow_block(world, **kwargs):
 
     entity_name = add_block(world, idx=0)
     #entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
-    # obstruction_name = add_box(world)
+    #obstruction_name = add_box(world, idx=0)
     # test_grasps(world, entity_name)
     set_all_static()
     add_kinect(world)  # TODO: this needs to be after set_all_static
@@ -148,6 +148,7 @@ def stow_block(world, **kwargs):
     goal_surface = 'indigo_drawer_top' # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
     sample_placement(world, entity_name, initial_surface)
+    #sample_placement(world, obstruction_name, 'hitman_tmp')
 
     return Task(world, movable_base=True,
                 #goal_holding=[entity_name],

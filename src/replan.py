@@ -10,7 +10,8 @@ REUSE_ARGUMENTS = {
     # This should really be done by type instead
     'pick': [0, 2],  # ?o1 ?g
     'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
-    # TODO: unable to adhere to place actions for some reason...
+    # The previous pick error I had was because it moved to the carry_aq and then detected
+    # However, it was next constrained to move the base rather than the arm
 }
 
 def make_wild_skeleton(plan):

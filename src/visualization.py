@@ -8,7 +8,7 @@ from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_grasps, surface
 
 GROW_PLACEMENT = 0.05
 GROW_INVERSE_BASE = 0.05
-GROW_FORWARD_RADIUS = 0.1
+GROW_FORWARD_RADIUS = 0.25 # Done for block. Incorrect for other object types
 
 def get_floor_z(world, floor_z=0.005):
     return get_point(world.floor)[2] + floor_z
@@ -57,6 +57,7 @@ def add_markers(world, placements=True, forward_place=True, pull_bases=True, inv
                                                 parent=world.kitchen, parent_link=surface_link))
 
     if forward_place:
+        # TODO: do this by taking the union of all grasps
         object_points = list(map(point_from_pose, load_forward_placements(world)))
         robot_point = point_from_pose(get_link_pose(world.robot, world.base_link))
         #z = 0.

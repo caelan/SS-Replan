@@ -105,16 +105,20 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     task = world.task # One task per world
     print(task)
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
-
-    init_bq = Conf(world.robot, world.base_joints)
-    init_aq = Conf(world.robot, world.arm_joints)
-    init_gq = Conf(world.robot, world.gripper_joints)
+    # TODO: repackage stream outputs to avoid recomputation
 
     carry_aq = world.carry_conf
     calibrate_aq = world.calibrate_conf
-    # TODO: order goals for serialization
-    # TODO: return set of facts that dist_support the previous plan
-    # TODO: repackage stream outputs to avoid recomputation
+    base_difference_fn = get_difference_fn(world.robot, world.base_joints)
+    arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
+
+    # TODO: could replace objects for init_bq and init_gq instead of using closeto
+    init_bq = Conf(world.robot, world.base_joints)
+    init_aq = Conf(world.robot, world.arm_joints)
+    for aq in [carry_aq]: # calibrate_aq
+        if np.allclose(arm_distance_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
+            init_aq = aq
+    init_gq = Conf(world.robot, world.gripper_joints)
 
     constant_map = {
         '@world': 'world',
@@ -171,6 +175,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     compute_pose_kin = get_compute_pose_kin(world)
     compute_angle_kin = get_compute_angle_kin(world)
 
+    # TODO: order goals for serialization
     goal_literals = []
     goal_literals += [('Holding', name) for name in task.goal_holding] + \
                      [('On', name, surface) for name, surface in task.goal_on.items()] + \
@@ -197,7 +202,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             ('AConf', goal_bq, carry_aq),
             ('CloseTo', goal_bq, goal_bq),
         ])
-        base_difference_fn = get_difference_fn(world.robot, world.base_joints)
+
         if np.less_equal(np.abs(base_difference_fn(init_bq.values, goal_bq.values)),
                          [0.05, 0.05, math.radians(10)]).all():
             print('Close to goal base configuration')
@@ -205,7 +210,6 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         goal_literals.append(Exists(['?bq'], And(
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
         if task.return_init_aq:
-            arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
             if np.less_equal(np.abs(arm_distance_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
                 print('Close to goal arm configuration')

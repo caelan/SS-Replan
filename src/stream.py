@@ -165,15 +165,16 @@ def get_ofree_ray_pose_test(world, **kwargs):
     def test(ray, obj_name, pose):
         if ray.name == obj_name:
             return True
-        # TODO: test whether they physically are in collision
-        # TODO: some of the rays clip the top of objects for some reason?
-        # If so, reject
+        # TODO: some of the rays clip the top of objects. Might be related to the slight z translation
         ray.pose.assign()
         pose.assign()
+        body = world.get_body(ray.name)
+        obstacles = get_link_obstacles(world, obj_name)
+        if any(pairwise_collision(body, obst) for obst in obstacles):
+            return False
         move_occluding(world, ray, obj_name)
         #ray.draw()
         #wait_for_user()
-        obstacles = get_link_obstacles(world, obj_name)
         return not obstacles & ray.compute_occluding()
     return test
 
@@ -505,12 +506,12 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
 
 ################################################################################
 
-def get_fixed_pick_gen_fn(world, max_attempts=10, collisions=True, **kwargs):
+def get_fixed_pick_gen_fn(world, max_attempts=25, collisions=True, **kwargs):
 
     def gen(obj_name, pose, grasp, base_conf):
         obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)  # | {obj_body}
-        if not collisions:
-            obstacles = set()
+        #if not collisions:
+        #    obstacles = set()
         if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
             return
         for i in range(max_attempts):
@@ -529,8 +530,8 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
 
     def gen(obj_name, pose, grasp, *args):
         obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
-        if not collisions:
-            obstacles = set()
+        #if not collisions:
+        #    obstacles = set()
         if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
             return
 
@@ -638,8 +639,8 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     handle_link, handle_grasp, handle_pregrasp = handle_plan
     # TODO: could push if the goal is to be fully closed
 
-    door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) if collisions else set()
-    obstacles = (world.static_obstacles | door_obstacles) if collisions else set()
+    door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) # if collisions else set()
+    obstacles = (world.static_obstacles | door_obstacles) # if collisions else set()
 
     base_conf.assign()
     world.open_gripper()
@@ -722,7 +723,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
         # TODO: check if within database convex hull
         door_joint = joint_from_name(world.kitchen, joint_name)
         obstacles = (world.static_obstacles | get_descendant_obstacles(
-            world.kitchen, door_joint)) if collisions else set()
+            world.kitchen, door_joint)) # if collisions else set()
 
         base_conf.assign()
         door_plans = [door_plan for door_plan in compute_door_paths(
@@ -745,8 +746,8 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
 def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):
     # TODO: could condition pick/place into cabinet on the joint angle
     obstacles = world.static_obstacles
-    if not collisions:
-        obstacles = set()
+    #if not collisions:
+    #    obstacles = set()
 
     def gen(joint_name, door_conf1, door_conf2, *args):
         if door_conf1 == door_conf2:
@@ -783,8 +784,9 @@ def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, lea
 
 ################################################################################
 
-def parse_fluents(world, fluents, obstacles):
+def parse_fluents(world, fluents):
     attachments = []
+    obstacles = set()
     for fluent in fluents:
         predicate, args = fluent[0], fluent[1:]
         if predicate in {p.lower() for p in ['AtBConf', 'AtAConf', 'AtGConf']}:
@@ -808,7 +810,7 @@ def parse_fluents(world, fluents, obstacles):
                 attachments[-1].assign()
         else:
             raise NotImplementedError(predicate)
-    return attachments
+    return attachments, obstacles
 
 def get_base_motion_fn(world, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
@@ -818,10 +820,10 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
         #    return None
         bq1.assign()
         aq.assign()
-        obstacles = set(world.static_obstacles)
-        attachments = parse_fluents(world, fluents, obstacles)
+        attachments, obstacles = parse_fluents(world, fluents)
         if not collisions:
             obstacles = set()
+        obstacles.update(world.static_obstacles)
         initial_saver = BodySaver(world.robot)
         if (bq1 == bq2) or teleport:
             path = [bq1.values, bq2.values]
@@ -868,10 +870,10 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
         #    return None
         bq.assign()
         aq1.assign()
-        obstacles = set(world.static_obstacles)
-        attachments = parse_fluents(world, fluents, obstacles)
+        attachments, obstacles = parse_fluents(world, fluents)
         if not collisions:
             obstacles = set()
+        obstacles.update(world.static_obstacles)
         initial_saver = BodySaver(world.robot)
         if teleport:
             path = [aq1.values, aq2.values]
