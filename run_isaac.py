@@ -161,7 +161,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         wait_for_user()
 
         state.assign()
-        if (commands is None) or args.teleport:
+        if (commands is None) or args.teleport or args.cfree:
             return False
         if not commands:
             return True

@@ -25,7 +25,7 @@
 
   (:stream sample-pose
     :inputs (?o ?r)
-    :domain (Stackable ?o ?r)
+    :domain (and (MovableBase) (Stackable ?o ?r))
     :outputs (?rp)
     :certified (and (RelPose ?o ?rp ?r) (Value ?rp) (Sample ?rp)))
   (:stream sample-nearby-pose
@@ -33,7 +33,8 @@
     :domain (and (NearPose ?o2 ?p2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure open?
     :outputs (?p1 ?rp)
     :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
-                    (Value ?p1) (Sample ?p1) (Value ?rp) (Sample ?rp)
+                    (Value ?p1) (Sample ?p1)
+                    (Value ?rp) (Sample ?rp)
                     (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)))
 
   ; Movable base
@@ -64,7 +65,8 @@
     :certified (NearPose ?o ?p ?bq))
   (:stream fixed-plan-pick
     :inputs (?o ?p ?g ?bq)
-    :domain (and (NearPose ?o ?p ?bq) (WorldPose ?o ?p) (Sample ?p) (Grasp ?o ?g))
+    :domain (and (NearPose ?o ?p ?bq) ; (InitBConf ?bq)
+                 (WorldPose ?o ?p) (Sample ?p) (Grasp ?o ?g))
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at)))

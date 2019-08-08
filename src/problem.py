@@ -220,7 +220,7 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
             goal_literals.append(Exists(['?aq'], And(
                 ('CloseTo', '?aq', goal_aq), ('AtAConf', '?aq'))))
 
-    surface_poses = {}
+    initial_poses = {}
     for joint in world.kitchen_joints:
         joint_name = get_joint_name(world.kitchen, joint)
         #joint_name = str(joint_name.decode('UTF-8'))
@@ -244,8 +244,13 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
                 ('AngleKin', link_name, world_pose, joint_name, conf),
                 ('WorldPose', link_name, world_pose),
             ])
+            if joint in world.kitchen_joints:
+                init.extend([
+                    ('Sample', world_pose),
+                    ('Value', world_pose),
+                ])
             if conf == init_conf:
-                surface_poses[link_name] = world_pose
+                initial_poses[link_name] = world_pose
                 init.extend([
                     ('AtAngle', joint_name, conf),
                     ('AtWorldPose', link_name, world_pose),
@@ -255,26 +260,22 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
         surface = surface_from_name(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
         parent_joint = parent_joint_from_link(surface_link)
-        if parent_joint in world.kitchen_joints:
-            assert surface_name in surface_poses
-            #joint_name = get_joint_name(world.kitchen, parent_joint)
-            world_pose = surface_poses[surface_name]
-        else:
+        if parent_joint not in world.kitchen_joints:
             world_pose = RelPose(world.kitchen, surface_link, init=True)
-            surface_poses[surface_name] = world_pose
+            initial_poses[surface_name] = world_pose
             init += [
-                #('Counter', surface_name, world_pose),  # Fixed surface
+                ('Counter', surface_name, world_pose),  # Fixed surface
                 #('RelPose', surface_name, world_pose, 'world'),
                 ('WorldPose', surface_name, world_pose),
                 #('AtRelPose', surface_name, world_pose, 'world'),
                 ('AtWorldPose', surface_name, world_pose),
+                ('Sample', world_pose),
+                ('Value', world_pose),
             ]
         init.extend([
             ('CheckNearby', surface_name),
             #('InitPose', world_pose),
             ('Localized', surface_name),
-            ('Sample', world_pose),
-            ('Value', world_pose),
         ])
         for grasp_type in GRASP_TYPES:
             if has_place_database(world.robot_name, surface_name, grasp_type):
@@ -324,7 +325,7 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
                 poses = [world_pose]
                 #raise RuntimeError(obj_name, supporting)
             else:
-                surface_pose = surface_poses[surface_name]
+                surface_pose = initial_poses[surface_name]
                 world_pose, = compute_pose_kin(obj_name, rel_pose, surface_name, surface_pose)
                 init += [
                     # Static
