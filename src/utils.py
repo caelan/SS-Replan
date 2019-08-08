@@ -71,6 +71,17 @@ FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
 
 ################################################################################
 
+TOP_GRASP = 'top'
+SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
+UNDER_GRASP = 'under' # TODO: for franka_carter
+GRASP_TYPES = [
+    TOP_GRASP,
+    SIDE_GRASP,
+]
+APPROACH_DISTANCE = 0.075 # 0.1
+
+################################################################################
+
 BLOCK_SIZES = ['small', 'big']
 BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf')
@@ -99,8 +110,10 @@ DRAWERS = [
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
-ZED_LEFT_SURFACES = ['indigo_tmp', #'range',
-                     'indigo_drawer_top']
+ZED_LEFT_SURFACES = [
+    'indigo_tmp', 'range',
+    'indigo_drawer_top', 'indigo_drawer_bottom',
+]
 
 Surface = namedtuple('Surface', ['link', 'shape', 'joints'])
 
@@ -169,7 +182,9 @@ DRAWER_JOINTS = [
 #LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
 #                'dagger_door_left_joint', 'dagger_door_right_joint']
 
-ZED_LEFT_JOINTS = ['indigo_drawer_top_joint']
+ZED_LEFT_JOINTS = [
+    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
+]
 
 ALL_JOINTS = ZED_LEFT_JOINTS
 #ALL_JOINTS = [] + DRAWER_JOINTS + CABINET_JOINTS
@@ -424,15 +439,6 @@ class Grasp(object):
         return Conf(self.world.robot, self.world.gripper_joints, conf)
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
-
-TOP_GRASP = 'top'
-SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
-UNDER_GRASP = 'under' # TODO: for franka_carter
-GRASP_TYPES = [
-    TOP_GRASP,
-    #SIDE_GRASP,
-]
-APPROACH_DISTANCE = 0.075 # 0.1
 
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTANCE, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER

@@ -5,14 +5,21 @@ import os
 import signal
 import time
 import pickle
+import rospy
+import tf2_ros
+
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from image_geometry import PinholeCameraModel
+from sensor_msgs.msg import CameraInfo
 
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
     BASE_LINK, LockRenderer, base_values_from_pose, \
     pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
-    set_renderer, draw_pose
-from src.utils import CAMERAS, LEFT_CAMERA
+    set_renderer, draw_pose, read_json
+from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH
 from src.utils import get_ycb_obj_path
 
 ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
@@ -22,6 +29,10 @@ ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
 CONTROL_TOPIC = '/sim/desired_joint_states'
 TEMPLATE = '%s_1'
+
+PANDA_FULL_CONFIG_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/configs/panda_full_config.json')
+#SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/instance_image' # {0, 1}
+SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/label_image' # {0, ..., 13}
 
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
@@ -142,8 +153,6 @@ def update_robot(world, domain, observer):
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
-    import rospy
-    import tf2_ros
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/sim_test_tools.py
     try:
@@ -158,11 +167,9 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
                       "Err:{}".format(target_frame, source_frame, e))
         return None
 
-def display_kinect(world, observer):
-    from image_geometry import PinholeCameraModel
-    from sensor_msgs.msg import CameraInfo
-    import rospy
+################################################################################
 
+def display_kinect(world, observer):
     if world.cameras:
         return
     camera_infos = []
@@ -174,11 +181,6 @@ def display_kinect(world, observer):
         cam_model.fromCameraInfo(camera_info)
         #cam_model.height, cam_model.width # TODO: also pass these parameters
         camera_matrix = np.array(cam_model.projectionMatrix())[:3, :3]
-        #camera_matrix[:2, 2] *= 2
-        #print(camera_matrix)
-        #print(camera_info)
-        #camera_matrix = None
-        #print(camera_matrix)
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
         for camera_name in CAMERAS:
@@ -188,7 +190,7 @@ def display_kinect(world, observer):
                 kitchen_from_camera = multiply(invert(world_from_kitchen), world_from_camera)
                 print(camera_name, tuple(kitchen_from_camera[0]), tuple(kitchen_from_camera[1]))
                 world.add_camera(camera_name, world_from_camera, camera_matrix)
-
+        observer.camera_sub.unregister()
         # draw_viewcone(world_from_camera)
         # /sim/left_color_camera/camera_info
         # /sim/left_depth_camera/camera_info
@@ -198,6 +200,33 @@ def display_kinect(world, observer):
     observer.camera_sub = rospy.Subscriber(
         "/sim/{}_{}_camera/camera_info".format('left', 'color'), # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
+
+def detect_classes():
+    # from brain.scripts.logger import Logger
+    # logger = Logger()
+    cv_bridge = CvBridge()
+    config_data = read_json(PANDA_FULL_CONFIG_PATH)
+    camera_data = config_data['LeftCamera']['CameraComponent']
+    segmentation_labels = [d['name'] for d in camera_data['segmentation_classes']['static_mesh']]
+    print('Labels:', segmentation_labels)
+    # https://gitlab-master.nvidia.com/srl/srl_system/blob/a1255229910a30f9c510bad1c4719c1c59c7b8ec/packages/isaac_bridge/configs/panda_full_config.json#L411
+    # python packages/brain/scripts/segmentation_visualizer.py
+
+    detections = []
+    def callback(data):
+        segmentation = cv_bridge.imgmsg_to_cv2(data)
+        indices = np.unique(segmentation)
+        #print(indices)
+        detections.append({segmentation_labels[i] for i in indices if i < len(segmentation_labels)})
+        subscriber.unregister()
+
+    # TODO: count the number of pixels
+    subscriber = rospy.Subscriber(SEGMENTATION_TOPIC, Image, callback)
+    while not detections:
+        rospy.sleep(0.01)
+    return detections[-1]
+
+################################################################################
 
 def update_world(world, domain, observer):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
@@ -274,7 +303,6 @@ def update_isaac_robot(observer, sim_manager, world):
     sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
 
 def update_isaac_sim(domain, observer, sim_manager, world):
-    import rospy
     # RobotConfigModulator seems to just change the default config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/robot_config_modulator.py

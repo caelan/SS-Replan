@@ -18,12 +18,11 @@ from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
-    wait_for_user, wait_for_duration, Pose, Point, Euler, unit_from_theta
+from pybullet_tools.utils import LockRenderer, set_camera_pose, wait_for_user, Pose, Point, Euler, unit_from_theta
 
 from src.observation import create_observable_belief
 from src.visualization import add_markers
-from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, update_observer
+from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, detect_classes
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
@@ -49,6 +48,7 @@ YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
 
 TOP_DRAWER = 'indigo_drawer_top'
 JOINT_TEMPLATE = '{}_joint'
+
 
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 

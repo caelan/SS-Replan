@@ -190,12 +190,14 @@
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?p1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq1)
                        (Calibrated) (OpenGripper)
+                       ; TODO: instead check collisions with objects on the drawer
                        (not (UnsafeATraj ?at))
-                       (not (UnsafeBConf ?bq))
+                       ;(not (UnsafeBConf ?bq)) ; This was meant to capture ?p2
                        ;(CFreeBConfPose ?bq ?o2 ?p2)
                   )
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?p2) (AtAConf ?aq2)
                  (CanMoveBase) (CanMoveArm)
+                 ; TODO: could apply collisions by removing a Safe fact
                  (not (AtAngle ?j ?a1)) (not (AtWorldPose ?o ?p1)) (not (AtAConf ?aq1))
                  (forall (?o3 ?p3 ?rp3) (when (and (PoseKin ?o3 ?p3 ?rp3 ?o ?p1) (AtRelPose ?o3 ?rp3 ?o))
                                               (not (AtWorldPose ?o3 ?p3))))
