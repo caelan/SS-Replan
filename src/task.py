@@ -17,7 +17,8 @@ class Task(object):
                  movable_base=True, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
-                 goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[]):
+                 goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
+                 init=[], goal=[]):
         self.world = world
         world.task = self
         self.objects = tuple(objects)
@@ -33,6 +34,8 @@ class Task(object):
         self.goal_open = set(goal_open)
         self.goal_closed = set(goal_closed)
         self.goal_cooked = set(goal_cooked)
+        self.init = init
+        self.goal = goal
     def __repr__(self):
         return '{}{}'.format(self.__class__.__name__, {
             key: value for key, value in self.__dict__.items() if value not in [self.world]})

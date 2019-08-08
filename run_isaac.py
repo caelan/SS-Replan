@@ -20,23 +20,16 @@ from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, wait_for_user, Pose, Point, Euler, unit_from_theta
 
+from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS
 from src.observation import create_observable_belief
 from src.visualization import add_markers
-from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera, detect_classes
+from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.problem import pdddlstream_from_problem
 from src.task import Task
 from src.replan import get_plan_postfix, make_wild_skeleton
-
-from pddlstream.language.constants import Not, And
-
-TASKS = [
-    'open_bottom', 'open_top', 'pick_spam',
-    'put_away', # tomato_soup_can
-    'put_spam',
-]
 
 SPAM = 'potted_meat_can'
 MUSTARD = 'mustard_bottle'
@@ -49,90 +42,9 @@ YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
 TOP_DRAWER = 'indigo_drawer_top'
 JOINT_TEMPLATE = '{}_joint'
 
-
-# cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
-
-# Detection & Tracking
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L470
-
 ################################################################################
 
-def task_from_trial_manager(world, trial_manager, task_name, fixed=False):
-    objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
-    goals = [(h.format(o), v) for h, v in goal for o in objects]
-    print('Goals:', goals)
-    #regex = re.compile(r"(\w+)\((\)\n")
-    task = Task(world, movable_base=not fixed)
-    init = []
-    goal_literals = []
-
-    # TODO: use the task plan to constrain solution
-    # TODO: include these within task instead
-    for head, value in goals:
-        predicate, arguments = head.strip(')').split('(')
-        args = [arg.strip() for arg in arguments.split(',')]
-        if predicate == 'on_counter':
-            obj, = args
-            surface = 'indigo_tmp'
-            atom = ('On', obj, surface)
-        elif predicate == 'is_free':
-            atom = ('HandEmpty',)
-        elif predicate == 'gripper_closed':
-            assert value is False
-            value = True
-            atom = ('AtGConf', world.open_gq)
-        elif predicate == 'cabinet_is_open':
-            cabinet, = args
-            joint_name = '{}_joint'.format(cabinet)
-            atom = ('DoorStatus', joint_name, 'open')
-        elif predicate == 'cabinet_is_closed':
-            cabinet, = args
-            joint_name = '{}_joint'.format(cabinet)
-            atom = ('DoorStatus', joint_name, 'closed')
-        elif predicate == 'in_drawer':
-            obj, surface = args
-            # TODO: ensure that it actually is a surface?
-            init.append(('Stackable', obj, surface))
-            atom = ('On', obj, surface)
-        else:
-            raise NotImplementedError(predicate)
-        goal_literals.append(atom if value else Not(atom))
-    return task, init, goal_literals
-
-################################################################################
-
-def create_trial_args(**kwargs):
-    args = lambda: None # Dummy class
-    args.side = 'right'
-    args.drawer = 'top'
-    args.script_timeout = None
-    args.no_planning = True
-    args.debug_planner = False
-    args.pause = False
-    args.image = 'img%02d.png'
-    args.max_count = 999999
-    args.disrupt = False
-    args.linear = False
-    args.replan = False
-    args.seed = None
-    args.image_topic = '/sim/left_color_camera/image'
-    args.iter = 1
-    args.max_t = 3*60
-    args.randomize_textures = 0.
-    args.randomize_camera = 0.
-    args.sigma = 0.
-    args.p_sample = 0.
-    args.lula_collisions = False
-    args.babble = False
-    # TODO: use setattr
-    return args
-
-################################################################################
-
-def planning_loop(domain, observer, world, args, additional_init=[], additional_goals=[]):
+def planning_loop(domain, observer, world, args):
     robot_entity = domain.get_robot()
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
 
@@ -143,8 +55,6 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         # The difference in state is that this one is only used for visualization
         state = world.get_initial_state() # TODO: create from belief for holding
         problem = pdddlstream_from_problem(belief, collisions=not args.cfree, teleport=args.teleport)
-        problem[-2].extend(additional_init)
-        problem = problem[:-1] + (And(problem[-1], *additional_goals),)
 
         wait_for_user('Plan?')
         plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
@@ -179,12 +89,50 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
 ################################################################################
 
 class Interface(object):
-    def __init__(self, domain, observer, sim_manager=None):
-        self.domain = domain
+    def __init__(self, args, task, observer, carter=None, trial_manager=None, simulation=True):
+        self.args = args
+        self.task = task
         self.observer = observer
-        self.sim_manager = sim_manager
+        self.carter = carter
+        self.trial_manager = trial_manager
+        self.simulation = simulation
+    @property
+    def world(self):
+        return self.task.world
+    @property
+    def domain(self):
+        return self.observer.domain
+    @property
+    def sim_manager(self):
+        if self.trial_manager is None:
+            return None
+        return self.trial_manager.sim
+
+################################################################################
 
 def localize_all(task, observer):
+    # Detection & Tracking
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L470
+
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
+    #dart = LulaInitializeDart(localization_rospaths=LOCALIZATION_ROSPATHS,
+    #                          time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
+    # Robot calibration policy
+
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
+    #obj = world_state.entities[goal]
+    #obj.localize()
+    #obj.detect()
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
+    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
+    #administrator = ObjectAdministrator(obj_frame, wait_for_connection=False)
+    #administrator.activate() # localize
+    #administrator.detect_once() # detect
+    #administrator.deactivate() # stop_localizing
+
     world_state = observer.current_state
     for name in task.objects:
         obj = world_state.entities[name]
@@ -204,16 +152,44 @@ def localize_all(task, observer):
 
 ################################################################################
 
+def test_carter(domain, carter):
+    x, y, theta = carter.current_pose  # current_velocity
+    pos = np.array([x, y])
+    goal_pos = pos + 0.2 * unit_from_theta(theta)
+    goal_pose = np.append(goal_pos, [theta])
+    # goal_pose = np.append(pos, [0.])
+
+    # carter.move_to(goal_pose) # recursion bug
+    carter.move_to_safe(goal_pose)  # move_to_async | move_to_safe
+    # move_to_open_loop | move_to_safe_followed_by_openloop
+
+    # carter.simple_move(0.1) # simple_move | simple_stop
+    # rospy.sleep(2.0)
+    # carter.simple_stop()
+    domain.get_robot().carter_interface = carter
+    # domain.get_robot().unsuppress_fixed_bases()
+
+    # /sim/tf to get all objects
+    # https://gitlab-master.nvidia.com/srl/srl_system/blob/722d127a016c9105ec68a33902a73480c36b31ac/packages/isaac_bridge/scripts/sim_tf_relay.py
+    # sim_tf_relay.py
+
+    # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false world:=franka_leftright_kitchen_ycb_world.yaml
+    # https://gitlab-master.nvidia.com/srl/srl_system/blob/fb94253c60b1bd1308a37c1aeb9dc4a4c453c512/packages/isaac_bridge/launch/sim_franka.launch
+    # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.sim.yaml
+    # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.yaml
+
 #   File "/home/cpaxton/srl_system/workspace/src/brain/src/brain_ros/ros_world_state.py", line 397, in update_msg
 #     self.gripper = msg.get_positions([self.gripper_joint])[0]
 # TypeError: 'NoneType' object has no attribute '__getitem__'
 
+################################################################################
+
 def main():
     parser = create_parser()
     parser.add_argument('-execute', action='store_true',
-                        help="When enabled, uses the real robot")
+                        help="When enabled, uses the real robot_entity")
     parser.add_argument('-fixed', action='store_true',
-                        help="When enabled, fixes the robot's base")
+                        help="When enabled, fixes the robot_entity's base")
     parser.add_argument('-jump', action='store_true',
                         help="When enabled, skips base control")
     parser.add_argument('-lula', action='store_true',
@@ -224,10 +200,7 @@ def main():
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
     task_name = args.problem.replace('_', ' ')
-    #if args.seed is not None:
-    #    set_seed(args.seed)
     np.set_printoptions(precision=3, suppress=True)
-    use_lula = args.lula # args.execute or args.lula
     args.watch |= args.execute
 
     # srl_system/packages/isaac_bridge/configs/ycb_table_config.json
@@ -242,65 +215,30 @@ def main():
     #if args.execute:
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
     #else:
-    domain = KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
-    domain.root[domain.robot].suppress_fixed_bases() # Not as much error?
-    #domain.root[domain.robot].unsuppress_fixed_bases() # Significant error
+    domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
+    robot_entity = domain.get_robot()
+    robot_entity.suppress_fixed_bases() # Not as much error?
+    #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
+
     if args.execute and not args.fixed:
         # TODO: only seems to work in simulation
         carter = Carter(goal_threshold_tra=0.10,
                         goal_threshold_rot=math.radians(15.),
                         vel_threshold_lin=0.01,
                         vel_threshold_ang=math.radians(1.0))
-        x, y, theta = carter.current_pose # current_velocity
-        pos = np.array([x, y])
-        goal_pos = pos + 0.2*unit_from_theta(theta)
-        goal_pose = np.append(goal_pos, [theta])
-        #goal_pose = np.append(pos, [0.])
-
-        #carter.move_to(goal_pose) # recursion bug
-        carter.move_to_safe(goal_pose) # move_to_async | move_to_safe
-        # move_to_open_loop | move_to_safe_followed_by_openloop
-
-        #carter.simple_move(0.1) # simple_move | simple_stop
-        #rospy.sleep(2.0)
-        #carter.simple_stop()
-        #domain.get_robot().carter_interface = carter
-        #domain.get_robot().unsuppress_fixed_bases()
-
-        # /sim/tf to get all objects
-        # https://gitlab-master.nvidia.com/srl/srl_system/blob/722d127a016c9105ec68a33902a73480c36b31ac/packages/isaac_bridge/scripts/sim_tf_relay.py
-        # sim_tf_relay.py
-
-        # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false world:=franka_leftright_kitchen_ycb_world.yaml
-        # https://gitlab-master.nvidia.com/srl/srl_system/blob/fb94253c60b1bd1308a37c1aeb9dc4a4c453c512/packages/isaac_bridge/launch/sim_franka.launch
-        # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.sim.yaml
-        # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.yaml
+        robot_entity.carter_interface = carter
+        robot_entity.unsuppress_fixed_bases()
+    else:
+        carter = None
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
 
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
-    #dart = LulaInitializeDart(localization_rospaths=LOCALIZATION_ROSPATHS,
-    #                          time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
-    # Robot calibration policy
-
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
-    #obj = world_state.entities[goal]
-    #obj.localize()
-    #obj.detect()
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
-    #administrator = ObjectAdministrator(obj_frame, wait_for_connection=False)
-    #administrator.activate() # localize
-    #administrator.detect_once() # detect
-    #administrator.deactivate() # stop_localizing
-
     if args.execute:
         observer = RosObserver(domain)
         sim_manager = None
-        additional_init, additional_goals = [], []
         task = Task(world,
                     objects=[SPAM, SUGAR], #, CHEEZIT],
                     #goal_holding=[SPAM],
@@ -310,24 +248,29 @@ def main():
                     #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
                     return_init_bq=True, return_init_aq=True)
+        interface = Interface(args, task, observer, carter=carter, simulation=False)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
-        trial_manager = TrialManager(trial_args, domain, lula=use_lula)
+        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
         observer = trial_manager.observer
         sim_manager = trial_manager.sim
-        #camera_point = Point(4.95, -9.03, 2.03)
-        camera_point = Point(4.5, -9.5, 2.)
-        camera_pose = Pose(camera_point, Euler(roll=-3*np.pi/4))
-        # TODO: could make the camera follow the robot around
-        set_isaac_camera(sim_manager, camera_pose)
+
+        # TODO: could make the camera follow the robot_entity around
+
+        ##camera_point = Point(4.95, -9.03, 2.03)
+        #camera_point = Point(4.5, -9.5, 2.)
+        #camera_pose = Pose(camera_point, Euler(roll=-3*np.pi/4))
+        #set_isaac_camera(sim_manager, camera_pose)
         #trial_manager.set_camera(randomize=False)
+
         # Need to reset at the start
-        task, additional_init, additional_goals = task_from_trial_manager(
-            world, trial_manager, task_name, fixed=args.fixed)
+        task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed, objects=YCB_OBJECTS)
         if args.jump:
-            domain.get_robot().carter_interface = sim_manager
+            robot_entity.carter_interface = sim_manager
         #trial_manager.disable() # Disables collisions
+        interface = Interface(args, task, observer, trial_manager=trial_manager, simulation=True)
+
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -341,7 +284,7 @@ def main():
         localize_all(task, observer)
         update_world(world, domain, observer)
         #close_all_doors(world)
-        if (sim_manager is not None) and task.movable_base:
+        if interface.simulation and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
             #world.set_initial_conf()
             update_isaac_sim(domain, observer, sim_manager, world)
@@ -351,34 +294,9 @@ def main():
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
 
-    # Adjusting impedance thresholds to allow contact
-    # /franka_control/set_cartesian_impedance
-    # /franka_control/set_force_torque_collision_behavior
-    # /franka_control/set_full_collision_behavior
-    # /franka_control/set_joint_impedance
-
-    # 3 control options:
-    # 1) LULA + RMP
-    # 2) Position joint trajectory controller
-    # 3) LULA backend directly
-
-    # franka_backend
-    # roslaunch franka_controllers lula_control.launch
-
-    # 1) roslaunch franka_controllers lula_control.launch
-    # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
-
-    # rosed franka_controllers set_parameters
-    # srl@vgilligan:~/srl_system/workspace/src/third_party/franka_controllers/scripts$ rosed franka_controllers set_parameters
-    # killall move_group franka_control_node local_controller
-
-    success = planning_loop(domain, observer, world, args,
-                            additional_init=additional_init,
-                            additional_goals=additional_goals)
+    success = planning_loop(domain, observer, world, args)
     print('Success:', success)
     world.destroy()
-    # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
-    # roslaunch panda_moveit_config start_moveit.launch
 
     # /tracker/axe/joint_states
     # /tracker/baker/joint_states
@@ -392,3 +310,29 @@ if __name__ == '__main__':
         #raise e
     finally:
         kill_lula()
+
+# 3 real robot control options:
+# 1) LULA + RMP
+# 2) Position joint trajectory controller
+# 3) LULA backend directly
+
+# Running in IsaacSim
+# 1) roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
+
+# Running on the real robot w/o LULA
+# 1) roslaunch franka_controllers lula_control.launch
+# 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+# 3) killall move_group franka_control_node local_controller
+
+# Running on the real robot w/ lula
+# 1) franka_backend
+# 2) roslaunch panda_moveit_config start_moveit.launch
+# 3) ...
+
+# Adjusting impedance thresholds to allow contact
+# /franka_control/set_cartesian_impedance
+# /franka_control/set_force_torque_collision_behavior
+# /franka_control/set_full_collision_behavior
+# /franka_control/set_joint_impedance
+# srl@vgilligan:~/srl_system/workspace/src/third_party/franka_controllers/scripts
+# rosed franka_controllers set_parameters

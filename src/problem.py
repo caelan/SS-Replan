@@ -155,7 +155,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         ('CanMoveBase',),
         ('CanMoveArm',),
         ('CanMoveGripper',),
-    ] + list(additional_init)
+    ] + list(task.init) + list(additional_init)
     for action_name, cost in ACTION_COSTS.items():
         function_name = '{}Cost'.format(title_from_snake(action_name))
         function = (function_name,)
@@ -186,7 +186,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                       for joint_name in task.goal_closed] + \
                      [Exists(['?a'], And(('AngleWithin', joint_name, '?a', OPEN),
                                          ('AtAngle', joint_name, '?a')))
-                      for joint_name in task.goal_open]
+                      for joint_name in task.goal_open] + list(task.goal)
 
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
