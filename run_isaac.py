@@ -287,14 +287,14 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world,
-                    objects=[SPAM], #, CHEEZIT],
+                    objects=[SPAM, SUGAR], #, CHEEZIT],
                     #goal_holding=[SPAM],
                     goal_on={SPAM: TOP_DRAWER},
                     #goal_closed=[],
-                    #goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
+                    goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
                     #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
-                    return_init_bq=False, return_init_aq=False)
+                    return_init_bq=True, return_init_aq=True)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()

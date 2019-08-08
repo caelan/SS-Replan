@@ -84,7 +84,7 @@ KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
 
 STOVES = ['range']
-COUNTERS = ['hitman_tmp', 'indigo_tmp']
+COUNTERS = ['hitman_tmp', 'indigo_tmp'] # + ['range']
 OPEN_SURFACES = COUNTERS + STOVES
 
 SURFACE_BOTTOM = 'bottom'
@@ -430,8 +430,9 @@ GRASP_TYPES = [
     TOP_GRASP,
     #SIDE_GRASP,
 ]
+APPROACH_DISTANCE = 0.075 # 0.1
 
-def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):
+def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTANCE, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
     fraction = 0.5

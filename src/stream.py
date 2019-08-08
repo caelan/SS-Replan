@@ -19,7 +19,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
-from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
+from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, get_link_obstacles
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
@@ -560,7 +560,7 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
 HandleGrasp = namedtuple('HandleGrasp', ['link', 'handle_grasp', 'handle_pregrasp'])
 DoorPath = namedtuple('DoorPath', ['link_path', 'handle_path', 'handle_grasp', 'tool_path'])
 
-def get_handle_grasps(world, joint, pre_distance=0.1):
+def get_handle_grasps(world, joint, pre_distance=APPROACH_DISTANCE):
     pre_direction = pre_distance * get_unit_vector([0, 0, 1])
     #half_extent = 1.0*FINGER_EXTENT[2] # Collides
     half_extent = 1.1*FINGER_EXTENT[2]
