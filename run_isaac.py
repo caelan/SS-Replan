@@ -9,21 +9,24 @@ import traceback
 import numpy as np
 import math
 
+from src.interface import Interface
+
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from brain_ros.kitchen_domain import KitchenDomain
-#from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain # from grasps import *
+#from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain
+#from grasps import *
 from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, wait_for_user, Pose, Point, Euler, unit_from_theta
+from pybullet_tools.utils import LockRenderer, set_camera_pose, wait_for_user, unit_from_theta
 
 from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS
 from src.observation import create_observable_belief
 from src.visualization import add_markers
-from src.issac import update_world, kill_lula, update_isaac_sim, set_isaac_camera
+from src.issac import update_world, kill_lula, update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
@@ -44,12 +47,11 @@ JOINT_TEMPLATE = '{}_joint'
 
 ################################################################################
 
-def planning_loop(domain, observer, world, args):
-    robot_entity = domain.get_robot()
-    moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
-
+def planning_loop(interface):
+    args = interface.args
+    domain = interface.domain
+    world = interface.world
     belief = create_observable_belief(world)
-    task = world.task # One task per world
     last_skeleton = None
     while True:
         # The difference in state is that this one is only used for visualization
@@ -78,77 +80,13 @@ def planning_loop(domain, observer, world, args):
 
         #wait_for_user()
         for command in commands:
-            command.execute(domain, moveit, observer, state)
+            command.execute(domain, interface.moveit, interface.observer, state)
 
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
-        localize_all(task, observer)
-        update_world(world, domain, observer)
+        interface.localize_all()
+        update_world(world, domain, interface.observer)
 
-
-################################################################################
-
-class Interface(object):
-    def __init__(self, args, task, observer, carter=None, trial_manager=None, simulation=True):
-        self.args = args
-        self.task = task
-        self.observer = observer
-        self.carter = carter
-        self.trial_manager = trial_manager
-        self.simulation = simulation
-    @property
-    def world(self):
-        return self.task.world
-    @property
-    def domain(self):
-        return self.observer.domain
-    @property
-    def sim_manager(self):
-        if self.trial_manager is None:
-            return None
-        return self.trial_manager.sim
-
-################################################################################
-
-def localize_all(task, observer):
-    # Detection & Tracking
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L470
-
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L427
-    #dart = LulaInitializeDart(localization_rospaths=LOCALIZATION_ROSPATHS,
-    #                          time=6., config_modulator=domain.config_modulator, views=domain.view_tags)
-    # Robot calibration policy
-
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/lula_policies.py#L46
-    #obj = world_state.entities[goal]
-    #obj.localize()
-    #obj.detect()
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py#L182
-    # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/object_administrator.py
-    #administrator = ObjectAdministrator(obj_frame, wait_for_connection=False)
-    #administrator.activate() # localize
-    #administrator.detect_once() # detect
-    #administrator.deactivate() # stop_localizing
-
-    world_state = observer.current_state
-    for name in task.objects:
-        obj = world_state.entities[name]
-        #wait_for_duration(1.0)
-        obj.localize() # Needed to ensure detectable
-        print('Localizing', name)
-        rospy.sleep(0.1)
-        obj.detect() # Actually applies the blue model
-        print('Detecting', name)
-        #print(world_state.entities[name])
-        #obj.administrator.detect()
-        #print(obj.pose[:3, 3])
-    rospy.sleep(6.0)
-    #wait_for_duration(2.0)
-    print('Localized:', task.objects)
-    # TODO: wait until the variance in estimates is low
 
 ################################################################################
 
@@ -254,10 +192,8 @@ def main():
         trial_args = create_trial_args()
         trial_manager = TrialManager(trial_args, domain, lula=args.lula)
         observer = trial_manager.observer
-        sim_manager = trial_manager.sim
 
         # TODO: could make the camera follow the robot_entity around
-
         ##camera_point = Point(4.95, -9.03, 2.03)
         #camera_point = Point(4.5, -9.5, 2.)
         #camera_pose = Pose(camera_point, Euler(roll=-3*np.pi/4))
@@ -266,11 +202,10 @@ def main():
 
         # Need to reset at the start
         task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed, objects=YCB_OBJECTS)
-        if args.jump:
-            robot_entity.carter_interface = sim_manager
         #trial_manager.disable() # Disables collisions
         interface = Interface(args, task, observer, trial_manager=trial_manager, simulation=True)
-
+        if args.jump:
+            robot_entity.carter_interface = interface.sim_manager
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -281,25 +216,27 @@ def main():
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
         update_world(world, domain, observer)
-        localize_all(task, observer)
+        interface.localize_all()
         update_world(world, domain, observer)
         #close_all_doors(world)
         if interface.simulation and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
             #world.set_initial_conf()
-            update_isaac_sim(domain, observer, sim_manager, world)
+            update_isaac_sim(domain, observer, interface.sim_manager, world)
         world.update_initial()
         add_markers(world, inverse_place=False)
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
 
-    success = planning_loop(domain, observer, world, args)
+    success = planning_loop(interface)
     print('Success:', success)
     world.destroy()
 
     # /tracker/axe/joint_states
     # /tracker/baker/joint_states
+
+################################################################################
 
 if __name__ == '__main__':
     #main()
