@@ -159,24 +159,12 @@ def main():
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
 
-    if args.execute and not args.fixed:
-        # TODO: only seems to work in simulation
-        carter = Carter(goal_threshold_tra=0.10,
-                        goal_threshold_rot=math.radians(15.),
-                        vel_threshold_lin=0.01,
-                        vel_threshold_ang=math.radians(1.0))
-        robot_entity.carter_interface = carter
-        robot_entity.unsuppress_fixed_bases()
-    else:
-        carter = None
-
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
 
     if args.execute:
         observer = RosObserver(domain)
-        sim_manager = None
         task = Task(world,
                     objects=[SPAM, SUGAR], #, CHEEZIT],
                     #goal_holding=[SPAM],
@@ -186,7 +174,15 @@ def main():
                     #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
                     return_init_bq=True, return_init_aq=True)
-        interface = Interface(args, task, observer, carter=carter, simulation=False)
+
+        if not args.fixed:
+            carter = Carter(goal_threshold_tra=0.10,
+                            goal_threshold_rot=math.radians(15.),
+                            vel_threshold_lin=0.01,
+                            vel_threshold_ang=math.radians(1.0))
+            robot_entity.carter_interface = carter
+            robot_entity.unsuppress_fixed_bases()
+        interface = Interface(args, task, observer)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
@@ -203,7 +199,7 @@ def main():
         # Need to reset at the start
         task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed, objects=YCB_OBJECTS)
         #trial_manager.disable() # Disables collisions
-        interface = Interface(args, task, observer, trial_manager=trial_manager, simulation=True)
+        interface = Interface(args, task, observer, trial_manager=trial_manager)
         if args.jump:
             robot_entity.carter_interface = interface.sim_manager
 

@@ -2,13 +2,14 @@ import rospy
 
 
 class Interface(object):
-    def __init__(self, args, task, observer, carter=None, trial_manager=None, simulation=True):
+    def __init__(self, args, task, observer, trial_manager=None):
         self.args = args
         self.task = task
         self.observer = observer
-        self.carter = carter
         self.trial_manager = trial_manager
-        self.simulation = simulation
+    @property
+    def simulation(self):
+        return self.trial_manager is not None
     @property
     def world(self):
         return self.task.world
@@ -22,6 +23,8 @@ class Interface(object):
     def moveit(self):
         return self.robot_entity.get_motion_interface()
         #return self.robot_entity.planner
+    def carter(self):
+        return self.robot_entity.carter_interface
     @property
     def sim_manager(self):
         if self.trial_manager is None:

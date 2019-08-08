@@ -1,23 +1,26 @@
-from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, \
-    move_gripper_action, open_gripper_action, close_gripper_action
-from src.retime import spline_parameterization
-from src.base import follow_base_trajectory
-from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
-    wait_for_duration, user_input, wait_for_user, flatten_links, remove_handles, \
-    get_max_limit, get_joint_limits, waypoints_from_path, link_from_name, batch_ray_collision, draw_ray
-from src.issac import update_robot, update_isaac_robot, update_observer
-from src.utils import surface_from_name
+import math
+import numpy as np
+import time
 
 from isaac_bridge.manager import SimulationManager
 
-import numpy as np
-import time
-import copy
-import math
+from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
+    wait_for_duration, user_input, flatten_links, remove_handles, \
+    get_joint_limits, batch_ray_collision, draw_ray
+from src.base import follow_base_trajectory
+from src.execution import moveit_control, \
+    open_gripper_action, close_gripper_action
+from src.issac import update_robot, update_isaac_robot, update_observer
 
-MOVEIT = True
 DEFAULT_SLEEP = 0.5
 FORCE = 50 # 20 | 50 | 100
+# TODO: force per object
+
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/isaac_bridge/launch/carter_localization_priors.launch#L6
+# /isaac/odometry is zero
+# /isaac/pose_status is 33.1
+CARTER_X = 33.1
+CARTER_Y = 7.789
 
 class State(object):
     # TODO: rename to be world state?
@@ -87,13 +90,6 @@ class Sequence(object):
 
 ################################################################################
 
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/isaac_bridge/launch/carter_localization_priors.launch#L6
-
-# /isaac/odometry is zero
-# /isaac/pose_status is 33.1
-CARTER_X = 33.1
-CARTER_Y = 7.789
-
 class Trajectory(Command):
     def __init__(self, world, robot, joints, path, speed=1.0):
         super(Trajectory, self).__init__(world)
@@ -116,62 +112,64 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
 
-    def execute(self, domain, moveit, observer, state):
-        # TODO: ensure the same joint names
-        if self.joints == self.world.base_joints:
-            #assert not moveit.use_lula
-            robot_entity = domain.get_robot() # TODO: actor
-            #robot_entity = world_state.entities[domain.robot]
-            carter = robot_entity.carter_interface
-            if carter is None:
-                follow_base_trajectory(self.world, self.path, moveit, observer)
-            elif isinstance(carter, SimulationManager):
-                sim_manager = carter
-                sim_manager.pause() # TODO: context manager
-                set_joint_positions(self.robot, self.joints, self.path[-1])
-                update_isaac_robot(observer, sim_manager, self.world)
-                time.sleep(DEFAULT_SLEEP)
-                sim_manager.pause()
-                # TODO: teleport attached
-            else:
-                world_state = domain.root
-                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter_sim.py
-                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/2cb8df9ac14b56a5955251cf4325369172c2ba72/packages/isaac_bridge/src/isaac_bridge/carter.py
-                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
-                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_policies.py
-                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_predicates.py#L164
-                # TODO: ensure that I transform into the correct base units
-                # The base uses its own motion planner
-                # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
-                world_state[domain.robot].suppress_fixed_bases()
-                carter.move_to_async(self.path[-1])
-                #for conf in waypoints_from_path(self.path):
-                #    carter.move_to_safe(conf)
-                #    #carter.move_to_async(conf)
-                #    #carter.simple_move(cmd)
-                #carter.simple_stop()
-                world_state[domain.robot].unsuppress_fixed_bases()
-                #carter.pub_disable_deadman_switch.publish(True)
-            return
-
-        if MOVEIT:
-            if self.joints == self.world.gripper_joints:
-                position = self.path[-1][0]
-                #move_gripper_action(position)
-                joint = self.joints[0]
-                average = np.average(get_joint_limits(self.robot, joint))
-                if position < average:
-                    close_gripper_action(moveit)
-                    #moveit.close_gripper(force=FORCE)
-                else:
-                    open_gripper_action(moveit)
-                    #moveit.open_gripper()
-            else:
-                moveit_control(self.robot, self.joints, self.path, moveit, observer)
+    def execute_base(self, domain, moveit, observer):
+        assert self.joints == self.world.base_joints
+        # assert not moveit.use_lula
+        robot_entity = domain.get_robot()  # TODO: actor
+        # robot_entity = world_state.entities[domain.robot]
+        carter = robot_entity.carter_interface
+        if carter is None:
+            follow_base_trajectory(self.world, self.path, moveit, observer)
+        elif isinstance(carter, SimulationManager):
+            sim_manager = carter
+            sim_manager.pause()  # TODO: context manager
+            set_joint_positions(self.robot, self.joints, self.path[-1])
+            update_isaac_robot(observer, sim_manager, self.world)
             time.sleep(DEFAULT_SLEEP)
+            sim_manager.pause()
+            # TODO: teleport attached
         else:
-            # TODO: use the spline controller here
-            status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
+            world_state = domain.root
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter_sim.py
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/2cb8df9ac14b56a5955251cf4325369172c2ba72/packages/isaac_bridge/src/isaac_bridge/carter.py
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_franka/scripts/move_carter.py
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_policies.py
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/carter_predicates.py#L164
+            # TODO: ensure that I transform into the correct base units
+            # The base uses its own motion planner
+            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/lula_dart/lula_dartpy/fixed_base_suppressor.py
+            world_state[domain.robot].suppress_fixed_bases()
+            carter.move_to_async(self.path[-1])
+            # for conf in waypoints_from_path(self.path):
+            #    carter.move_to_safe(conf)
+            #    #carter.move_to_async(conf)
+            #    #carter.simple_move(cmd)
+            # carter.simple_stop()
+            world_state[domain.robot].unsuppress_fixed_bases()
+            # carter.pub_disable_deadman_switch.publish(True)
+
+    def execute_gripper(self, moveit):
+        assert self.joints == self.world.gripper_joints
+        position = self.path[-1][0]
+        # move_gripper_action(position)
+        joint = self.joints[0]
+        average = np.average(get_joint_limits(self.robot, joint))
+        if position < average:
+            close_gripper_action(moveit)
+            # moveit.close_gripper(force=FORCE)
+        else:
+            open_gripper_action(moveit)
+            # moveit.open_gripper()
+
+    def execute(self, domain, moveit, observer, state):
+        # TODO: ensure the same joint name order
+        if self.joints == self.world.base_joints:
+            self.execute_base(domain, moveit, observer)
+        elif self.joints == self.world.gripper_joints:
+            self.execute_gripper(moveit)
+        else:
+            moveit_control(self.robot, self.joints, self.path, moveit, observer)
+        #status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         time.sleep(DEFAULT_SLEEP)
         #return status
 
@@ -198,6 +196,14 @@ class DoorTrajectory(Command):
         assert len(self.robot_path) == len(self.door_path)
 
     @property
+    def joints(self):
+        return self.robot_joints
+
+    @property
+    def path(self):
+        return self.robot_path
+
+    @property
     def bodies(self):
         return flatten_links(self.robot, get_moving_links(self.robot, self.robot_joints)) | \
                flatten_links(self.world.kitchen, get_moving_links(self.world.kitchen, self.door_joints))
@@ -215,20 +221,19 @@ class DoorTrajectory(Command):
     def execute(self, domain, moveit, observer, state):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
-        if MOVEIT:
-            close_gripper_action(moveit)
-            #moveit.close_gripper() #force=FORCE)
-            time.sleep(DEFAULT_SLEEP)
-            moveit_control(self.robot, self.robot_joints, self.robot_path, moveit, observer)
-            time.sleep(DEFAULT_SLEEP)
-            open_gripper_action(moveit)
-            #moveit.open_gripper()
-            time.sleep(DEFAULT_SLEEP)
-        else:
-            close_gripper(self.robot, moveit)
-            status = joint_state_control(self.robot, self.robot_joints, self.robot_path,
-                                         domain, moveit, observer)
-            open_gripper(self.robot, moveit)
+        close_gripper_action(moveit)
+        #moveit.close_gripper() #force=FORCE)
+        time.sleep(DEFAULT_SLEEP)
+        moveit_control(self.robot, self.robot_joints, self.robot_path, moveit, observer)
+        time.sleep(DEFAULT_SLEEP)
+        open_gripper_action(moveit)
+        #moveit.open_gripper()
+        time.sleep(DEFAULT_SLEEP)
+
+        #close_gripper(self.robot, moveit)
+        #status = joint_state_control(self.robot, self.robot_joints, self.robot_path,
+        #                             domain, moveit, observer)
+        #open_gripper(self.robot, moveit)
         #return status
 
     def __repr__(self):
@@ -264,11 +269,9 @@ class Attach(Command):
     def execute(self, domain, moveit, observer, state):
         if self.world.robot != self.robot:
             return
-        if MOVEIT:
-            close_gripper_action(moveit)
-            #moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
-        else:
-            return close_gripper(self.robot, moveit)
+        close_gripper_action(moveit)
+        #moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
+        #return close_gripper(self.robot, moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
@@ -305,11 +308,9 @@ class Detach(Command):
     def execute(self, domain, moveit, observer, state):
         if self.world.robot != self.robot:
             return
-        if MOVEIT:
-            open_gripper_action(moveit)
-            #moveit.open_gripper()
-        else:
-            return open_gripper(self.robot, moveit)
+        open_gripper_action(moveit)
+        #moveit.open_gripper()
+        #return open_gripper(self.robot, moveit)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
@@ -384,7 +385,7 @@ class Wait(Command):
 
 ################################################################################s
 
-def iterate_plan(state, commands, time_step=None):
+def iterate_commands(state, commands, time_step=None):
     if commands is None:
         return
     for i, command in enumerate(commands):
@@ -400,3 +401,6 @@ def iterate_plan(state, commands, time_step=None):
                 user_input('Command {:2} | step {:2} | Next?'.format(i, j))
             else:
                 wait_for_duration(time_step)
+
+def execute_commands():
+    pass

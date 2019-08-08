@@ -19,7 +19,7 @@ from src.observation import create_observable_belief, \
     transition_belief_update, create_surface_belief, UniformDist, observe_scene
 from src.utils import ZED_LEFT_SURFACES
 from src.debug import test_observation
-from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_plan, \
+from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_commands, \
     solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
 from src.problem import pdddlstream_from_problem
@@ -138,7 +138,7 @@ def run_stochastic(task, args):
         commands = commands_from_plan(world, plan_prefix)
         if not video: # Video doesn't include planning time
             wait_for_user()
-        iterate_plan(state, commands, time_step=DEFAULT_TIME_STEP)
+        iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP)
         #simulate_plan(state, commands, args)
         transition_belief_update(belief, plan_prefix)
 

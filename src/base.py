@@ -9,10 +9,12 @@ from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 
 from pybullet_tools.utils import get_closest_angle_fn, INF, point_from_pose, wrap_angle, euler_from_quat, \
     quat_from_pose, get_angle, circular_difference, waypoints_from_path, get_link_pose, remove_handles, draw_pose
-from src.execution import ROSPose
 from src.issac import lookup_pose, ISSAC_PREFIX, ISSAC_CARTER_FRAME, ISSAC_WORLD_FRAME
 from src.utils import WHEEL_JOINTS
 
+def ROSPose(pose):
+    point, quat = pose
+    return Pose(position=Point(*point), orientation=Quaternion(*quat))
 
 def base_control(world, goal_values, moveit, observer,
                  timeout=30, sleep=1.0, verbose=False):
@@ -136,7 +138,6 @@ def base_control(world, goal_values, moveit, observer,
     print('Final angular error: {:.1f} ({:.1f})'.format(
         *map(math.degrees, [goal_yaw_error, angular_threshold])))
     return False
-
 
 def follow_base_trajectory(world, path, moveit, observer, **kwargs):
     path = waypoints_from_path(path)

@@ -15,7 +15,7 @@ from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
-from src.command import Wait, iterate_plan, Trajectory
+from src.command import Wait, iterate_commands, Trajectory
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
@@ -166,7 +166,7 @@ def simulate_plan(state, commands, args, record=False, time_step=DEFAULT_TIME_ST
     if record:
         video_path = VIDEO_TEMPLATE.format(args.problem)
         with VideoSaver(video_path):
-            iterate_plan(state, commands, time_step=time_step)
+            iterate_commands(state, commands, time_step=time_step)
         print('Saved', video_path)
     else:
-        iterate_plan(state, commands, time_step=time_step)
+        iterate_commands(state, commands, time_step=time_step)
