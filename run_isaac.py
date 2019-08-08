@@ -19,7 +19,7 @@ from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
-    wait_for_user, wait_for_duration, Pose, Point, Euler
+    wait_for_user, wait_for_duration, Pose, Point, Euler, unit_from_theta
 
 from src.observation import create_observable_belief
 from src.visualization import add_markers
@@ -197,7 +197,7 @@ def localize_all(task, observer):
         #print(world_state.entities[name])
         #obj.administrator.detect()
         #print(obj.pose[:3, 3])
-    rospy.sleep(5.0)
+    rospy.sleep(6.0)
     #wait_for_duration(2.0)
     print('Localized:', task.objects)
     # TODO: wait until the variance in estimates is low
@@ -237,13 +237,29 @@ def main():
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
     #else:
     domain = KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
+    domain.root[domain.robot].suppress_fixed_bases() # Not as much error?
+    #domain.root[domain.robot].unsuppress_fixed_bases() # Significant error
+    # Significant error without either
     if args.execute and not args.fixed:
         # TODO: only seems to work in simulation
         carter = Carter(goal_threshold_tra=0.10,
                         goal_threshold_rot=math.radians(15.),
                         vel_threshold_lin=0.01,
                         vel_threshold_ang=math.radians(1.0))
-        domain.get_robot().carter_interface = carter
+        x, y, theta = carter.current_pose # current_velocity
+        pos = np.array([x, y])
+        goal_pos = pos + 0.2*unit_from_theta(theta)
+        goal_pose = np.append(goal_pos, [theta])
+        #goal_pose = np.append(pos, [0.])
+
+        #carter.move_to(goal_pose) # recursion bug
+        carter.move_to_safe(goal_pose) # move_to_async | move_to_safe
+        # move_to_open_loop | move_to_safe_followed_by_openloop
+
+        #carter.simple_move(0.1) # simple_move | simple_stop
+        #rospy.sleep(2.0)
+        #carter.simple_stop()
+        #domain.get_robot().carter_interface = carter
         #domain.get_robot().unsuppress_fixed_bases()
 
     world = World(use_gui=True) # args.visualize)
@@ -271,14 +287,14 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world,
-                    objects=[SPAM, CHEEZIT],
+                    objects=[SPAM], #, CHEEZIT],
                     #goal_holding=[SPAM],
                     goal_on={SPAM: TOP_DRAWER},
                     #goal_closed=[],
                     #goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
                     #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
-                    return_init_bq=False, return_init_aq=True)
+                    return_init_bq=False, return_init_aq=False)
     else:
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
@@ -336,6 +352,10 @@ def main():
 
     # 1) roslaunch franka_controllers lula_control.launch
     # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+
+    # rosed franka_controllers set_parameters
+    # srl@vgilligan:~/srl_system/workspace/src/third_party/franka_controllers/scripts$ rosed franka_controllers set_parameters
+    # killall move_group franka_control_node local_controller
 
     success = planning_loop(domain, observer, world, args,
                             additional_init=additional_init,

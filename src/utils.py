@@ -428,7 +428,7 @@ SIDE_GRASP = 'side' # TODO: allow normal side grasps for cabinets?
 UNDER_GRASP = 'under' # TODO: for franka_carter
 GRASP_TYPES = [
     TOP_GRASP,
-    SIDE_GRASP,
+    #SIDE_GRASP,
 ]
 
 def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=0.1, **kwargs):

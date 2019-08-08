@@ -34,9 +34,9 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
         'compute-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
                                        p_success=0.5, eager=True),
         #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
-        #'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
-        #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
-        #'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
+        'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
+        'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
+        'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
 
         'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-4),
 
@@ -152,7 +152,8 @@ def commands_from_plan(world, plan):
             commands.append(Wait(world, steps=steps))
         else:
             raise NotImplementedError(action)
-    return combine_commands(commands)
+    return commands
+    #return combine_commands(commands)
 
 ################################################################################
 

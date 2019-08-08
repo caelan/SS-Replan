@@ -228,6 +228,8 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
         # Relies on the fact that drawers have identical surface and link names
         link_name = get_link_name(world.kitchen, link)
         #link_name = str(link_name.decode('UTF-8'))
+        link_name = str(link_name.encode('ascii','ignore'))
+        print(type(joint_name), type(link_name))
         init_conf = Conf(world.kitchen, [joint], init=True)
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         #init_conf = open_conf
@@ -261,7 +263,7 @@ def pdddlstream_from_problem(belief, additional_init=[], **kwargs):
             world_pose = RelPose(world.kitchen, surface_link, init=True)
             surface_poses[surface_name] = world_pose
             init += [
-                ('Counter', surface_name, world_pose),  # Fixed surface
+                #('Counter', surface_name, world_pose),  # Fixed surface
                 #('RelPose', surface_name, world_pose, 'world'),
                 ('WorldPose', surface_name, world_pose),
                 #('AtRelPose', surface_name, world_pose, 'world'),

@@ -21,7 +21,8 @@ from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryAction,
     JointTrajectoryGoal, GripperCommandActionGoal, GripperCommandAction, GripperCommandGoal
 from lula_controller_msgs.msg import JointPosVelAccCommand
 
-from lula_franka.franka import FrankaGripper
+#from lula_franka.franka import FrankaGripper
+from lula_franka.franka_gripper_commander import FrankaGripperCommander
 
 # control_msgs/GripperCommandAction
 # control_msgs/JointTrajectoryAction
@@ -125,6 +126,13 @@ def follow_control(robot, joints, path, **kwargs):
     print('Finished', action_topic)
     # TODO: create this action client once
 
+    error_threshold = 1e-3
+    threshold_template = '/position_joint_trajectory_controller/constraints/{}/goal'
+    for name in get_joint_names(robot, joints):
+        param = threshold_template.format(name)
+        rospy.set_param(param, error_threshold)
+        #print(name, rospy.get_param(param))
+
     # Moveit's trajectories
     # rostopic echo /execute_trajectory/goal
     # About 1 waypoint per second
@@ -132,6 +140,7 @@ def follow_control(robot, joints, path, **kwargs):
     # Accelerations are about zero (except at the start and end)
 
     trajectory = spline_parameterization(robot, joints, path, **kwargs)
+    #trajectory.points[-1].time_from_start = trajectory.points[-1].time_from_start + rospy.Duration(1.0)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
@@ -143,6 +152,7 @@ def follow_control(robot, joints, path, **kwargs):
     client.send_goal_and_wait(goal)  # send_goal_and_wait
     # client.get_result()
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
+    #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
 
 def moveit_control(robot, joints, path, moveit, observer, **kwargs):
     #path = waypoints_from_path(path)
@@ -204,8 +214,8 @@ def lula_control(world, path, domain, observer, world_state):
 #FINGER_VELOCITY_LIMIT = 0.2
 
 def move_gripper_action(position, effort=20):
-    gripper = FrankaGripper(is_physical_robot=True)
-    gripper.commander.move(position, speed=.03, wait=True)
+    #gripper = FrankaGripper(is_physical_robot=True)
+    #gripper.commander.move(position, speed=.03, wait=True)
 
     # Should be the same as the following:
     # /home/cpaxton/srl_system/packages/external/lula_franka/lula_franka/franka_gripper_commander.py
@@ -227,17 +237,22 @@ def move_gripper_action(position, effort=20):
     goal.command.position = position
     goal.command.max_effort = effort
     client.send_goal(goal) # send_goal | send_goal_and_wait
+    client.wait_for_result()
     #client.get_result()
     #rospy.sleep(1.0)
 
 def open_gripper_action(moveit, **kwargs):
-    gripper = FrankaGripper(is_physical_robot=True)
-    return gripper.open(speed=0.1, wait=True)
+    commander = FrankaGripperCommander()
+    commander.open(speed=0.1, wait=True)
+    #gripper = FrankaGripper(is_physical_robot=True)
+    #return gripper.open(speed=0.1, wait=True)
     #return move_gripper_action(moveit.gripper.open_positions[0], **kwargs)
 
 def close_gripper_action(moveit):
-    gripper = FrankaGripper(is_physical_robot=True)
-    return gripper.close(attach_obj=None, speed=0.1, force=40, actuate_gripper=True, wait=True)
+    commander = FrankaGripperCommander()
+    commander.close(speed=0.1, force=60, wait=True)
+    #gripper = FrankaGripper(is_physical_robot=True)
+    #return gripper.close(attach_obj=None, speed=0.1, force=40, actuate_gripper=True, wait=True)
     #return move_gripper_action(moveit.gripper.closed_positions[0], effort=50)
 
 ################################################################################

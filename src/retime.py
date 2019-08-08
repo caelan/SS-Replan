@@ -99,6 +99,7 @@ def spline_parameterization(robot, joints, path, speed=ARM_SPEED):
         #point.effort = list(np.ones(len(joints)))
         point.time_from_start = rospy.Duration(t)
         trajectory.points.append(point)
+    #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
     return trajectory
 
 ################################################################################

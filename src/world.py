@@ -82,6 +82,7 @@ class World(object):
                                 urdf_string=read(urdf_path))
             lower, upper = self.ik_solver.get_joint_limits()
             buffer = 0.1*np.ones(len(self.ik_solver.joint_names))
+            buffer[-1] *= 2
             self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
         else:
             self.ik_solver = None
