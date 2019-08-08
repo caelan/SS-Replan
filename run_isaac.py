@@ -19,7 +19,7 @@ from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, WorldSaver, \
-    wait_for_user, wait_for_duration, Pose, Point, Euler
+    wait_for_user, wait_for_duration, Pose, Point, Euler, unit_from_theta
 
 from src.observation import create_observable_belief
 from src.visualization import add_markers
@@ -46,8 +46,6 @@ SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
 
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-#USE_OBJECTS = [CHEEZIT, SPAM, SUGAR]  # , TOMATO_SOUP]
-USE_OBJECTS = [SPAM]
 
 TOP_DRAWER = 'indigo_drawer_top'
 JOINT_TEMPLATE = '{}_joint'
@@ -139,7 +137,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
     moveit = robot_entity.get_motion_interface() # equivalently robot_entity.planner
 
     belief = create_observable_belief(world)
-    #task = world.task # One task per world
+    task = world.task # One task per world
     last_skeleton = None
     while True:
         # The difference in state is that this one is only used for visualization
@@ -163,7 +161,7 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         wait_for_user()
 
         state.assign()
-        if (commands is None) or args.teleport:
+        if (commands is None) or args.teleport or args.cfree:
             return False
         if not commands:
             return True
@@ -171,10 +169,11 @@ def planning_loop(domain, observer, world, args, additional_init=[], additional_
         #wait_for_user()
         for command in commands:
             command.execute(domain, moveit, observer, state)
+
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
-        localize_all(observer)
-        update_world(world, domain, observer, USE_OBJECTS)
+        localize_all(task, observer)
+        update_world(world, domain, observer)
 
 
 ################################################################################
@@ -185,20 +184,29 @@ class Interface(object):
         self.observer = observer
         self.sim_manager = sim_manager
 
-def localize_all(observer):
+def localize_all(task, observer):
     world_state = observer.current_state
-    for name in USE_OBJECTS:
+    for name in task.objects:
         obj = world_state.entities[name]
         #wait_for_duration(1.0)
-        obj.localize()
-        obj.detect()
-        print(world_state.entities[name])
+        obj.localize() # Needed to ensure detectable
+        print('Localizing', name)
+        rospy.sleep(0.1)
+        obj.detect() # Actually applies the blue model
+        print('Detecting', name)
+        #print(world_state.entities[name])
         #obj.administrator.detect()
         #print(obj.pose[:3, 3])
-    wait_for_duration(2.0)
-    print('Localized:', USE_OBJECTS)
+    rospy.sleep(6.0)
+    #wait_for_duration(2.0)
+    print('Localized:', task.objects)
+    # TODO: wait until the variance in estimates is low
 
 ################################################################################
+
+#   File "/home/cpaxton/srl_system/workspace/src/brain/src/brain_ros/ros_world_state.py", line 397, in update_msg
+#     self.gripper = msg.get_positions([self.gripper_joint])[0]
+# TypeError: 'NoneType' object has no attribute '__getitem__'
 
 def main():
     parser = create_parser()
@@ -231,13 +239,29 @@ def main():
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
     #else:
     domain = KitchenDomain(sim=not args.execute, sigma=0, lula=use_lula)
+    domain.root[domain.robot].suppress_fixed_bases() # Not as much error?
+    #domain.root[domain.robot].unsuppress_fixed_bases() # Significant error
+    # Significant error without either
     if args.execute and not args.fixed:
         # TODO: only seems to work in simulation
         carter = Carter(goal_threshold_tra=0.10,
                         goal_threshold_rot=math.radians(15.),
                         vel_threshold_lin=0.01,
                         vel_threshold_ang=math.radians(1.0))
-        domain.get_robot().carter_interface = carter
+        x, y, theta = carter.current_pose # current_velocity
+        pos = np.array([x, y])
+        goal_pos = pos + 0.2*unit_from_theta(theta)
+        goal_pose = np.append(goal_pos, [theta])
+        #goal_pose = np.append(pos, [0.])
+
+        #carter.move_to(goal_pose) # recursion bug
+        carter.move_to_safe(goal_pose) # move_to_async | move_to_safe
+        # move_to_open_loop | move_to_safe_followed_by_openloop
+
+        #carter.simple_move(0.1) # simple_move | simple_stop
+        #rospy.sleep(2.0)
+        #carter.simple_stop()
+        #domain.get_robot().carter_interface = carter
         #domain.get_robot().unsuppress_fixed_bases()
 
     world = World(use_gui=True) # args.visualize)
@@ -265,10 +289,11 @@ def main():
         sim_manager = None
         additional_init, additional_goals = [], []
         task = Task(world,
-                    goal_holding=[SPAM],
-                    #goal_on={SPAM: TOP_DRAWER},
+                    objects=[SPAM, SUGAR], #, CHEEZIT],
+                    #goal_holding=[SPAM],
+                    goal_on={SPAM: TOP_DRAWER},
                     #goal_closed=[],
-                    #goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
+                    goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
                     #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                     movable_base=not args.fixed,
                     return_init_bq=True, return_init_aq=True)
@@ -299,9 +324,9 @@ def main():
     with LockRenderer(lock=True):
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
-        update_world(world, domain, observer, USE_OBJECTS)
-        localize_all(observer)
-        update_world(world, domain, observer, USE_OBJECTS)
+        update_world(world, domain, observer)
+        localize_all(task, observer)
+        update_world(world, domain, observer)
         #close_all_doors(world)
         if (sim_manager is not None) and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
@@ -326,6 +351,13 @@ def main():
 
     # franka_backend
     # roslaunch franka_controllers lula_control.launch
+
+    # 1) roslaunch franka_controllers lula_control.launch
+    # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+
+    # rosed franka_controllers set_parameters
+    # srl@vgilligan:~/srl_system/workspace/src/third_party/franka_controllers/scripts$ rosed franka_controllers set_parameters
+    # killall move_group franka_control_node local_controller
 
     success = planning_loop(domain, observer, world, args,
                             additional_init=additional_init,

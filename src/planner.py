@@ -15,7 +15,7 @@ from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
-from src.command import Wait, iterate_plan
+from src.command import Wait, iterate_plan, Trajectory
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
@@ -34,9 +34,9 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
         'compute-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
                                        p_success=0.5, eager=True),
         #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
-        #'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
-        #'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
-        #'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
+        'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
+        'sample-nearby-pose': StreamInfo(opt_gen_fn=PartialInputs(unique=False)),
+        'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
 
         'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-4),
 
@@ -119,6 +119,20 @@ def extract_plan_prefix(plan):
 
 DEFAULT_TIME_STEP = 0.02
 
+def combine_commands(commands):
+    combined_commands = []
+    for command in commands:
+        if not combined_commands:
+            combined_commands.append(command)
+            continue
+        prev_command = combined_commands[-1]
+        if isinstance(prev_command, Trajectory) and isinstance(command, Trajectory) and \
+                (prev_command.joints == command.joints):
+            prev_command.path = (prev_command.path + command.path)
+        else:
+            combined_commands.append(command)
+    return combined_commands
+
 def commands_from_plan(world, plan):
     if plan is None:
         return None
@@ -139,6 +153,7 @@ def commands_from_plan(world, plan):
         else:
             raise NotImplementedError(action)
     return commands
+    #return combine_commands(commands)
 
 ################################################################################
 

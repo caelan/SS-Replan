@@ -80,6 +80,10 @@ class World(object):
             self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                                 timeout=0.01, epsilon=1e-5, solve_type="Speed",
                                 urdf_string=read(urdf_path))
+            lower, upper = self.ik_solver.get_joint_limits()
+            buffer = 0.1*np.ones(len(self.ik_solver.joint_names))
+            buffer[-1] *= 2
+            self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
         else:
             self.ik_solver = None
         self.body_from_name = {}

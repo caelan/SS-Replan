@@ -1,9 +1,11 @@
 from src.execution import joint_state_control, open_gripper, close_gripper, moveit_control, \
-    follow_base_trajectory, move_gripper, time_parameterization
+    move_gripper_action, open_gripper_action, close_gripper_action
+from src.retime import spline_parameterization
+from src.base import follow_base_trajectory
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, wait_for_user, flatten_links, remove_handles, \
     get_max_limit, get_joint_limits, waypoints_from_path, link_from_name, batch_ray_collision, draw_ray
-from src.issac import update_robot, update_isaac_robot
+from src.issac import update_robot, update_isaac_robot, update_observer
 from src.utils import surface_from_name
 
 from isaac_bridge.manager import SimulationManager
@@ -14,8 +16,8 @@ import copy
 import math
 
 MOVEIT = True
-DEFAULT_SLEEP = 1.0
-FORCE = 100
+DEFAULT_SLEEP = 0.5
+FORCE = 50 # 20 | 50 | 100
 
 class State(object):
     # TODO: rename to be world state?
@@ -93,11 +95,12 @@ CARTER_X = 33.1
 CARTER_Y = 7.789
 
 class Trajectory(Command):
-    def __init__(self, world, robot, joints, path):
+    def __init__(self, world, robot, joints, path, speed=1.0):
         super(Trajectory, self).__init__(world)
         self.robot = robot
         self.joints = tuple(joints)
         self.path = tuple(path)
+        self.speed = speed
 
     @property
     def bodies(self):
@@ -153,13 +156,16 @@ class Trajectory(Command):
 
         if MOVEIT:
             if self.joints == self.world.gripper_joints:
+                position = self.path[-1][0]
+                #move_gripper_action(position)
                 joint = self.joints[0]
                 average = np.average(get_joint_limits(self.robot, joint))
-                position = self.path[-1][0]
                 if position < average:
-                    moveit.close_gripper(force=FORCE)
+                    close_gripper_action(moveit)
+                    #moveit.close_gripper(force=FORCE)
                 else:
-                    moveit.open_gripper()
+                    open_gripper_action(moveit)
+                    #moveit.open_gripper()
             else:
                 moveit_control(self.robot, self.joints, self.path, moveit, observer)
             time.sleep(DEFAULT_SLEEP)
@@ -169,6 +175,13 @@ class Trajectory(Command):
         time.sleep(DEFAULT_SLEEP)
         #return status
 
+        if self.joints == self.world.arm_joints:
+            #world_state = observer.current_state
+            world_state = update_observer(observer)
+            robot_entity = world_state.entities[domain.robot]
+            print('Error:', (np.array(robot_entity.q) - np.array(self.path[-1])).round(5))
+            update_robot(self.world, domain, observer)
+            #wait_for_user('Continue?')
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
 
@@ -203,11 +216,13 @@ class DoorTrajectory(Command):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
         if MOVEIT:
-            moveit.close_gripper() #force=FORCE)
+            close_gripper_action(moveit)
+            #moveit.close_gripper() #force=FORCE)
             time.sleep(DEFAULT_SLEEP)
             moveit_control(self.robot, self.robot_joints, self.robot_path, moveit, observer)
             time.sleep(DEFAULT_SLEEP)
-            moveit.open_gripper()
+            open_gripper_action(moveit)
+            #moveit.open_gripper()
             time.sleep(DEFAULT_SLEEP)
         else:
             close_gripper(self.robot, moveit)
@@ -250,8 +265,8 @@ class Attach(Command):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
-            move_gripper(moveit.gripper.closed_positions[0], effort=20)
-            moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
+            close_gripper_action(moveit)
+            #moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
         else:
             return close_gripper(self.robot, moveit)
 
@@ -291,8 +306,8 @@ class Detach(Command):
         if self.world.robot != self.robot:
             return
         if MOVEIT:
-            move_gripper(moveit.gripper.open_positions[0], effort=20)
-            moveit.open_gripper()
+            open_gripper_action(moveit)
+            #moveit.open_gripper()
         else:
             return open_gripper(self.robot, moveit)
 
