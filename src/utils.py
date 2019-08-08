@@ -125,6 +125,8 @@ SURFACE_FROM_NAME = {
 ALL_SURFACES = ZED_LEFT_SURFACES
 #ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
+TABLE_PATH = '/home/caelan/Documents/IKEA/OBJ/SM_TableB.obj'
+
 ################################################################################
 
 LEFT_CAMERA = 'zed_left'

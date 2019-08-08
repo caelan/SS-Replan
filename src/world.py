@@ -9,7 +9,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
-    step_simulation, apply_alpha, RED, \
+    step_simulation, apply_alpha, approximate_as_prism, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
@@ -19,7 +19,7 @@ from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH
+    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH, TABLE_PATH
 
 DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
@@ -34,9 +34,16 @@ DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476
 CABINET_OPEN_ANGLE = 4 * np.pi / 9 # out of np.pi / 2
 DRAWER_OPEN_FRACTION = 0.75
 
+#JOINT_LIMITS_BUFFER = 0.0
+JOINT_LIMITS_BUFFER = 0.1
+# TODO: make sure to regenerate databases upon adjusting
+
 Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
 
 ################################################################################
+
+TABLE_X = 1.16 # meters
+TABLE_Y = 3.53 # meters
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
@@ -45,6 +52,16 @@ class World(object):
         add_data_path()
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
         draw_pose(Pose(point=Point(z=1e-2)), length=3)
+
+        # TODO: table is not convex
+        #self.table = load_pybullet(TABLE_PATH, fixed_base=True)
+        #_, (w, l, _) = approximate_as_prism(self.table)
+        #z = stable_z(self.table, self.floor)
+        #table_pose = Pose(Point(TABLE_X + w/2, -TABLE_Y, z), Euler(yaw=np.pi/2))
+        #set_pose(self.table, table_pose)
+        # From kitchen world coordinates (chewie bottom right)
+        # +x distance to computer tables: 240cm
+        # table distance +x: 116cm, -y: 353cm (rotated 90 degrees)
 
         self.robot_name = robot_name
         if self.robot_name == FRANKA_CARTER:
@@ -81,7 +98,7 @@ class World(object):
                                 timeout=0.01, epsilon=1e-5, solve_type="Speed",
                                 urdf_string=read(urdf_path))
             lower, upper = self.ik_solver.get_joint_limits()
-            buffer = 0.1*np.ones(len(self.ik_solver.joint_names))
+            buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
             buffer[-1] *= 2
             self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
         else:

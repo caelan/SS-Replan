@@ -268,6 +268,15 @@ def main():
         #domain.get_robot().carter_interface = carter
         #domain.get_robot().unsuppress_fixed_bases()
 
+        # /sim/tf to get all objects
+        # https://gitlab-master.nvidia.com/srl/srl_system/blob/722d127a016c9105ec68a33902a73480c36b31ac/packages/isaac_bridge/scripts/sim_tf_relay.py
+        # sim_tf_relay.py
+
+        # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false world:=franka_leftright_kitchen_ycb_world.yaml
+        # https://gitlab-master.nvidia.com/srl/srl_system/blob/fb94253c60b1bd1308a37c1aeb9dc4a4c453c512/packages/isaac_bridge/launch/sim_franka.launch
+        # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.sim.yaml
+        # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.yaml
+
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
@@ -370,6 +379,9 @@ def main():
     world.destroy()
     # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
     # roslaunch panda_moveit_config start_moveit.launch
+
+    # /tracker/axe/joint_states
+    # /tracker/baker/joint_states
 
 if __name__ == '__main__':
     #main()

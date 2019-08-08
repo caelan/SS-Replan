@@ -210,6 +210,7 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES, # TODO: relative i
                 #user_input('Continue?')
         if not valid_samples:
             return
+        # TODO: open the door to the full extend to see if visible
         if mlo:
             rp = max(valid_samples, key=valid_samples.__getitem__)
             yield (rp,)
@@ -363,6 +364,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
             bq.assign()
             for conf in world.special_confs:
                 # TODO: ensure the end-effector is visible at the calibrate_conf
+                # Could even sample a special visible conf for this base_conf
                 conf.assign()
                 if any(pairwise_collision(world.robot, b, max_distance=min_distance) for b in obstacles):
                     break
