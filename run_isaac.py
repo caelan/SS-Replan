@@ -230,7 +230,11 @@ def main():
     use_lula = args.lula # args.execute or args.lula
     args.watch |= args.execute
 
-    # assets/maps/seattle_map_res02_181214.config.json
+    # srl_system/packages/isaac_bridge/configs/ycb_table_config.json
+    # srl_system/packages/isaac_bridge/configs/ycb_table_graph.json
+    # srl_system/packages/isaac_bridge/configs/panda_full_config.json
+    # srl_system/packages/isaac_bridge/configs/panda_full_graph.json
+    # alice/assets/maps/seattle_map_res02_181214.config.json
 
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/brain/src/brain_ros/lula_policies.py#L464
     rospy.init_node("STRIPStream")

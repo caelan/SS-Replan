@@ -107,25 +107,24 @@ def run_stochastic(task, args):
         print('Belief:', belief)
         belief.draw()
         #wait_for_user('Plan?')
-        problem = pdddlstream_from_problem(belief, additional_init=previous_facts, fixed_base=True,
+        problem = pdddlstream_from_problem(belief, fixed_base=True, additional_init=previous_facts,
                                            collisions=not args.cfree, teleport=args.teleport)
         print_separator(n=25)
-        plan = None
+        plan, cost = None, INF
         if previous_skeleton is not None:
             print('Skeleton:', previous_skeleton)
             print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
             # The search my get stuck otherwise
             plan, cost, certificate = solve_pddlstream(
-                problem, args, max_time=15, skeleton=previous_skeleton)
+                problem, args, max_time=30, skeleton=previous_skeleton)
             if plan is None:
                 wait_for_user('Failed to adhere to plan')
 
         # TODO: store history of stream evaluations
         if plan is None:
-            # TODO: could reusing the same problem be troublesome?
-            # TODO: could require that this run be done without fixed base
+            problem = pdddlstream_from_problem(belief, fixed_base=False, additional_init=previous_facts,
+                                               collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
-            cost = INF # Attempt to find a cheaper plan
             plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time, max_cost=cost)
         if plan is None:
             print('Failure')

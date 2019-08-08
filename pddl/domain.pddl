@@ -94,6 +94,7 @@
   )
 
   ; TODO: prevent the robot from moving to the same spot?
+  ; TODO: force the search to select new base poses after one manipulation is performed
   (:action move_base
     ;:parameters (?bq1 ?bq2 ?aq ?bt)
     ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
@@ -209,7 +210,7 @@
                        (Detect ?o1 ?p2 ?r) (DistSample ?rp1 ?rp2)
                        (AtWorldPose ?o1 ?p1) ; (AtRelPose ?o1 ?rp1 ?o0) ; (AtWorldPose ?o0 ?p0)
                        (Accessible ?o0 ?p0)
-                       (not (UnsafeRelPose ?o1 ?rp2 ?o0))
+                       ; (not (UnsafeRelPose ?o1 ?rp2 ?o0))
                        (not (OccludedRay ?r))
                   )
     :effect (and (Localized ?o1) (On ?o1 ?o0)
