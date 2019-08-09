@@ -44,6 +44,7 @@ Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
 ################################################################################
 
 # table distance +x: 116cm, -y: 353cm (rotated 90 degrees)
+TABLE_NAME = 'table'
 TABLE_X = 1.16 # meters
 TABLE_Y = 3.53 # meters
 
@@ -120,6 +121,13 @@ class World(object):
             set_pose(body, root_from_part)
         # TODO: release bounding box or convex hull
         # TODO: static object nonconvex collisions
+
+        if TABLE_NAME in self.environment_bodies:
+            body = self.environment_bodies[TABLE_NAME]
+            _, (w, l, _) = approximate_as_prism(body)
+            _, _, z = get_point(body)
+            new_pose = Pose(Point(TABLE_X + l/2, -TABLE_Y, z), Euler(yaw=np.pi/2))
+            set_pose(body, new_pose)
 
         if USE_TRACK_IK:
             from trac_ik_python.trac_ik import IK # killall -9 rosmaster
@@ -215,13 +223,16 @@ class World(object):
         # TODO: decompose obstacles
         #return [(self.kitchen, frozenset(get_links(self.kitchen)) - self.door_links)]
         return {(self.kitchen, frozenset([link])) for link in
-                set(get_links(self.kitchen)) - self.door_links}
+                set(get_links(self.kitchen)) - self.door_links} | \
+               {(body, None) for body in self.environment_bodies.values()}
     @property
     def movable(self):
         return set(self.body_from_name) # frozenset?
     @property
     def all_bodies(self):
-        return set(self.body_from_name.values()) | {self.robot, self.kitchen}
+        return set(self.environment_bodies.values()) | \
+               set(self.body_from_name.values()) | \
+               {self.robot, self.kitchen}
     @property
     def default_conf(self):
         if self.robot_name == EVE:
@@ -255,6 +266,7 @@ class World(object):
         #min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
         full_lower, full_upper = self.get_world_aabb()
         base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
+        base_limits[1][0] = COMPUTER_X - min_extent # TODO: robot radius
         for handle in self.base_limits_handles:
             remove_debug(handle)
         z = get_point(self.floor)[2] + 1e-2
