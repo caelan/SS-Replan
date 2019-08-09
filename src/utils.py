@@ -94,8 +94,8 @@ YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_convex.urdf')
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
 
-STOVES = ['range']
-COUNTERS = ['hitman_tmp', 'indigo_tmp'] # + ['range']
+STOVES = [] # ['range']
+COUNTERS = ['indigo_tmp'] # + ['hitman_tmp'] + ['range']
 OPEN_SURFACES = COUNTERS + STOVES
 
 SURFACE_BOTTOM = 'bottom'
@@ -111,7 +111,7 @@ DRAWERS = [
 ]
 
 ZED_LEFT_SURFACES = [
-    'indigo_tmp', 'range',
+    'indigo_tmp', # 'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
@@ -138,7 +138,8 @@ SURFACE_FROM_NAME = {
 ALL_SURFACES = ZED_LEFT_SURFACES
 #ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
-TABLE_PATH = '/home/caelan/Documents/IKEA/OBJ/SM_TableB.obj'
+#IKEA_PATH = '/home/caelan/Documents/IKEA/OBJ/'
+IKEA_PATH = os.path.join(MODELS_PATH, 'kitchen')
 
 ################################################################################
 

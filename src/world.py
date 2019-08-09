@@ -9,17 +9,18 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
-    step_simulation, apply_alpha, approximate_as_prism, RED, \
+    step_simulation, apply_alpha, approximate_as_prism, BASE_LINK, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
-    set_quat, quat_from_euler, INF, get_difference
+    set_quat, quat_from_euler, INF, get_difference, wait_for_user, read_json
 from src.issac import load_calibrate_conf
 from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH, TABLE_PATH
+    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH, IKEA_PATH
+from log_poses import POSES_PATH
 
 DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
@@ -42,8 +43,12 @@ Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
 
 ################################################################################
 
+# table distance +x: 116cm, -y: 353cm (rotated 90 degrees)
 TABLE_X = 1.16 # meters
 TABLE_Y = 3.53 # meters
+
+# +x distance to computer tables: 240cm
+COMPUTER_X = 2.40
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
@@ -54,14 +59,13 @@ class World(object):
         draw_pose(Pose(point=Point(z=1e-2)), length=3)
 
         # TODO: table is not convex
-        #self.table = load_pybullet(TABLE_PATH, fixed_base=True)
+        #collision_path = os.collision_path.join(IDEA_PATH, 'fridge.obj')
+        #self.table = load_pybullet(collision_path, fixed_base=True)
         #_, (w, l, _) = approximate_as_prism(self.table)
         #z = stable_z(self.table, self.floor)
         #table_pose = Pose(Point(TABLE_X + w/2, -TABLE_Y, z), Euler(yaw=np.pi/2))
         #set_pose(self.table, table_pose)
         # From kitchen world coordinates (chewie bottom right)
-        # +x distance to computer tables: 240cm
-        # table distance +x: 116cm, -y: 353cm (rotated 90 degrees)
 
         self.robot_name = robot_name
         if self.robot_name == FRANKA_CARTER:
@@ -86,6 +90,36 @@ class World(object):
         with HideOutput(enable=True):
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
         set_point(self.kitchen, Point(z=stable_z(self.kitchen, self.floor)))
+        #draw_pose(get_link_pose(self.kitchen, self.kitchen_link))
+
+        # wall to fridge: 4cm
+        # fridge to goal: 1.5cm
+        # hitman to range: 3.5cm
+        # range to indigo: 3.5cm
+        self.environment_bodies = {}
+        self.environment_poses = read_json(POSES_PATH)
+        root_from_world = get_link_pose(self.kitchen, self.world_link)
+        for name, world_from_part in self.environment_poses.items():
+            visual_path = os.path.join(IKEA_PATH, '{}.obj'.format(name))
+            collision_path = os.path.join(IKEA_PATH, '{}_collision.obj'.format(name))
+            mesh_path = None
+            for path in [collision_path, visual_path]:
+                if os.path.exists(path):
+                    mesh_path = path
+                    break
+            if mesh_path is None:
+                continue
+            body = load_pybullet(mesh_path, fixed_base=True)
+            root_from_part = multiply(root_from_world, world_from_part)
+            if name in ['axe', 'dishwasher', 'echo', 'fox', 'golf']:
+                (pos, quat) = root_from_part
+                # TODO: still not totally aligned
+                pos = np.array(pos) + np.array([0, -0.035, 0]) #, -0.005])
+                root_from_part = (pos, quat)
+            self.environment_bodies[name] = body
+            set_pose(body, root_from_part)
+        # TODO: release bounding box or convex hull
+        # TODO: static object nonconvex collisions
 
         if USE_TRACK_IK:
             from trac_ik_python.trac_ik import IK # killall -9 rosmaster
@@ -166,6 +200,9 @@ class World(object):
     @property
     def tool_link(self):
         return link_from_name(self.robot, get_tool_link(self.robot))
+    @property
+    def world_link(self): # for kitchen
+        return BASE_LINK
     @property
     def door_links(self):
         door_links = set()

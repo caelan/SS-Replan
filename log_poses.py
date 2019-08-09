@@ -2,15 +2,24 @@
 
 from __future__ import print_function
 
-import copy
 import rospy
 import tf.transformations as tra
 import numpy as np
 import json
+import os
+import sys
+import tf
+
+sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
+                for d in ['pddlstream', 'ss-pybullet'])
+
+from pybullet_tools.utils import write_json, tform_from_pose
+from src.issac import UNREAL_WORLD_FRAME, ISSAC_WORLD_FRAME, lookup_pose
 
 from isaac_bridge.manager import corrections
 from tf2_msgs.msg import TFMessage
 
+POSES_PATH = 'kitchen_poses.json'
 
 class TFRepublisher:
     objs = [
@@ -25,14 +34,18 @@ class TFRepublisher:
 
     def __init__(self):
         self.sub = rospy.Subscriber("/sim/tf", TFMessage, self.tf_callback)
-        self.transforms = None
+        self.tf_listener = tf.TransformListener()
+        self.transforms = {}
+        self.updated = False
 
     def tf_callback(self, msg):
         self.sub.unregister()
-        self.transforms = {}
+
+        world_from_unreal = tform_from_pose(lookup_pose(self.tf_listener, UNREAL_WORLD_FRAME))
         for t in msg.transforms:
-            if t.header.frame_id != "world": # ue_world
+            if t.header.frame_id != ISSAC_WORLD_FRAME:
                 continue
+            t.header.frame_id = UNREAL_WORLD_FRAME
             # https://gitlab-master.nvidia.com/srl/srl_system/blob/fb94253c60b1bd1308a37c1aeb9dc4a4c453c512/packages/isaac_bridge/src/isaac_bridge/manager.py#L26
             frame = t.child_frame_id # TODO: prune frame suffix
             if any(obj in frame for obj in self.objs):
@@ -49,23 +62,24 @@ class TFRepublisher:
                 t.transform.translation.y,
                 t.transform.translation.z,
             ]
-            correction = corrections.get(frame, np.eye(4))
+            #correction = corrections.get(frame, np.eye(4)) # Causes the table to float?
+            correction = np.eye(4)
             corrected_pose = obj_pose.dot(correction)
+            world_pose = world_from_unreal.dot(corrected_pose)
 
             # convert back to message
-            rot = tra.quaternion_from_matrix(corrected_pose)
-            trans = tra.translation_from_matrix(corrected_pose)
-
-            self.transforms[frame] = (list(rot), list(trans))
+            trans = tra.translation_from_matrix(world_pose)
+            rot = tra.quaternion_from_matrix(world_pose)
+            self.transforms[frame] = (list(trans), list(rot))
+        self.updated = True
 
     def spin(self, rate=120):
         rate = rospy.Rate(rate)
-        while (self.transforms is None) and not rospy.is_shutdown():
+        while not self.updated and not rospy.is_shutdown():
             rate.sleep()
-        path = 'kitchen_poses.json'
-        with open(path, 'w') as f:
-            json.dump(self.transforms, f, indent=2, sort_keys=True)
-        print('Saved', path)
+        print(sorted(self.transforms))
+        write_json(POSES_PATH, self.transforms)
+        print('Saved', POSES_PATH)
 
 if __name__ == "__main__":
     rospy.init_node('log_poses')
