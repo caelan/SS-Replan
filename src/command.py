@@ -9,7 +9,7 @@ from pybullet_tools.utils import get_moving_links, set_joint_positions, create_a
     get_joint_limits, batch_ray_collision, draw_ray
 from src.base import follow_base_trajectory
 from src.execution import moveit_control, \
-    open_gripper_action, close_gripper_action
+    franka_open_gripper, franka_close_gripper, franka_control
 from src.issac import update_robot, update_isaac_robot, update_observer
 
 DEFAULT_SLEEP = 0.5
@@ -68,7 +68,7 @@ class Command(object):
     def iterate(self, state):
         raise NotImplementedError()
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         raise NotImplementedError()
 
 class Sequence(object):
@@ -112,19 +112,18 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
 
-    def execute_base(self, domain, moveit, observer):
+    def execute_base(self, interface):
         assert self.joints == self.world.base_joints
         # assert not moveit.use_lula
-        robot_entity = domain.get_robot()  # TODO: actor
-        # robot_entity = world_state.entities[domain.robot]
-        carter = robot_entity.carter_interface
+        domain = interface.domain
+        carter = domain.carter
         if carter is None:
-            follow_base_trajectory(self.world, self.path, moveit, observer)
+            follow_base_trajectory(self.world, self.path, interface.moveit, interface.observer)
         elif isinstance(carter, SimulationManager):
             sim_manager = carter
             sim_manager.pause()  # TODO: context manager
             set_joint_positions(self.robot, self.joints, self.path[-1])
-            update_isaac_robot(observer, sim_manager, self.world)
+            update_isaac_robot(interface.observer, sim_manager, self.world)
             time.sleep(DEFAULT_SLEEP)
             sim_manager.pause()
             # TODO: teleport attached
@@ -148,37 +147,36 @@ class Trajectory(Command):
             world_state[domain.robot].unsuppress_fixed_bases()
             # carter.pub_disable_deadman_switch.publish(True)
 
-    def execute_gripper(self, moveit):
+    def execute_gripper(self, interface):
         assert self.joints == self.world.gripper_joints
         position = self.path[-1][0]
         # move_gripper_action(position)
         joint = self.joints[0]
         average = np.average(get_joint_limits(self.robot, joint))
         if position < average:
-            close_gripper_action(moveit)
-            # moveit.close_gripper(force=FORCE)
+            franka_close_gripper(interface)
         else:
-            open_gripper_action(moveit)
-            # moveit.open_gripper()
+            franka_open_gripper(interface)
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         # TODO: ensure the same joint name order
+        observer = interface.observer
         if self.joints == self.world.base_joints:
-            self.execute_base(domain, moveit, observer)
+            self.execute_base(interface)
         elif self.joints == self.world.gripper_joints:
-            self.execute_gripper(moveit)
+            self.execute_gripper(interface)
         else:
-            moveit_control(self.robot, self.joints, self.path, moveit, observer)
+            franka_control(self.robot, self.joints, self.path, interface)
         #status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         time.sleep(DEFAULT_SLEEP)
         #return status
 
         if self.joints == self.world.arm_joints:
             #world_state = observer.current_state
-            world_state = update_observer(observer)
-            robot_entity = world_state.entities[domain.robot]
+            world_state = interface.update_state()
+            robot_entity = world_state[interface.domain.robot]
             print('Error:', (np.array(robot_entity.q) - np.array(self.path[-1])).round(5))
-            update_robot(self.world, domain, observer)
+            update_robot(self.world, interface.domain, observer)
             #wait_for_user('Continue?')
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
@@ -218,16 +216,16 @@ class DoorTrajectory(Command):
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
-        close_gripper_action(moveit)
-        #moveit.close_gripper() #force=FORCE)
+        franka_close_gripper(interface)
         time.sleep(DEFAULT_SLEEP)
-        moveit_control(self.robot, self.robot_joints, self.robot_path, moveit, observer)
+
+        franka_control(self.robot, self.joints, self.path, interface)
         time.sleep(DEFAULT_SLEEP)
-        open_gripper_action(moveit)
-        #moveit.open_gripper()
+
+        franka_open_gripper(interface)
         time.sleep(DEFAULT_SLEEP)
 
         #close_gripper(self.robot, moveit)
@@ -266,11 +264,10 @@ class Attach(Command):
         state.attachments[self.body] = self.attach()
         yield
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         if self.world.robot != self.robot:
             return
-        close_gripper_action(moveit)
-        #moveit.close_gripper(force=FORCE, sleep=0., speed=0.03, wait=True)
+        franka_close_gripper(interface)
         #return close_gripper(self.robot, moveit)
 
     def __repr__(self):
@@ -305,11 +302,10 @@ class Detach(Command):
         del state.attachments[self.body]
         yield
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         if self.world.robot != self.robot:
             return
-        open_gripper_action(moveit)
-        #moveit.open_gripper()
+        franka_open_gripper(interface)
         #return open_gripper(self.robot, moveit)
 
     def __repr__(self):
@@ -352,7 +348,7 @@ class Detect(Command):
             yield
         remove_handles(handles)
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         pass
 
     def __repr__(self):
@@ -375,7 +371,7 @@ class Wait(Command):
         for _ in range(self.steps):
             yield
 
-    def execute(self, domain, moveit, observer, state):
+    def execute(self, interface):
         pass
 
     def __repr__(self):
@@ -386,7 +382,7 @@ class Wait(Command):
 ################################################################################s
 
 def iterate_commands(state, commands, time_step=None):
-    if commands is None:
+    if not commands:
         return
     for i, command in enumerate(commands):
         print('\nCommand {:2}: {}'.format(i, command))
@@ -402,5 +398,8 @@ def iterate_commands(state, commands, time_step=None):
             else:
                 wait_for_duration(time_step)
 
-def execute_commands():
-    pass
+def execute_commands(intereface, commands):
+    if not commands:
+        return
+    for command in commands:
+        command.execute(intereface)

@@ -52,7 +52,7 @@ def slow_trajectory(robot, joints, path, speed=ARM_SPEED):
 
 ################################################################################
 
-def spline_parameterization(robot, joints, path, speed=ARM_SPEED):
+def spline_parameterization(robot, joints, path, **kwargs):
     # TODO: could interpolate each DOF independently
     # Univariate interpolation just means that the input is one dimensional (aka time)
     # The output can be arbitrary dimension
@@ -69,7 +69,7 @@ def spline_parameterization(robot, joints, path, speed=ARM_SPEED):
     # BPoly.from_derivatives
     # PPoly.from_spline # PPoly.from_bernstein_basis
     path = list(path)
-    time_from_starts = slow_trajectory(robot, joints, path, speed=speed)
+    time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
     for i in reversed(range(1, len(path))):
         if time_from_starts[i-1] == time_from_starts[i]:
             path.pop(i)

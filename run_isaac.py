@@ -9,8 +9,6 @@ import traceback
 import numpy as np
 import math
 
-from src.interface import Interface
-
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
@@ -23,10 +21,12 @@ from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, set_camera_pose, wait_for_user, unit_from_theta
 
+from src.interface import Interface
+from src.command import execute_commands
 from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS
 from src.observation import create_observable_belief
 from src.visualization import add_markers
-from src.issac import update_world, kill_lula, update_isaac_sim
+from src.issac import update_world, kill_lula, update_isaac_sim, dump_dict
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
@@ -79,9 +79,7 @@ def planning_loop(interface):
             return True
 
         #wait_for_user()
-        for command in commands:
-            command.execute(domain, interface.moveit, interface.observer, state)
-
+        execute_commands(interface, commands)
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
         interface.localize_all()
@@ -158,6 +156,7 @@ def main():
     robot_entity.suppress_fixed_bases() # Not as much error?
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
+    #print(dump_dict(robot_entity))
 
     world = World(use_gui=True) # args.visualize)
     set_camera_pose(camera_point=[2, 0, 2])

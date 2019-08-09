@@ -1,5 +1,6 @@
 import rospy
 
+from src.issac import update_observer
 
 class Interface(object):
     def __init__(self, args, task, observer, trial_manager=None):
@@ -17,7 +18,8 @@ class Interface(object):
     def domain(self):
         return self.observer.domain
     @property
-    def robot_entity(self):
+    def robot_entity(self): # TODO: actor
+        #return self.domain.root.entities[domain.robot]
         return self.domain.get_robot()
     @property
     def moveit(self):
@@ -30,6 +32,8 @@ class Interface(object):
         if self.trial_manager is None:
             return None
         return self.trial_manager.sim
+    def update_state(self):
+        return update_observer(self.observer)
     def localize_all(self):
         if self.simulation:
             return
