@@ -68,6 +68,13 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #wait_for_user('Continue?')
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
+    #goal.goal_time_tolerance =
+    for joint in trajectory.joint_names:
+        #goal.path_tolerance.name = joint
+        #goal.path_tolerance.position = 1e-2 # position | velocity | acceleration
+        goal.goal_tolerance.name = joint
+        goal.goal_tolerance.position = 1e-3 # position | velocity | acceleration
+
     start_time = time.time()
     client.send_goal_and_wait(goal)  # send_goal_and_wait
     # client.get_result()

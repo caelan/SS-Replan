@@ -1,5 +1,6 @@
 from pddlstream.language.constants import Not
 from src.task import Task
+from src.problem import door_closed_formula, door_open_formula
 
 TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
@@ -24,30 +25,33 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
         if predicate == 'on_counter':
             obj, = args
             surface = 'indigo_tmp'
-            atom = ('On', obj, surface)
+            formula = ('On', obj, surface)
         elif predicate == 'is_free':
-            atom = ('HandEmpty',)
+            formula = ('HandEmpty',)
         elif predicate == 'gripper_closed':
             assert value is False
             value = True
-            atom = ('AtGConf', world.open_gq)
+            formula = ('AtGConf', world.open_gq)
         elif predicate == 'cabinet_is_open':
             cabinet, = args
             joint_name = '{}_joint'.format(cabinet)
-            atom = ('DoorStatus', joint_name, 'open')
+            #formula = ('DoorStatus', joint_name, 'open')
+            formula = door_open_formula(joint_name)
         elif predicate == 'cabinet_is_closed':
             cabinet, = args
             joint_name = '{}_joint'.format(cabinet)
-            atom = ('DoorStatus', joint_name, 'closed')
+            #formula = ('DoorStatus', joint_name, 'closed')
+            formula = door_closed_formula(joint_name)
         elif predicate == 'in_drawer':
             obj, surface = args
             # TODO: ensure that it actually is a surface?
             init.append(('Stackable', obj, surface))
-            atom = ('On', obj, surface)
+            formula = ('On', obj, surface)
         else:
             raise NotImplementedError(predicate)
-        goal_literals.append(atom if value else Not(atom))
-    task = Task(world, movable_base=not fixed, init=init, goal=goal_literals, **kwargs)
+        goal_literals.append(formula if value else Not(formula))
+    task = Task(world, movable_base=not fixed, init=init, goal=goal_literals,
+                return_init_bq=False, return_init_aq=False, **kwargs)
     return task
 
 ################################################################################

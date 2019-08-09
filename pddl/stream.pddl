@@ -109,7 +109,6 @@
   ;                  (CalibrateMotion ?bq @rest_aq ?at))
   ;)
 
-
   (:stream sample-belief
     :inputs (?o1 ?rp1 ?o2)
     :domain (and (RelPose ?o1 ?rp1 ?o2) (Dist ?rp1))

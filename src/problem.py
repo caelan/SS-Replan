@@ -100,6 +100,16 @@ def get_streams(world, debug=False, **kwargs):
     }
     return stream_pddl, stream_map
 
+def door_status_formula(joint_name, status):
+    return Exists(['?a'], And(('AngleWithin', joint_name, '?a', status),
+                              ('AtAngle', joint_name, '?a')))
+
+def door_closed_formula(joint_name):
+    return door_status_formula(joint_name, CLOSED)
+
+def door_open_formula(joint_name):
+    return door_status_formula(joint_name, OPEN)
+
 def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwargs):
     world = belief.world # One world per state
     task = world.task # One task per world
@@ -181,12 +191,9 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                      [('On', name, surface) for name, surface in task.goal_on.items()] + \
                      [('Cooked', name) for name in task.goal_cooked] + \
                      [('Localized', name) for name in task.goal_detected] + \
-                     [Exists(['?a'], And(('AngleWithin', joint_name, '?a', CLOSED),
-                                         ('AtAngle', joint_name, '?a')))
-                      for joint_name in task.goal_closed] + \
-                     [Exists(['?a'], And(('AngleWithin', joint_name, '?a', OPEN),
-                                         ('AtAngle', joint_name, '?a')))
-                      for joint_name in task.goal_open] + list(task.goal)
+                     [door_closed_formula(joint_name) for joint_name in task.goal_closed] + \
+                     [door_open_formula(joint_name) for joint_name in task.goal_open] + \
+                     list(task.goal)
 
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
