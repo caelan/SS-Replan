@@ -150,7 +150,6 @@ def update_robot(world, domain, observer):
     #print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
     #print()
 
-
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
@@ -263,9 +262,9 @@ def update_world(world, domain, observer):
         elif isinstance(entity, Drawer):
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
-            world_from_entity = get_world_from_model(observer, entity, world.kitchen)
-            with LockRenderer():
-                set_pose(world.kitchen, world_from_entity)
+            #world_from_entity = get_world_from_model(observer, entity, world.kitchen)
+            #with LockRenderer():
+            #    set_pose(world.kitchen, world_from_entity)
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):

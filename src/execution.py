@@ -60,7 +60,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #    rospy.set_param(param, error_threshold)
     #    #print(name, rospy.get_param(param))
 
-    trajectory = linear_parameterization(robot, joints, path, speed=0.05*np.pi)
+    trajectory = spline_parameterization(robot, joints, path, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
@@ -106,7 +106,7 @@ def moveit_control(robot, joints, path, interface, **kwargs):
     moveit = interface.moveit
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used
-    trajectory = spline_parameterization(robot, joints, path, **kwargs)
+    trajectory = linear_parameterization(robot, joints, path, speed=0.025*np.pi)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     plan = RobotTrajectory(joint_trajectory=trajectory)

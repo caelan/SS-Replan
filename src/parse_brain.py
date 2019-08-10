@@ -51,7 +51,7 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
             raise NotImplementedError(predicate)
         goal_literals.append(formula if value else Not(formula))
     task = Task(world, movable_base=not fixed, init=init, goal=goal_literals,
-                return_init_bq=False, return_init_aq=False, **kwargs)
+                return_init_bq=True, return_init_aq=True, **kwargs)
     return task
 
 ################################################################################
