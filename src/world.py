@@ -44,6 +44,7 @@ Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
 ################################################################################
 
 # table distance +x: 116cm, -y: 353cm (rotated 90 degrees)
+# From kitchen world coordinates (chewie bottom right)
 TABLE_NAME = 'table'
 TABLE_X = 1.16 # meters
 TABLE_Y = 3.53 # meters
@@ -56,17 +57,16 @@ class World(object):
         self.task = None
         self.client = connect(use_gui=use_gui)
         add_data_path()
-        self.floor = load_pybullet('plane.urdf', fixed_base=True)
-        draw_pose(Pose(point=Point(z=1e-2)), length=3)
+        draw_pose(Pose(), length=3)
 
-        # TODO: table is not convex
-        #collision_path = os.collision_path.join(IDEA_PATH, 'fridge.obj')
-        #self.table = load_pybullet(collision_path, fixed_base=True)
-        #_, (w, l, _) = approximate_as_prism(self.table)
-        #z = stable_z(self.table, self.floor)
-        #table_pose = Pose(Point(TABLE_X + w/2, -TABLE_Y, z), Euler(yaw=np.pi/2))
-        #set_pose(self.table, table_pose)
-        # From kitchen world coordinates (chewie bottom right)
+        self.kitchen_yaml = load_yaml(KITCHEN_YAML)
+        with HideOutput(enable=True):
+            self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
+
+        self.floor = load_pybullet('plane.urdf', fixed_base=True)
+        z = stable_z(self.kitchen, self.floor) - get_point(self.floor)[2]
+        point = np.array(get_point(self.kitchen)) - np.array([0, 0, z])
+        set_point(self.floor, point)
 
         self.robot_name = robot_name
         if self.robot_name == FRANKA_CARTER:
@@ -82,17 +82,36 @@ class World(object):
         #chassis_pose = get_link_pose(self.robot, link_from_name(self.robot, 'chassis_link'))
         #wheel_pose = get_link_pose(self.robot, link_from_name(self.robot, 'left_wheel_link'))
         #wait_for_user()
-
         set_point(self.robot, Point(z=stable_z(self.robot, self.floor)))
         self.set_initial_conf()
         self.gripper = create_gripper(self.robot)
 
-        self.kitchen_yaml = load_yaml(KITCHEN_YAML)
-        with HideOutput(enable=True):
-            self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
-        set_point(self.kitchen, Point(z=stable_z(self.kitchen, self.floor)))
-        #draw_pose(get_link_pose(self.kitchen, self.kitchen_link))
+        self.initialize_environment()
+        self.ik_solver = None
+        self.initialize_ik(urdf_path)
 
+        self.body_from_name = {}
+        self.path_from_name = {}
+        self.custom_limits = {}
+        self.base_limits_handles = []
+        self.cameras = {}
+
+        self.disabled_collisions = set()
+        if self.robot_name == FRANKA_CARTER:
+            self.disabled_collisions.update(tuple(link_from_name(self.robot, link) for link in pair)
+                                            for pair in DISABLED_FRANKA_COLLISIONS)
+
+        self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
+        #self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
+        self.calibrate_conf = Conf(self.robot, self.arm_joints, self.default_conf) # Must differ from carry_conf
+        self.special_confs = [self.carry_conf, self.calibrate_conf]
+        self.open_gq = Conf(self.robot, self.gripper_joints,
+                            get_max_limits(self.robot, self.gripper_joints))
+        self.closed_gq = Conf(self.robot, self.gripper_joints,
+                              get_min_limits(self.robot, self.gripper_joints))
+        self.update_custom_limits()
+        self.update_initial()
+    def initialize_environment(self):
         # wall to fridge: 4cm
         # fridge to goal: 1.5cm
         # hitman to range: 3.5cm
@@ -115,7 +134,7 @@ class World(object):
             if name in ['axe', 'dishwasher', 'echo', 'fox', 'golf']:
                 (pos, quat) = root_from_part
                 # TODO: still not totally aligned
-                pos = np.array(pos) + np.array([0, -0.035, 0]) #, -0.005])
+                pos = np.array(pos) + np.array([0, -0.035, 0])  # , -0.005])
                 root_from_part = (pos, quat)
             self.environment_bodies[name] = body
             set_pose(body, root_from_part)
@@ -126,49 +145,26 @@ class World(object):
             body = self.environment_bodies[TABLE_NAME]
             _, (w, l, _) = approximate_as_prism(body)
             _, _, z = get_point(body)
-            new_pose = Pose(Point(TABLE_X + l/2, -TABLE_Y, z), Euler(yaw=np.pi/2))
+            new_pose = Pose(Point(TABLE_X + l / 2, -TABLE_Y, z), Euler(yaw=np.pi / 2))
             set_pose(body, new_pose)
-
-        if USE_TRACK_IK:
-            from trac_ik_python.trac_ik import IK # killall -9 rosmaster
-            base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
-            tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
-            # limit effort and velocities are required
-            # solve_type: Speed, Distance, Manipulation1, Manipulation2
-            # TODO: fast solver and slow solver
-            self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
-                                timeout=0.01, epsilon=1e-5, solve_type="Speed",
-                                urdf_string=read(urdf_path))
-            lower, upper = self.ik_solver.get_joint_limits()
-            buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
-            buffer[-1] *= 2
-            self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
-        else:
-            self.ik_solver = None
-        self.body_from_name = {}
-        self.path_from_name = {}
-        self.custom_limits = {}
-        self.base_limits_handles = []
-        self.cameras = {}
-
-        self.disabled_collisions = set()
-        if self.robot_name == FRANKA_CARTER:
-            self.disabled_collisions.update(tuple(link_from_name(self.robot, link) for link in pair)
-                                            for pair in DISABLED_FRANKA_COLLISIONS)
-
-        self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
-        #self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
-        self.calibrate_conf = Conf(self.robot, self.arm_joints, self.default_conf) # Must differ from carry_conf
-        self.special_confs = [self.carry_conf, self.calibrate_conf]
-        self.open_gq = Conf(self.robot, self.gripper_joints,
-                            get_max_limits(self.robot, self.gripper_joints))
-        self.closed_gq = Conf(self.robot, self.gripper_joints,
-                              get_min_limits(self.robot, self.gripper_joints))
-        self.update_initial()
+    def initialize_ik(self, urdf_path):
+        if not USE_TRACK_IK or (self.ik_solver is not None):
+            return
+        from trac_ik_python.trac_ik import IK # killall -9 rosmaster
+        base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
+        tip_link = get_link_name(self.robot, child_link_from_joint(self.arm_joints[-1]))
+        # limit effort and velocities are required
+        # solve_type: Speed, Distance, Manipulation1, Manipulation2
+        # TODO: fast solver and slow solver
+        self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
+                            timeout=0.01, epsilon=1e-5, solve_type="Speed",
+                            urdf_string=read(urdf_path))
+        lower, upper = self.ik_solver.get_joint_limits()
+        buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
+        buffer[-1] *= 2
+        self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
     def update_initial(self):
         # TODO: store initial poses as well?
-        self.update_floor()
-        self.update_custom_limits()
         self.initial_saver = WorldSaver()
     def get_initial_state(self):
         # TODO: would be better to explicitly keep the state around
@@ -256,10 +252,6 @@ class World(object):
         set_joint_positions(self.robot, self.base_joints, conf)
     def get_world_aabb(self):
         return aabb_union(get_aabb(body) for body in self.all_bodies)
-    def update_floor(self):
-        z = stable_z(self.kitchen, self.floor) - get_point(self.floor)[2]
-        point = np.array(get_point(self.kitchen)) - np.array([0, 0, z])
-        set_point(self.floor, point)
     def update_custom_limits(self, min_extent=0.0):
         #robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners
