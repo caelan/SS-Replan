@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from pddlstream.language.constants import Not
 from src.task import Task
 from src.problem import door_closed_formula, door_open_formula

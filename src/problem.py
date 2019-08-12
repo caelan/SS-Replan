@@ -220,7 +220,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             with WorldSaver():
                 world.initial_saver.restore()
                 goal_aq = Conf(world.robot, world.arm_joints)
-            arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
+            if np.allclose(arm_distance_fn(goal_aq.values, carry_aq.values), np.zeros(len(carry_aq.joints))):
+                goal_aq = aq
             if np.less_equal(np.abs(arm_distance_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
                 print('Close to goal arm configuration')

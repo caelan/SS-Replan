@@ -19,7 +19,7 @@ from src.command import Wait, iterate_commands, Trajectory
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
-REPLAN_ACTIONS = {'calibrate', 'detect'} #, 'place'}
+REPLAN_ACTIONS = {'calibrate', 'detect', 'pull', 'place'}
 
 def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
     reset_globals()

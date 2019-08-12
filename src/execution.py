@@ -32,7 +32,7 @@ def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
     display_trajectory.trajectory[0].joint_trajectory.header.frame_id = frame
     moveit.display_trajectory_publisher.publish(display_trajectory)
 
-################################################################################s
+################################################################################
 
 def franka_control(robot, joints, path, interface, **kwargs):
 
@@ -40,6 +40,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #follow_control(robot, joints, path, **kwargs)
     if interface.simulation:
         return moveit_control(robot, joints, path, interface)
+        #return joint_state_control(robot, joints, path, interface)
 
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
     action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
@@ -103,10 +104,12 @@ def moveit_control(robot, joints, path, interface, **kwargs):
     # Start and end velocities are zero
     # Accelerations are about zero (except at the start and end)
 
+    # TODO: the moveit trajectory execution is wobbly. Was this always the case?
     moveit = interface.moveit
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used
     trajectory = linear_parameterization(robot, joints, path, speed=0.025*np.pi)
+    #trajectory = spline_parameterization(robot, joints, path, speed=0.025*np.pi, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     plan = RobotTrajectory(joint_trajectory=trajectory)

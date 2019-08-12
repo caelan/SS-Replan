@@ -8,8 +8,9 @@ from src.execution import suppress_lula
 from src.issac import update_robot, update_observer
 from src.retime import get_joint_names, spline_parameterization
 
+################################################################################
 
-def joint_state_control(robot, joints, path, domain, moveit, observer,
+def joint_state_control(robot, joints, path, interface,
                         threshold=0.01, timeout=1.0):
     # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
@@ -19,6 +20,8 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
     distance_fn = get_distance_fn(robot, joints)
     #difference_fn = get_difference_fn(robot, joints)
 
+    # TODO: separate path and goal thresholds
+    assert interface.simulation
     # TODO: spline interpolation
     #path = waypoints_from_path(path)
     if len(joints) == 2:
@@ -28,13 +31,13 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
         velocity = None
         #velocity = list(0.25 * np.array(max_velocities))
         joint_state = JointState(name=joint_names, position=list(target_conf), velocity=velocity)
-        moveit.joint_cmd_pub.publish(joint_state)
+        interface.moveit.joint_cmd_pub.publish(joint_state)
         #rate = rospy.Rate(1000)
         start_time = rospy.Time.now()
         while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < timeout):
             with Verbose():
-                world_state = update_observer(observer)
-            robot_entity = world_state.entities[domain.robot]
+                world_state = update_observer(interface.observer)
+            robot_entity = world_state.entities[interface.domain.robot]
             #difference = difference_fn(target_conf, robot_entity.q)
             if distance_fn(target_conf, robot_entity.q) < threshold:
                 break
@@ -47,7 +50,7 @@ def joint_state_control(robot, joints, path, domain, moveit, observer,
     # TODO: return status
     return None
 
-################################################################################s
+################################################################################
 
 def joint_command_control(robot, joints, path, **kwargs):
     # /robot/right_gripper/joint_command
@@ -78,7 +81,7 @@ def joint_command_control(robot, joints, path, **kwargs):
         print('Waypoint={} | Duration={:.3f}'.format(i, duration.to_sec()))
         rospy.sleep(duration)
 
-################################################################################s
+################################################################################
 
 def lula_control(world, path, domain, observer, world_state):
     suppress_lula(world_state)
@@ -95,7 +98,7 @@ def lula_control(world, path, domain, observer, world_state):
        #wait_for_duration(1e-3)
        # TODO: attachments
 
-################################################################################s
+################################################################################
 
 #FINGER_EFFORT_LIMIT = 20
 #FINGER_VELOCITY_LIMIT = 0.2
