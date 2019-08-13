@@ -222,13 +222,14 @@ class World(object):
                 set(get_links(self.kitchen)) - self.door_links} | \
                {(body, None) for body in self.environment_bodies.values()}
     @property
-    def movable(self):
+    def movable(self): # movable base
         return set(self.body_from_name) # frozenset?
     @property
+    def fixed(self): # fixed base
+        return set(self.environment_bodies.values()) | {self.kitchen}
+    @property
     def all_bodies(self):
-        return set(self.environment_bodies.values()) | \
-               set(self.body_from_name.values()) | \
-               {self.robot, self.kitchen}
+        return self.movable | self.fixed | {self.robot}
     @property
     def default_conf(self):
         if self.robot_name == EVE:
@@ -251,7 +252,7 @@ class World(object):
     def set_base_conf(self, conf):
         set_joint_positions(self.robot, self.base_joints, conf)
     def get_world_aabb(self):
-        return aabb_union(get_aabb(body) for body in self.all_bodies)
+        return aabb_union(get_aabb(body) for body in self.fixed) # self.all_bodies
     def update_custom_limits(self, min_extent=0.0):
         #robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners

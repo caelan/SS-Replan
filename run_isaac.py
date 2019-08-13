@@ -85,7 +85,7 @@ def planning_loop(interface):
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
         interface.localize_all()
-        update_world(world, domain, interface.observer)
+        update_world(world, interface)
 
 
 ################################################################################
@@ -213,25 +213,24 @@ def main():
     with LockRenderer(lock=True):
         # Need to do expensive computation before localize_all
         # Such as loading the meshes
-        update_world(world, domain, observer)
-        interface.localize_all()
-        update_world(world, domain, observer)
-        #close_all_doors(world)
-        if interface.simulation and task.movable_base:
-            world.set_base_conf([2.0, 0, -np.pi/2])
-            #world.set_initial_conf()
+        update_world(world, interface)
+        if interface.simulation:
+            # close_all_doors(world)
+            if task.movable_base:
+                world.set_base_conf([2.0, 0, -np.pi/2])
+                #world.set_initial_conf()
+            else:
+                pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
+                pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
+                for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
+                    sample_placement(world, name, ECHO_COUNTER, learned=False)
             update_isaac_sim(interface, world)
+            #wait_for_user()
+
+        interface.localize_all()
+        update_world(world, interface)
         world.update_initial()
         add_markers(world, inverse_place=False)
-
-    if interface.simulation:
-        pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
-        pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
-        for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
-            sample_placement(world, name, ECHO_COUNTER, learned=False)
-        update_isaac_sim(interface, world)
-        world.update_initial()
-        wait_for_user()
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return

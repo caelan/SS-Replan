@@ -8,6 +8,7 @@ import pickle
 import rospy
 import tf2_ros
 
+#from collections import Counter
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from image_geometry import PinholeCameraModel
@@ -18,7 +19,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
     BASE_LINK, LockRenderer, base_values_from_pose, \
     pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
-    set_renderer, draw_pose, read_json
+    set_renderer, draw_pose, read_json, Pose, Point
 from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH
 from src.utils import get_ycb_obj_path
 
@@ -29,6 +30,8 @@ ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
 CONTROL_TOPIC = '/sim/desired_joint_states'
 TEMPLATE = '%s_1'
+
+NULL_POSE = Pose(Point(z=-2))
 
 PANDA_FULL_CONFIG_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/configs/panda_full_config.json')
 #SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/instance_image' # {0, 1}
@@ -185,9 +188,9 @@ def display_kinect(world, observer):
         for camera_name in CAMERAS:
             world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
             if world_from_camera is not None:
-                world_from_kitchen = get_pose(world.kitchen)
-                kitchen_from_camera = multiply(invert(world_from_kitchen), world_from_camera)
-                print(camera_name, tuple(kitchen_from_camera[0]), tuple(kitchen_from_camera[1]))
+                #world_from_kitchen = get_pose(world.kitchen)
+                #kitchen_from_camera = multiply(invert(world_from_kitchen), world_from_camera)
+                #print(camera_name, tuple(kitchen_from_camera[0]), tuple(kitchen_from_camera[1]))
                 world.add_camera(camera_name, world_from_camera, camera_matrix)
         observer.camera_sub.unregister()
         # draw_viewcone(world_from_camera)
@@ -214,20 +217,23 @@ def detect_classes():
     detections = []
     def callback(data):
         segmentation = cv_bridge.imgmsg_to_cv2(data)
+        #frequency = Counter(segmentation.flatten().tolist()) # TODO: use the area
+        #print(frequency)
         indices = np.unique(segmentation)
         #print(indices)
-        detections.append({segmentation_labels[i] for i in indices if i < len(segmentation_labels)})
+        detections.append({segmentation_labels[i-1] for i in indices}) # wraps around [-1]
         subscriber.unregister()
 
-    # TODO: count the number of pixels
-    subscriber = rospy.Subscriber(SEGMENTATION_TOPIC, Image, callback)
+    rospy.sleep(0.1) # This sleep is needed
+    subscriber = rospy.Subscriber(SEGMENTATION_TOPIC, Image, callback, queue_size=1)
     while not detections:
         rospy.sleep(0.01)
+    print('Detections:', detections[-1])
     return detections[-1]
 
 ################################################################################
 
-def update_world(world, domain, observer):
+def update_world(world, interface):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
@@ -235,16 +241,24 @@ def update_world(world, domain, observer):
 
     task = world.task
     objects = task.objects
+    observer = interface.observer
+    domain = interface.domain
     world_state = update_observer(observer)
     print('Entities:', sorted(world_state.entities))
     #world.reset()
+    if interface.simulation and not interface.observable:
+        visible = detect_classes()
+    else:
+        visible = set(world_state.entities.keys())
+    print('Visible:', visible)
     update_robot(world, domain, observer)
     for name, entity in world_state.entities.items():
-        #entity.obj_type
-        #entity.semantic_frames
+        #dump_dict(entity)
+        #entity.obj_type, entity.semantic_frames
         if isinstance(entity, RobotArm):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
+            # entity.is_tracked, entity.location_belief, entity.view
             if name not in objects:
                 continue
             if name not in world.body_from_name:
@@ -253,10 +267,13 @@ def update_world(world, domain, observer):
                 world.add_body(name, ycb_obj_path, color=np.ones(4), mass=0)
             body = world.get_body(name)
             frame_name = ISSAC_PREFIX + name
-            world_from_entity = lookup_pose(observer.tf_listener, frame_name)
-            #world_from_entity = get_world_from_model(observer, entity, body)
-            #world_from_entity = pose_from_tform(entity.pose)
-            #print(name, world_from_entity)
+            if (visible is None) or (name in visible):
+                world_from_entity = lookup_pose(observer.tf_listener, frame_name)
+                #world_from_entity = get_world_from_model(observer, entity, body)
+                #world_from_entity = pose_from_tform(entity.pose)
+            else:
+                # TODO: modify the message directly?
+                world_from_entity = NULL_POSE
             set_pose(body, world_from_entity)
             # TODO: prune objects that are far away
         elif isinstance(entity, Drawer):
@@ -274,7 +291,6 @@ def update_world(world, domain, observer):
             raise NotImplementedError(entity.__class__)
         #print(name, entity)
         #wait_for_user()
-    # TODO: draw floor under the robot instead?
     display_kinect(world, observer)
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)

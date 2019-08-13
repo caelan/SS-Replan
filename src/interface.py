@@ -8,9 +8,13 @@ class Interface(object):
         self.task = task
         self.observer = observer
         self.trial_manager = trial_manager
+        # TODO: flag for whether it's paused or not
     @property
     def simulation(self):
         return self.trial_manager is not None
+    @property
+    def observable(self):
+        return self.args.observable
     @property
     def world(self):
         return self.task.world

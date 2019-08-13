@@ -43,7 +43,7 @@ class Task(object):
 ################################################################################
 
 UNIT_POSE2D = (0., 0., 0.)
-BOX_POSE2D = (0.1, 1.15, 0) # x, y, yaw
+BOX_POSE2D = (0.125, 1.175, -np.pi/4) # x, y, yaw
 CRACKER_POSE2D = (0.2, 1.2, np.pi/4) # x, y, yaw
 
 def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
