@@ -175,6 +175,8 @@ CAMERA_POSES = {
 
 ################################################################################
 
+JOINT_TEMPLATE = '{}_joint'
+
 CABINET_JOINTS = [
     'baker_joint',
     'chewie_door_left_joint', 'chewie_door_right_joint',

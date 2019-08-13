@@ -3,12 +3,26 @@ from __future__ import print_function
 from pddlstream.language.constants import Not
 from src.task import Task
 from src.problem import door_closed_formula, door_open_formula
+from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 
 TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
     'put_away', # tomato_soup_can
     'put_spam',
 ]
+
+SPAM = 'potted_meat_can'
+MUSTARD = 'mustard_bottle'
+TOMATO_SOUP = 'tomato_soup_can'
+SUGAR = 'sugar_box'
+CHEEZIT = 'cracker_box'
+YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
+
+ECHO_COUNTER = 'echo'
+INDIGO_COUNTER = 'indigo_tmp'
+TOP_DRAWER = 'indigo_drawer_top'
+
+################################################################################
 
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 
@@ -56,9 +70,12 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
         else:
             raise NotImplementedError(predicate)
         goal_literals.append(formula if value else Not(formula))
-    task = Task(world, movable_base=not fixed, init=init, goal=goal_literals,
+    prior = {
+        SPAM: DeltaDist(INDIGO_COUNTER),
+        CHEEZIT: DeltaDist(INDIGO_COUNTER),
+    }
+    return Task(world, prior=prior, movable_base=not fixed, init=init, goal=goal_literals,
                 return_init_bq=True, return_init_aq=True, **kwargs)
-    return task
 
 ################################################################################
 

@@ -10,7 +10,7 @@ from examples.discrete_belief.dist import UniformDist, DDist, DeltaDist, mixDDis
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import base_values_from_pose, CIRCULAR_LIMITS, stable_z_on_aabb, point_from_pose, Point, Pose, \
     Euler, set_pose, multiply, draw_circle, LockRenderer, BodySaver, Ray, batch_ray_collision, draw_ray, wrap_angle, \
-    circular_difference, remove_handles, get_pose
+    circular_difference, remove_handles, get_pose, pairwise_collision
 from src.database import get_surface_reference_pose
 from src.utils import compute_surface_aabb, create_relative_pose, CAMERA_MATRIX, KINECT_DEPTH, Z_EPSILON, test_supported
 
@@ -315,6 +315,15 @@ def compute_visible(body, poses, camera_pose, draw=True):
     # TODO: move objects out of the way?
     return {pose for pose, result in zip(ordered_poses, ray_results)
             if result.objectUniqueId in (body, -1)}
+
+
+def compute_cfree(body, poses, obstacles=[]):
+    cfree_poses = set()
+    for pose in poses:
+        pose.assign()
+        if not any(pairwise_collision(body, obst) for obst in obstacles):
+            cfree_poses.add(pose)
+    return cfree_poses
 
 ################################################################################
 

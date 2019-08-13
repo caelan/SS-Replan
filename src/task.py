@@ -8,12 +8,13 @@ from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
-    KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb
-from examples.discrete_belief.dist import DDist, UniformDist
-
+    KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, ZED_LEFT_SURFACES
+from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
+#from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
+from src.observation import Belief, create_surface_belief
 
 class Task(object):
-    def __init__(self, world, objects=[], skeletons=[],
+    def __init__(self, world, prior={}, skeletons=[],
                  movable_base=True, noisy_base=True,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
@@ -21,7 +22,7 @@ class Task(object):
                  init=[], goal=[]):
         self.world = world
         world.task = self
-        self.objects = tuple(objects)
+        self.prior = dict(prior) # DiscreteDist over
         self.skeletons = list(skeletons)
         self.movable_base = movable_base
         self.noisy_base = noisy_base
@@ -36,22 +37,26 @@ class Task(object):
         self.goal_cooked = set(goal_cooked)
         self.init = init
         self.goal = goal
+    def create_belief(self):
+        belief = create_surface_belief(self.world, self.prior)
+        belief.task = self
+        return belief
     def __repr__(self):
         return '{}{}'.format(self.__class__.__name__, {
             key: value for key, value in self.__dict__.items() if value not in [self.world]})
 
 ################################################################################
 
+# (x, y, yaw)
 UNIT_POSE2D = (0., 0., 0.)
-BOX_POSE2D = (0.125, 1.175, -np.pi/4) # x, y, yaw
-CRACKER_POSE2D = (0.2, 1.2, np.pi/4) # x, y, yaw
+BOX_POSE2D = (0.125, 1.175, -np.pi/4) # 0.)
+CRACKER_POSE2D = (0.2, 1.2, np.pi/4)
 
 def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
     x, y, yaw = pose2d
     body = world.get_body(entity_name)
     surface_aabb = compute_surface_aabb(world, surface_name)
     z = stable_z_on_aabb(body, surface_aabb)
-    #z = stable_z(body, world.kitchen, link_from_name(world.kitchen, surface_name))
     pose = Pose(Point(x, y, z), Euler(yaw=yaw))
     set_pose(body, pose)
     return pose
@@ -117,7 +122,11 @@ def detect_block(world, **kwargs):
         sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
-    return Task(world, movable_base=True,
+    prior = {
+        entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top']),
+        obstruction_name: DeltaDist('indigo_tmp'),
+    }
+    return Task(world, prior=prior, movable_base=True,
                 return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
                 #goal_holding=[entity_name],
@@ -134,8 +143,10 @@ def hold_block(world, **kwargs):
     set_all_static()
     add_kinect(world)
     sample_placement(world, entity_name, initial_surface, learned=True)
-
-    return Task(world, movable_base=True,
+    prior = {
+        entity_name: DeltaDist(initial_surface),
+    }
+    return Task(world, prior=prior, movable_base=True,
                 return_init_bq=True, # return_init_aq=False,
                 goal_holding=[entity_name],
                 #goal_closed=ALL_JOINTS,
@@ -173,7 +184,10 @@ def stow_block(world, **kwargs):
     #    sample_placement(world, entity_name, surface_name=initial_surface, learned=False)
     #    wait_for_user()
 
-    return Task(world, movable_base=True,
+    prior = {
+        entity_name: DeltaDist(initial_surface),
+    }
+    return Task(world, prior=prior, movable_base=True,
                 #goal_holding=[entity_name],
                 goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,

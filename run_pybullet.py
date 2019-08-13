@@ -16,9 +16,8 @@ from pybullet_tools.utils import wait_for_user, INF, LockRenderer, \
     VideoSaver
 from src.visualization import add_markers
 from src.observation import create_observable_belief, \
-    transition_belief_update, create_surface_belief, UniformDist, observe_scene
-from src.utils import ZED_LEFT_SURFACES
-from src.debug import test_observation
+    transition_belief_update, observe_pybullet
+#from src.debug import test_observation
 from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_commands, \
     solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.world import World
@@ -75,30 +74,21 @@ def run_deterministic(task, args):
 ################################################################################
 
 def run_stochastic(task, args):
-    # Soft constraints tell you when you succeed
-    # Hard constraints are nice because they allow the solver to prune
-    # Constrain to use the previous plan skeleton
-    # Allow a plan skeleton to be short-cutted (don't need to move base twice)
-    # Technically all values change upon each observation
-    #last_cost = INF # TODO: update the remaining cost (removing attempted actions)
-    # The nice thing about having a correct belief model is that you actually know what cost makes progress
     world = task.world
-    state = world.get_initial_state()
-    belief = create_surface_belief(world, UniformDist(ZED_LEFT_SURFACES))
-    # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
+    real_state = world.get_initial_state()
+    belief = task.create_belief()
     print('Prior:', belief)
     video = None
     if args.record:
         wait_for_user('Start?')
         video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
+    # TODO: make this a generic policy
 
     previous_facts = []
     previous_skeleton = None
-    #previous_cost = INF
-    # TODO: make this a generic policy
     while True:
         print_separator(n=50)
-        observation = observe_scene(world)
+        observation = observe_pybullet(world)
         print('Observation:', observation)
         belief.update(observation)
         print('Belief:', belief)
@@ -111,7 +101,7 @@ def run_stochastic(task, args):
         if previous_skeleton is not None:
             print('Skeleton:', previous_skeleton)
             print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
-            # The search my get stuck otherwise
+            # TODO: could compare to the previous plan cost
             plan, cost, certificate = solve_pddlstream(
                 problem, args, max_time=30, skeleton=previous_skeleton)
             if plan is None:
@@ -124,9 +114,9 @@ def run_stochastic(task, args):
             print_separator(n=25)
             plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time, max_cost=cost)
         if plan is None:
-            print('Failure')
+            print('Failure!')
             return False
-        print('Preimage:', sorted(certificate.preimage_facts, key=lambda f: f[0]))
+        #print('Preimage:', sorted(certificate.preimage_facts, key=lambda f: f[0]))
         if not plan:
             break
         print_separator(n=25)
@@ -135,22 +125,16 @@ def run_stochastic(task, args):
         commands = commands_from_plan(world, plan_prefix)
         if not video: # Video doesn't include planning time
             wait_for_user()
-        iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP)
-        #simulate_plan(state, commands, args)
+        iterate_commands(real_state, commands, time_step=DEFAULT_TIME_STEP)
+        #simulate_plan(real_state, commands, args)
         transition_belief_update(belief, plan_prefix)
 
         plan_postfix = get_plan_postfix(plan, plan_prefix)
-        #previous_skeleton = make_wild_skeleton(plan_postfix)
-        previous_skeleton = make_exact_skeleton(plan_postfix)
-        #last_cost = compute_plan_cost(plan_postfix)
-
+        previous_skeleton = make_exact_skeleton(plan_postfix) # make_wild_skeleton
         #previous_facts = []
-        #previous_facts = certificate.preimage_facts # includes fluents!
         previous_facts = reuse_facts(problem, certificate, previous_skeleton)
-        #assert compute_plan_cost(plan_prefix) + last_cost == cost
-        #if not plan_postfix:
-        #    break
-    print('Success')
+
+    print('Success!')
     if video:
         video.restore()
     return True
@@ -185,7 +169,7 @@ def main():
             add_markers(world, inverse_place=False)
     #wait_for_user()
     # TODO: FD instantiation is slightly slow to a deepcopy
-
+    # 4650801/25658    2.695    0.000    8.169    0.000 /home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/skeleton.py:114(do_evaluate_helper)
     #test_observation(world, entity_name='big_red_block0')
     #return
     if args.observable:

@@ -188,9 +188,6 @@ def display_kinect(world, observer):
         for camera_name in CAMERAS:
             world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
             if world_from_camera is not None:
-                #world_from_kitchen = get_pose(world.kitchen)
-                #kitchen_from_camera = multiply(invert(world_from_kitchen), world_from_camera)
-                #print(camera_name, tuple(kitchen_from_camera[0]), tuple(kitchen_from_camera[1]))
                 world.add_camera(camera_name, world_from_camera, camera_matrix)
         observer.camera_sub.unregister()
         # draw_viewcone(world_from_camera)
@@ -233,7 +230,7 @@ def detect_classes():
 
 ################################################################################
 
-def update_world(world, interface):
+def observe_world(world, interface):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
@@ -251,6 +248,7 @@ def update_world(world, interface):
     print('Visible:', visible)
     update_robot(world, interface.domain, observer)
     world_aabb = world.get_world_aabb()
+    observation = {}
     for name, entity in world_state.entities.items():
         #dump_dict(entity)
         #entity.obj_type, entity.semantic_frames
@@ -264,25 +262,21 @@ def update_world(world, interface):
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
                 print('Loading', ycb_obj_path)
                 world.add_body(name, ycb_obj_path, color=np.ones(4), mass=0)
-            body = world.get_body(name)
-            frame_name = ISSAC_PREFIX + name
+                set_pose(world.get_body(name), NULL_POSE)
             if (visible is None) or (name in visible):
+                frame_name = ISSAC_PREFIX + name
                 pose = lookup_pose(observer.tf_listener, frame_name)
                 #pose = get_world_from_model(observer, entity, body)
                 #pose = pose_from_tform(entity.pose)
             else:
                 pose = NULL_POSE  # TODO: modify world_state directly?
-            detected = aabb_contains_point(point_from_pose(pose), world_aabb)
-            if not detected:
-                pose = NULL_POSE
-            set_pose(body, pose)
-            # TODO: prune objects that are far away
+            if aabb_contains_point(point_from_pose(pose), world_aabb):
+                observation[name] = pose
         elif isinstance(entity, Drawer):
+            # /tracker/axe/joint_states
+            # /tracker/baker/joint_states
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
-            #pose = get_world_from_model(observer, entity, world.kitchen)
-            #with LockRenderer():
-            #    set_pose(world.kitchen, pose)
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):
@@ -290,23 +284,24 @@ def update_world(world, interface):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-        #print(name, entity)
-        #wait_for_user()
-    display_kinect(world, observer)
+    display_kinect(world, observer) # Just do this once?
     #draw_pose(get_pose(world.robot), length=3)
     #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
     #wait_for_user('Raw observations')
     #world.fix_geometry()
     #wait_for_user('Fixed observations')
+    return observation
 
 ################################################################################
 
 def set_isaac_camera(sim_manager, camera_pose):
+    # TODO: could make the camera follow the robot_entity around
     from brain_ros.ros_world_state import make_pose
     from isaac_bridge.manager import ros_camera_pose_correction
     camera_tform = make_pose(camera_pose)
     camera_tform = ros_camera_pose_correction(camera_tform, LEFT_CAMERA)
     sim_manager.set_pose(LEFT_CAMERA, camera_tform, do_correction=False)
+    # trial_manager.set_camera(randomize=False)
 
 def update_isaac_robot(observer, sim_manager, world):
     unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
@@ -339,19 +334,15 @@ def update_kitchen_joints(interface, world):
         positions = get_joint_positions(body, joints)
         interface.sim_manager.set_joints(names, positions, duration=rospy.Duration(5))
         print('Kitchen joints:', names)
-    print('awef')
-
 
 def update_isaac_sim(interface, world):
-    # RobotConfigModulator seems to just change the default config
+    # RobotConfigModulator just changes the rest config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/robot_config_modulator.py
     #sim_manager = trial_manager.sim
     #ycb_objects = kitchen_poses.supported_ycb_objects
 
-    sim_manager = interface.sim_manager
-    observer = interface.observer
-    sim_manager.pause() # This pauses the simulator
+    interface.pause_simulation()
     update_isaac_poses(interface, world)
     # TODO: freezes here with newest version of srl_system
     #update_kitchen_joints(interface, world)
@@ -360,12 +351,12 @@ def update_isaac_sim(interface, world):
     #config_modulator = domain.config_modulator
     #print(kitchen_poses.ycb_place_in_drawer_q) # 7 DOF
     #config_modulator.send_config(get_joint_positions(world.robot, world.arm_joints)) # Arm joints
-    update_isaac_robot(observer, sim_manager, world)
+    update_isaac_robot(interface.observer, interface.sim_manager, world)
     #print(get_camera())
     #set_isaac_camera(sim_manager, camera_pose)
     time.sleep(1.0)
     # rospy.sleep(1.) # Small sleep might be needed
-    sim_manager.pause() # The second invocation resumes the simulator
+    interface.resume_simulation()
 
     #sim_manager.reset()
     #sim_manager.wait_for_services()

@@ -22,7 +22,6 @@ from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
     RelPose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
-
 #OBS_POS_STD, OBS_ORI_STD = 0.01, np.pi / 8
 OBS_POS_STD, OBS_ORI_STD = 0., 0.
 
@@ -139,6 +138,7 @@ def create_observable_belief(world, **kwargs):
             for name in world.movable}, **kwargs)
 
 def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
+    # TODO: likely easier to just make a null surface below ground
     placement_gen = get_stable_gen(world, max_attempts=100, learned=True,
                                    pos_scale=1e-3, rot_scale=1e-2)
     poses = []
@@ -146,31 +146,20 @@ def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
         with BodySaver(world.get_body(obj_name)):
             while len(poses) < n:
                 surface_name = surface_dist.sample()
+                assert surface_name is not ELSEWHERE
                 result = next(placement_gen(obj_name, surface_name), None)
                 if result is None:
                     surface_dist = surface_dist.condition(lambda s: s != surface_name)
                 else:
                     (rel_pose,) = result
                     poses.append(rel_pose)
-    pose_dist = PoseDist(world, obj_name, UniformDist(poses))
-    return pose_dist
+    return PoseDist(world, obj_name, UniformDist(poses))
 
-def create_surface_belief(world, surface_dist, **kwargs):
+def create_surface_belief(world, surface_dists, **kwargs):
     with WorldSaver():
         return Belief(world, pose_dists={
             name: create_surface_pose_dist(world, name, surface_dist)
-            for name in world.movable}, **kwargs)
-
-################################################################################
-
-def compute_cfree(body, poses, obstacles=[]):
-    cfree_poses = set()
-    for pose in poses:
-        pose.assign()
-        if not any(pairwise_collision(body, obst) for obst in obstacles):
-            cfree_poses.add(pose)
-    return cfree_poses
-
+            for name, surface_dist in surface_dists.items()}, **kwargs)
 
 ################################################################################
 
@@ -197,12 +186,17 @@ def are_visible(world):
         remove_handles(handles)
     return visible_names
 
-def observe_scene(world):
-    visible_entities = are_visible(world)
-    detections = {}
+################################################################################
+
+def fully_observe_pybullet(world):
+    return {name: get_pose(body) for name, body in world.body_from_name.items()}
+
+def observe_pybullet(world):
     # TODO: randomize robot's pose
     # TODO: probabilities based on whether in viewcone or not
     # TODO: sample from poses on table
+    visible_entities = are_visible(world)
+    detections = {}
     assert OBS_P_FP == 0
     for name in visible_entities:
         # TODO: false positives

@@ -121,11 +121,11 @@ class Trajectory(Command):
             follow_base_trajectory(self.world, self.path, interface.moveit, interface.observer)
         elif isinstance(carter, SimulationManager):
             sim_manager = carter
-            sim_manager.pause()  # TODO: context manager
+            interface.pause_simulation()
             set_joint_positions(self.robot, self.joints, self.path[-1])
             update_isaac_robot(interface.observer, sim_manager, self.world)
             time.sleep(DEFAULT_SLEEP)
-            sim_manager.pause()
+            interface.resume_simulation()
             # TODO: teleport attached
         else:
             world_state = domain.root

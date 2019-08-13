@@ -8,7 +8,7 @@ class Interface(object):
         self.task = task
         self.observer = observer
         self.trial_manager = trial_manager
-        # TODO: flag for whether it's paused or not
+        self.paused = False
     @property
     def simulation(self):
         return self.trial_manager is not None
@@ -36,6 +36,17 @@ class Interface(object):
         if self.trial_manager is None:
             return None
         return self.trial_manager.sim
+    def disable_collisions(self):
+        self.trial_manager.disable()
+    def pause_simulation(self):
+        # TODO: context manager
+        if not self.paused:
+            self.sim_manager.pause()
+            self.paused = True
+    def resume_simulation(self):
+        if self.paused:
+            self.sim_manager.pause()
+            self.paused = False
     def update_state(self):
         return update_observer(self.observer)
     def localize_all(self):
