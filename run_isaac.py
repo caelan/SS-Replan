@@ -31,7 +31,7 @@ from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.problem import pdddlstream_from_problem
-from src.task import Task
+from src.task import Task, CRACKER_POSE2D, BOX_POSE2D, pose2d_on_surface, sample_placement
 from src.replan import get_plan_postfix, make_wild_skeleton
 
 SPAM = 'potted_meat_can'
@@ -42,6 +42,8 @@ CHEEZIT = 'cracker_box'
 
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
 
+ECHO_COUNTER = 'echo'
+INDIGO_COUNTER = 'indigo_tmp'
 TOP_DRAWER = 'indigo_drawer_top'
 JOINT_TEMPLATE = '{}_joint'
 
@@ -157,9 +159,9 @@ def main():
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
     #print(dump_dict(robot_entity))
+    # TODO: forcibly reset robot configuration
 
     world = World(use_gui=True) # args.visualize)
-    set_camera_pose(camera_point=[2, 0, 2])
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
 
     if args.execute:
@@ -217,9 +219,18 @@ def main():
         if interface.simulation and task.movable_base:
             world.set_base_conf([2.0, 0, -np.pi/2])
             #world.set_initial_conf()
-            update_isaac_sim(domain, observer, interface.sim_manager, world)
+            update_isaac_sim(interface, world)
         world.update_initial()
         add_markers(world, inverse_place=False)
+
+    if interface.simulation:
+        pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
+        pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
+        for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
+            sample_placement(world, name, ECHO_COUNTER, learned=False)
+        update_isaac_sim(interface, world)
+        world.update_initial()
+        wait_for_user()
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return

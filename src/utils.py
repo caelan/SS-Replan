@@ -110,6 +110,13 @@ DRAWERS = [
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
+ENV_SURFACES = [
+    'range',
+    'table',
+    'golf',
+    'echo', # fox is covered by echo
+]
+
 ZED_LEFT_SURFACES = [
     'indigo_tmp', # 'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',
@@ -330,9 +337,14 @@ def create_gripper(robot, visual=False):
 
 def create_surface_attachment(world, obj_name, surface_name):
     body = world.get_body(obj_name)
-    surface = surface_from_name(surface_name)
-    surface_link = link_from_name(world.kitchen, surface.link)
-    return create_attachment(world.kitchen, surface_link, body)
+    if surface_name in ENV_SURFACES:
+        surface_body = world.environment_bodies[surface_name]
+        surface_link = BASE_LINK
+    else:
+        surface = surface_from_name(surface_name)
+        surface_body = world.kitchen
+        surface_link = link_from_name(surface_body, surface.link)
+    return create_attachment(surface_body, surface_link, body)
 
 def create_relative_pose(world, name, surface, **kwargs):
     attachment = create_surface_attachment(world, name, surface)
@@ -387,14 +399,19 @@ class RelPose(object):
             return 'wp{}'.format(id(self) % 1000)
         return 'rp{}'.format(id(self) % 1000)
 
-def compute_surface_aabb(world, name):
-    surface_name, shape_name, _ = surface_from_name(name)
-    surface_link = link_from_name(world.kitchen, surface_name)
-    surface_pose = get_link_pose(world.kitchen, surface_link)
+def compute_surface_aabb(world, surface_name):
+    if surface_name in ENV_SURFACES: # TODO: clean this up
+        # TODO: the aabb for golf is off the table
+        surface_body = world.environment_bodies[surface_name]
+        return get_aabb(surface_body)
+    surface_body = world.kitchen
+    surface_name, shape_name, _ = surface_from_name(surface_name)
+    surface_link = link_from_name(surface_body, surface_name)
+    surface_pose = get_link_pose(surface_body, surface_link)
     if shape_name == SURFACE_TOP:
-        surface_aabb = get_aabb(world.kitchen, surface_link)
+        surface_aabb = get_aabb(surface_body, surface_link)
     elif shape_name == SURFACE_BOTTOM:
-        data = sorted(get_collision_data(world.kitchen, surface_link),
+        data = sorted(get_collision_data(surface_body, surface_link),
                       key=lambda d: point_from_pose(get_data_pose(d))[2])[0]
         extent = np.array(get_data_extents(data))
         aabb = AABB(-extent/2., +extent/2.)
@@ -402,10 +419,10 @@ def compute_surface_aabb(world, name):
         surface_aabb = aabb_from_points(vertices)
     else:
         [data] = filter(lambda d: d.filename != '',
-                        get_collision_data(world.kitchen, surface_link))
+                        get_collision_data(surface_body, surface_link))
         meshes = read_obj(data.filename)
         #colors = spaced_colors(len(meshes))
-        #set_color(world.kitchen, link=surface_link, color=np.zeros(4))
+        #set_color(surface_body, link=surface_link, color=np.zeros(4))
         mesh = meshes[shape_name]
         #for i, (name, mesh) in enumerate(meshes.items()):
         mesh = tform_mesh(multiply(surface_pose, get_data_pose(data)), mesh=mesh)

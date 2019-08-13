@@ -21,7 +21,8 @@ from src.database import load_placements, get_surface_reference_pose, load_place
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
-    compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, get_link_obstacles
+    compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
+    get_link_obstacles, ENV_SURFACES
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.belief import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
@@ -286,6 +287,9 @@ def get_stable_gen(world, max_attempts=100,
     # TODO: place where currently standing
     def gen(obj_name, surface_name):
         obj_body = world.get_body(obj_name)
+        surface_body = world.kitchen
+        if surface_name in ENV_SURFACES:
+            surface_body = world.environment_bodies[surface_name]
         surface_aabb = compute_surface_aabb(world, surface_name)
         learned_poses = None
         if learned:
@@ -295,7 +299,7 @@ def get_stable_gen(world, max_attempts=100,
         while True:
             for _ in range(max_attempts):
                 if learned:
-                    surface_pose_world = get_surface_reference_pose(world.kitchen, surface_name)
+                    surface_pose_world = get_surface_reference_pose(surface_body, surface_name)
                     sampled_pose_surface = multiply(surface_pose_world, random.choice(learned_poses))
                     [x, y, _] = point_from_pose(sampled_pose_surface)
                     _, _, yaw = euler_from_quat(quat_from_pose(sampled_pose_surface))

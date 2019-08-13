@@ -13,7 +13,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
-    set_quat, quat_from_euler, INF, get_difference, wait_for_user, read_json
+    set_quat, quat_from_euler, INF, get_difference, wait_for_user, read_json, set_camera_pose, draw_aabb
 from src.issac import load_calibrate_conf
 from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
@@ -57,6 +57,7 @@ class World(object):
         self.task = None
         self.client = connect(use_gui=use_gui)
         add_data_path()
+        set_camera_pose(camera_point=[2, -1, 1])
         draw_pose(Pose(), length=3)
 
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
@@ -256,11 +257,15 @@ class World(object):
         #robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners
         #min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
-        full_lower, full_upper = self.get_world_aabb()
+        world_aabb = self.get_world_aabb()
+        full_lower, full_upper = world_aabb
         base_limits = (full_lower[:2] - min_extent, full_upper[:2] + min_extent)
         base_limits[1][0] = COMPUTER_X - min_extent # TODO: robot radius
+        base_limits[0][1] += 0.1
+        base_limits[1][1] -= 0.1
         for handle in self.base_limits_handles:
             remove_debug(handle)
+        self.base_limits_handles = draw_aabb(world_aabb)
         z = get_point(self.floor)[2] + 1e-2
         self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
         self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)

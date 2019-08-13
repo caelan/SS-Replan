@@ -4,7 +4,7 @@ import random
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
     apply_alpha, RED, step_simulation, joint_from_name, set_all_static, \
-    WorldSaver, stable_z_on_aabb
+    WorldSaver, stable_z_on_aabb, wait_for_user, draw_aabb, get_aabb, pairwise_collision
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
@@ -42,7 +42,11 @@ class Task(object):
 
 ################################################################################
 
-def pose2d_on_surface(world, entity_name, surface_name, pose2d):
+UNIT_POSE2D = (0., 0., 0.)
+BOX_POSE2D = (0.1, 1.15, 0) # x, y, yaw
+CRACKER_POSE2D = (0.2, 1.2, np.pi/4) # x, y, yaw
+
+def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
     x, y, yaw = pose2d
     body = world.get_body(entity_name)
     surface_aabb = compute_surface_aabb(world, surface_name)
@@ -52,22 +56,22 @@ def pose2d_on_surface(world, entity_name, surface_name, pose2d):
     set_pose(body, pose)
     return pose
 
-def add_block(world, x=0.1, y=1.15, yaw=0, idx=0):
+def add_block(world, idx=0, **kwargs):
     # TODO: automatically produce a unique name
     name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], idx)
     entity_path = get_block_path(name)
     #name = 'potted_meat_can'
     #entity_path = get_ycb_obj_path(name)
     world.add_body(name, entity_path)
-    pose2d_on_surface(world, name, COUNTERS[0], (x, y, yaw))
+    pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
-def add_box(world, x=0.2, y=1.2, yaw=np.pi/4, idx=0):
+def add_box(world, idx=0, **kwargs):
     ycb_type = 'cracker_box'
     name = '{}{}'.format(ycb_type, idx)
     obstruction_path = get_ycb_obj_path(ycb_type)
     world.add_body(name, obstruction_path, color=np.ones(4))
-    pose2d_on_surface(world, name, COUNTERS[0], (x, y, yaw))
+    pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
 def add_kinect(world, camera_name=LEFT_CAMERA):
@@ -78,11 +82,16 @@ def add_kinect(world, camera_name=LEFT_CAMERA):
 ################################################################################
 
 def sample_placement(world, entity_name, surface_name, **kwargs):
-    # TODO: check for collisions
+    entity_body = world.get_body(entity_name)
+    placement_gen = get_stable_gen(world, pos_scale=1e-3, rot_scale=1e-2, **kwargs)
     with WorldSaver():
-        placement_gen = get_stable_gen(world, pos_scale=1e-3, rot_scale=1e-2, **kwargs)
-        pose, = next(placement_gen(entity_name, surface_name))
+        for pose, in placement_gen(entity_name, surface_name):
+            pose.assign()
+            if not any(pairwise_collision(entity_body, obst_body) for obst_body in
+                       world.body_from_name.values() if entity_body != obst_body):
+                break
     pose.assign()
+    return pose
 
 def close_all_doors(world):
     for joint in world.kitchen_joints:
@@ -95,8 +104,8 @@ def open_all_doors(world):
 ################################################################################
 
 def detect_block(world, **kwargs):
-    entity_name = add_block(world, idx=0)
-    obstruction_name = add_box(world, idx=0)
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    obstruction_name = add_box(world, idx=0, pose2d=CRACKER_POSE2D)
     #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:
@@ -120,7 +129,7 @@ def detect_block(world, **kwargs):
 
 def hold_block(world, **kwargs):
     #open_all_doors(world)
-    entity_name = add_block(world, idx=0)
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
     set_all_static()
     add_kinect(world)
@@ -139,7 +148,7 @@ def stow_block(world, **kwargs):
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
     # wait_for_user()
 
-    entity_name = add_block(world, idx=0)
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     #entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
     #obstruction_name = add_box(world, idx=0)
     # test_grasps(world, entity_name)
@@ -153,6 +162,13 @@ def stow_block(world, **kwargs):
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
     sample_placement(world, entity_name, initial_surface)
     #sample_placement(world, obstruction_name, 'hitman_tmp')
+
+    #initial_surface = 'golf' # range | table | golf
+    #surface_body = world.environment_bodies[initial_surface]
+    #draw_aabb(get_aabb(surface_body))
+    #while True:
+    #    sample_placement(world, entity_name, surface_name=initial_surface, learned=False)
+    #    wait_for_user()
 
     return Task(world, movable_base=True,
                 #goal_holding=[entity_name],

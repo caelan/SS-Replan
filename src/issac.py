@@ -301,13 +301,15 @@ def update_isaac_robot(observer, sim_manager, world):
     unreal_from_carter = multiply(unreal_from_world, world_from_carter)
     sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
 
-def update_isaac_sim(domain, observer, sim_manager, world):
+def update_isaac_sim(interface, world):
     # RobotConfigModulator seems to just change the default config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/external/lula_control/lula_control/robot_config_modulator.py
     #sim_manager = trial_manager.sim
     #ycb_objects = kitchen_poses.supported_ycb_objects
 
+    sim_manager = interface.sim_manager
+    observer = interface.observer
     sim_manager.pause() # This pauses the simulator
     unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
                                     target_frame=UNREAL_WORLD_FRAME)
@@ -327,7 +329,7 @@ def update_isaac_sim(domain, observer, sim_manager, world):
         # TODO: doesn't seem to actually work
         names = get_joint_names(body, joints)
         positions = get_joint_positions(body, joints)
-        sim_manager.set_joints(names, positions, duration=rospy.Duration(5.0))
+        sim_manager.set_joints(names, positions, duration=rospy.Duration(5))
         print('Kitchen joints:', names)
 
     # Changes the default configuration

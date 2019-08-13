@@ -62,6 +62,7 @@ class Belief(object):
         self.observations = []
         self.handles = []
         # TODO: belief fluents
+        # TODO: report grasp failure if gripper is ever fully closed
     @property
     def names(self):
         return sorted(self.pose_dists)
