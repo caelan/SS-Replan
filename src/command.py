@@ -381,7 +381,10 @@ class Wait(Command):
 
 ################################################################################s
 
-def iterate_commands(state, commands, time_step=None):
+DEFAULT_TIME_STEP = 0.02
+
+
+def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
     if not commands:
         return
     for i, command in enumerate(commands):

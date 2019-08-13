@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import cProfile
 import pstats
-import math
 
 from examples.discrete_belief.run import MAX_COST
 from pddlstream.algorithms.constraints import PlanConstraints
@@ -15,7 +14,7 @@ from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
-from src.command import Wait, iterate_commands, Trajectory
+from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
@@ -116,8 +115,6 @@ def extract_plan_prefix(plan):
         if name in REPLAN_ACTIONS:
             break
     return prefix
-
-DEFAULT_TIME_STEP = 0.02
 
 def combine_commands(commands):
     combined_commands = []

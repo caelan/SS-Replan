@@ -7,25 +7,21 @@ import argparse
 import os
 import numpy as np
 
-
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user, INF, LockRenderer, \
-    get_random_seed, get_numpy_seed, set_numpy_seed, set_random_seed, print_separator, \
-    VideoSaver
+from pybullet_tools.utils import wait_for_user, LockRenderer, \
+    get_random_seed, get_numpy_seed
 from src.visualization import add_markers
 from src.observation import create_observable_belief, \
-    transition_belief_update, observe_pybullet
+    observe_pybullet
 #from src.debug import test_observation
-from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_commands, \
-    solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix, REPLAN_ACTIONS
+from src.planner import VIDEO_TEMPLATE, iterate_commands, \
+    solve_pddlstream, simulate_plan, commands_from_plan
 from src.world import World
 from src.problem import pdddlstream_from_problem
-from src.task import stow_block, detect_block, TASKS
-from src.replan import make_wild_skeleton, make_exact_skeleton, compute_plan_cost, get_plan_postfix, reuse_facts
-
-
+from src.task import TASKS
+from src.policy import run_policy
 #from src.debug import dump_link_cross_sections, test_rays
 
 def create_parser():
@@ -59,7 +55,7 @@ def create_parser():
 
 ################################################################################
 
-def run_deterministic(task, args):
+def run_plan(task, args):
     world = task.world
     state = world.get_initial_state()
     belief = create_observable_belief(world)
@@ -72,77 +68,6 @@ def run_deterministic(task, args):
     commands = commands_from_plan(world, plan)
     simulate_plan(state, commands, args, record=args.record)
     wait_for_user()
-
-################################################################################
-
-def run_stochastic(task, args):
-    world = task.world
-    real_state = world.get_initial_state()
-    if args.observable:
-        belief = create_observable_belief(world) # Faster
-    else:
-        belief = task.create_belief()
-    print('Prior:', belief)
-    video = None
-    if args.record:
-        wait_for_user('Start?')
-        video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
-    # TODO: make this a generic policy
-
-    previous_facts = []
-    previous_skeleton = None
-    while True:
-        print_separator(n=50)
-        observation = observe_pybullet(world)
-        print('Observation:', observation)
-        belief.update(observation)
-        print('Belief:', belief)
-        belief.draw()
-        #wait_for_user('Plan?')
-        problem = pdddlstream_from_problem(belief, fixed_base=True, additional_init=previous_facts,
-                                           collisions=not args.cfree, teleport=args.teleport)
-        print_separator(n=25)
-        plan, cost = None, INF
-        if previous_skeleton is not None:
-            print('Skeleton:', previous_skeleton)
-            print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
-            # TODO: could compare to the previous plan cost
-            plan, cost, certificate = solve_pddlstream(
-                problem, args, max_time=30, skeleton=previous_skeleton)
-            if plan is None:
-                wait_for_user('Failed to adhere to plan')
-
-        # TODO: store history of stream evaluations
-        if plan is None:
-            problem = pdddlstream_from_problem(belief, fixed_base=False, additional_init=previous_facts,
-                                               collisions=not args.cfree, teleport=args.teleport)
-            print_separator(n=25)
-            plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time, max_cost=cost)
-        if plan is None:
-            print('Failure!')
-            return False
-        #print('Preimage:', sorted(certificate.preimage_facts, key=lambda f: f[0]))
-        if not plan:
-            break
-        print_separator(n=25)
-        plan_prefix = extract_plan_prefix(plan)
-        print('Prefix:', plan_prefix)
-        commands = commands_from_plan(world, plan_prefix)
-        if not video: # Video doesn't include planning time
-            wait_for_user()
-        iterate_commands(real_state, commands, time_step=DEFAULT_TIME_STEP)
-        #simulate_plan(real_state, commands, args)
-        transition_belief_update(belief, plan_prefix)
-
-        plan_postfix = get_plan_postfix(plan, plan_prefix)
-        previous_skeleton = make_exact_skeleton(plan_postfix) # make_wild_skeleton
-        #previous_facts = []
-        previous_facts = reuse_facts(problem, certificate, previous_skeleton)
-
-    print('Success!')
-    if video:
-        video.restore()
-    return True
 
 ################################################################################
 
@@ -177,10 +102,15 @@ def main():
     # 4650801/25658    2.695    0.000    8.169    0.000 /home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/skeleton.py:114(do_evaluate_helper)
     #test_observation(world, entity_name='big_red_block0')
     #return
+
     if args.deterministic and args.observable:
-        run_deterministic(task, args)
+        run_plan(task, args)
     else:
-        run_stochastic(task, args)
+        real_state = world.get_initial_state()
+        observation_fn = lambda: observe_pybullet(world)
+        transition_fn = lambda commands: iterate_commands(real_state, commands)
+        # simulate_plan(real_state, commands, args)
+        run_policy(task, args, observation_fn, transition_fn)
     world.destroy()
 
 if __name__ == '__main__':

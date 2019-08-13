@@ -1,8 +1,10 @@
+from __future__ import print_function
+
 import numpy as np
 import scipy
+
 from collections import namedtuple
 from scipy.stats import norm, truncnorm
-
 from sklearn.neighbors import KernelDensity
 
 from examples.discrete_belief.dist import UniformDist, DDist, DeltaDist, mixDDists, ProductDistribution, \
@@ -31,7 +33,8 @@ Neighborhood = namedtuple('Neighborhood', ['poses', 'prob'])
 ################################################################################
 
 class PoseDist(object):
-    # TODO: maintain one of these for each surface instead? It is nice to treat them all as one distribution though
+    # TODO: maintain one of these for each surface instead?
+    # It is nice to treat them all as one distribution though
     def __init__(self, world, name, dist, weight=1.0, bandwidth=0.01):
         self.world = world
         self.name = name

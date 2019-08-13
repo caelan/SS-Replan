@@ -21,6 +21,7 @@ from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta
 
+from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands
 from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, \
@@ -30,56 +31,31 @@ from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
-from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
-from src.problem import pdddlstream_from_problem
+from src.planner import simulate_plan
 from src.task import Task, CRACKER_POSE2D, BOX_POSE2D, pose2d_on_surface, sample_placement
-from src.replan import get_plan_postfix, make_wild_skeleton
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
-
 
 def planning_loop(interface):
     task = interface.task
     world = task.world
-    # interface.localize_all()
-    # observe_world(world, interface)
     args = interface.args
-    belief = task.create_belief()
-    last_skeleton = None
-    while True:
+
+    def observation_fn():
         interface.localize_all()
-        observation = observe_world(interface)
-        print(observation)
-        belief.update(observation)
-        belief.draw()
-        wait_for_user('Plan?')
+        return observe_world(interface)
 
-        # The difference in state is that this one is only used for visualization
+    def transition_fn(commands):
         sim_state = world.get_initial_state()  # TODO: create from belief for holding
-        problem = pdddlstream_from_problem(belief, collisions=not args.cfree, teleport=args.teleport)
-
-        wait_for_user('Plan?')
-        plan, cost, evaluations = solve_pddlstream(problem, args, skeleton=last_skeleton)
-        if (plan is None) and (last_skeleton is not None):
-            plan, cost, evaluations = solve_pddlstream(problem, args)
-
-        plan_prefix = extract_plan_prefix(plan)
-        print('Prefix:', plan_prefix)
-        commands = commands_from_plan(world, plan_prefix)
-        print('Commands:', commands)
         if args.watch or args.record:
             # TODO: operate on real state
             simulate_plan(sim_state.copy(), commands, args, record=args.record)
         wait_for_user()
-
         sim_state.assign()
         if (commands is None) or args.teleport or args.cfree:
             return False
-        if not commands:
-            return True
-        #wait_for_user()
-        execute_commands(interface, commands)
-        plan_postfix = get_plan_postfix(plan, plan_prefix)
-        last_skeleton = make_wild_skeleton(plan_postfix)
+        return execute_commands(interface, commands)
+
+    return run_policy(task, args, observation_fn, transition_fn)
 
 ################################################################################
 

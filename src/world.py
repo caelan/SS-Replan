@@ -393,7 +393,6 @@ class World(object):
         if pose is None:
             pose = get_pose(body)
         # TODO: can also drop in simulation
-        print(pose)
         x, y, z = point_from_pose(pose)
         roll, pitch, yaw = euler_from_quat(quat_from_pose(pose))
         quat = quat_from_euler(Euler(yaw=yaw))
