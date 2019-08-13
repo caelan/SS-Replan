@@ -51,7 +51,6 @@ JOINT_TEMPLATE = '{}_joint'
 
 def planning_loop(interface):
     args = interface.args
-    domain = interface.domain
     world = interface.world
     belief = create_observable_belief(world)
     last_skeleton = None
@@ -199,7 +198,8 @@ def main():
         #trial_manager.set_camera(randomize=False)
 
         # Need to reset at the start
-        task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed, objects=YCB_OBJECTS)
+        task = task_from_trial_manager(world, trial_manager, task_name,
+                                       objects=YCB_OBJECTS, fixed=args.fixed)
         #trial_manager.disable() # Disables collisions
         interface = Interface(args, task, observer, trial_manager=trial_manager)
         if args.jump:
@@ -223,7 +223,8 @@ def main():
                 pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
                 pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
                 for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
-                    sample_placement(world, name, ECHO_COUNTER, learned=False)
+                    if name in world.body_from_name:
+                        sample_placement(world, name, ECHO_COUNTER, learned=False)
             update_isaac_sim(interface, world)
             #wait_for_user()
 

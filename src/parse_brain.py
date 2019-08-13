@@ -15,6 +15,7 @@ TASKS = [
 def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwargs):
     objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
     trial_goals = [(h.format(o), v) for h, v in goal for o in objects]
+    print('Objects:', objects)
     print('Goals:', trial_goals)
     #regex = re.compile(r"(\w+)\((\)\n")
 

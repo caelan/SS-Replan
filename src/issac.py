@@ -19,7 +19,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
     BASE_LINK, LockRenderer, base_values_from_pose, \
     pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
-    set_renderer, draw_pose, read_json, Pose, Point
+    set_renderer, draw_pose, read_json, Pose, Point, point_from_pose, aabb_contains_point
 from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH
 from src.utils import get_ycb_obj_path
 
@@ -240,9 +240,7 @@ def update_world(world, interface):
     # Using state is nice because it applies noise
 
     task = world.task
-    objects = task.objects
     observer = interface.observer
-    domain = interface.domain
     world_state = update_observer(observer)
     print('Entities:', sorted(world_state.entities))
     #world.reset()
@@ -251,7 +249,8 @@ def update_world(world, interface):
     else:
         visible = set(world_state.entities.keys())
     print('Visible:', visible)
-    update_robot(world, domain, observer)
+    update_robot(world, interface.domain, observer)
+    world_aabb = world.get_world_aabb()
     for name, entity in world_state.entities.items():
         #dump_dict(entity)
         #entity.obj_type, entity.semantic_frames
@@ -259,7 +258,7 @@ def update_world(world, interface):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
             # entity.is_tracked, entity.location_belief, entity.view
-            if name not in objects:
+            if name not in task.objects:
                 continue
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
@@ -268,20 +267,22 @@ def update_world(world, interface):
             body = world.get_body(name)
             frame_name = ISSAC_PREFIX + name
             if (visible is None) or (name in visible):
-                world_from_entity = lookup_pose(observer.tf_listener, frame_name)
-                #world_from_entity = get_world_from_model(observer, entity, body)
-                #world_from_entity = pose_from_tform(entity.pose)
+                pose = lookup_pose(observer.tf_listener, frame_name)
+                #pose = get_world_from_model(observer, entity, body)
+                #pose = pose_from_tform(entity.pose)
             else:
-                # TODO: modify the message directly?
-                world_from_entity = NULL_POSE
-            set_pose(body, world_from_entity)
+                pose = NULL_POSE  # TODO: modify world_state directly?
+            detected = aabb_contains_point(point_from_pose(pose), world_aabb)
+            if not detected:
+                pose = NULL_POSE
+            set_pose(body, pose)
             # TODO: prune objects that are far away
         elif isinstance(entity, Drawer):
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
-            #world_from_entity = get_world_from_model(observer, entity, world.kitchen)
+            #pose = get_world_from_model(observer, entity, world.kitchen)
             #with LockRenderer():
-            #    set_pose(world.kitchen, world_from_entity)
+            #    set_pose(world.kitchen, pose)
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):
@@ -362,7 +363,7 @@ def update_isaac_sim(interface, world):
     update_isaac_robot(observer, sim_manager, world)
     #print(get_camera())
     #set_isaac_camera(sim_manager, camera_pose)
-    time.sleep(0.1)
+    time.sleep(1.0)
     # rospy.sleep(1.) # Small sleep might be needed
     sim_manager.pause() # The second invocation resumes the simulator
 
