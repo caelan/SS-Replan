@@ -156,12 +156,15 @@ def stow_block(world, **kwargs):
     add_kinect(world)  # TODO: this needs to be after set_all_static
 
     #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
+    initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp | range
     #initial_surface = 'indigo_drawer_top'
     goal_surface = 'indigo_drawer_top' # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
-    sample_placement(world, entity_name, initial_surface)
+    sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, obstruction_name, 'hitman_tmp')
+
+    joint_name = 'indigo_drawer_top_joint'
+    #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     #initial_surface = 'golf' # range | table | golf
     #surface_body = world.environment_bodies[initial_surface]
@@ -174,6 +177,7 @@ def stow_block(world, **kwargs):
                 #goal_holding=[entity_name],
                 goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
+                #goal_open=[joint_name],
                 goal_closed=ALL_JOINTS,
                 **kwargs)
 

@@ -1,3 +1,5 @@
+from itertools import count
+
 from pddlstream.algorithms.constraints import WILD, ORDER_PREDICATE
 from pddlstream.language.constants import Action, EQ, get_prefix, get_args, is_cost, is_parameter
 from pddlstream.language.object import OPT_PREFIX
@@ -14,10 +16,12 @@ REUSE_ARGUMENTS = {
     # However, it was next constrained to move the base rather than the arm
 }
 
+def is_optimistic(arg):
+    return isinstance(arg, str) and arg.startswith(OPT_PREFIX)
+
 def test_reusable(name, index, arg):
     indices = REUSE_ARGUMENTS.get(name, [])
-    return ((index in indices) or isinstance(arg, str)) and \
-           not (isinstance(arg, str) and arg.startswith(OPT_PREFIX))
+    return ((index in indices) or isinstance(arg, str)) and not is_optimistic(arg)
 
 def make_wild_skeleton(plan):
     # Can always constrain grasps and selected poses
@@ -34,39 +38,34 @@ def make_wild_skeleton(plan):
     return skeleton
 
 def make_exact_skeleton(plan):
-    skeleton = []
-    arg_from_id = {}
+    # TODO: spend more effort on samples that were previously discovered
+    # TODO: possibly reuse the kinematic solutions as seeds
+    #arg_from_id = {}
     var_from_id = {}
     count_from_prefix = {}
-    #var_from_opt = {}
+    skeleton = []
     for name, args in plan:
         new_args = []
         for i, arg in enumerate(args):
-            if isinstance(arg, str):
-                if arg.startswith(OPT_PREFIX):
-                    #new_arg = WILD
-                    new_arg = '?{}'.format(arg[len(OPT_PREFIX):])
-                else:
-                    new_arg = arg
+            #arg_from_id[id(arg)] = arg
+            if test_reusable(name, i, arg):
+                new_args.append(arg)
             else:
-                #if 'move_arm' in name and (i not in [0, 2]) and False:
-                #    new_arg = WILD
-                #else:
-                #prefix = 'w'
-                prefix = str(arg)[:2].lower()
-                num = count_from_prefix.get(prefix, 0)
-                count_from_prefix[prefix] = count_from_prefix.get(prefix, 0) + 1
-                var = '?{}{}'.format(prefix, num)
-                arg_from_id[id(arg)] = arg
-                new_arg = var_from_id.setdefault(id(arg), var)
-            # TODO: not sure why this fails still
-            #print(arg, new_arg)
-            new_args.append(new_arg)
+                key = id(arg)
+                if key not in var_from_id:
+                    if is_optimistic(arg):
+                        var_from_id[key] = '?{}'.format(arg[len(OPT_PREFIX):]) # WILD
+                    else:
+                        prefix = str(arg)[:2].lower() # 'w'
+                        num = next(count_from_prefix.setdefault(prefix, count()))
+                        var_from_id[key] = '?{}{}'.format(prefix, num)
+                new_args.append(var_from_id[key])
         skeleton.append(Action(name, new_args))
-        print(skeleton[-1])
-    for i, var in sorted(var_from_id.items(), key=lambda pair: pair[-1]):
-        print(arg_from_id[i], var)
-    #raw_input('Continue?')
+        #print(skeleton[-1])
+    #for i, var in sorted(var_from_id.items(), key=lambda pair: pair[-1]):
+    #    print(arg_from_id[i], var)
+    # TODO: could fall back on wild if this fails
+    # TODO: this fails for placing (due to carry_conf / rest_conf disagreement)
     return skeleton
 
 ################################################################################
