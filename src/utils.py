@@ -150,8 +150,9 @@ IKEA_PATH = os.path.join(MODELS_PATH, 'kitchen')
 
 ################################################################################
 
-LEFT_CAMERA = 'zed_left'
-RIGHT_CAMERA = 'zed_right'
+CAMERA_TEMPLATE = 'zed_{}'
+LEFT_CAMERA = CAMERA_TEMPLATE.format('left')
+RIGHT_CAMERA = CAMERA_TEMPLATE.format('right')
 CAMERAS = [LEFT_CAMERA, RIGHT_CAMERA]
 
 KINECT_DEPTH = 5.0

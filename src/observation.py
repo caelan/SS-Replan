@@ -15,7 +15,8 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
     LockRenderer, multiply, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, remove_handles, add_line, BLUE, has_gui, wait_for_duration
+    pairwise_collision, elapsed_time, randomize, remove_handles, add_line, BLUE, has_gui, wait_for_duration, \
+    wait_for_user
 from src.belief import NUM_PARTICLES, PoseDist
 from src.stream import get_stable_gen
 from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
@@ -184,6 +185,7 @@ def are_visible(world):
                    for idx in visible_indices]
         wait_for_duration(1.0)
         remove_handles(handles)
+    # TODO: the object drop seems to happen around here
     return visible_names
 
 ################################################################################

@@ -19,44 +19,42 @@ from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
-from pybullet_tools.utils import LockRenderer, set_camera_pose, wait_for_user, unit_from_theta
+from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta
 
 from src.interface import Interface
 from src.command import execute_commands
-from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS
-from src.observation import create_observable_belief
+from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, \
+    CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER
+from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
-from src.issac import update_world, kill_lula, update_isaac_sim, dump_dict
+from src.issac import observe_world, kill_lula, update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
 from src.problem import pdddlstream_from_problem
 from src.task import Task, CRACKER_POSE2D, BOX_POSE2D, pose2d_on_surface, sample_placement
 from src.replan import get_plan_postfix, make_wild_skeleton
+from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 
-SPAM = 'potted_meat_can'
-MUSTARD = 'mustard_bottle'
-TOMATO_SOUP = 'tomato_soup_can'
-SUGAR = 'sugar_box'
-CHEEZIT = 'cracker_box'
-
-YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-
-ECHO_COUNTER = 'echo'
-INDIGO_COUNTER = 'indigo_tmp'
-TOP_DRAWER = 'indigo_drawer_top'
-JOINT_TEMPLATE = '{}_joint'
-
-################################################################################
 
 def planning_loop(interface):
+    task = interface.task
+    world = task.world
+    # interface.localize_all()
+    # observe_world(world, interface)
     args = interface.args
-    world = interface.world
-    belief = create_observable_belief(world)
+    belief = task.create_belief()
     last_skeleton = None
     while True:
+        interface.localize_all()
+        observation = observe_world(interface)
+        print(observation)
+        belief.update(observation)
+        belief.draw()
+        wait_for_user('Plan?')
+
         # The difference in state is that this one is only used for visualization
-        state = world.get_initial_state() # TODO: create from belief for holding
+        sim_state = world.get_initial_state()  # TODO: create from belief for holding
         problem = pdddlstream_from_problem(belief, collisions=not args.cfree, teleport=args.teleport)
 
         wait_for_user('Plan?')
@@ -70,22 +68,18 @@ def planning_loop(interface):
         print('Commands:', commands)
         if args.watch or args.record:
             # TODO: operate on real state
-            simulate_plan(state.copy(), commands, args, record=args.record)
+            simulate_plan(sim_state.copy(), commands, args, record=args.record)
         wait_for_user()
 
-        state.assign()
+        sim_state.assign()
         if (commands is None) or args.teleport or args.cfree:
             return False
         if not commands:
             return True
-
         #wait_for_user()
         execute_commands(interface, commands)
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         last_skeleton = make_wild_skeleton(plan_postfix)
-        interface.localize_all()
-        update_world(world, interface)
-
 
 ################################################################################
 
@@ -119,6 +113,68 @@ def test_carter(domain, carter):
 #     self.gripper = msg.get_positions([self.gripper_joint])[0]
 # TypeError: 'NoneType' object has no attribute '__getitem__'
 
+def test_isaac_sim(interface):
+    assert interface.simulation
+    task = interface.task
+    world = task.world
+    task = world.task
+    # close_all_doors(world)
+    if task.movable_base:
+        world.set_base_conf([2.0, 0, -np.pi / 2])
+        # world.set_initial_conf()
+    else:
+        pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
+        pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
+        for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
+            if name in world.body_from_name:
+                sample_placement(world, name, ECHO_COUNTER, learned=False)
+    update_isaac_sim(interface, world)
+    # wait_for_user()
+
+################################################################################
+
+def simulation_setup(domain, world, args):
+    # TODO: forcibly reset robot configuration
+    # trial_args = parse.parse_kitchen_args()
+    trial_args = create_trial_args()
+    trial_manager = TrialManager(trial_args, domain, lula=args.lula)
+    observer = trial_manager.observer
+    task_name = args.problem.replace('_', ' ')
+    task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
+    interface = Interface(args, task, observer, trial_manager=trial_manager)
+    if args.jump:
+        robot_entity = domain.get_robot()
+        robot_entity.carter_interface = interface.sim_manager
+    return interface
+
+
+def real_setup(domain, world, args):
+    # TODO: detect if lula is active
+    observer = RosObserver(domain)
+    prior = {
+        SPAM: DeltaDist(INDIGO_COUNTER),
+        CHEEZIT: DeltaDist(INDIGO_COUNTER),
+    }
+    task = Task(world, prior=prior,
+                # goal_holding=[SPAM],
+                goal_on={SPAM: TOP_DRAWER},
+                # goal_closed=[],
+                goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)],  # , 'indigo_drawer_bottom_joint'],
+                # goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
+                movable_base=not args.fixed,
+                return_init_bq=True, return_init_aq=True)
+
+    if not args.fixed:
+        carter = Carter(goal_threshold_tra=0.10,
+                        goal_threshold_rot=math.radians(15.),
+                        vel_threshold_lin=0.01,
+                        vel_threshold_ang=math.radians(1.0))
+        robot_entity = domain.get_robot()
+        robot_entity.carter_interface = carter
+        robot_entity.unsuppress_fixed_bases()
+    return Interface(args, task, observer)
+
+
 ################################################################################
 
 def main():
@@ -136,7 +192,6 @@ def main():
     parser.add_argument('-watch', action='store_true',
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
-    task_name = args.problem.replace('_', ' ')
     np.set_printoptions(precision=3, suppress=True)
     args.watch |= args.execute
 
@@ -150,7 +205,7 @@ def main():
     rospy.init_node("STRIPStream")
     #with HideOutput():
     #if args.execute:
-    #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True)
+    #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     #else:
     domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
     robot_entity = domain.get_robot()
@@ -158,52 +213,13 @@ def main():
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
     #print(dump_dict(robot_entity))
-    # TODO: forcibly reset robot configuration
 
-    world = World(use_gui=True) # args.visualize)
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
-
+    world = World(use_gui=True) # args.visualize)
     if args.execute:
-        observer = RosObserver(domain)
-        task = Task(world,
-                    objects=[SPAM, SUGAR], #, CHEEZIT],
-                    #goal_holding=[SPAM],
-                    goal_on={SPAM: TOP_DRAWER},
-                    #goal_closed=[],
-                    goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)], #, 'indigo_drawer_bottom_joint'],
-                    #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
-                    movable_base=not args.fixed,
-                    return_init_bq=True, return_init_aq=True)
-
-        if not args.fixed:
-            carter = Carter(goal_threshold_tra=0.10,
-                            goal_threshold_rot=math.radians(15.),
-                            vel_threshold_lin=0.01,
-                            vel_threshold_ang=math.radians(1.0))
-            robot_entity.carter_interface = carter
-            robot_entity.unsuppress_fixed_bases()
-        interface = Interface(args, task, observer)
+        interface = real_setup(domain, world, args)
     else:
-        # TODO: detect if lula is active
-        #trial_args = parse.parse_kitchen_args()
-        trial_args = create_trial_args()
-        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
-        observer = trial_manager.observer
-
-        # TODO: could make the camera follow the robot_entity around
-        ##camera_point = Point(4.95, -9.03, 2.03)
-        #camera_point = Point(4.5, -9.5, 2.)
-        #camera_pose = Pose(camera_point, Euler(roll=-3*np.pi/4))
-        #set_isaac_camera(sim_manager, camera_pose)
-        #trial_manager.set_camera(randomize=False)
-
-        # Need to reset at the start
-        task = task_from_trial_manager(world, trial_manager, task_name,
-                                       objects=YCB_OBJECTS, fixed=args.fixed)
-        #trial_manager.disable() # Disables collisions
-        interface = Interface(args, task, observer, trial_manager=trial_manager)
-        if args.jump:
-            robot_entity.carter_interface = interface.sim_manager
+        interface = simulation_setup(domain, world, args)
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -211,25 +227,11 @@ def main():
     #wait_for_user()
     #print('Entities:', sorted(world_state.entities))
     with LockRenderer(lock=True):
-        # Need to do expensive computation before localize_all
-        # Such as loading the meshes
-        update_world(world, interface)
-        if interface.simulation:
-            # close_all_doors(world)
-            if task.movable_base:
-                world.set_base_conf([2.0, 0, -np.pi/2])
-                #world.set_initial_conf()
-            else:
-                pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
-                pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
-                for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
-                    if name in world.body_from_name:
-                        sample_placement(world, name, ECHO_COUNTER, learned=False)
-            update_isaac_sim(interface, world)
-            #wait_for_user()
-
-        interface.localize_all()
-        update_world(world, interface)
+        # Used to need to do expensive computation before localize_all
+        # due to the LULA overhead (e.g. loading complex meshes)
+        observe_world(interface)
+        if interface.simulation:  # TODO: move to simulation instead?
+            test_isaac_sim(interface)
         world.update_initial()
         add_markers(world, inverse_place=False)
 
@@ -239,9 +241,6 @@ def main():
     success = planning_loop(interface)
     print('Success:', success)
     world.destroy()
-
-    # /tracker/axe/joint_states
-    # /tracker/baker/joint_states
 
 ################################################################################
 

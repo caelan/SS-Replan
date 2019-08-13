@@ -12,7 +12,8 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
-    set_quat, quat_from_euler, INF, get_difference, wait_for_user, read_json, set_camera_pose, draw_aabb
+    set_quat, quat_from_euler, INF, get_difference, wait_for_user, read_json, set_camera_pose, draw_aabb, \
+    disable_gravity
 from src.issac import load_calibrate_conf
 from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
@@ -55,6 +56,7 @@ class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.task = None
         self.client = connect(use_gui=use_gui)
+        disable_gravity()
         add_data_path()
         set_camera_pose(camera_point=[2, -1, 1])
         draw_pose(Pose(), length=3)
@@ -174,8 +176,7 @@ class World(object):
             surface_name = self.get_supporting(obj_name)
             if surface_name is not None:
                 initial_attachments.append(create_surface_attachment(self, obj_name, surface_name))
-        return State(self, savers=[self.initial_saver],
-                     attachments=initial_attachments)
+        return State(self, savers=[self.initial_saver], attachments=initial_attachments)
 
     #########################
 
@@ -374,11 +375,25 @@ class World(object):
         set_pose(body, pose)
         step_simulation()
         return name
+
+    def get_supporting(self, obj_name):
+        # is_placed_on_aabb | is_center_on_aabb
+        # Only want to generate stable placements, but can operate on initially unstable ones
+        body = self.get_body(obj_name)
+        supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
+            body, compute_surface_aabb(self, surface),
+            above_epsilon=5e-2, below_epsilon=5e-2)]
+        if len(supporting) != 1:
+            print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
+            return None
+        [surface_name] = supporting
+        return surface_name
     def fix_pose(self, name, pose=None):
         body = self.get_body(name)
         if pose is None:
             pose = get_pose(body)
         # TODO: can also drop in simulation
+        print(pose)
         x, y, z = point_from_pose(pose)
         roll, pitch, yaw = euler_from_quat(quat_from_pose(pose))
         quat = quat_from_euler(Euler(yaw=yaw))
@@ -394,23 +409,15 @@ class World(object):
         print('{}: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
             name, roll, pitch, new_z - z))
         return (point, quat)
-    def fix_geometry(self):
-        for name in self.movable:
-            fixed_pose = self.fix_pose(name)
-            if fixed_pose is not None:
-                set_pose(self.get_body(name), fixed_pose)
-    def get_supporting(self, obj_name):
-        # is_placed_on_aabb | is_center_on_aabb
-        # Only want to generate stable placements, but can operate on initially unstable ones
-        body = self.get_body(obj_name)
-        supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
-            body, compute_surface_aabb(self, surface),
-            above_epsilon=5e-2, below_epsilon=5e-2)]
-        if len(supporting) != 1:
-            print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
-            return None
-        [surface_name] = supporting
-        return surface_name
+
+    # def fix_geometry(self):
+    #    for name in self.movable:
+    #        fixed_pose = self.fix_pose(name)
+    #        if fixed_pose is not None:
+    #            set_pose(self.get_body(name), fixed_pose)
+
+    #########################
+
     def add_body(self, name, path, **kwargs):
         assert name not in self.body_from_name
         self.path_from_name[name] = path

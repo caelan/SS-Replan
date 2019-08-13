@@ -1,10 +1,11 @@
 import numpy as np
 import random
+import time
 
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
     apply_alpha, RED, step_simulation, joint_from_name, set_all_static, \
-    WorldSaver, stable_z_on_aabb, wait_for_user, draw_aabb, get_aabb, pairwise_collision
+    WorldSaver, stable_z_on_aabb, wait_for_user, draw_aabb, get_aabb, pairwise_collision, elapsed_time
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
@@ -38,8 +39,11 @@ class Task(object):
         self.init = init
         self.goal = goal
     def create_belief(self):
+        t0 = time.time()
+        print('Creating initial belief')
         belief = create_surface_belief(self.world, self.prior)
         belief.task = self
+        print('Took {:2f} seconds'.format(elapsed_time(t0)))
         return belief
     def __repr__(self):
         return '{}{}'.format(self.__class__.__name__, {

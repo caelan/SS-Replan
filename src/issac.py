@@ -20,8 +20,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     BASE_LINK, LockRenderer, base_values_from_pose, \
     pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
     set_renderer, draw_pose, read_json, Pose, Point, point_from_pose, aabb_contains_point
-from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH
-from src.utils import get_ycb_obj_path
+from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH, get_ycb_obj_path, CAMERA_TEMPLATE
 
 ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
 ISSAC_FRANKA_FRAME = 'base_link' # Robot base
@@ -115,6 +114,20 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     world_from_model = multiply(world_from_entity, entity_from_model)
     return world_from_model
 
+
+def check_limits(world, entity):
+    violation = False
+    arm_joints = joints_from_names(world.robot, entity.joints)
+    for i, joint in enumerate(arm_joints):
+        if violates_limit(world.robot, joint, entity.q[i]):
+            print('Joint {} violates limits: index={}, position={}, range={}'.format(
+                entity.joints[i], i, entity.q[i], get_joint_limits(world.robot, joint)))
+            violation = True
+            # TODO: change the link's color
+    if violation:
+        set_renderer(enable=True)
+        wait_for_user()
+
 def update_robot(world, domain, observer):
     world_state = observer.current_state
     entity = world_state.entities[domain.robot]
@@ -136,16 +149,9 @@ def update_robot(world, domain, observer):
     world.set_base_conf(base_values)
     print('Initial base:', base_values)
 
-    violation = False
-    for i, joint in enumerate(arm_joints):
-        if violates_limit(world.robot, joint, entity.q[i]):
-            print('Joint {} violates limits: index={}, position={}, range={}'.format(
-                entity.joints[i], i, entity.q[i], get_joint_limits(world.robot, joint)))
-            violation = True
-            # TODO: change the link's color
-    if violation:
-       set_renderer(enable=True)
-       wait_for_user()
+    check_limits(world, entity)
+    # draw_pose(get_pose(world.robot), length=3)
+    # draw_pose(get_link_pose(world.robot, world.base_link), length=1)
 
     #map_from_carter = pose_from_pose2d(carter_values)
     #world_from_carter = pose_from_pose2d(base_values)
@@ -171,7 +177,7 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
 
 ################################################################################
 
-def display_kinect(world, observer):
+def display_kinect(world, observer, side):
     if world.cameras:
         return
     camera_infos = []
@@ -185,10 +191,10 @@ def display_kinect(world, observer):
         camera_matrix = np.array(cam_model.projectionMatrix())[:3, :3]
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
-        for camera_name in CAMERAS:
-            world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
-            if world_from_camera is not None:
-                world.add_camera(camera_name, world_from_camera, camera_matrix)
+        camera_name = CAMERA_TEMPLATE.format(side)
+        world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
+        if world_from_camera is not None:
+            world.add_camera(camera_name, world_from_camera, camera_matrix)
         observer.camera_sub.unregister()
         # draw_viewcone(world_from_camera)
         # /sim/left_color_camera/camera_info
@@ -197,7 +203,7 @@ def display_kinect(world, observer):
         # TODO: would be cool to display the kinect2 as well
 
     observer.camera_sub = rospy.Subscriber(
-        "/sim/{}_{}_camera/camera_info".format('left', 'color'), # TODO: right as well
+        "/sim/{}_{}_camera/camera_info".format(side, 'color'),  # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
 
 def detect_classes():
@@ -230,12 +236,13 @@ def detect_classes():
 
 ################################################################################
 
-def observe_world(world, interface):
+def observe_world(interface):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
     #print(world_state.get_frames())
     # Using state is nice because it applies noise
 
+    world = interface.world
     task = world.task
     observer = interface.observer
     world_state = update_observer(observer)
@@ -246,6 +253,7 @@ def observe_world(world, interface):
     else:
         visible = set(world_state.entities.keys())
     print('Visible:', visible)
+
     update_robot(world, interface.domain, observer)
     world_aabb = world.get_world_aabb()
     observation = {}
@@ -256,7 +264,7 @@ def observe_world(world, interface):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
             # entity.is_tracked, entity.location_belief, entity.view
-            if name not in task.objects:
+            if name not in task.prior:
                 continue
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
@@ -271,7 +279,7 @@ def observe_world(world, interface):
             else:
                 pose = NULL_POSE  # TODO: modify world_state directly?
             if aabb_contains_point(point_from_pose(pose), world_aabb):
-                observation[name] = pose
+                observation.setdefault(name, []).append(pose)
         elif isinstance(entity, Drawer):
             # /tracker/axe/joint_states
             # /tracker/baker/joint_states
@@ -284,12 +292,7 @@ def observe_world(world, interface):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-    display_kinect(world, observer) # Just do this once?
-    #draw_pose(get_pose(world.robot), length=3)
-    #draw_pose(get_link_pose(world.robot, world.base_link), length=1)
-    #wait_for_user('Raw observations')
-    #world.fix_geometry()
-    #wait_for_user('Fixed observations')
+    display_kinect(world, observer, side='left')
     return observation
 
 ################################################################################
