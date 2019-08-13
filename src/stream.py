@@ -3,7 +3,6 @@ import random
 from itertools import islice, cycle
 from collections import namedtuple
 
-from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, \
     set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
@@ -22,7 +21,7 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES
+    get_link_obstacles, ENV_SURFACES, FConf
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.belief import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
@@ -364,7 +363,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
                 continue
             # TODO: account for doors and placed-object collisions here
             #pose.assign()
-            bq = Conf(world.robot, world.base_joints, base_conf)
+            bq = FConf(world.robot, world.base_joints, base_conf)
             bq.assign()
             for conf in world.special_confs:
                 # TODO: ensure the end-effector is visible at the calibrate_conf
@@ -493,7 +492,7 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     if approach_path is None:
         return
     if MOVE_ARM:
-        aq = Conf(world.robot, world.arm_joints, approach_path[0])
+        aq = FConf(world.robot, world.arm_joints, approach_path[0])
     else:
         aq = world.carry_conf
 
@@ -695,8 +694,8 @@ def plan_pull(world, door_joint, door_plan, base_conf,
         approach_paths.append(approach_path)
 
     if MOVE_ARM:
-        aq1 = Conf(world.robot, world.arm_joints, approach_paths[0][0])
-        aq2 = Conf(world.robot, world.arm_joints, approach_paths[-1][0])
+        aq1 = FConf(world.robot, world.arm_joints, approach_paths[0][0])
+        aq2 = FConf(world.robot, world.arm_joints, approach_paths[-1][0])
     else:
         aq1 = world.carry_conf
         aq2 = aq1
@@ -706,7 +705,7 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     grasp_width = close_until_collision(world.robot, world.gripper_joints,
                                         bodies=[(world.kitchen, [handle_link])])
     gripper_motion_fn = get_gripper_motion_gen(world, teleport=teleport, collisions=collisions, **kwargs)
-    gripper_conf = Conf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
+    gripper_conf = FConf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
     cmd = Sequence(State(world, savers=[robot_saver]), commands=[
@@ -857,7 +856,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
 
 def get_reachability_test(world, **kwargs):
     base_motion_fn = get_base_motion_fn(world, restarts=2, iterations=50, smooth=0, **kwargs)
-    bq0 = Conf(world.robot, world.base_joints)
+    bq0 = FConf(world.robot, world.base_joints)
     # TODO: can check for arm motions as well
 
     def test(bq):

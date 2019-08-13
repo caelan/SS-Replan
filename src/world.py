@@ -3,7 +3,6 @@ import os
 from collections import namedtuple
 
 from ikfast.ik import sample_tool_ik
-from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutput, set_point, Point, stable_z, \
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
@@ -19,7 +18,7 @@ from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH, IKEA_PATH
+    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH, IKEA_PATH, FConf
 from log_poses import POSES_PATH
 
 DISABLED_FRANKA_COLLISIONS = {
@@ -102,13 +101,13 @@ class World(object):
             self.disabled_collisions.update(tuple(link_from_name(self.robot, link) for link in pair)
                                             for pair in DISABLED_FRANKA_COLLISIONS)
 
-        self.carry_conf = Conf(self.robot, self.arm_joints, self.default_conf)
+        self.carry_conf = FConf(self.robot, self.arm_joints, self.default_conf)
         #self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
-        self.calibrate_conf = Conf(self.robot, self.arm_joints, self.default_conf) # Must differ from carry_conf
+        self.calibrate_conf = FConf(self.robot, self.arm_joints, self.default_conf) # Must differ from carry_conf
         self.special_confs = [self.carry_conf, self.calibrate_conf]
-        self.open_gq = Conf(self.robot, self.gripper_joints,
+        self.open_gq = FConf(self.robot, self.gripper_joints,
                             get_max_limits(self.robot, self.gripper_joints))
-        self.closed_gq = Conf(self.robot, self.gripper_joints,
+        self.closed_gq = FConf(self.robot, self.gripper_joints,
                               get_min_limits(self.robot, self.gripper_joints))
         self.update_custom_limits()
         self.update_initial()

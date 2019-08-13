@@ -140,6 +140,7 @@ def commands_from_plan(world, plan):
     # TODO: propagate the state
     commands = []
     for action, params in plan:
+        # TODO: break if the action is a StreamAction
         if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull']:
             commands.extend(params[-1].commands)
         elif action == 'detect':

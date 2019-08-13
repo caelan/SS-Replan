@@ -185,6 +185,7 @@ def main():
             robot_entity.unsuppress_fixed_bases()
         interface = Interface(args, task, observer)
     else:
+        # TODO: detect if lula is active
         #trial_args = parse.parse_kitchen_args()
         trial_args = create_trial_args()
         trial_manager = TrialManager(trial_args, domain, lula=args.lula)

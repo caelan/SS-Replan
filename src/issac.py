@@ -301,6 +301,30 @@ def update_isaac_robot(observer, sim_manager, world):
     unreal_from_carter = multiply(unreal_from_world, world_from_carter)
     sim_manager.set_pose(robot_name, tform_from_pose(unreal_from_carter), do_correction=False)
 
+def update_isaac_poses(interface, world):
+    unreal_from_world = lookup_pose(interface.observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
+                                    target_frame=UNREAL_WORLD_FRAME)
+    for name, body in world.body_from_name.items():
+        full_name = TEMPLATE % name
+        world_from_urdf = get_pose(body)
+        unreal_from_urdf = multiply(unreal_from_world, world_from_urdf)
+        interface.sim_manager.set_pose(full_name, tform_from_pose(unreal_from_urdf), do_correction=False)
+
+def update_kitchen_joints(interface, world):
+    for body in [world.kitchen]: #, world.robot]:
+        # TODO: doesn't seem to work for robots
+        # TODO: set kitchen base pose
+        joints = get_movable_joints(body)
+        #joints = world.arm_joints
+        # Doesn't seem to fail if the kitchen joint doesn't exist
+        # TODO: doesn't seem to actually work
+        names = get_joint_names(body, joints)
+        positions = get_joint_positions(body, joints)
+        interface.sim_manager.set_joints(names, positions, duration=rospy.Duration(5))
+        print('Kitchen joints:', names)
+    print('awef')
+
+
 def update_isaac_sim(interface, world):
     # RobotConfigModulator seems to just change the default config
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py
@@ -311,32 +335,14 @@ def update_isaac_sim(interface, world):
     sim_manager = interface.sim_manager
     observer = interface.observer
     sim_manager.pause() # This pauses the simulator
-    unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
-                                    target_frame=UNREAL_WORLD_FRAME)
-
-    for name, body in world.body_from_name.items():
-        full_name = TEMPLATE % name
-        world_from_urdf = get_pose(body)
-        unreal_from_urdf = multiply(unreal_from_world, world_from_urdf)
-        sim_manager.set_pose(full_name, tform_from_pose(unreal_from_urdf), do_correction=False)
-
-    for body in [world.kitchen]: #, world.robot]:
-        # TODO: doesn't seem to work for robots
-        # TODO: set kitchen base pose
-        joints = get_movable_joints(body)
-        #joints = world.arm_joints
-        # Doesn't seem to fail if the kitchen joint doesn't exist
-        # TODO: doesn't seem to actually work
-        names = get_joint_names(body, joints)
-        positions = get_joint_positions(body, joints)
-        sim_manager.set_joints(names, positions, duration=rospy.Duration(5))
-        print('Kitchen joints:', names)
+    update_isaac_poses(interface, world)
+    # TODO: freezes here with newest version of srl_system
+    #update_kitchen_joints(interface, world)
 
     # Changes the default configuration
     #config_modulator = domain.config_modulator
     #print(kitchen_poses.ycb_place_in_drawer_q) # 7 DOF
     #config_modulator.send_config(get_joint_positions(world.robot, world.arm_joints)) # Arm joints
-
     update_isaac_robot(observer, sim_manager, world)
     #print(get_camera())
     #set_isaac_camera(sim_manager, camera_pose)

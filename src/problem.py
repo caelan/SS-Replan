@@ -9,12 +9,11 @@ from pddlstream.language.stream import DEBUG
 from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
-from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
     WorldSaver, get_difference_fn
 
 from src.belief import PoseDist
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, FConf
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -123,12 +122,12 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
 
     # TODO: could replace objects for init_bq and init_gq instead of using closeto
-    init_bq = Conf(world.robot, world.base_joints)
-    init_aq = Conf(world.robot, world.arm_joints)
+    init_bq = FConf(world.robot, world.base_joints)
+    init_aq = FConf(world.robot, world.arm_joints)
     for aq in [carry_aq]: # calibrate_aq
         if np.allclose(arm_distance_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
             init_aq = aq
-    init_gq = Conf(world.robot, world.gripper_joints)
+    init_gq = FConf(world.robot, world.gripper_joints)
 
     constant_map = {
         '@world': 'world',
@@ -200,7 +199,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     if not task.movable_base or task.return_init_bq:
         with WorldSaver():
             world.initial_saver.restore()
-            goal_bq = Conf(world.robot, world.base_joints)
+            goal_bq = FConf(world.robot, world.base_joints)
         if not task.movable_base:
             goal_bq = init_bq
         init.extend([
@@ -219,7 +218,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         if task.return_init_aq:
             with WorldSaver():
                 world.initial_saver.restore()
-                goal_aq = Conf(world.robot, world.arm_joints)
+                goal_aq = FConf(world.robot, world.arm_joints)
             if np.allclose(arm_distance_fn(goal_aq.values, carry_aq.values), np.zeros(len(carry_aq.joints))):
                 goal_aq = aq
             if np.less_equal(np.abs(arm_distance_fn(init_aq.values, goal_aq.values)),
@@ -242,10 +241,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         link_name = get_link_name(world.kitchen, link)
         #link_name = str(link_name.decode('UTF-8'))
         #link_name = str(link_name.encode('ascii','ignore'))
-        init_conf = Conf(world.kitchen, [joint], init=True)
-        open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
+        init_conf = FConf(world.kitchen, [joint], init=True)
+        open_conf = FConf(world.kitchen, [joint], [world.open_conf(joint)])
         #init_conf = open_conf
-        closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
+        closed_conf = FConf(world.kitchen, [joint], [world.closed_conf(joint)])
         for conf in [init_conf, open_conf, closed_conf]:
             # TODO: return to initial poses?
             world_pose, = compute_angle_kin(link_name, joint_name, conf)

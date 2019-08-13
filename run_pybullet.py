@@ -24,7 +24,7 @@ from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_commands, \
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block, detect_block, TASKS
-from src.replan import make_wild_skeleton, compute_plan_cost, get_plan_postfix, reuse_facts
+from src.replan import make_wild_skeleton, make_exact_skeleton, compute_plan_cost, get_plan_postfix, reuse_facts
 
 
 #from src.debug import dump_link_cross_sections, test_rays
@@ -84,10 +84,7 @@ def run_stochastic(task, args):
     # The nice thing about having a correct belief model is that you actually know what cost makes progress
     world = task.world
     state = world.get_initial_state()
-    if args.observable:
-        belief = create_observable_belief(world)
-    else:
-        belief = create_surface_belief(world, UniformDist(ZED_LEFT_SURFACES))
+    belief = create_surface_belief(world, UniformDist(ZED_LEFT_SURFACES))
     # TODO: when no collisions, the robot doesn't necessarily stand in reach of the surface
     print('Prior:', belief)
     video = None
@@ -143,8 +140,8 @@ def run_stochastic(task, args):
         transition_belief_update(belief, plan_prefix)
 
         plan_postfix = get_plan_postfix(plan, plan_prefix)
-        previous_skeleton = make_wild_skeleton(plan_postfix)
-        #previous_skeleton = make_exact_skeleton(plan_postfix)
+        #previous_skeleton = make_wild_skeleton(plan_postfix)
+        previous_skeleton = make_exact_skeleton(plan_postfix)
         #last_cost = compute_plan_cost(plan_postfix)
 
         #previous_facts = []
@@ -182,6 +179,7 @@ def main():
     # TODO: objects lift up for some reason
 
     task = task_fn(world)
+    world.update_initial()
     if not args.record:
         with LockRenderer():
             add_markers(world, inverse_place=False)

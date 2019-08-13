@@ -34,6 +34,9 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
             assert value is False
             value = True
             formula = ('AtGConf', world.open_gq)
+        elif predicate == 'gripper_open':
+            assert value is True
+            formula = ('AtGConf', world.open_gq)
         elif predicate == 'cabinet_is_open':
             cabinet, = args
             joint_name = '{}_joint'.format(cabinet)

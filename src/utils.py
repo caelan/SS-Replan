@@ -333,6 +333,18 @@ def create_gripper(robot, visual=False):
     #user_input()
     return gripper
 
+class FConf(Conf):
+    def __repr__(self):
+        if len(self.joints) == 2:
+            prefix = 'gq'
+        elif len(self.joints) == 3:
+            prefix = 'bq'
+        elif len(self.joints) == 7:
+            prefix = 'aq'
+        else:
+            prefix = 'q'
+        return '{}{}'.format(prefix, id(self) % 1000)
+
 ################################################################################
 
 def create_surface_attachment(world, obj_name, surface_name):
@@ -454,7 +466,7 @@ class Grasp(object):
                           self.grasp_pose, self.world.get_body(self.body_name))
     def get_gripper_conf(self):
         conf = [self.grasp_width] * len(self.world.gripper_joints)
-        return Conf(self.world.robot, self.world.gripper_joints, conf)
+        return FConf(self.world.robot, self.world.gripper_joints, conf)
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
