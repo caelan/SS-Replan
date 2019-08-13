@@ -19,7 +19,7 @@ from src.observation import create_observable_belief, \
     transition_belief_update, observe_pybullet
 #from src.debug import test_observation
 from src.planner import VIDEO_TEMPLATE, DEFAULT_TIME_STEP, iterate_commands, \
-    solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix
+    solve_pddlstream, simulate_plan, commands_from_plan, extract_plan_prefix, REPLAN_ACTIONS
 from src.world import World
 from src.problem import pdddlstream_from_problem
 from src.task import stow_block, detect_block, TASKS
@@ -34,8 +34,10 @@ def create_parser():
                         help='Runs in an anytime mode')
     parser.add_argument('-cfree', action='store_true',
                         help='When enabled, disables collision checking (for debugging).')
-    parser.add_argument('-defer', action='store_true',
-                        help='When enabled, defers evaluation of motion planning streams.')
+    #parser.add_argument('-defer', action='store_true',
+    #                    help='When enabled, defers evaluation of motion planning streams.')
+    parser.add_argument('-deterministic', action='store_true',
+                        help='Treats actions as fully deterministic')
     parser.add_argument('-observable', action='store_true',
                         help='Treats the state as fully observable')
     parser.add_argument('-max_time', default=3*60, type=int,
@@ -43,8 +45,8 @@ def create_parser():
     parser.add_argument('-record', action='store_true',
                         help='When enabled, records and saves a video at {}'.format(
                             VIDEO_TEMPLATE.format('<problem>')))
-    parser.add_argument('-seed', default=None,
-                        help='The random seed to use.')
+    #parser.add_argument('-seed', default=None,
+    #                    help='The random seed to use.')
     parser.add_argument('-teleport', action='store_true',
                         help='When enabled, motion planning is skipped')
     parser.add_argument('-unit', action='store_true',
@@ -65,7 +67,7 @@ def run_deterministic(task, args):
 
     problem = pdddlstream_from_problem(belief,
         collisions=not args.cfree, teleport=args.teleport)
-    solution = solve_pddlstream(problem, args)
+    solution = solve_pddlstream(problem, args, replan_actions={})
     plan, cost, evaluations = solution
     commands = commands_from_plan(world, plan)
     simulate_plan(state, commands, args, record=args.record)
@@ -76,7 +78,10 @@ def run_deterministic(task, args):
 def run_stochastic(task, args):
     world = task.world
     real_state = world.get_initial_state()
-    belief = task.create_belief()
+    if args.observable:
+        belief = create_observable_belief(world) # Faster
+    else:
+        belief = task.create_belief()
     print('Prior:', belief)
     video = None
     if args.record:
@@ -172,7 +177,7 @@ def main():
     # 4650801/25658    2.695    0.000    8.169    0.000 /home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/skeleton.py:114(do_evaluate_helper)
     #test_observation(world, entity_name='big_red_block0')
     #return
-    if args.observable:
+    if args.deterministic and args.observable:
         run_deterministic(task, args)
     else:
         run_stochastic(task, args)

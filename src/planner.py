@@ -19,9 +19,9 @@ from src.command import Wait, iterate_commands, Trajectory
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
-REPLAN_ACTIONS = {'calibrate', 'detect', 'pull', 'place'}
+REPLAN_ACTIONS = tuple(['calibrate', 'detect', 'pull', 'place'])
 
-def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
+def solve_pddlstream(problem, args, skeleton=None, replan_actions=REPLAN_ACTIONS, max_time=INF, max_cost=INF):
     reset_globals()
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
@@ -69,7 +69,6 @@ def solve_pddlstream(problem, args, skeleton=None, max_time=INF, max_cost=INF):
         #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
     #print(set(stream_map) - set(stream_info))
-    replan_actions = REPLAN_ACTIONS if args.defer else set()
     skeletons = None if skeleton is None else [skeleton]
     max_cost = min(max_cost, MAX_COST)
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
