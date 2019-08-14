@@ -19,12 +19,6 @@ from src.stream import get_stable_gen
 from src.utils import create_relative_pose, \
     RelPose
 
-OBS_P_FP, OBS_P_FN = 0.0, 0.0
-#OBS_POS_STD, OBS_ORI_STD = 0.01, np.pi / 8
-OBS_POS_STD, OBS_ORI_STD = 0., 0.
-
-ELSEWHERE = None # symbol for elsewhere pose
-
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
 # TODO: use a proper probabilistic programming library rather than dist.py

@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 from pybullet_tools.utils import wait_for_user, VideoSaver, print_separator, INF
-from src.observation import create_observable_belief, transition_belief_update
+from src.belief import create_observable_belief, transition_belief_update
 from src.planner import VIDEO_TEMPLATE, solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts

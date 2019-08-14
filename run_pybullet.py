@@ -14,8 +14,8 @@ from pybullet_tools.utils import wait_for_user, LockRenderer, \
     get_random_seed, get_numpy_seed
 from src.command import create_state
 from src.visualization import add_markers
-from src.observation import create_observable_belief, \
-    observe_pybullet
+from src.belief import create_observable_belief
+from src.observe import observe_pybullet
 #from src.debug import test_observation
 from src.planner import VIDEO_TEMPLATE, iterate_commands, \
     solve_pddlstream, simulate_plan, commands_from_plan

@@ -14,7 +14,7 @@ from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, ZED_LEFT_SURFACES
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
-from src.observation import Belief, create_surface_belief
+from src.belief import Belief, create_surface_belief
 
 class Task(object):
     def __init__(self, world, prior={}, skeletons=[],
