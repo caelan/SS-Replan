@@ -1,8 +1,5 @@
 from __future__ import print_function
 
-import numpy as np
-import random
-import math
 import time
 
 from pddlstream.utils import str_from_object
@@ -12,15 +9,14 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask
 
 #from examples.discrete_belief.run import geometric_cost
-from pybullet_tools.pr2_utils import is_visible_point
-from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Point, Pose, Euler, set_pose, get_pose, BodySaver, \
-    LockRenderer, multiply, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, remove_handles, add_line, BLUE, has_gui, wait_for_duration, \
-    wait_for_user
+from pybullet_tools.utils import BodySaver, \
+    LockRenderer, spaced_colors, WorldSaver, \
+    pairwise_collision, elapsed_time, randomize, remove_handles
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
+from src.observe import fix_detections
 from src.stream import get_stable_gen
-from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
+from src.utils import create_relative_pose, \
     RelPose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
@@ -172,84 +168,6 @@ def create_surface_belief(world, surface_dists, **kwargs):
             for name, surface_dist in surface_dists.items()}, **kwargs)
 
 ################################################################################
-
-def are_visible(world):
-    ray_names = []
-    rays = []
-    for name in world.movable:
-        for camera, info in world.cameras.items():
-            camera_pose = get_pose(info.body)
-            camera_point = point_from_pose(camera_pose)
-            point = point_from_pose(get_pose(world.get_body(name)))
-            if is_visible_point(CAMERA_MATRIX, KINECT_DEPTH, point, camera_pose=camera_pose):
-                ray_names.append(name)
-                rays.append(Ray(camera_point, point))
-    ray_results = batch_ray_collision(rays)
-    visible_indices = [idx for idx, (name, result) in enumerate(zip(ray_names, ray_results))
-                       if result.objectUniqueId == world.get_body(name)]
-    visible_names = {ray_names[idx] for idx in visible_indices}
-    print('Detected:', sorted(visible_names))
-    if has_gui():
-        handles = [add_line(rays[idx].start, rays[idx].end, color=BLUE)
-                   for idx in visible_indices]
-        wait_for_duration(1.0)
-        remove_handles(handles)
-    # TODO: the object drop seems to happen around here
-    return visible_names
-
-################################################################################
-
-def fully_observe_pybullet(world):
-    return {name: get_pose(body) for name, body in world.body_from_name.items()}
-
-def observe_pybullet(world):
-    # TODO: randomize robot's pose
-    # TODO: probabilities based on whether in viewcone or not
-    # TODO: sample from poses on table
-    visible_entities = are_visible(world)
-    detections = {}
-    assert OBS_P_FP == 0
-    for name in visible_entities:
-        # TODO: false positives
-        if random.random() < OBS_P_FN:
-            continue
-        body = world.get_body(name)
-        pose = get_pose(body)
-        dx, dy = np.random.multivariate_normal(
-            mean=np.zeros(2), cov=math.pow(OBS_POS_STD, 2) * np.eye(2))
-        dyaw, = np.random.multivariate_normal(
-            mean=np.zeros(1), cov=math.pow(OBS_ORI_STD, 2) * np.eye(1))
-        print('{}: dx={:.3f}, dy={:.3f}, dyaw={:.5f}'.format(name, dx, dy, dyaw))
-        noise_pose = Pose(Point(x=dx, y=dy), Euler(yaw=dyaw))
-        observed_pose = multiply(pose, noise_pose)
-        #world.get_body_type(name)
-        detections.setdefault(name, []).append(observed_pose) # TODO: use type instead
-    return detections
-
-################################################################################
-
-def fix_detections(belief, detections):
-    # TODO: move directly to belief?
-    world = belief.world
-    fixed_detections = {}
-    for name in detections:
-        if name == belief.holding:
-            continue
-        body = world.get_body(name)
-        for observed_pose in detections[name]:
-            fixed_pose, support = world.fix_pose(name, observed_pose)
-            #fixed_pose = observed_pose
-            if fixed_pose is None:
-                continue
-            set_pose(body, fixed_pose)
-            support = world.get_supporting(name)
-            if support is None:
-                continue # Could also fix as relative to the world
-            assert support is not None
-            relative_pose = create_relative_pose(world, name, support, init=False)
-            fixed_detections.setdefault(name, []).append(relative_pose)
-            # relative_pose.assign()
-    return fixed_detections
 
 def transition_belief_update(belief, plan):
     if plan is None:
