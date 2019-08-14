@@ -11,7 +11,7 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.utils import BodySaver, \
     LockRenderer, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, remove_handles
+    pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, ELSEWHERE
@@ -59,9 +59,9 @@ class Belief(object):
         if self.grasped is None:
             return None
         return self.grasped.body_name
-    def update(self, observation, n_samples=25):
+
+    def update(self, detections, n_samples=25):
         start_time = time.time()
-        detections = fix_detections(self, observation)
         self.observations.append(detections)
         # Processing detected first
         # Could simply sample from the set of worlds and update
@@ -69,8 +69,9 @@ class Belief(object):
         # Instead, let the moving object take on different poses
         order = [name for name in detections] # Detected
         order.extend(set(self.pose_dists) - set(order)) # Not detected
-        with WorldSaver():
-            with LockRenderer():
+        with LockRenderer():
+            with WorldSaver():
+                # detections = fix_detections(self, detections) # TODO: skip if in sim
                 for name in order:
                     self.pose_dists[name] = self.pose_dists[name].update(
                         self, detections, n_samples=n_samples)
@@ -109,13 +110,15 @@ class Belief(object):
             #self.pose_dists[name].dump()
             print(i, name, self.pose_dists[name])
     def draw(self, **kwargs):
-        with LockRenderer():
+        with LockRenderer(False):
             remove_handles(self.handles)
             self.handles = []
             with WorldSaver():
                 for name, pose_dist in self.pose_dists.items():
                     self.handles.extend(pose_dist.draw(
                             color=self.color_from_name[name], **kwargs))
+        wait_for_user()
+        wait_for_duration(0.1)
     def __repr__(self):
         return '{}(holding={}, placed={})'.format(self.__class__.__name__, self.holding, str_from_object(
             {name: self.pose_dists[name].surface_dist for name in self.names}))

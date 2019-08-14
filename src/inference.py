@@ -226,11 +226,12 @@ class PoseDist(object):
     def update(self, belief, observation, n_samples=25, verbose=False, **kwargs):
         if verbose:
             print('Prior:', self.dist)
+        body = self.world.get_body(self.name)
         obstacles = [self.world.get_body(name) for name in belief.pose_dists if name != self.name]
         dists = []
         for _ in range(n_samples):
             belief.sample(discrete=True)  # Trouble if no support
-            with BodySaver(self.world.get_body(self.name)):
+            with BodySaver(body):
                 new_dist = self.update_dist(observation, obstacles, **kwargs)
                 #new_pose_dist = self.__class__(self.world, self.name, new_dist).resample()
             dists.append(new_dist)

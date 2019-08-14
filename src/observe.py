@@ -4,7 +4,7 @@ import random
 
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import get_pose, point_from_pose, Ray, batch_ray_collision, has_gui, add_line, BLUE, \
-    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose
+    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose, wait_for_user, WorldSaver
 from src.utils import CAMERA_MATRIX, KINECT_DEPTH, create_relative_pose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
@@ -48,6 +48,7 @@ def observe_pybullet(world):
     # TODO: randomize robot's pose
     # TODO: probabilities based on whether in viewcone or not
     # TODO: sample from poses on table
+    world_saver = WorldSaver()
     visible_entities = are_visible(world)
     detections = {}
     assert OBS_P_FP == 0
@@ -66,6 +67,9 @@ def observe_pybullet(world):
         observed_pose = multiply(pose, noise_pose)
         #world.get_body_type(name)
         detections.setdefault(name, []).append(observed_pose) # TODO: use type instead
+    wait_for_user()
+    world_saver.restore()
+    wait_for_user()
     return detections
 
 ################################################################################

@@ -89,7 +89,6 @@ def main():
     world = World(use_gui=True)
     task_fn_from_name = {fn.__name__: fn for fn in TASKS}
     task_fn = task_fn_from_name[args.problem]
-    # TODO: objects lift up for some reason
 
     task = task_fn(world)
     world.update_initial()
