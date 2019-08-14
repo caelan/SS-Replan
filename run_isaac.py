@@ -20,10 +20,11 @@ from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta
+from pddlstream.utils import Verbose
 
 from src.policy import run_policy
 from src.interface import Interface
-from src.command import execute_commands
+from src.command import execute_commands, iterate_commands
 from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, \
     CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER
 from src.utils import JOINT_TEMPLATE
@@ -32,30 +33,29 @@ from src.issac import observe_world, kill_lula, update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import simulate_plan
-from src.task import Task, CRACKER_POSE2D, BOX_POSE2D, pose2d_on_surface, sample_placement
+from src.task import Task, CRACKER_POSE2D, SPAM_POSE2D, pose2d_on_surface, sample_placement
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 
 def planning_loop(interface):
-    task = interface.task
-    world = task.world
     args = interface.args
 
     def observation_fn():
         interface.localize_all()
         return observe_world(interface)
 
-    def transition_fn(commands):
-        sim_state = world.get_initial_state()  # TODO: create from belief for holding
+    def transition_fn(belief, commands):
+        sim_state = belief.sample_state()
         if args.watch or args.record:
-            # TODO: operate on real state
-            simulate_plan(sim_state.copy(), commands, args, record=args.record)
+            # simulate_plan(sim_state.copy(), commands, args, record=args.record)
+            iterate_commands(sim_state.copy(), commands, args)
         wait_for_user()
         sim_state.assign()
-        if (commands is None) or args.teleport or args.cfree:
+        if args.teleport or args.cfree:
+            print('Skipping execution')
             return False
         return execute_commands(interface, commands)
 
-    return run_policy(task, args, observation_fn, transition_fn)
+    return run_policy(interface.task, args, observation_fn, transition_fn)
 
 ################################################################################
 
@@ -99,7 +99,7 @@ def test_isaac_sim(interface):
         world.set_base_conf([2.0, 0, -np.pi / 2])
         # world.set_initial_conf()
     else:
-        pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=BOX_POSE2D)
+        pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
         pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
         for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
             if name in world.body_from_name:
@@ -113,7 +113,8 @@ def simulation_setup(domain, world, args):
     # TODO: forcibly reset robot configuration
     # trial_args = parse.parse_kitchen_args()
     trial_args = create_trial_args()
-    trial_manager = TrialManager(trial_args, domain, lula=args.lula)
+    with Verbose(False):
+        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
     observer = trial_manager.observer
     task_name = args.problem.replace('_', ' ')
     task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
@@ -183,7 +184,8 @@ def main():
     #if args.execute:
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     #else:
-    domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
+    with Verbose(False):
+        domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
     robot_entity = domain.get_robot()
     robot_entity.suppress_fixed_bases() # Not as much error?
     #robot_entity.unsuppress_fixed_bases() # Significant error
@@ -206,8 +208,8 @@ def main():
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
         observe_world(interface)
-        if interface.simulation:  # TODO: move to simulation instead?
-            test_isaac_sim(interface)
+        # if interface.simulation:  # TODO: move to simulation instead?
+        #    test_isaac_sim(interface)
         world.update_initial()
         add_markers(world, inverse_place=False)
 

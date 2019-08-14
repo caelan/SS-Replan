@@ -6,11 +6,12 @@ from isaac_bridge.manager import SimulationManager
 
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, flatten_links, remove_handles, \
-    get_joint_limits, batch_ray_collision, draw_ray
+    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver
 from src.base import follow_base_trajectory
 from src.execution import moveit_control, \
     franka_open_gripper, franka_close_gripper, franka_control
 from src.issac import update_robot, update_isaac_robot, update_observer
+from src.utils import create_surface_attachment
 
 DEFAULT_SLEEP = 0.5
 FORCE = 50 # 20 | 50 | 100
@@ -47,6 +48,19 @@ class State(object):
         self.derive()
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, list(self.savers), self.attachments)
+
+
+def create_state(world):
+    # TODO: support initially holding
+    # TODO: would be better to explicitly keep the state around
+    # world.initial_saver.restore()
+    world_saver = WorldSaver()
+    attachments = []
+    for obj_name in world.movable:
+        surface_name = world.get_supporting(obj_name)
+        if surface_name is not None:
+            attachments.append(create_surface_attachment(world, obj_name, surface_name))
+    return State(world, savers=[world_saver], attachments=attachments)
 
 ################################################################################
 
@@ -383,12 +397,11 @@ class Wait(Command):
 
 DEFAULT_TIME_STEP = 0.02
 
-
 def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
-    if not commands:
-        return
+    if commands is None:
+        return False
     for i, command in enumerate(commands):
-        print('\nCommand {:2}: {}'.format(i, command))
+        print('\nCommand {:2}/{:2}: {}'.format(i, len(commands), command))
         # TODO: skip to end
         # TODO: downsample
         for j, _ in enumerate(command.iterate(state)):
@@ -397,12 +410,15 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
                 continue
             if time_step is None:
                 wait_for_duration(1e-2)
-                user_input('Command {:2} | step {:2} | Next?'.format(i, j))
+                wait_for_user('Command {:2}/{:2} | step {:2} | Next?'.format(i, len(commands), j))
             else:
                 wait_for_duration(time_step)
+    return True
 
-def execute_commands(intereface, commands):
-    if not commands:
-        return
+
+def execute_commands(interface, commands):
+    if commands is None:
+        return False
     for command in commands:
-        command.execute(intereface)
+        command.execute(interface)
+    return True

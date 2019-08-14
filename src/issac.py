@@ -114,7 +114,6 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     world_from_model = multiply(world_from_entity, entity_from_model)
     return world_from_model
 
-
 def check_limits(world, entity):
     violation = False
     arm_joints = joints_from_names(world.robot, entity.joints)
@@ -147,7 +146,7 @@ def update_robot(world, domain, observer):
     world_from_origin = multiply(world_from_entity, invert(entity_from_origin))
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
-    print('Initial base:', base_values)
+    print('Initial base:', np.array(base_values).round(3))
 
     check_limits(world, entity)
     # draw_pose(get_pose(world.robot), length=3)
@@ -252,7 +251,7 @@ def observe_world(interface):
         visible = detect_classes()
     else:
         visible = set(world_state.entities.keys())
-    print('Visible:', visible)
+    print('Visible:', sorted(visible))
 
     update_robot(world, interface.domain, observer)
     world_aabb = world.get_world_aabb()

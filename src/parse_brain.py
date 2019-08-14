@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from pddlstream.language.constants import Not
+from pddlstream.utils import Verbose
 from src.task import Task
 from src.problem import door_closed_formula, door_open_formula
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
@@ -27,7 +28,8 @@ TOP_DRAWER = 'indigo_drawer_top'
 # cage_handle_from_drawer = ([0.28, 0.0, 0.0], [0.533, -0.479, -0.501, 0.485])
 
 def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwargs):
-    objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
+    with Verbose(False):
+        objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
     trial_goals = [(h.format(o), v) for h, v in goal for o in objects]
     print('Objects:', objects)
     print('Goals:', trial_goals)

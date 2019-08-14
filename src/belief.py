@@ -140,6 +140,7 @@ class PoseDist(object):
         density = self.get_density(surface)
         if density is None:
             return None
+        assert surface is not None
         body = self.world.get_body(self.name)
         while True:
             [sample] = density.sample(n_samples=1)
@@ -177,6 +178,10 @@ class PoseDist(object):
         return pose_dists
     def update_dist(self, observation, obstacles=[], verbose=False):
         # cfree_dist.conditionOnVar(index=1, has_detection=True)
+        if not BAYESIAN and (self.name in observation):
+            # TODO: convert into a Multivariate Gaussian
+            [detected_pose] = observation[self.name]
+            return DeltaDist(detected_pose)
         body = self.world.get_body(self.name)
         all_poses = self.dist.support()
         cfree_poses = all_poses
@@ -196,9 +201,7 @@ class PoseDist(object):
         assert set(visible_poses) <= set(detectable_poses)
         # obs_fn = get_observation_fn(surface)
         #wait_for_user()
-        if BAYESIAN:
-            return self.bayesian_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
-        return self.multi_modal_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
+        return self.bayesian_belief_update(cfree_dist, visible_poses, observation, verbose=verbose)
     def bayesian_belief_update(self, prior_dist, visible_poses, observation, verbose=False):
         has_detection = self.name in observation
         detected_surface = None
@@ -220,19 +223,13 @@ class PoseDist(object):
         # cfree_dist = bayesEvidence(cfree_dist, detection_fn, has_detection) # projects out b and computes joint
         # joint_dist = JDist(cfree_dist, detection_fn, registration_fn)
         return new_dist
-    def multi_modal_belief_update(self, prior_dist, visible_poses, observation, verbose=False):
-        if self.name in observation:
-            # TODO: convert into a Multivariate Gaussian
-            [detected_pose] = observation[self.name]
-            return DeltaDist(detected_pose)
-        return self.bayesian_belief_update(prior_dist, visible_poses, observation, verbose=verbose)
     def update(self, belief, observation, n_samples=25, verbose=False, **kwargs):
         if verbose:
             print('Prior:', self.dist)
         obstacles = [self.world.get_body(name) for name in belief.pose_dists if name != self.name]
         dists = []
         for _ in range(n_samples):
-            belief.sample()
+            belief.sample(discrete=True)  # Trouble if no support
             with BodySaver(self.world.get_body(self.name)):
                 new_dist = self.update_dist(observation, obstacles, **kwargs)
                 #new_pose_dist = self.__class__(self.world, self.name, new_dist).resample()

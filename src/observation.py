@@ -17,6 +17,7 @@ from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Poin
     LockRenderer, multiply, spaced_colors, WorldSaver, \
     pairwise_collision, elapsed_time, randomize, remove_handles, add_line, BLUE, has_gui, wait_for_duration, \
     wait_for_user
+from src.command import State
 from src.belief import NUM_PARTICLES, PoseDist
 from src.stream import get_stable_gen
 from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
@@ -38,11 +39,8 @@ ELSEWHERE = None # symbol for elsewhere pose
 # * Instead, produce a detection for a subset of the region
 # * Preconditions involving the likelihood something is interfering
 
-################################################################################
-
 # https://github.com/tlpmit/hpn
 # https://github.mit.edu/tlp/bhpn
-
 # https://github.com/caelan/pddlstream/tree/stable/examples/discrete_belief
 # https://github.mit.edu/caelan/stripstream/blob/master/scripts/openrave/run_belief_online.py
 # https://github.mit.edu/caelan/stripstream/blob/master/robotics/openrave/belief_tamp.py
@@ -89,18 +87,29 @@ class Belief(object):
         print('Update time: {:.3f} sec for {} objects and {} samples'.format(
             elapsed_time(start_time), len(order), n_samples))
         return self
-    def sample(self):
+
+    def sample(self, discrete=True):
         while True:
             poses = {}
             for name, pose_dist in randomize(self.pose_dists.items()):
                 body = self.world.get_body(name)
-                pose = pose_dist.sample()
+                pose = pose_dist.sample_discrete() if discrete else pose_dist.sample()
                 pose.assign()
                 if any(pairwise_collision(body, self.world.get_body(other)) for other in poses):
                     break
                 poses[name] = pose
             else:
                 return poses
+
+    def sample_state(self, **kwargs):
+        pose_from_name = self.sample(**kwargs)
+        world_saver = WorldSaver()
+        attachments = []
+        for pose in pose_from_name.values():
+            attachments.extend(pose.confs)
+        if self.grasped is not None:
+            attachments.append(self.grasped.get_attachment())
+        return State(self.world, savers=[world_saver], attachments=attachments)
     #def resample(self):
     #    for pose_dist in self.pose_dists:
     #        pose_dist.resample() # Need to update distributions
@@ -232,6 +241,7 @@ def fix_detections(belief, detections):
             set_pose(body, fixed_pose)
             support = world.get_supporting(name)
             if support is None:
+                # print('Warning! Could not find a supporting surface for observation', name)
                 continue # Could also fix as relative to the world
             assert support is not None
             relative_pose = create_relative_pose(world, name, support, init=False)

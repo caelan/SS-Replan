@@ -829,7 +829,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
         if not collisions:
             obstacles = set()
         obstacles.update(world.static_obstacles)
-        initial_saver = BodySaver(world.robot)
+        robot_saver = BodySaver(world.robot)
         if (bq1 == bq2) or teleport:
             path = [bq1.values, bq2.values]
         else:
@@ -848,7 +848,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                 set_renderer(enable=False)
                 return None
         # TODO: could actually plan with all joints as long as we return to the same config
-        cmd = Sequence(State(world, savers=[initial_saver]), commands=[
+        cmd = Sequence(State(world, savers=[robot_saver]), commands=[
             Trajectory(world, world.robot, world.base_joints, path),
         ], name='base')
         return (cmd,)
@@ -879,7 +879,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
         if not collisions:
             obstacles = set()
         obstacles.update(world.static_obstacles)
-        initial_saver = BodySaver(world.robot)
+        robot_saver = BodySaver(world.robot)
         if teleport:
             path = [aq1.values, aq2.values]
         else:
@@ -898,7 +898,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                     wait_for_user()
                 set_renderer(enable=False)
                 return None
-        cmd = Sequence(State(world, savers=[initial_saver]), commands=[
+        cmd = Sequence(State(world, savers=[robot_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
         ], name='arm')
         return (cmd,)

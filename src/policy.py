@@ -1,9 +1,10 @@
+from __future__ import print_function
+
 from pybullet_tools.utils import wait_for_user, VideoSaver, print_separator, INF
 from src.observation import create_observable_belief, transition_belief_update
 from src.planner import VIDEO_TEMPLATE, solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts
-
 
 def run_policy(task, args, observation_fn, transition_fn):
     world = task.world
@@ -16,7 +17,6 @@ def run_policy(task, args, observation_fn, transition_fn):
     if args.record:
         wait_for_user('Start?')
         video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
-    # TODO: make this a generic policy
 
     previous_facts = []
     previous_skeleton = None
@@ -43,7 +43,8 @@ def run_policy(task, args, observation_fn, transition_fn):
 
         # TODO: store history of stream evaluations
         if plan is None:
-            problem = pdddlstream_from_problem(belief, fixed_base=False, additional_init=previous_facts,
+            problem = pdddlstream_from_problem(belief, fixed_base=not task.movable_base,
+                                               additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
             plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time, max_cost=cost)
@@ -60,7 +61,7 @@ def run_policy(task, args, observation_fn, transition_fn):
         print('Commands:', commands)
         if not video:  # Video doesn't include planning time
             wait_for_user()
-        transition_fn(commands)
+        result = transition_fn(belief, commands)  # Break if none?
         transition_belief_update(belief, plan_prefix)
         plan_postfix = get_plan_postfix(plan, plan_prefix)
         previous_skeleton = make_exact_skeleton(plan_postfix)  # make_wild_skeleton

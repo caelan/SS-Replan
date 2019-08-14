@@ -11,15 +11,13 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     step_simulation, apply_alpha, approximate_as_prism, BASE_LINK, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
-    is_placed_on_aabb, is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
-    set_quat, quat_from_euler, INF, get_difference, wait_for_user, read_json, set_camera_pose, draw_aabb, \
+    is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
+    set_quat, quat_from_euler, INF, read_json, set_camera_pose, draw_aabb, \
     disable_gravity
-from src.issac import load_calibrate_conf
-from src.command import State
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, create_surface_attachment, KINECT_DEPTH, IKEA_PATH, FConf
+    ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf
 from log_poses import POSES_PATH
 
 DISABLED_FRANKA_COLLISIONS = {
@@ -58,7 +56,7 @@ class World(object):
         self.client = connect(use_gui=use_gui)
         disable_gravity()
         add_data_path()
-        set_camera_pose(camera_point=[2, -1, 1])
+        set_camera_pose(camera_point=[2, -1.5, 1])
         draw_pose(Pose(), length=3)
 
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
@@ -88,9 +86,9 @@ class World(object):
         self.set_initial_conf()
         self.gripper = create_gripper(self.robot)
 
-        self.initialize_environment()
-        self.ik_solver = None
-        self.initialize_ik(urdf_path)
+        self._initialize_environment()
+        self._initialize_ik(urdf_path)
+        self.initial_saver = WorldSaver()
 
         self.body_from_name = {}
         self.path_from_name = {}
@@ -113,7 +111,8 @@ class World(object):
                               get_min_limits(self.robot, self.gripper_joints))
         self.update_custom_limits()
         self.update_initial()
-    def initialize_environment(self):
+
+    def _initialize_environment(self):
         # wall to fridge: 4cm
         # fridge to goal: 1.5cm
         # hitman to range: 3.5cm
@@ -149,8 +148,10 @@ class World(object):
             _, _, z = get_point(body)
             new_pose = Pose(Point(TABLE_X + l / 2, -TABLE_Y, z), Euler(yaw=np.pi / 2))
             set_pose(body, new_pose)
-    def initialize_ik(self, urdf_path):
-        if not USE_TRACK_IK or (self.ik_solver is not None):
+
+    def _initialize_ik(self, urdf_path):
+        if not USE_TRACK_IK:
+            self.ik_solver = None
             return
         from trac_ik_python.trac_ik import IK # killall -9 rosmaster
         base_link = get_link_name(self.robot, parent_link_from_joint(self.robot, self.arm_joints[0]))
@@ -168,15 +169,6 @@ class World(object):
     def update_initial(self):
         # TODO: store initial poses as well?
         self.initial_saver = WorldSaver()
-    def get_initial_state(self):
-        # TODO: would be better to explicitly keep the state around
-        initial_attachments = []
-        self.initial_saver.restore()
-        for obj_name in self.movable:
-            surface_name = self.get_supporting(obj_name)
-            if surface_name is not None:
-                initial_attachments.append(create_surface_attachment(self, obj_name, surface_name))
-        return State(self, savers=[self.initial_saver], attachments=initial_attachments)
 
     #########################
 
@@ -392,6 +384,8 @@ class World(object):
         body = self.get_body(name)
         if pose is None:
             pose = get_pose(body)
+        else:
+            set_pose(body, pose)
         # TODO: can also drop in simulation
         x, y, z = point_from_pose(pose)
         roll, pitch, yaw = euler_from_quat(quat_from_pose(pose))
@@ -405,7 +399,7 @@ class World(object):
         point = Point(x, y, new_z)
         set_point(body, point)
         # TODO: rotate objects that are symmetrical about xy 180 to ensure the start upright
-        print('{}: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
+        print('{} error: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
             name, roll, pitch, new_z - z))
         return (point, quat)
 

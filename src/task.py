@@ -55,7 +55,8 @@ class Task(object):
 
 # (x, y, yaw)
 UNIT_POSE2D = (0., 0., 0.)
-BOX_POSE2D = (0.125, 1.175, -np.pi/4) # 0.)
+BOX_POSE2D = (0.15, 1.15, 0.)
+SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
 CRACKER_POSE2D = (0.2, 1.2, np.pi/4)
 
 def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
@@ -144,7 +145,7 @@ def detect_block(world, **kwargs):
 
 def hold_block(world, **kwargs):
     #open_all_doors(world)
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    entity_name = add_block(world, idx=0, pose2d=SPAM_POSE2D)
     initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
     set_all_static()
     add_kinect(world)
@@ -165,7 +166,7 @@ def stow_block(world, **kwargs):
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
     # wait_for_user()
 
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    entity_name = add_block(world, idx=0, pose2d=SPAM_POSE2D)
     #entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
     #obstruction_name = add_box(world, idx=0)
     # test_grasps(world, entity_name)

@@ -12,6 +12,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, \
     get_random_seed, get_numpy_seed
+from src.command import create_state
 from src.visualization import add_markers
 from src.observation import create_observable_belief, \
     observe_pybullet
@@ -55,9 +56,8 @@ def create_parser():
 
 ################################################################################
 
-def run_plan(task, args):
+def run_plan(task, real_state, args):
     world = task.world
-    state = world.get_initial_state()
     belief = create_observable_belief(world)
     #wait_for_user('Start?')
 
@@ -66,7 +66,7 @@ def run_plan(task, args):
     solution = solve_pddlstream(problem, args, replan_actions={})
     plan, cost, evaluations = solution
     commands = commands_from_plan(world, plan)
-    simulate_plan(state, commands, args, record=args.record)
+    simulate_plan(real_state, commands, args, record=args.record)
     wait_for_user()
 
 ################################################################################
@@ -84,7 +84,6 @@ def main():
     #set_numpy_seed(None)
     print('Random seed:', get_random_seed())
     print('Numpy seed:', get_numpy_seed())
-    # TODO: adjust camera
 
     np.set_printoptions(precision=3, suppress=True)
     world = World(use_gui=True)
@@ -103,12 +102,13 @@ def main():
     #test_observation(world, entity_name='big_red_block0')
     #return
 
+    real_state = create_state(world)
     if args.deterministic and args.observable:
-        run_plan(task, args)
+        run_plan(task, real_state, args)
     else:
-        real_state = world.get_initial_state()
         observation_fn = lambda: observe_pybullet(world)
-        transition_fn = lambda commands: iterate_commands(real_state, commands)
+        # restore real_state just in case?
+        transition_fn = lambda belief, commands: iterate_commands(real_state, commands)
         # simulate_plan(real_state, commands, args)
         run_policy(task, args, observation_fn, transition_fn)
     world.destroy()
