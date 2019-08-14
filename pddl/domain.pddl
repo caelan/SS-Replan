@@ -163,7 +163,8 @@
                   )
     :effect (and (AtGrasp ?o1 ?g)
                  (CanMoveBase) (CanMoveArm)
-                 (AtGConf @closed_gq) (not (AtGConf ?gq))
+                 ; (AtGConf @closed_gq) ; No need to save closed state
+                 (not (AtGConf ?gq))
                  (Holding ?o1) (not (On ?o1 ?o2))
                  (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?p1))
                  (not (HandEmpty))
@@ -171,10 +172,10 @@
                  (increase (total-cost) (PickCost)))
   )
   (:action place
-    :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?aq ?gq ?at)
-    :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Value ?p1) (GConf ?gq)
+    :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?aq ?at) ; ?gq
+    :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Value ?p1) ; (GConf ?gq)
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
-                       (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
+                       (AtBConf ?bq) (AtAConf ?aq) ; (AtGConf ?gq)
                        (Calibrated) (Accessible ?o2 ?p2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?p1 ?g))
@@ -182,7 +183,7 @@
                   )
     :effect (and (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                  (On ?o1 ?o2) (not (Holding ?o1))
-                 (AtGConf @open_gq) (not (AtGConf ?gq))
+                 (AtGConf @open_gq) ; (not (AtGConf ?gq))
                  (CanMoveBase) (CanMoveArm)
                  (not (AtGrasp ?o1 ?g))
                  ;(not (Localized ?o1))
@@ -201,7 +202,7 @@
                        ;(CFreeBConfPose ?bq ?o2 ?p2)
                   )
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?p2) (AtAConf ?aq2)
-                 (AtGConf @open_gq) (not (AtGConf ?gq))
+                 ; (AtGConf @open_gq) (not (AtGConf ?gq))
                  (CanMoveBase) (CanMoveArm)
                  ; TODO: could apply collisions by removing a Safe fact
                  (not (AtAngle ?j ?a1)) (not (AtWorldPose ?o ?p1)) (not (AtAConf ?aq1))
@@ -247,11 +248,11 @@
   ;  (exists (?g) (and (Grasp ?o ?g)
   ;                    (AtGrasp ?o ?g)))
   ;)
-  (:derived (OpenGripper)
-    ;(AtGConf @open_gq)
-    (exists (?gq) (and (OpenGConf ?gq)
-                       (AtGConf ?gq)))
-  )
+  ;(:derived (OpenGripper)
+  ;  ;(AtGConf @open_gq)
+  ;  (exists (?gq) (and (OpenGConf ?gq)
+  ;                     (AtGConf ?gq)))
+  ;)
 
   (:derived (Accessible ?o ?p) (or
     (Counter ?o ?p)

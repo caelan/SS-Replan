@@ -130,7 +130,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             init_aq = aq
             break
     init_gq = FConf(world.robot, world.gripper_joints)
-    for gq in [world.open_gq, world.closed_gq]:
+    for gq in [world.open_gq]: #, world.closed_gq]:
         if np.allclose(gripper_difference_fn(init_gq.values, gq.values), np.zeros(len(gq.joints))):
             init_gq = gq
 
@@ -157,10 +157,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
 
-        ('GConf', init_gq),
-        ('AtGConf', init_gq),
         ('GConf', world.open_gq),
         ('GConf', world.closed_gq),
+        ('GConf', init_gq),
+        #('AtGConf', init_gq),
 
         ('Grasp', None, None),
         ('AtGrasp', None, None),
@@ -298,7 +298,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 
     if belief.grasped is None:
-        init.append(('HandEmpty',))
+        init.extend([
+            ('HandEmpty',),
+            ('AtGConf', init_gq),
+        ])
     else:
         obj_name = belief.grasped.body_name
         assert obj_name not in belief.pose_dists
