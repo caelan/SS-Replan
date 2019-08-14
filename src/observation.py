@@ -18,7 +18,7 @@ from pybullet_tools.utils import point_from_pose, Ray, batch_ray_collision, Poin
     pairwise_collision, elapsed_time, randomize, remove_handles, add_line, BLUE, has_gui, wait_for_duration, \
     wait_for_user
 from src.command import State
-from src.belief import NUM_PARTICLES, PoseDist
+from src.inference import NUM_PARTICLES, PoseDist
 from src.stream import get_stable_gen
 from src.utils import KINECT_DEPTH, CAMERA_MATRIX, create_relative_pose, \
     RelPose
@@ -237,11 +237,13 @@ def fix_detections(belief, detections):
             continue
         body = world.get_body(name)
         for observed_pose in detections[name]:
-            fixed_pose = world.fix_pose(name, observed_pose)
+            fixed_pose, support = world.fix_pose(name, observed_pose)
+            #fixed_pose = observed_pose
+            if fixed_pose is None:
+                continue
             set_pose(body, fixed_pose)
             support = world.get_supporting(name)
             if support is None:
-                # print('Warning! Could not find a supporting surface for observation', name)
                 continue # Could also fix as relative to the world
             assert support is not None
             relative_pose = create_relative_pose(world, name, support, init=False)

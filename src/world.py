@@ -393,7 +393,7 @@ class World(object):
         set_quat(body, quat)
         surface_name = self.get_supporting(name)
         if surface_name is None:
-            return None
+            return None, None
         surface_aabb = compute_surface_aabb(self, surface_name)
         new_z = stable_z_on_aabb(body, surface_aabb)
         point = Point(x, y, new_z)
@@ -401,11 +401,12 @@ class World(object):
         # TODO: rotate objects that are symmetrical about xy 180 to ensure the start upright
         print('{} error: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
             name, roll, pitch, new_z - z))
-        return (point, quat)
+        new_pose = (point, quat)
+        return new_pose, surface_name
 
     # def fix_geometry(self):
     #    for name in self.movable:
-    #        fixed_pose = self.fix_pose(name)
+    #        fixed_pose, _ = self.fix_pose(name)
     #        if fixed_pose is not None:
     #            set_pose(self.get_body(name), fixed_pose)
 

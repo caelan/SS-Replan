@@ -23,7 +23,7 @@ from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
     get_link_obstacles, ENV_SURFACES, FConf
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
-from src.belief import SurfaceDist, NUM_PARTICLES
+from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
 
 DETECT_COST = 1.
