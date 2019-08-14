@@ -401,7 +401,7 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
     if commands is None:
         return False
     for i, command in enumerate(commands):
-        print('\nCommand {:2}/{:2}: {}'.format(i, len(commands), command))
+        print('\nCommand {:2}/{:2}: {}'.format(i + 1, len(commands), command))
         # TODO: skip to end
         # TODO: downsample
         for j, _ in enumerate(command.iterate(state)):
@@ -410,7 +410,7 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
                 continue
             if time_step is None:
                 wait_for_duration(1e-2)
-                wait_for_user('Command {:2}/{:2} | step {:2} | Next?'.format(i, len(commands), j))
+                wait_for_user('Command {:2}/{:2} | step {:2} | Next?'.format(i + 1, len(commands), j))
             else:
                 wait_for_duration(time_step)
     return True

@@ -108,8 +108,8 @@ def moveit_control(robot, joints, path, interface, **kwargs):
     moveit = interface.moveit
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used
-    trajectory = linear_parameterization(robot, joints, path, speed=0.025*np.pi)
-    #trajectory = spline_parameterization(robot, joints, path, speed=0.025*np.pi, **kwargs)
+    # trajectory = linear_parameterization(robot, joints, path, speed=0.025*np.pi)
+    trajectory = spline_parameterization(robot, joints, path, speed=0.05 * np.pi, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     plan = RobotTrajectory(joint_trajectory=trajectory)

@@ -112,6 +112,7 @@ def main():
         # simulate_plan(real_state, commands, args)
         run_policy(task, args, observation_fn, transition_fn)
     world.destroy()
+    # TODO: make the sink extrude from the mesh
 
 if __name__ == '__main__':
     main()

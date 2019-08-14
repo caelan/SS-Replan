@@ -54,7 +54,6 @@ NEARBY_PULL = 0.25
 # Manip1: runs for full timeout, returns solution that maximizes sqrt(det(J*J^T))
 # Manip2: runs for full timeout, returns solution that minimizes cond(J) = |J|*|J^-1|
 
-
 # ik_solver.set_joint_limits([0.0]* ik_solver.number_of_joints, upper_bound)
 
 # TODO: need to wrap trajectory when executing in simulation or running on the robot
@@ -84,6 +83,7 @@ def detect_cost_fn(rp_dist, rp_sample):
     return cost
 
 def opt_detect_cost_fn(rp_dist, rp_sample):
+    # TODO: prune these surfaces if the cost is already too high
     if isinstance(rp_sample, RelPose):
         # This shouldn't be needed if eager=True
         return detect_cost_fn(rp_dist, rp_sample)

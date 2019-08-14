@@ -27,7 +27,7 @@ def run_policy(task, args, observation_fn, transition_fn):
         belief.update(observation)
         print('Belief:', belief)
         belief.draw()
-        wait_for_user('Plan?')
+        # wait_for_user('Plan?')
         problem = pdddlstream_from_problem(belief, fixed_base=True, additional_init=previous_facts,
                                            collisions=not args.cfree, teleport=args.teleport)
         print_separator(n=25)

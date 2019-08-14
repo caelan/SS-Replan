@@ -89,7 +89,7 @@ def test_carter(domain, carter):
 #     self.gripper = msg.get_positions([self.gripper_joint])[0]
 # TypeError: 'NoneType' object has no attribute '__getitem__'
 
-def test_isaac_sim(interface):
+def set_isaac_sim(interface):
     assert interface.simulation
     task = interface.task
     world = task.world
@@ -99,11 +99,11 @@ def test_isaac_sim(interface):
         world.set_base_conf([2.0, 0, -np.pi / 2])
         # world.set_initial_conf()
     else:
-        pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
-        pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
-        for name in [MUSTARD, TOMATO_SOUP, SUGAR]:
-            if name in world.body_from_name:
-                sample_placement(world, name, ECHO_COUNTER, learned=False)
+        for name, dist in task.prior.items():
+            surface = dist.sample()
+            sample_placement(world, name, surface, learned=False)
+        # pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
+        # pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
     update_isaac_sim(interface, world)
     # wait_for_user()
 
@@ -208,8 +208,8 @@ def main():
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
         observe_world(interface)
-        # if interface.simulation:  # TODO: move to simulation instead?
-        #    test_isaac_sim(interface)
+        if interface.simulation:  # TODO: move to simulation instead?
+            set_isaac_sim(interface)
         world.update_initial()
         add_markers(world, inverse_place=False)
 

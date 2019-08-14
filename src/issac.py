@@ -40,8 +40,7 @@ SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/label_image' # {0, ..., 13}
 # view_root = "%s_base_link" % view_tags[view]
 
 def update_observer(observer):
-    import rospy
-    while not observer.update():
+    while not observer.update(noise=False):
         rospy.sleep(0.1)
     return observer.current_state
 

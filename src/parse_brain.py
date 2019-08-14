@@ -43,7 +43,7 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
         args = [arg.strip() for arg in arguments.split(',')]
         if predicate == 'on_counter':
             obj, = args
-            surface = 'indigo_tmp'
+            surface = INDIGO_COUNTER
             formula = ('On', obj, surface)
         elif predicate == 'is_free':
             formula = ('HandEmpty',)
@@ -75,6 +75,9 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
     prior = {
         SPAM: DeltaDist(INDIGO_COUNTER),
         CHEEZIT: DeltaDist(INDIGO_COUNTER),
+        MUSTARD: DeltaDist(ECHO_COUNTER),
+        TOMATO_SOUP: DeltaDist(ECHO_COUNTER),
+        SUGAR: DeltaDist(ECHO_COUNTER),
     }
     return Task(world, prior=prior, movable_base=not fixed, init=init, goal=goal_literals,
                 return_init_bq=True, return_init_aq=True, **kwargs)
