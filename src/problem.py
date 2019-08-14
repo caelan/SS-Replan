@@ -119,15 +119,20 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     carry_aq = world.carry_conf
     calibrate_aq = world.calibrate_conf
     base_difference_fn = get_difference_fn(world.robot, world.base_joints)
-    arm_distance_fn = get_difference_fn(world.robot, world.arm_joints)
+    arm_difference_fn = get_difference_fn(world.robot, world.arm_joints)
+    gripper_difference_fn = get_difference_fn(world.robot, world.gripper_joints)
 
     # TODO: could replace objects for init_bq and init_gq instead of using closeto
     init_bq = FConf(world.robot, world.base_joints)
     init_aq = FConf(world.robot, world.arm_joints)
     for aq in [carry_aq]: # calibrate_aq
-        if np.allclose(arm_distance_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
+        if np.allclose(arm_difference_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
             init_aq = aq
+            break
     init_gq = FConf(world.robot, world.gripper_joints)
+    for gq in [world.open_gq, world.closed_gq]:
+        if np.allclose(gripper_difference_fn(init_gq.values, gq.values), np.zeros(len(gq.joints))):
+            init_gq = gq
 
     constant_map = {
         '@world': 'world',
@@ -219,9 +224,9 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             with WorldSaver():
                 world.initial_saver.restore()
                 goal_aq = FConf(world.robot, world.arm_joints)
-            if np.allclose(arm_distance_fn(goal_aq.values, carry_aq.values), np.zeros(len(carry_aq.joints))):
+            if np.allclose(arm_difference_fn(goal_aq.values, carry_aq.values), np.zeros(len(carry_aq.joints))):
                 goal_aq = aq
-            if np.less_equal(np.abs(arm_distance_fn(init_aq.values, goal_aq.values)),
+            if np.less_equal(np.abs(arm_difference_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
                 print('Close to goal arm configuration')
                 init.append(('CloseTo', init_aq, goal_aq))
