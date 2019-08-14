@@ -3,16 +3,20 @@ from __future__ import print_function
 import time
 import moveit_msgs.msg
 import numpy as np
+import rospy
 
 from src.retime import spline_parameterization, get_joint_names, linear_parameterization
 from src.issac import ISSAC_FRANKA_FRAME, update_observer
-from pybullet_tools.utils import elapsed_time
+from pybullet_tools.utils import elapsed_time, wait_for_user
 from pddlstream.utils import Verbose
 
-from moveit_msgs.msg import RobotTrajectory
+from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotState, RobotTrajectory
 from actionlib import SimpleActionClient
-#from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, GripperCommandAction, GripperCommandGoal
+#from actionlib_msgs.msg import GoalStatus, GoalState, SimpleClientGoalState
+# http://docs.ros.org/jade/api/actionlib/html/classactionlib_1_1SimpleClientGoalState.html
+# http://docs.ros.org/kinetic/api/actionlib_msgs/html/msg/GoalStatus.html
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, \
+    GripperCommandAction, GripperCommandGoal, JointTolerance
 
 #from lula_franka.franka import FrankaGripper
 from lula_franka.franka_gripper_commander import FrankaGripperCommander
@@ -24,13 +28,28 @@ from lula_franka.franka_gripper_commander import FrankaGripperCommander
 # moveit_msgs/ExecuteTrajectoryAction
 # moveit_msgs/MoveGroupAction
 
-def publish_display_trajectory(moveit, plan, frame=ISSAC_FRANKA_FRAME):
-    trajectory_start = moveit.robot.get_current_state()
+def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAME):
     display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-    display_trajectory.trajectory_start = trajectory_start
-    display_trajectory.trajectory.append(plan)
-    display_trajectory.trajectory[0].joint_trajectory.header.frame_id = frame
+    #display_trajectory.model_id = 'pr2'
+    display_trajectory.trajectory_start = moveit.robot.get_current_state()
+    robot_trajectory = RobotTrajectory(joint_trajectory=joint_trajectory)
+    robot_trajectory.joint_trajectory.header.frame_id = frame
+    display_trajectory.trajectory.append(robot_trajectory)
     moveit.display_trajectory_publisher.publish(display_trajectory)
+
+    robot_state_pub = rospy.Publisher('/display_robot_state', DisplayRobotState, queue_size=1)
+    display_state = DisplayRobotState()
+    display_state.state = display_trajectory.trajectory_start
+
+    last_conf = joint_trajectory.points[-1].positions
+    joint_state = display_state.state.joint_state
+    joint_state.position = list(joint_state.position)
+    for joint_name, position in zip(joint_trajectory.joint_names, last_conf):
+        joint_index = joint_state.name.index(joint_name)
+        joint_state.position[joint_index] = position
+    robot_state_pub.publish(display_state)
+
+    return display_trajectory
 
 ################################################################################
 
@@ -66,19 +85,27 @@ def franka_control(robot, joints, path, interface, **kwargs):
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
-    #wait_for_user('Continue?')
+
+    publish_display_trajectory(interface.moveit, trajectory)
+    wait_for_user('Continue?')
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
     #goal.goal_time_tolerance =
     for joint in trajectory.joint_names:
-        #goal.path_tolerance.name = joint
-        #goal.path_tolerance.position = 1e-2 # position | velocity | acceleration
-        goal.goal_tolerance.name = joint
-        goal.goal_tolerance.position = 1e-3 # position | velocity | acceleration
+        #goal.path_tolerance.append(JointTolerance(name=joint, position=1e-2)) # position | velocity | acceleration
+        goal.goal_tolerance.append(JointTolerance(name=joint, position=1e-3)) # position | velocity | acceleration
 
+    # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
     start_time = time.time()
-    client.send_goal_and_wait(goal)  # send_goal_and_wait
-    # client.get_result()
+    state = client.send_goal_and_wait(goal)  # send_goal_and_wait
+    print('State:', state)
+    state = client.get_state()
+    print('State:', state)
+    print('Status:', client.get_goal_status_text())
+    result = client.get_result()
+    print('Result:', result)
+    # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
+
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
 

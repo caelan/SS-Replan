@@ -81,7 +81,7 @@ def fix_detections(belief, detections):
             continue
         for observed_pose in detections[name]:
             fixed_pose, support = world.fix_pose(name, observed_pose)
-            if fixed_pose is None:
+            if fixed_pose is not None:
                 fixed_detections.setdefault(name, []).append(fixed_pose)
     return fixed_detections
 
@@ -96,10 +96,10 @@ def relative_detections(belief, detections):
         for observed_pose in detections[name]:
             set_pose(body, observed_pose)
             support = world.get_supporting(name)
-            if support is None:
-                continue  # Could also fix as relative to the world
-            assert support is not None
-            relative_pose = create_relative_pose(world, name, support, init=False)
-            rel_detections.setdefault(name, []).append(relative_pose)
-            # relative_pose.assign()
+            #assert support is not None
+            if support is not None:
+                # Could also fix as relative to the world
+                relative_pose = create_relative_pose(world, name, support, init=False)
+                rel_detections.setdefault(name, []).append(relative_pose)
+                # relative_pose.assign()
     return rel_detections

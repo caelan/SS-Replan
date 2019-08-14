@@ -16,8 +16,7 @@ from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, relative_detections, ELSEWHERE
 from src.stream import get_stable_gen
-from src.utils import create_relative_pose, \
-    RelPose
+from src.utils import create_relative_pose, RelPose
 
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
@@ -69,7 +68,7 @@ class Belief(object):
         # Instead, let the moving object take on different poses
         with LockRenderer():
             with WorldSaver():
-                # detections = fix_detections(self, detections) # TODO: skip if in sim
+                #detections = fix_detections(self, detections) # TODO: skip if in sim
                 detections = relative_detections(self, detections)
                 order = [name for name in detections]  # Detected
                 order.extend(set(self.pose_dists) - set(order))  # Not detected

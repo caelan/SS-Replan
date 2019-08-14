@@ -17,7 +17,7 @@ from sensor_msgs.msg import CameraInfo
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
-    BASE_LINK, LockRenderer, base_values_from_pose, \
+    BASE_LINK, LockRenderer, base_values_from_pose, unit_pose, \
     pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
     set_renderer, draw_pose, read_json, Pose, Point, point_from_pose, aabb_contains_point
 from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH, get_ycb_obj_path, CAMERA_TEMPLATE
@@ -175,7 +175,9 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
 
 ################################################################################
 
-def display_kinect(world, observer, side):
+def display_kinect(interface, side):
+    world = interface.world
+    observer = interface.observer
     if world.cameras:
         return
     camera_infos = []
@@ -189,9 +191,18 @@ def display_kinect(world, observer, side):
         camera_matrix = np.array(cam_model.projectionMatrix())[:3, :3]
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
-        camera_name = CAMERA_TEMPLATE.format(side)
-        world_from_camera = lookup_pose(observer.tf_listener, ISSAC_PREFIX + camera_name)
-        if world_from_camera is not None:
+        if interface.simulation:
+            camera_name = CAMERA_TEMPLATE.format(side)
+            camera_frame = ISSAC_PREFIX + camera_name
+        else:
+            camera_name = 'kinect1'
+            camera_frame = '{}_link'.format(camera_name)
+        print('Received camera info from camera', camera_name)
+
+        world_from_camera = lookup_pose(observer.tf_listener, camera_frame)
+        if world_from_camera is None:
+            print('Failed to detect pose for camera ', camera_name)
+        else:
             world.add_camera(camera_name, world_from_camera, camera_matrix)
         observer.camera_sub.unregister()
         # draw_viewcone(world_from_camera)
@@ -200,8 +211,14 @@ def display_kinect(world, observer, side):
         # /sim/right_color_camera/camera_info
         # TODO: would be cool to display the kinect2 as well
 
+    if interface.simulation:
+        calibration_topic = "/sim/{}_{}_camera/camera_info".format(side, 'color')
+    else:
+        # Using kinect2 instead of kinect1
+        calibration_topic = '/kinect1/rgb/camera_info'
+
     observer.camera_sub = rospy.Subscriber(
-        "/sim/{}_{}_camera/camera_info".format(side, 'color'),  # TODO: right as well
+        calibration_topic,  # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
 
 def detect_classes():
@@ -268,7 +285,9 @@ def observe_world(interface):
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
                 print('Loading', ycb_obj_path)
                 world.add_body(name, ycb_obj_path, color=np.ones(4), mass=0)
-                set_pose(world.get_body(name), NULL_POSE)
+                body = world.get_body(name)
+                set_pose(body, NULL_POSE)
+                draw_pose(unit_pose(), parent=body)
             if (visible is None) or (name in visible):
                 frame_name = ISSAC_PREFIX + name
                 pose = lookup_pose(observer.tf_listener, frame_name)
@@ -290,7 +309,7 @@ def observe_world(interface):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-    display_kinect(world, observer, side='left')
+    display_kinect(interface, side='left')
     return observation
 
 ################################################################################

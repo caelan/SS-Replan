@@ -59,8 +59,8 @@ def run_policy(task, args, observation_fn, transition_fn):
         print('Prefix:', plan_prefix)
         commands = commands_from_plan(world, plan_prefix)
         print('Commands:', commands)
-        if not video:  # Video doesn't include planning time
-            wait_for_user()
+        #if not video:  # Video doesn't include planning time
+        #    wait_for_user() # TODO: move to the pybullet version?
         result = transition_fn(belief, commands)  # Break if none?
         transition_belief_update(belief, plan_prefix)
         plan_postfix = get_plan_postfix(plan, plan_prefix)

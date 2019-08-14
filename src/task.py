@@ -40,6 +40,9 @@ class Task(object):
         self.goal_cooked = set(goal_cooked)
         self.init = init
         self.goal = goal
+    @property
+    def objects(self):
+        return set(self.prior.keys())
     def create_belief(self):
         t0 = time.time()
         print('Creating initial belief')

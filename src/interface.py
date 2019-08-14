@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import rospy
 
 from src.issac import update_observer
@@ -29,6 +31,7 @@ class Interface(object):
     def moveit(self):
         return self.robot_entity.get_motion_interface()
         #return self.robot_entity.planner
+    @property
     def carter(self):
         return self.robot_entity.carter_interface
     @property
@@ -74,8 +77,9 @@ class Interface(object):
         #administrator.detect_once() # detect
         #administrator.deactivate() # stop_localizing
 
+        #return
         world_state = self.observer.current_state
-        for name in self.task.objects:
+        for name in self.task.prior:
             obj = world_state.entities[name]
             #wait_for_duration(1.0)
             obj.localize() # Needed to ensure detectable

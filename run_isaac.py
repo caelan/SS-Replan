@@ -35,6 +35,7 @@ from run_pybullet import create_parser
 from src.planner import simulate_plan
 from src.task import Task, CRACKER_POSE2D, SPAM_POSE2D, pose2d_on_surface, sample_placement
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
+#from src.issac import display_kinect
 
 def planning_loop(interface):
     args = interface.args
@@ -45,6 +46,7 @@ def planning_loop(interface):
 
     def transition_fn(belief, commands):
         sim_state = belief.sample_state()
+        wait_for_user()
         if args.watch or args.record:
             # simulate_plan(sim_state.copy(), commands, args)
             iterate_commands(sim_state.copy(), commands)
@@ -53,27 +55,35 @@ def planning_loop(interface):
         if args.teleport or args.cfree:
             print('Skipping execution')
             return False
+        # TODO: could calibrate closed-loop relative to the object
+        # Terminate if failed to pick up
         return execute_commands(interface, commands)
 
     return run_policy(interface.task, args, observation_fn, transition_fn)
 
 ################################################################################
 
-def test_carter(domain, carter):
-    x, y, theta = carter.current_pose  # current_velocity
+def test_carter(interface):
+    carter = interface.carter
+
+    assert carter is not None
+    carter_pose = carter.current_pose
+    print('Carter pose:', carter_pose)
+    x, y, theta = carter_pose  # current_velocity
     pos = np.array([x, y])
-    goal_pos = pos + 0.2 * unit_from_theta(theta)
+    goal_pos = pos + 1.0 * unit_from_theta(theta)
     goal_pose = np.append(goal_pos, [theta])
-    # goal_pose = np.append(pos, [0.])
+    #goal_pose = np.append(pos, [0.])
 
     # carter.move_to(goal_pose) # recursion bug
     carter.move_to_safe(goal_pose)  # move_to_async | move_to_safe
+    #carter.move_to_openloop(goal_pose)
     # move_to_open_loop | move_to_safe_followed_by_openloop
 
-    # carter.simple_move(0.1) # simple_move | simple_stop
+    #carter.simple_move(0.1) # simple_move | simple_stop
     # rospy.sleep(2.0)
     # carter.simple_stop()
-    domain.get_robot().carter_interface = carter
+    #domain.get_robot().carter_interface = interface.carter
     # domain.get_robot().unsuppress_fixed_bases()
 
     # /sim/tf to get all objects
@@ -130,7 +140,7 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     prior = {
         SPAM: DeltaDist(INDIGO_COUNTER),
-        CHEEZIT: DeltaDist(INDIGO_COUNTER),
+        #CHEEZIT: DeltaDist(INDIGO_COUNTER),
     }
     task = Task(world, prior=prior,
                 # goal_holding=[SPAM],
@@ -198,6 +208,8 @@ def main():
         interface = real_setup(domain, world, args)
     else:
         interface = simulation_setup(domain, world, args)
+    #test_carter(interface)
+    #display_kinect(interface, side='left')
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -219,6 +231,12 @@ def main():
     success = planning_loop(interface)
     print('Success:', success)
     world.destroy()
+
+# cpaxton@lokeefe:~/alice$ bazel run apps/samples/navigation_rosbridge
+# srl@carter:~/deploy/srl/carter-pkg$ ./apps/carter/carter -r 2 -m seattle_map_res02_181214
+# cpaxton@lokeefe:~$ roscore
+# cpaxton@lokeefe:~/srl_system/workspace/src/brain/src/brain_ros$ rosrun lula_dart object_administrator --detect --j=00_potted_meat_can
+# cpaxton@lokeefe:~$ franka world franka_center_right_kitchen.yaml
 
 ################################################################################
 
@@ -243,7 +261,8 @@ if __name__ == '__main__':
 # Running on the real robot w/o LULA
 # 1) roslaunch franka_controllers lula_control.launch
 # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
-# 3) killall move_group franka_control_node local_controller
+# 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz
+# 4) killall move_group franka_control_node local_controller
 
 # Running on the real robot w/ lula
 # 1) franka_backend

@@ -128,10 +128,12 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     for aq in [carry_aq]: # calibrate_aq
         if np.allclose(arm_difference_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
             init_aq = aq
+            print('Near carry arm config')
             break
     init_gq = FConf(world.robot, world.gripper_joints)
     for gq in [world.open_gq]: #, world.closed_gq]:
         if np.allclose(gripper_difference_fn(init_gq.values, gq.values), np.zeros(len(gq.joints))):
+            print('Near open gripper config')
             init_gq = gq
 
     constant_map = {
