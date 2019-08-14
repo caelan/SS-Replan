@@ -46,8 +46,8 @@ def planning_loop(interface):
     def transition_fn(belief, commands):
         sim_state = belief.sample_state()
         if args.watch or args.record:
-            # simulate_plan(sim_state.copy(), commands, args, record=args.record)
-            iterate_commands(sim_state.copy(), commands, args)
+            # simulate_plan(sim_state.copy(), commands, args)
+            iterate_commands(sim_state.copy(), commands)
         wait_for_user()
         sim_state.assign()
         if args.teleport or args.cfree:

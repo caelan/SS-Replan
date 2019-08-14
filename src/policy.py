@@ -9,7 +9,7 @@ from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts
 def run_policy(task, args, observation_fn, transition_fn):
     world = task.world
     if args.observable:
-        belief = create_observable_belief(world)  # Faster
+        belief = create_observable_belief(world)  # Fast
     else:
         belief = task.create_belief()
     print('Prior:', belief)

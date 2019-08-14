@@ -155,12 +155,12 @@ def commands_from_plan(world, plan):
 
 ################################################################################
 
-def simulate_plan(state, commands, args, record=False, time_step=DEFAULT_TIME_STEP):
+def simulate_plan(state, commands, args, time_step=DEFAULT_TIME_STEP):
     wait_for_user()
     if commands is None:
         return
     time_step = None if args.teleport else time_step
-    if record:
+    if args.record:
         video_path = VIDEO_TEMPLATE.format(args.problem)
         with VideoSaver(video_path):
             iterate_commands(state, commands, time_step=time_step)

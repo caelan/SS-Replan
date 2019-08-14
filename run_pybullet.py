@@ -66,7 +66,7 @@ def run_plan(task, real_state, args):
     solution = solve_pddlstream(problem, args, replan_actions={})
     plan, cost, evaluations = solution
     commands = commands_from_plan(world, plan)
-    simulate_plan(real_state, commands, args, record=args.record)
+    simulate_plan(real_state, commands, args)
     wait_for_user()
 
 ################################################################################

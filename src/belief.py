@@ -14,7 +14,7 @@ from pybullet_tools.utils import BodySaver, \
     pairwise_collision, elapsed_time, randomize, remove_handles
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
-from src.observe import fix_detections
+from src.observe import fix_detections, ELSEWHERE
 from src.stream import get_stable_gen
 from src.utils import create_relative_pose, \
     RelPose
