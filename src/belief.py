@@ -14,7 +14,7 @@ from pybullet_tools.utils import BodySaver, \
     pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
-from src.observe import fix_detections, ELSEWHERE
+from src.observe import fix_detections, relative_detections, ELSEWHERE
 from src.stream import get_stable_gen
 from src.utils import create_relative_pose, \
     RelPose
@@ -67,11 +67,12 @@ class Belief(object):
         # Could simply sample from the set of worlds and update
         # Would need to sample many worlds with name at different poses
         # Instead, let the moving object take on different poses
-        order = [name for name in detections] # Detected
-        order.extend(set(self.pose_dists) - set(order)) # Not detected
         with LockRenderer():
             with WorldSaver():
                 # detections = fix_detections(self, detections) # TODO: skip if in sim
+                detections = relative_detections(self, detections)
+                order = [name for name in detections]  # Detected
+                order.extend(set(self.pose_dists) - set(order))  # Not detected
                 for name in order:
                     self.pose_dists[name] = self.pose_dists[name].update(
                         self, detections, n_samples=n_samples)
@@ -110,15 +111,13 @@ class Belief(object):
             #self.pose_dists[name].dump()
             print(i, name, self.pose_dists[name])
     def draw(self, **kwargs):
-        with LockRenderer(False):
+        with LockRenderer(True):
             remove_handles(self.handles)
             self.handles = []
             with WorldSaver():
                 for name, pose_dist in self.pose_dists.items():
                     self.handles.extend(pose_dist.draw(
                             color=self.color_from_name[name], **kwargs))
-        wait_for_user()
-        wait_for_duration(0.1)
     def __repr__(self):
         return '{}(holding={}, placed={})'.format(self.__class__.__name__, self.holding, str_from_object(
             {name: self.pose_dists[name].surface_dist for name in self.names}))

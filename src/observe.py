@@ -48,7 +48,7 @@ def observe_pybullet(world):
     # TODO: randomize robot's pose
     # TODO: probabilities based on whether in viewcone or not
     # TODO: sample from poses on table
-    world_saver = WorldSaver()
+    # world_saver = WorldSaver()
     visible_entities = are_visible(world)
     detections = {}
     assert OBS_P_FP == 0
@@ -67,9 +67,7 @@ def observe_pybullet(world):
         observed_pose = multiply(pose, noise_pose)
         #world.get_body_type(name)
         detections.setdefault(name, []).append(observed_pose) # TODO: use type instead
-    wait_for_user()
-    world_saver.restore()
-    wait_for_user()
+    #world_saver.restore()
     return detections
 
 ################################################################################
@@ -81,18 +79,27 @@ def fix_detections(belief, detections):
     for name in detections:
         if name == belief.holding:
             continue
-        body = world.get_body(name)
         for observed_pose in detections[name]:
             fixed_pose, support = world.fix_pose(name, observed_pose)
-            #fixed_pose = observed_pose
             if fixed_pose is None:
-                continue
-            set_pose(body, fixed_pose)
+                fixed_detections.setdefault(name, []).append(fixed_pose)
+    return fixed_detections
+
+
+def relative_detections(belief, detections):
+    world = belief.world
+    rel_detections = {}
+    for name in detections:
+        if name == belief.holding:
+            continue
+        body = world.get_body(name)
+        for observed_pose in detections[name]:
+            set_pose(body, observed_pose)
             support = world.get_supporting(name)
             if support is None:
-                continue # Could also fix as relative to the world
+                continue  # Could also fix as relative to the world
             assert support is not None
             relative_pose = create_relative_pose(world, name, support, init=False)
-            fixed_detections.setdefault(name, []).append(relative_pose)
+            rel_detections.setdefault(name, []).append(relative_pose)
             # relative_pose.assign()
-    return fixed_detections
+    return rel_detections

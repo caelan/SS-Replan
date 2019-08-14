@@ -21,10 +21,10 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
-from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost
+from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost, DDist
 
 DETECT_COST = 1.
 
@@ -196,28 +196,38 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
-def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES, # TODO: relative instead?
-                          mlo=False, **kwargs):
+
+def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative instead?
+                          mlo_only=False, **kwargs):
 
     def gen(obj_name, pose_dist, surface_name):
-        valid_samples = { }
+        # TODO: apply these checks to the whole surfaces
+        # TODO: incorporate ray tracing
+        open_surface_joints(world, surface_name)
+        valid_samples = {}
         for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)
             cost = detect_cost_fn(pose_dist, rp)
             if (min_prob <= prob) and (cost <= MAX_COST):
                 valid_samples[rp] = prob
+                pose = rp.get_world_from_body()
+                print(pose)
+
                 #print(obj_name, surface_name, prob)
                 #user_input('Continue?')
         if not valid_samples:
             return
-        # TODO: open the door to the full extend to see if visible
-        if mlo:
+        if mlo_only:
             rp = max(valid_samples, key=valid_samples.__getitem__)
             yield (rp,)
         else:
-            # TODO: random sample without replacement
-            for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
+            # for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
+            #    yield (rp,)
+            while valid_samples:
+                dist = DDist(valid_samples)
+                rp = dist.sample()
                 yield (rp,)
+                del valid_samples[rp]
     return gen
 
 ################################################################################
