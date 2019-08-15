@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import time
-import moveit_msgs.msg
 import numpy as np
 import rospy
 
@@ -10,7 +9,7 @@ from src.issac import ISSAC_FRANKA_FRAME, update_observer
 from pybullet_tools.utils import elapsed_time, wait_for_user
 from pddlstream.utils import Verbose
 
-from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotState, RobotTrajectory
+from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
 from actionlib import SimpleActionClient
 #from actionlib_msgs.msg import GoalStatus, GoalState, SimpleClientGoalState
 # http://docs.ros.org/jade/api/actionlib/html/classactionlib_1_1SimpleClientGoalState.html
@@ -29,18 +28,20 @@ from lula_franka.franka_gripper_commander import FrankaGripperCommander
 # moveit_msgs/MoveGroupAction
 
 def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAME):
-    display_trajectory = moveit_msgs.msg.DisplayTrajectory()
+    display_trajectory_pub = rospy.Publisher('/display_planned_path', DisplayTrajectory, queue_size=1)
+
+    display_trajectory = DisplayTrajectory()
     #display_trajectory.model_id = 'pr2'
     display_trajectory.trajectory_start = moveit.robot.get_current_state()
     robot_trajectory = RobotTrajectory(joint_trajectory=joint_trajectory)
     robot_trajectory.joint_trajectory.header.frame_id = frame
     display_trajectory.trajectory.append(robot_trajectory)
-    moveit.display_trajectory_publisher.publish(display_trajectory)
+    display_trajectory_pub.publish(display_trajectory)
+    # moveit.display_trajectory_publisher.publish(display_trajectory)
 
     robot_state_pub = rospy.Publisher('/display_robot_state', DisplayRobotState, queue_size=1)
     display_state = DisplayRobotState()
     display_state.state = display_trajectory.trajectory_start
-
     last_conf = joint_trajectory.points[-1].positions
     joint_state = display_state.state.joint_state
     joint_state.position = list(joint_state.position)
@@ -85,7 +86,6 @@ def franka_control(robot, joints, path, interface, **kwargs):
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
-
     publish_display_trajectory(interface.moveit, trajectory)
     wait_for_user('Continue?')
 
@@ -139,18 +139,29 @@ def moveit_control(robot, joints, path, interface, **kwargs):
     trajectory = spline_parameterization(robot, joints, path, speed=0.05 * np.pi, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
+    publish_display_trajectory(interface.moveit, trajectory)
+    wait_for_user('Continue?')
+    # /move_base_simple/goal - no listeners
+    # /move_group/goal
+    # ABORTED: Cannot execute trajectory since ~allow_trajectory_execution was set to false
+
     plan = RobotTrajectory(joint_trajectory=trajectory)
     if moveit.use_lula:
         world_state = update_observer(interface.observer)
         suppress_lula(world_state)
+    # moveit_msgs/ExecuteTrajectoryActionGoal
+    # moveit.group.execute(plan, wait=True)
+    # https://ros-planning.github.io/moveit_tutorials/doc/move_group_python_interface/move_group_python_interface_tutorial.html
+    #return
+
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
-    #moveit.dilation = 2
+    moveit.dilation = 0.5
     start_time = time.time()
     # /move_group/display_planned_path
     # TODO: display base motions?
     #publish_display_trajectory(moveit, plan) # TODO: get this in the base_link frame
-    with Verbose():
+    with Verbose(False):
         moveit.execute(plan, required_orig_err=0.005, timeout=5.0,
                        publish_display_trajectory=False)
         #moveit.go_local(q=path[-1], ...)
@@ -188,6 +199,8 @@ def franka_move_gripper(position, effort=20):
 
 def franka_open_gripper(interface, **kwargs):
     if interface.simulation:
+        # https://gitlab-master.nvidia.com/srl/srl_system/compare/9d2455ccd4c97b49f85f86cb2af80fc34e0b66cc...master
+        interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
         interface.moveit.open_gripper()
     else:
         commander = FrankaGripperCommander()
@@ -198,6 +211,7 @@ def franka_open_gripper(interface, **kwargs):
 
 def franka_close_gripper(interface):
     if interface.simulation:
+        interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
         interface.moveit.close_gripper()
     else:
         commander = FrankaGripperCommander()

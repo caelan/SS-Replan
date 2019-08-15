@@ -58,7 +58,7 @@ class Task(object):
 
 # (x, y, yaw)
 UNIT_POSE2D = (0., 0., 0.)
-BOX_POSE2D = (0.15, 1.15, 0.)
+BOX_POSE2D = (0.1, 1.15, 0.)
 SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
 CRACKER_POSE2D = (0.2, 1.2, np.pi/4)
 
