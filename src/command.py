@@ -190,7 +190,7 @@ class Trajectory(Command):
             world_state = interface.update_state()
             robot_entity = world_state[interface.domain.robot]
             print('Error:', (np.array(robot_entity.q) - np.array(self.path[-1])).round(5))
-            update_robot(self.world, interface.domain, observer)
+            update_robot(interface)
             #wait_for_user('Continue?')
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))

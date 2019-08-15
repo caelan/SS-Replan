@@ -11,7 +11,7 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.utils import BodySaver, \
     LockRenderer, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user
+    pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user, get_joint_positions
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, relative_detections, ELSEWHERE
@@ -36,6 +36,8 @@ from src.utils import create_relative_pose, RelPose
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
 
+MIN_GRASP_WIDTH = 0.01
+
 ################################################################################
 
 # TODO: point estimates and confidence intervals/regions
@@ -59,6 +61,18 @@ class Belief(object):
             return None
         return self.grasped.body_name
 
+    def check_consistent(self):
+        # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/d1e6024c5c13df7edeab3a271b745e656a794b02/control_tools/execution.py#L163
+        # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/pr2_controller.py#L93
+        # https://github.mit.edu/caelan/mudfish/blob/master/scripts/planner.py#L346
+        # each joint in [0.00, 0.04] (units coincide with the physical gripper)
+        current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
+        gripper_width = sum(current_gq)
+        if (self.grasped is not None) and (gripper_width <= MIN_GRASP_WIDTH):
+            # TODO: need to add the grasp object back into the dist
+            self.grasped = None
+            return False
+        return True
     def update(self, detections, n_samples=25):
         start_time = time.time()
         self.observations.append(detections)

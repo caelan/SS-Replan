@@ -57,21 +57,21 @@ def run_policy(task, args, observation_fn, transition_fn):
         print_separator(n=25)
         plan_prefix = extract_plan_prefix(plan)
         print('Prefix:', plan_prefix)
-        sequences = [plan_prefix]
-        # sequences = [[action] for action in plan_prefix]
+        # sequences = [plan_prefix]
+        sequences = [[action] for action in plan_prefix]
 
-        success = True
+        success = belief.check_consistent()
         for i, sequence in enumerate(sequences):
+            if not success:
+                break
             print(i, sequence)
             commands = commands_from_plan(world, sequence)
             print('Commands:', commands)
             # if not video:  # Video doesn't include planning time
             #    wait_for_user() # TODO: move to the pybullet version?
-            result = transition_fn(belief, commands)  # Break if none?
-            if not transition_belief_update(belief, plan_prefix):
-                success = False
-                break
-
+            success &= transition_fn(belief, commands) and \
+                       transition_belief_update(belief, sequence) and \
+                       belief.check_consistent()
         if success:
             plan_postfix = get_plan_postfix(plan, plan_prefix)
             previous_skeleton = make_exact_skeleton(plan_postfix)  # make_wild_skeleton

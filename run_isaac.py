@@ -29,7 +29,7 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
     CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
-from src.issac import observe_world, kill_lula, update_isaac_sim
+from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import simulate_plan
@@ -53,11 +53,13 @@ def planning_loop(interface):
         wait_for_user()
         sim_state.assign()
         if args.teleport or args.cfree:
-            print('Skipping execution')
+            print('Some constraints were ignored. Skipping execution!')
             return False
         # TODO: could calibrate closed-loop relative to the object
         # Terminate if failed to pick up
-        return execute_commands(interface, commands)
+        success = execute_commands(interface, commands)
+        update_robot_conf(interface)
+        return success
 
     return run_policy(interface.task, args, observation_fn, transition_fn)
 

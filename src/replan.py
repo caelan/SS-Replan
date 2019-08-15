@@ -16,6 +16,9 @@ REUSE_ARGUMENTS = {
     # However, it was next constrained to move the base rather than the arm
 }
 
+
+# TODO: could keep around previous base plans as long as we don't reuse them
+
 def is_optimistic(arg):
     return isinstance(arg, str) and arg.startswith(OPT_PREFIX)
 

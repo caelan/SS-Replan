@@ -138,8 +138,13 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
 
 ################################################################################
 
-def update_robot_conf(world, entity):
+def update_robot_conf(interface, entity=None):
+    # https://gitlab-master.nvidia.com/srl/srl_system/blob/ea286e95d3e2d46ff5a3389085beb4f9f3fc3f84/packages/brain/src/brain_ros/ros_world_state.py#L494
     # Update joint positions
+    world = interface.world
+    if entity is None:
+        world_state = interface.update_state()
+        entity = world_state.entities[interface.domain.robot]
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
@@ -170,12 +175,12 @@ def update_robot_base(world, observer, entity):
     # print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
     # print()
 
-def update_robot(world, domain, observer):
-    world_state = observer.current_state
-    entity = world_state.entities[domain.robot]
-    update_robot_conf(world, entity)
-    update_robot_base(world, observer, entity)
 
+def update_robot(interface):
+    world_state = interface.observer.current_state
+    entity = world_state.entities[interface.domain.robot]
+    update_robot_conf(interface, entity)
+    update_robot_base(interface.world, interface.observer, entity)
 
 def check_limits(world, entity):
     violation = False
@@ -286,7 +291,7 @@ def observe_world(interface):
         visible = set(world_state.entities.keys())
     print('Visible:', sorted(visible))
 
-    update_robot(world, interface.domain, observer)
+    update_robot(interface)
     world_aabb = world.get_world_aabb()
     observation = {}
     for name, entity in world_state.entities.items():

@@ -112,8 +112,10 @@ def main():
         return observe_pybullet(world)
 
     def transition_fn(belief, commands):
+        # TODO: fixed-base planning and execution
+        # Multiple rays for detecting
         # restore real_state just in case?
-        wait_for_user()
+        # wait_for_user()
         # simulate_plan(real_state, commands, args)
         return iterate_commands(real_state, commands)
 
