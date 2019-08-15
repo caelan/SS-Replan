@@ -101,15 +101,23 @@ def main():
     #test_observation(world, entity_name='big_red_block0')
     #return
 
+    # TODO: mechanism that pickles the state of the world
     real_state = create_state(world)
     if args.deterministic and args.observable:
         run_plan(task, real_state, args)
-    else:
-        observation_fn = lambda: observe_pybullet(world)
+        world.destroy()
+        return
+
+    def observation_fn():
+        return observe_pybullet(world)
+
+    def transition_fn(belief, commands):
         # restore real_state just in case?
-        transition_fn = lambda belief, commands: iterate_commands(real_state, commands)
+        wait_for_user()
         # simulate_plan(real_state, commands, args)
-        run_policy(task, args, observation_fn, transition_fn)
+        return iterate_commands(real_state, commands)
+
+    run_policy(task, args, observation_fn, transition_fn)
     world.destroy()
     # TODO: make the sink extrude from the mesh
 

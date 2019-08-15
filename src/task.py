@@ -7,9 +7,9 @@ import time
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
     apply_alpha, RED, step_simulation, joint_from_name, set_all_static, \
-    WorldSaver, stable_z_on_aabb, wait_for_user, draw_aabb, get_aabb, pairwise_collision, elapsed_time
+    WorldSaver, stable_z_on_aabb, wait_for_user, draw_aabb, get_aabb, pairwise_collision, elapsed_time, set_base_values
 from src.stream import get_stable_gen
-from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
+from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, JOINT_TEMPLATE, COUNTERS, \
     get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
     KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, ZED_LEFT_SURFACES
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
@@ -129,12 +129,14 @@ def detect_block(world, **kwargs):
     initial_surface = initial_distribution.sample()
     if random.random() < 0.:
         # TODO: sometimes base/arm failure causes the planner to freeze
+        # Freezing is because the planner is struggling to find new samples
         sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     prior = {
-        entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top']),
+        entity_name: UniformDist(['indigo_tmp']),  # 'indigo_drawer_top'
         obstruction_name: DeltaDist('indigo_tmp'),
+        # TODO: test multiple rays on the object itself from the viewcone of th ething
     }
     return Task(world, prior=prior, movable_base=True,
                 return_init_bq=True, return_init_aq=True,
@@ -160,6 +162,35 @@ def hold_block(world, **kwargs):
                 return_init_bq=True, # return_init_aq=False,
                 goal_holding=[entity_name],
                 #goal_closed=ALL_JOINTS,
+                **kwargs)
+
+
+################################################################################
+
+BASE_POSE2D = (0.73, 0.80, -np.pi)
+
+
+def fixed_stow(world, **kwargs):
+    # set_base_values
+    entity_name = add_block(world, idx=0, pose2d=SPAM_POSE2D)
+    set_all_static()
+    add_kinect(world)
+
+    # set_base_values(world.robot, BASE_POSE2D)
+    world.set_base_conf(BASE_POSE2D)
+
+    initial_surface = 'indigo_tmp'
+    goal_surface = 'indigo_drawer_top'
+    sample_placement(world, entity_name, initial_surface, learned=True)
+    # joint_name = JOINT_TEMPLATE.format(goal_surface)
+
+    prior = {
+        entity_name: DeltaDist(initial_surface),
+    }
+    return Task(world, prior=prior, movable_base=False,
+                goal_on={entity_name: goal_surface},
+                return_init_bq=True, return_init_aq=True,
+                goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################
@@ -210,5 +241,6 @@ def stow_block(world, **kwargs):
 TASKS = [
     detect_block,
     hold_block,
+    fixed_stow,
     stow_block,
 ]

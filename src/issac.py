@@ -88,10 +88,10 @@ def load_calibrate_conf(side='left'):
 
 ################################################################################
 
-def get_robot_reference_frame(domain):
-    entity = domain.root.entities[domain.robot]
-    _, reference_frame = entity.base_frame.split('/')  # 'measured/right_gripper'
-    return reference_frame
+# def get_robot_reference_frame(domain):
+#    entity = domain.root.entities[domain.robot]
+#    _, reference_frame = entity.base_frame.split('/')  # 'measured/right_gripper'
+#    return reference_frame
 
 def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     # TODO: be careful with how base joints are handled
@@ -105,57 +105,19 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     #print(name, entity_frame, reference_frame)
     # print(entity.get_frames())
     # print(entity.get_pose_semantic_safe(arg1, arg2))
+    print('Model frame: {} | Reference frame: {}'.format(entity_frame, reference_frame))
+    # TODO: could just lookup frame in TF
+    #dump_dict(entity)
 
     entity_link = link_from_name(body, entity_frame) if get_links(body) else BASE_LINK
     frame_from_entity = get_link_pose(body, entity_link)
     frame_from_model = get_link_pose(body, model_link)
     entity_from_model = multiply(invert(frame_from_entity), frame_from_model)
     world_from_model = multiply(world_from_entity, entity_from_model)
+    #print(world_from_model)
+
     return world_from_model
 
-def check_limits(world, entity):
-    violation = False
-    arm_joints = joints_from_names(world.robot, entity.joints)
-    for i, joint in enumerate(arm_joints):
-        if violates_limit(world.robot, joint, entity.q[i]):
-            print('Joint {} violates limits: index={}, position={}, range={}'.format(
-                entity.joints[i], i, entity.q[i], get_joint_limits(world.robot, joint)))
-            violation = True
-            # TODO: change the link's color
-    if violation:
-        set_renderer(enable=True)
-        wait_for_user()
-
-def update_robot(world, domain, observer):
-    world_state = observer.current_state
-    entity = world_state.entities[domain.robot]
-    # Update joint positions
-    carter_values = entity.carter_pos
-    #carter_values = entity.carter_interface.running_pose
-    print('Carter base:', carter_values) # will be zero if a carter object isn't created
-    #world.set_base_conf(carter_values)
-    world.set_base_conf(np.zeros(3))
-    arm_joints = joints_from_names(world.robot, entity.joints)
-    set_joint_positions(world.robot, arm_joints, entity.q)
-    world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
-    world_from_entity = get_world_from_model(observer, entity, world.robot) #, model_link=BASE_LINK)
-
-    base_values = base_values_from_pose(world_from_entity, tolerance=INF)
-    entity_from_origin = pose_from_base_values(base_values)
-    world_from_origin = multiply(world_from_entity, invert(entity_from_origin))
-    set_pose(world.robot, world_from_origin)
-    world.set_base_conf(base_values)
-    print('Initial base:', np.array(base_values).round(3))
-
-    check_limits(world, entity)
-    # draw_pose(get_pose(world.robot), length=3)
-    # draw_pose(get_link_pose(world.robot, world.base_link), length=1)
-
-    #map_from_carter = pose_from_pose2d(carter_values)
-    #world_from_carter = pose_from_pose2d(base_values)
-    #map_from_world = multiply(map_from_carter, invert(world_from_carter))
-    #print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
-    #print()
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
     from brain_ros.ros_world_state import make_pose
@@ -172,6 +134,61 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
                       "{}, {}\n"
                       "Err:{}".format(target_frame, source_frame, e))
         return None
+
+
+################################################################################
+
+def update_robot_conf(world, entity):
+    # Update joint positions
+    arm_joints = joints_from_names(world.robot, entity.joints)
+    set_joint_positions(world.robot, arm_joints, entity.q)
+    world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
+    check_limits(world, entity)
+
+
+def update_robot_base(world, observer, entity):
+    carter_values = entity.carter_pos
+    # carter_values = entity.carter_interface.running_pose
+    print('Carter base:', carter_values)  # will be zero if a carter object isn't created
+    # world.set_base_conf(carter_values)
+    world.set_base_conf(np.zeros(3))
+    world_from_entity = get_world_from_model(observer, entity, world.robot)  # , model_link=BASE_LINK)
+
+    base_values = base_values_from_pose(world_from_entity, tolerance=INF)
+    entity_from_origin = pose_from_base_values(base_values)
+    world_from_origin = multiply(world_from_entity, invert(entity_from_origin))
+    set_pose(world.robot, world_from_origin)
+    world.set_base_conf(base_values)
+    print('Initial base:', np.array(base_values).round(3))
+
+    # draw_pose(get_pose(world.robot), length=3)
+    # draw_pose(get_link_pose(world.robot, world.base_link), length=1)
+
+    # map_from_carter = pose_from_pose2d(carter_values)
+    # world_from_carter = pose_from_pose2d(base_values)
+    # map_from_world = multiply(map_from_carter, invert(world_from_carter))
+    # print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
+    # print()
+
+def update_robot(world, domain, observer):
+    world_state = observer.current_state
+    entity = world_state.entities[domain.robot]
+    update_robot_conf(world, entity)
+    update_robot_base(world, observer, entity)
+
+
+def check_limits(world, entity):
+    violation = False
+    arm_joints = joints_from_names(world.robot, entity.joints)
+    for i, joint in enumerate(arm_joints):
+        if violates_limit(world.robot, joint, entity.q[i]):
+            print('Joint {} violates limits: index={}, position={}, range={}'.format(
+                entity.joints[i], i, entity.q[i], get_joint_limits(world.robot, joint)))
+            violation = True
+            # TODO: change the link's color
+    if violation:
+        set_renderer(enable=True)
+        wait_for_user()
 
 ################################################################################
 

@@ -166,7 +166,7 @@ def create_surface_belief(world, surface_dists, **kwargs):
 
 def transition_belief_update(belief, plan):
     if plan is None:
-        return None
+        return False
     # TODO: check that actually holding
     for action, params in plan:
         if action in ['move_base', 'move_arm', 'move_gripper', 'pull',
@@ -184,3 +184,4 @@ def transition_belief_update(belief, plan):
             pass
         else:
             raise NotImplementedError(action)
+    return True

@@ -1,54 +1,11 @@
 import rospy
 from lula_controller_msgs.msg import JointPosVelAccCommand
-from pddlstream.utils import Verbose
-from pybullet_tools.utils import get_distance_fn, wait_for_user, joint_from_name, get_max_force
+from pybullet_tools.utils import wait_for_user, joint_from_name, get_max_force
 from rospy import Publisher
 from sensor_msgs.msg import JointState
 from src.execution import suppress_lula
-from src.issac import update_robot, update_observer
+from src.issac import update_robot
 from src.retime import get_joint_names, spline_parameterization
-
-################################################################################
-
-def joint_state_control(robot, joints, path, interface,
-                        threshold=0.01, timeout=1.0):
-    # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
-    # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
-    #max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
-    #max_forces = np.array([get_max_force(robot, joint) for joint in joints])
-    joint_names = get_joint_names(robot, joints)
-    distance_fn = get_distance_fn(robot, joints)
-    #difference_fn = get_difference_fn(robot, joints)
-
-    # TODO: separate path and goal thresholds
-    assert interface.simulation
-    # TODO: spline interpolation
-    #path = waypoints_from_path(path)
-    if len(joints) == 2:
-        path = path[-1:]
-    for i, target_conf in enumerate(path):
-        print('Waypoint {} / {}'.format(i, len(path)))
-        velocity = None
-        #velocity = list(0.25 * np.array(max_velocities))
-        joint_state = JointState(name=joint_names, position=list(target_conf), velocity=velocity)
-        interface.moveit.joint_cmd_pub.publish(joint_state)
-        #rate = rospy.Rate(1000)
-        start_time = rospy.Time.now()
-        while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < timeout):
-            with Verbose():
-                world_state = update_observer(interface.observer)
-            robot_entity = world_state.entities[interface.domain.robot]
-            #difference = difference_fn(target_conf, robot_entity.q)
-            if distance_fn(target_conf, robot_entity.q) < threshold:
-                break
-            # ee_frame = moveit.forward_kinematics(joint_state.position)
-            # moveit.visualizer.send(ee_frame)
-            #rate.sleep()
-        else:
-            print('Failed to reach set point')
-    # TODO: send zero velocity command?
-    # TODO: return status
-    return None
 
 ################################################################################
 

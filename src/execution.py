@@ -3,10 +3,11 @@ from __future__ import print_function
 import time
 import numpy as np
 import rospy
+from sensor_msgs.msg import JointState
 
 from src.retime import spline_parameterization, get_joint_names, linear_parameterization
 from src.issac import ISSAC_FRANKA_FRAME, update_observer
-from pybullet_tools.utils import elapsed_time, wait_for_user
+from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn
 from pddlstream.utils import Verbose
 
 from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
@@ -52,6 +53,57 @@ def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAM
 
     return display_trajectory
 
+
+################################################################################
+
+def joint_state_control(robot, joints, path, interface,
+                        threshold=0.01, timeout=1.0, **kwargs):
+    # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
+    # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
+
+    # TODO: separate path and goal thresholds
+    assert interface.simulation
+    # max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
+    # max_forces = np.array([get_max_force(robot, joint) for joint in joints])
+    joint_names = get_joint_names(robot, joints)
+    distance_fn = get_distance_fn(robot, joints)
+    # difference_fn = get_difference_fn(robot, joints)
+
+    if len(joints) == 2:
+        path = path[-1:]
+    trajectory = spline_parameterization(robot, joints, path, **kwargs)
+    publish_display_trajectory(interface.moveit, trajectory)
+    success = True
+    for i, point in enumerate(trajectory.points):
+        print('Waypoint {} / {}'.format(i, len(path)))
+        target_conf = list(point.positions)
+        # velocity = list(point.velocities)
+        velocity = None
+        # velocity = list(0.25 * np.array(max_velocities))
+        interface.moveit.goal_joint_cmd_pub.publish(JointState(
+            name=joint_names, position=target_conf, velocity=velocity))
+        # rate = rospy.Rate(1000)
+        #
+        start_time = rospy.Time.now()
+        # duration = point[i].time_from_start - point[i-1].time_from_start if i !=0 else 0
+        duration = timeout
+        while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < duration):
+            with Verbose():
+                world_state = update_observer(interface.observer)
+            robot_entity = world_state.entities[interface.domain.robot]
+            # difference = difference_fn(target_conf, robot_entity.q)
+            if distance_fn(target_conf, robot_entity.q) < threshold:
+                break
+            # ee_frame = moveit.forward_kinematics(joint_state.position)
+            # moveit.visualizer.send(ee_frame)
+            # rate.sleep()
+        else:
+            success = False
+            print('Failed to reach set point after {:.3f} seconds'.format(time))
+    interface.moveit.goal_joint_cmd_pub.publish(JointState(
+        name=joint_names, velocity=np.zeros(len(joint_names)).tolist()))
+    return success
+
 ################################################################################
 
 def franka_control(robot, joints, path, interface, **kwargs):
@@ -59,7 +111,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #joint_command_control(robot, joints, path, **kwargs)
     #follow_control(robot, joints, path, **kwargs)
     if interface.simulation:
-        return moveit_control(robot, joints, path, interface)
+        return joint_state_control(robot, joints, path, interface)
+        #return moveit_control(robot, joints, path, interface)
         #return joint_state_control(robot, joints, path, interface)
 
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
