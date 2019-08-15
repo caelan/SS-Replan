@@ -174,7 +174,6 @@ class Trajectory(Command):
 
     def execute(self, interface):
         # TODO: ensure the same joint name order
-        observer = interface.observer
         if self.joints == self.world.base_joints:
             self.execute_base(interface)
         elif self.joints == self.world.gripper_joints:

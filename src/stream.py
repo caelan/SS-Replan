@@ -37,7 +37,9 @@ MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
-P_RANDOMIZE_IK = 0.5 # 0.0 | 0.5
+
+# TracIK is itself stochastic
+P_RANDOMIZE_IK = 0.25  # 0.0 | 0.5
 
 MAX_CONF_DISTANCE = 0.75
 NEARBY_APPROACH = MAX_CONF_DISTANCE
@@ -529,15 +531,21 @@ def get_fixed_pick_gen_fn(world, max_attempts=25, collisions=True, **kwargs):
         #    obstacles = set()
         if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
             return
-        for i in range(max_attempts):
-            # TracIK is itself stochastic
-            randomize = (random.random() < P_RANDOMIZE_IK)
-            ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
-                                        randomize=randomize, **kwargs), None)
-            if ik_outputs is not None:
-                yield ik_outputs
-                return
-        if PRINT_FAILURES: print('Fixed pick failure')
+        # TODO: increase timeouts if a previously successful value
+        # TODO: seed IK using the previous solution
+        while True:
+            for i in range(max_attempts):
+                randomize = (random.random() < P_RANDOMIZE_IK)
+                ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
+                                            randomize=randomize, **kwargs), None)
+                if ik_outputs is not None:
+                    yield ik_outputs
+                    break  # return
+            else:
+                if PRINT_FAILURES: print('Fixed pick failure')
+                if not pose.init:
+                    break
+                yield None
     return gen
 
 def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwargs):
@@ -571,6 +579,8 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
                     break
             else:
                 if PRINT_FAILURES: print('Pick failure')
+                if not pose.init:
+                    break
                 yield None
     return gen
 
@@ -746,16 +756,20 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
                       if is_pull_safe(world, door_joint, door_plan, obstacles)]
         if not door_plans:
             return
-        for i in range(max_attempts):
-            door_path = random.choice(door_plans)
-            # TracIK is itself stochastic
-            randomize = (random.random() < P_RANDOMIZE_IK)
-            ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,
-                              randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
-            if ik_outputs is not None:
-                yield ik_outputs
-                return
-        if PRINT_FAILURES: print('Fixed pull failure')
+        while True:
+            for i in range(max_attempts):
+                door_path = random.choice(door_plans)
+                # TracIK is itself stochastic
+                randomize = (random.random() < P_RANDOMIZE_IK)
+                ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,
+                                            randomize=randomize, collisions=collisions, teleport=teleport, **kwargs),
+                                  None)
+                if ik_outputs is not None:
+                    yield ik_outputs
+                    break  # return
+            else:
+                if PRINT_FAILURES: print('Fixed pull failure')
+                yield None
     return gen
 
 def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):
@@ -829,6 +843,7 @@ def parse_fluents(world, fluents):
 
 def get_base_motion_fn(world, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
+    # TODO: lazy planning on a common base roadmap
 
     def fn(bq1, bq2, aq, fluents=[]):
         #if bq1 == bq2:
@@ -898,7 +913,7 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      self_collisions=SELF_COLLISIONS,
                                      disabled_collisions=world.disabled_collisions,
                                      custom_limits=world.custom_limits, resolutions=resolutions,
-                                     restarts=2, iterations=25, smooth=25)
+                                     restarts=2, iterations=50, smooth=50)
             if path is None:
                 print('Failed to find an arm motion plan!')
                 set_renderer(enable=True)
