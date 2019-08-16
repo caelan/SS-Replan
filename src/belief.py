@@ -41,6 +41,7 @@ MIN_GRASP_WIDTH = 0.01
 ################################################################################
 
 # TODO: point estimates and confidence intervals/regions
+# TODO: mixture between discrete and growing Mixture of Gaussian
 
 class Belief(object):
     def __init__(self, world, pose_dists={}, grasped=None):

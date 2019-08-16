@@ -133,7 +133,8 @@ def get_compute_detect(world, **kwargs):
     obstacles = world.static_obstacles
 
     def fn(obj_name, pose):
-        # TODO: condition that the drawer is open
+        # TODO: incorporate probability mass
+        # Ether sample observation (control) or target belief (next state)
         for camera_name in world.cameras:
             camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
             camera_pose = get_pose(camera_body)
@@ -486,14 +487,14 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
     full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
     if full_grasp_conf is None:
-        if PRINT_FAILURES: print('Grasp kinematic failure')
+        # if PRINT_FAILURES: print('Grasp kinematic failure')
         return
     moving_links = get_moving_links(world.robot, world.arm_joints)
     robot_obstacle = (world.robot, frozenset(moving_links))
     #robot_obstacle = get_descendant_obstacles(world.robot, child_link_from_joint(world.arm_joints[0]))
     #robot_obstacle = world.robot
     if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-        if PRINT_FAILURES: print('Grasp collision failure')
+        #if PRINT_FAILURES: print('Grasp collision failure')
         #set_renderer(enable=True)
         #wait_for_user()
         #set_renderer(enable=False)
@@ -653,6 +654,7 @@ def is_pull_safe(world, door_joint, door_plan, obstacles):
     for door_conf in [door_path[0], door_path[-1]]:
         # TODO: check the whole door trajectory
         set_joint_positions(world.kitchen, [door_joint], door_conf)
+        # TODO: just check collisions with the base of the robot
         if any(pairwise_collision(world.robot, b) for b in obstacles):
             if PRINT_FAILURES: print('Door start/end failure')
             return False
@@ -751,6 +753,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
             world.kitchen, door_joint)) # if collisions else set()
 
         base_conf.assign()
+        world.carry_conf.assign()
         door_plans = [door_plan for door_plan in compute_door_paths(
             world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
                       if is_pull_safe(world, door_joint, door_plan, obstacles)]
