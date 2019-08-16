@@ -149,6 +149,7 @@ def update_robot_conf(interface, entity=None):
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
     check_limits(world, entity)
+    return dict(zip(entity.joints, entity.q))
 
 
 def update_robot_base(world, observer, entity):

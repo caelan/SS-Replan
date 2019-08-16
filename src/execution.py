@@ -6,8 +6,8 @@ import rospy
 from sensor_msgs.msg import JointState
 
 from src.retime import spline_parameterization, get_joint_names, linear_parameterization
-from src.issac import ISSAC_FRANKA_FRAME, update_observer
-from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn
+from src.issac import ISSAC_FRANKA_FRAME, update_observer, update_robot_conf
+from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, get_joint_positions
 from pddlstream.utils import Verbose
 
 from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
@@ -134,16 +134,18 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #    rospy.set_param(param, error_threshold)
     #    #print(name, rospy.get_param(param))
 
-    trajectory = spline_parameterization(robot, joints, path, **kwargs)
+    update_robot_conf(interface)
+    start_conf = get_joint_positions(robot, joints)
+    trajectory = spline_parameterization(robot, joints, [start_conf] + path, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
-        len(path), trajectory.points[-1].time_from_start.to_sec()))
+        len(trajectory.points), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
     publish_display_trajectory(interface.moveit, trajectory)
     wait_for_user('Continue?')
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
-    #goal.goal_time_tolerance =
+    goal.goal_time_tolerance = rospy.Duration.from_sec(1.0)
     for joint in trajectory.joint_names:
         #goal.path_tolerance.append(JointTolerance(name=joint, position=1e-2)) # position | velocity | acceleration
         goal.goal_tolerance.append(JointTolerance(name=joint, position=1e-3)) # position | velocity | acceleration
@@ -159,6 +161,9 @@ def franka_control(robot, joints, path, interface, **kwargs):
     print('Result:', result)
     # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
 
+    update_robot_conf(interface)
+    end_conf = get_joint_positions(robot, joints)
+    print('Final error:', (np.array(end_conf) - np.array(path[-1])).round(5))
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
 

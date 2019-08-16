@@ -14,7 +14,8 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, \
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
-    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input
+    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input, \
+    get_difference_fn
 
 try:
     import trac_ik_python
@@ -577,3 +578,9 @@ def get_link_obstacles(world, link_name):
         return flatten_links(world.kitchen, get_link_subtree(world.kitchen, link)) # subtree?
     assert link_name in SURFACE_FROM_NAME
     return set()
+
+
+def are_confs_close(conf1, conf2):  # , tol=None):
+    assert (conf1.body == conf2.body) and (conf1.joints == conf2.joints)
+    difference_fn = get_difference_fn(conf1.body, conf1.joints)
+    return np.allclose(difference_fn(conf1.values, conf2.values), np.zeros(len(conf1.joints)))
