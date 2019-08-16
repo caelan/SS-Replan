@@ -537,11 +537,11 @@ def get_descendant_obstacles(body, link=BASE_LINK):
 Z_EPSILON = 5e-3
 
 
-def open_surface_joints(world, surface_name):
+def open_surface_joints(world, surface_name, joint_names=ALL_JOINTS):
     surface = surface_from_name(surface_name)
     for joint_name in surface.joints:
         joint = joint_from_name(world.kitchen, joint_name)
-        if joint_name in CABINET_JOINTS:
+        if joint_name in joint_names:
             # TODO: remove this mechanic in the future
             world.open_door(joint)
 
@@ -552,7 +552,7 @@ def get_surface_obstacles(world, surface_name):
         link = child_link_from_joint(joint_from_name(world.kitchen, joint_name))
         obstacles.update(get_descendant_obstacles(world.kitchen, link)) # subtree?
     # Be careful to call this before each check
-    open_surface_joints(world, surface_name)
+    open_surface_joints(world, surface_name, joint_names=CABINET_JOINTS)
     return obstacles
 
 def test_supported(world, body, surface_name, collisions=True):

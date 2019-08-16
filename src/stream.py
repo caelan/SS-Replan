@@ -12,9 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, \
-    child_link_from_joint, set_renderer, apply_alpha, get_all_links, set_color, \
-    get_max_limits, dump_body, get_movable_joints, add_segments, draw_pose, \
-    get_difference, INF
+    child_link_from_joint, set_renderer, get_movable_joints, INF
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -129,7 +127,7 @@ def get_compute_angle_kin(world):
 
 ################################################################################
 
-def get_compute_detect(world, **kwargs):
+def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
 
     def fn(obj_name, pose):
@@ -145,16 +143,19 @@ def get_compute_detect(world, **kwargs):
                 continue
             ray = Ray(camera_point, obj_point)
             detect = Detect(world, camera_name, obj_name, pose, [ray])
-            # TODO: how should doors be handled?
-            if obstacles & detect.compute_occluding():
-                continue
+            if ray_trace:
+                # TODO: how should doors be handled?
+                move_occluding(world, detect, obj_name=None)
+                if obstacles & detect.compute_occluding():
+                    continue
             #detect.draw()
             #wait_for_user()
             return (detect,)
         return None
     return fn
 
-def move_occluding(world, ray, obj_name):
+
+def move_occluding(world, ray, obj_name):  # TODO: detect instead of ray
     if obj_name is None:
         movable = world.movable - {ray.name}
     else:
@@ -201,31 +202,33 @@ def get_ofree_ray_grasp_test(world, **kwargs):
 
 
 def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative instead?
-                          mlo_only=False, **kwargs):
-
+                          mlo_only=False, ordered=False, **kwargs):
+    # TODO: incorporate ray tracing
+    detect_fn = get_compute_detect(world, ray_trace=False, **kwargs)
     def gen(obj_name, pose_dist, surface_name):
         # TODO: apply these checks to the whole surfaces
-        # TODO: incorporate ray tracing
         open_surface_joints(world, surface_name)
         valid_samples = {}
         for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)
             cost = detect_cost_fn(pose_dist, rp)
             if (min_prob <= prob) and (cost <= MAX_COST):
-                valid_samples[rp] = prob
-                pose = rp.get_world_from_body()
-                print(pose)
-
-                #print(obj_name, surface_name, prob)
-                #user_input('Continue?')
+                # pose = rp.get_world_from_body()
+                result = detect_fn(obj_name, rp)
+                if result is not None:
+                    # detect, = result
+                    # detect.draw()
+                    valid_samples[rp] = prob
         if not valid_samples:
             return
         if mlo_only:
             rp = max(valid_samples, key=valid_samples.__getitem__)
             yield (rp,)
+            return
+        if ordered:
+            for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
+                yield (rp,)
         else:
-            # for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
-            #    yield (rp,)
             while valid_samples:
                 dist = DDist(valid_samples)
                 rp = dist.sample()
