@@ -3,7 +3,7 @@ import random
 from itertools import islice, cycle
 from collections import namedtuple
 
-from pybullet_tools.pr2_utils import is_visible_point
+from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb, is_visible_aabb
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, \
     set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
@@ -11,8 +11,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
-    is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, \
-    child_link_from_joint, set_renderer, get_movable_joints, INF
+    is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, get_aabb_extent, get_aabb_center, \
+    child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine
 from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -129,20 +129,29 @@ def get_compute_angle_kin(world):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
+    scale = 0.5
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass
         # Ether sample observation (control) or target belief (next state)
+        body = world.get_body(obj_name)
         for camera_name in world.cameras:
             camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
             camera_pose = get_pose(camera_body)
             camera_point = point_from_pose(camera_pose)
-            # TODO: could sample multiple rays around the object
             obj_point = point_from_pose(pose.get_world_from_body())
-            if not is_visible_point(camera_matrix, camera_depth, obj_point, camera_pose):
+
+            aabb = get_view_aabb(body, camera_pose)
+            center = get_aabb_center(aabb)
+            extent = np.multiply([scale, scale, 1], get_aabb_extent(aabb))
+            view_aabb = (center - extent / 2, center + extent / 2)
+            # print(is_visible_aabb(view_aabb, camera_matrix=camera_matrix))
+            obj_points = apply_affine(camera_pose, support_from_aabb(view_aabb)) + [obj_point]
+            # obj_points = [obj_point]
+            if not all(is_visible_point(camera_matrix, camera_depth, point, camera_pose) for point in obj_points):
                 continue
-            ray = Ray(camera_point, obj_point)
-            detect = Detect(world, camera_name, obj_name, pose, [ray])
+            rays = [Ray(camera_point, point) for point in obj_points]
+            detect = Detect(world, camera_name, obj_name, pose, rays)
             if ray_trace:
                 # TODO: how should doors be handled?
                 move_occluding(world, detect, obj_name=None)
