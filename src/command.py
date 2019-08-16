@@ -6,11 +6,11 @@ from isaac_bridge.manager import SimulationManager
 
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, flatten_links, remove_handles, \
-    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver
+    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, get_link_pose
 from src.base import follow_base_trajectory
 from src.execution import moveit_control, \
     franka_open_gripper, franka_close_gripper, franka_control
-from src.issac import update_robot, update_isaac_robot, update_observer
+from src.issac import update_robot, update_isaac_robot
 from src.utils import create_surface_attachment
 
 DEFAULT_SLEEP = 0.5
@@ -194,7 +194,30 @@ class Trajectory(Command):
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
 
-class DoorTrajectory(Command):
+
+class ApproachTrajectory(Trajectory):
+    def __init__(self, *args, **kwargs):
+        super(ApproachTrajectory, self).__init__(*args, **kwargs)
+        assert self.joints == self.world.arm_joints
+
+    def execute(self, interface):
+        super(ApproachTrajectory, self).execute(interface)
+        return
+
+        set_joint_positions(self.robot, self.joints, self.path[-1])
+        target_pose = get_link_pose(self.robot, self.world.tool_link)
+        interface.robot_entity.suppress_fixed_bases()
+        interface.robot_entity.unsuppress_fixed_bases()
+
+        world_state[domain.robot].suppress_fixed_bases()
+
+        interface.update_state()
+        update_robot(interface)
+
+        time.sleep(DEFAULT_SLEEP)
+
+
+class DoorTrajectory(Command):  # TODO: extend Trajectory
     def __init__(self, world, robot, robot_joints, robot_path,
                  door, door_joints, door_path):
         super(DoorTrajectory, self).__init__(world)

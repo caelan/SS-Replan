@@ -141,10 +141,9 @@ def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
 def update_robot_conf(interface, entity=None):
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/ea286e95d3e2d46ff5a3389085beb4f9f3fc3f84/packages/brain/src/brain_ros/ros_world_state.py#L494
     # Update joint positions
-    world = interface.world
     if entity is None:
-        world_state = interface.update_state()
-        entity = world_state.entities[interface.domain.robot]
+        entity = interface.update_state().entities[interface.domain.robot]
+    world = interface.world
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
     world.set_gripper(entity.gripper)  # 'gripper_joint': 'panda_finger_joint1'
@@ -152,13 +151,16 @@ def update_robot_conf(interface, entity=None):
     return dict(zip(entity.joints, entity.q))
 
 
-def update_robot_base(world, observer, entity):
+def update_robot_base(interface, entity=None):
+    if entity is None:
+        entity = interface.update_state().entities[interface.domain.robot]
+    world = interface.world
     carter_values = entity.carter_pos
     # carter_values = entity.carter_interface.running_pose
     print('Carter base:', carter_values)  # will be zero if a carter object isn't created
     # world.set_base_conf(carter_values)
     world.set_base_conf(np.zeros(3))
-    world_from_entity = get_world_from_model(observer, entity, world.robot)  # , model_link=BASE_LINK)
+    world_from_entity = get_world_from_model(interface.observer, entity, world.robot)  # , model_link=BASE_LINK)
 
     base_values = base_values_from_pose(world_from_entity, tolerance=INF)
     entity_from_origin = pose_from_base_values(base_values)
@@ -181,7 +183,7 @@ def update_robot(interface):
     world_state = interface.observer.current_state
     entity = world_state.entities[interface.domain.robot]
     update_robot_conf(interface, entity)
-    update_robot_base(interface.world, interface.observer, entity)
+    update_robot_base(interface, entity)
 
 def check_limits(world, entity):
     violation = False
@@ -281,9 +283,7 @@ def observe_world(interface):
     # Using state is nice because it applies noise
 
     world = interface.world
-    task = world.task
-    observer = interface.observer
-    world_state = update_observer(observer)
+    world_state = interface.update_state()
     print('Entities:', sorted(world_state.entities))
     #world.reset()
     if interface.simulation and not interface.observable:
@@ -302,7 +302,7 @@ def observe_world(interface):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
             # entity.is_tracked, entity.location_belief, entity.view
-            if name not in task.prior:
+            if name not in world.task.objects:
                 continue
             if name not in world.body_from_name:
                 ycb_obj_path = get_ycb_obj_path(entity.obj_type)
@@ -313,7 +313,7 @@ def observe_world(interface):
                 draw_pose(unit_pose(), parent=body)
             if (visible is None) or (name in visible):
                 frame_name = ISSAC_PREFIX + name
-                pose = lookup_pose(observer.tf_listener, frame_name)
+                pose = lookup_pose(interface.observer.tf_listener, frame_name)
                 #pose = get_world_from_model(observer, entity, body)
                 #pose = pose_from_tform(entity.pose)
             else:

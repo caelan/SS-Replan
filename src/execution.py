@@ -89,7 +89,7 @@ def joint_state_control(robot, joints, path, interface,
         duration = timeout
         while not rospy.is_shutdown() and ((rospy.Time.now() - start_time).to_sec() < duration):
             with Verbose():
-                world_state = update_observer(interface.observer)
+                world_state = interface.update_state()
             robot_entity = world_state.entities[interface.domain.robot]
             # difference = difference_fn(target_conf, robot_entity.q)
             if distance_fn(target_conf, robot_entity.q) < threshold:
@@ -205,7 +205,7 @@ def moveit_control(robot, joints, path, interface, **kwargs):
 
     plan = RobotTrajectory(joint_trajectory=trajectory)
     if moveit.use_lula:
-        world_state = update_observer(interface.observer)
+        world_state = interface.update_state()
         suppress_lula(world_state)
     # moveit_msgs/ExecuteTrajectoryActionGoal
     # moveit.group.execute(plan, wait=True)

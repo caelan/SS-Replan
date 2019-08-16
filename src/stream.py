@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, get_aabb_extent, get_aabb_center, \
     child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine
-from src.command import Sequence, Trajectory, Attach, Detach, State, DoorTrajectory, Detect
+from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
@@ -526,11 +526,11 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     attachment = create_surface_attachment(world, obj_name, pose.support)
     cmd = Sequence(State(world, savers=[robot_saver, obj_saver],
                          attachments=[attachment]), commands=[
-        Trajectory(world, world.robot, world.arm_joints, approach_path),
+        ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
         finger_cmd.commands[0],
         Detach(world, attachment.parent, attachment.parent_link, attachment.child),
         Attach(world, world.robot, world.tool_link, obj_body, grasp=grasp),
-        Trajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
+        ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
     ], name='pick')
     yield (aq, cmd,)
 
@@ -743,12 +743,12 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
     cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-        Trajectory(world, world.robot, world.arm_joints, approach_paths[0]),
+        ApproachTrajectory(world, world.robot, world.arm_joints, approach_paths[0]),
         finger_cmd.commands[0],
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
                        world.kitchen, [door_joint], door_path),
         finger_cmd.commands[0].reverse(),
-        Trajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
+        ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ], name='pull')
     yield (aq1, aq2, cmd,)
 
