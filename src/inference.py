@@ -182,6 +182,8 @@ class PoseDist(object):
             # TODO: convert into a Multivariate Gaussian
             [detected_pose] = observation[self.name]
             return DeltaDist(detected_pose)
+        if not self.world.cameras:
+            return self.dist.copy()
         body = self.world.get_body(self.name)
         all_poses = self.dist.support()
         cfree_poses = all_poses

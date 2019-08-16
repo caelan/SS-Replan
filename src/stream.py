@@ -996,7 +996,7 @@ def get_gripper_open_test(world, error_percent=0.1): #, tolerance=1e-2
         return np.less_equal(open_gq, gq.values).all()
     return test
 
-def get_door_test(world, error_percent=0.3): #, tolerance=1e-2):
+def get_door_test(world, error_percent=0.35): #, tolerance=1e-2):
     # TODO: separate error for open/closed
     def test(joint_name, conf, status):
         [joint] = conf.joints

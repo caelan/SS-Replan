@@ -13,14 +13,14 @@ from pddlstream.language.stream import StreamInfo, PartialInputs
 from pddlstream.language.function import FunctionInfo
 from pddlstream.utils import INF
 
-from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver
+from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver, wait_for_duration
 from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
 from src.stream import opt_detect_cost_fn
 
 VIDEO_TEMPLATE = '{}.mp4'
-REPLAN_ACTIONS = tuple(['calibrate', 'detect', 'pull']) # 'pull', 'place']) #, 'pick'])
+REPLAN_ACTIONS = tuple(['calibrate', 'detect', 'pull', 'place']) # 'pull', 'place']) #, 'pick'])
 
-def solve_pddlstream(problem, args, skeleton=None, replan_actions=REPLAN_ACTIONS, max_time=INF, max_cost=INF):
+def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=REPLAN_ACTIONS, max_time=INF, max_cost=INF):
     reset_globals()
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
@@ -80,6 +80,9 @@ def solve_pddlstream(problem, args, skeleton=None, replan_actions=REPLAN_ACTIONS
     pr = cProfile.Profile()
     pr.enable()
     saver = WorldSaver()
+    sim_state = belief.sample_state()
+    sim_state.assign()
+    wait_for_duration(0.1)
     with LockRenderer(lock=not args.visualize):
         # TODO: option to only consider costs during local optimization
         # effort_weight = 0 if args.anytime else 1

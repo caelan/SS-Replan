@@ -63,7 +63,7 @@ def run_plan(task, real_state, args):
 
     problem = pdddlstream_from_problem(belief,
         collisions=not args.cfree, teleport=args.teleport)
-    solution = solve_pddlstream(problem, args, replan_actions={})
+    solution = solve_pddlstream(belief, problem, args, replan_actions={})
     plan, cost, evaluations = solution
     commands = commands_from_plan(world, plan)
     simulate_plan(real_state, commands, args)

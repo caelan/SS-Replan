@@ -61,7 +61,10 @@ class Belief(object):
         if self.grasped is None:
             return None
         return self.grasped.body_name
-
+    def is_gripper_closed(self):
+        current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
+        gripper_width = sum(current_gq)
+        return gripper_width <= MIN_GRASP_WIDTH
     def check_consistent(self):
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/d1e6024c5c13df7edeab3a271b745e656a794b02/control_tools/execution.py#L163
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/pr2_controller.py#L93
@@ -69,7 +72,7 @@ class Belief(object):
         # each joint in [0.00, 0.04] (units coincide with the physical gripper)
         current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
         gripper_width = sum(current_gq)
-        if (self.grasped is not None) and (gripper_width <= MIN_GRASP_WIDTH):
+        if (self.grasped is not None) and self.is_gripper_closed():
             # TODO: need to add the grasp object back into the dist
             self.grasped = None
             return False
@@ -183,14 +186,19 @@ def transition_belief_update(belief, plan):
     if plan is None:
         return False
     # TODO: check that actually holding
+    success = True
     for action, params in plan:
         if action in ['move_base', 'move_arm', 'move_gripper', 'pull',
                       'calibrate', 'detect']:
             pass
         elif action == 'pick':
             o, p, g, rp = params[:4]
-            del belief.pose_dists[o]
-            belief.grasped = g
+            if not belief.is_gripper_closed():
+                del belief.pose_dists[o]
+                belief.grasped = g
+            else:
+                success = False
+                #break
         elif action == 'place':
             o, p, g, rp = params[:4]
             belief.grasped = None
@@ -199,4 +207,4 @@ def transition_belief_update(belief, plan):
             pass
         else:
             raise NotImplementedError(action)
-    return True
+    return success
