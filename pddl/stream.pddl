@@ -20,7 +20,7 @@
     :inputs (?o ?gty)
     :domain (and (Graspable ?o) (GraspType ?gty))
     :outputs (?g)
-    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty))) ; TODO: produce carry conf
+    :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty))) ; TODO: produce carry conf for ?o
 
 
   (:stream sample-pose
@@ -30,7 +30,7 @@
     :certified (and (RelPose ?o ?rp ?r) (Value ?rp) (Sample ?rp)))
   (:stream sample-nearby-pose
     :inputs (?o1 ?o2 ?p2 ?bq)
-    :domain (and (NearPose ?o2 ?p2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure open?
+    :domain (and (NearPose ?o2 ?p2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure door is open?
     :outputs (?p1 ?rp)
     :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
                     (Value ?p1) (Sample ?p1)

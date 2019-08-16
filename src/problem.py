@@ -125,12 +125,14 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     # TODO: could replace objects for init_bq and init_gq instead of using closeto
     init_bq = FConf(world.robot, world.base_joints)
     init_aq = FConf(world.robot, world.arm_joints)
+    init_gq = FConf(world.robot, world.gripper_joints)
+    # Despite the base not moving, it could be re-observed
+
     for aq in [carry_aq]: # calibrate_aq
         if np.allclose(arm_difference_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
             init_aq = aq
             print('Near carry arm config')
             break
-    init_gq = FConf(world.robot, world.gripper_joints)
     for gq in [world.open_gq]: #, world.closed_gq]:
         if np.allclose(gripper_difference_fn(init_gq.values, gq.values), np.zeros(len(gq.joints))):
             print('Near open gripper config')
@@ -161,8 +163,6 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
         ('GConf', world.open_gq),
         ('GConf', world.closed_gq),
-        ('GConf', init_gq),
-        #('AtGConf', init_gq),
 
         ('Grasp', None, None),
         ('AtGrasp', None, None),
@@ -204,9 +204,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
     if not task.movable_base or task.return_init_bq:
-        with WorldSaver():
-            world.initial_saver.restore()
-            goal_bq = FConf(world.robot, world.base_joints)
+        goal_bq = world.goal_bq
         if not task.movable_base:
             goal_bq = init_bq
         init.extend([
@@ -223,9 +221,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
 
         if task.return_init_aq:
-            with WorldSaver():
-                world.initial_saver.restore()
-                goal_aq = FConf(world.robot, world.arm_joints)
+            goal_aq = world.goal_aq
             if np.allclose(arm_difference_fn(goal_aq.values, carry_aq.values), np.zeros(len(carry_aq.joints))):
                 goal_aq = aq
             if np.less_equal(np.abs(arm_difference_fn(init_aq.values, goal_aq.values)),
@@ -302,6 +298,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     if belief.grasped is None:
         init.extend([
             ('HandEmpty',),
+            ('GConf', init_gq),
             ('AtGConf', init_gq),
         ])
     else:

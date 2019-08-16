@@ -6,27 +6,31 @@ from pddlstream.language.object import OPT_PREFIX
 from pddlstream.algorithms.downward import get_fluents
 from pddlstream.algorithms.algorithm import parse_domain
 from pddlstream.utils import INF, implies, hash_or_id
+from src.utils import FConf
 from src.problem import ACTION_COSTS
 
 REUSE_ARGUMENTS = {
-    # This should really be done by type instead
+    # TODO: this should really be done by type instead
     'pick': [0, 2],  # ?o1 ?g
     'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
     # The previous pick error I had was because it moved to the carry_aq and then detected
     # However, it was next constrained to move the base rather than the arm
 }
 
-
 # TODO: could keep around previous base plans as long as we don't reuse them
+# Don't need to replan safe plans form teh same location
+# My worry is that the ground plane will shift
 
 def is_optimistic(arg):
     return isinstance(arg, str) and arg.startswith(OPT_PREFIX)
 
-def test_reusable(name, index, arg):
+def test_reusable(world, name, index, arg):
+    if is_optimistic(arg):
+        return False
     indices = REUSE_ARGUMENTS.get(name, [])
-    return ((index in indices) or isinstance(arg, str)) and not is_optimistic(arg)
+    return (index in indices) or isinstance(arg, str) # or (isinstance(arg, FConf) and (arg in world.constants))
 
-def make_wild_skeleton(plan):
+def make_wild_skeleton(world, plan):
     # Can always constrain grasps and selected poses
     # Could store previous values to suggest new ones
     # Recover skeleton
@@ -35,12 +39,13 @@ def make_wild_skeleton(plan):
     # If all args the same
     skeleton = []
     for name, args in plan:
-        new_args = [arg if test_reusable(name, index, arg) else WILD for index, arg in enumerate(args)]
+        new_args = [arg if test_reusable(world, name, index, arg) else WILD
+                    for index, arg in enumerate(args)]
         skeleton.append(Action(name, new_args))
         #print(len(skeleton), skeleton[-1])
     return skeleton
 
-def make_exact_skeleton(plan):
+def make_exact_skeleton(world, plan):
     # TODO: spend more effort on samples that were previously discovered
     # TODO: possibly reuse the kinematic solutions as seeds
     #arg_from_id = {}
@@ -49,9 +54,9 @@ def make_exact_skeleton(plan):
     skeleton = []
     for name, args in plan:
         new_args = []
-        for i, arg in enumerate(args):
+        for idx, arg in enumerate(args):
             #arg_from_id[id(arg)] = arg
-            if test_reusable(name, i, arg):
+            if test_reusable(world, name, idx, arg):
                 new_args.append(arg)
             else:
                 key = id(arg)

@@ -150,7 +150,7 @@ def detect_block(world, **kwargs):
 
 def hold_block(world, **kwargs):
     #open_all_doors(world)
-    entity_name = add_block(world, idx=0, pose2d=SPAM_POSE2D)
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
     set_all_static()
     add_kinect(world)
@@ -172,7 +172,7 @@ BASE_POSE2D = (0.73, 0.80, -np.pi)
 
 def fixed_stow(world, **kwargs):
     # set_base_values
-    entity_name = add_block(world, idx=0, pose2d=SPAM_POSE2D)
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     set_all_static()
     add_kinect(world)
 
@@ -181,7 +181,7 @@ def fixed_stow(world, **kwargs):
 
     initial_surface = 'indigo_tmp'
     goal_surface = 'indigo_drawer_top'
-    sample_placement(world, entity_name, initial_surface, learned=True)
+    #sample_placement(world, entity_name, initial_surface, learned=True)
     # joint_name = JOINT_TEMPLATE.format(goal_surface)
 
     prior = {
