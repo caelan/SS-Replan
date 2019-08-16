@@ -224,7 +224,7 @@ def main():
         observe_world(interface)
         if interface.simulation:  # TODO: move to simulation instead?
             set_isaac_sim(interface)
-        world.update_initial()
+        world._update_initial()
         add_markers(world, inverse_place=False)
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)

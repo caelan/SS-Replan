@@ -91,7 +91,7 @@ def main():
     task_fn = task_fn_from_name[args.problem]
 
     task = task_fn(world)
-    world.update_initial()
+    world._update_initial()
     if not args.record:
         with LockRenderer():
             add_markers(world, inverse_place=False)

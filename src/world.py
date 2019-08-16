@@ -109,8 +109,9 @@ class World(object):
                             get_max_limits(self.robot, self.gripper_joints))
         self.closed_gq = FConf(self.robot, self.gripper_joints,
                               get_min_limits(self.robot, self.gripper_joints))
-        self.update_custom_limits()
-        self.update_initial()
+        self.gripper_confs = [self.open_gq, self.closed_gq]
+        self._update_custom_limits()
+        self._update_initial()
 
     def _initialize_environment(self):
         # wall to fridge: 4cm
@@ -166,9 +167,18 @@ class World(object):
         buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
         buffer[-1] *= 2
         self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
-    def update_initial(self):
+
+    def _update_initial(self):
         # TODO: store initial poses as well?
         self.initial_saver = WorldSaver()
+        self.goal_bq = FConf(self.robot, self.base_joints)
+        self.goal_aq = FConf(self.robot, self.arm_joints)
+        self.goal_gq = FConf(self.robot, self.gripper_joints)
+        self.initial_confs = [self.goal_bq, self.goal_aq, self.goal_gq]
+
+    @property
+    def constants(self):
+        return self.special_confs + self.gripper_confs + self.initial_confs
 
     #########################
 
@@ -246,7 +256,8 @@ class World(object):
         set_joint_positions(self.robot, self.base_joints, conf)
     def get_world_aabb(self):
         return aabb_union(get_aabb(body) for body in self.fixed) # self.all_bodies
-    def update_custom_limits(self, min_extent=0.0):
+
+    def _update_custom_limits(self, min_extent=0.0):
         #robot_extent = get_aabb_extent(get_aabb(self.robot))
         # Scaling by 0.5 to prevent getting caught in corners
         #min_extent = 0.5 * min(robot_extent[:2]) * np.ones(2) / 2
