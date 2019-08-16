@@ -9,7 +9,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
 
-ARM_SPEED = 0.2*np.pi # 0.25
+ARM_SPEED = 0.15*np.pi # 0.2 is too high
 
 
 def get_joint_names(body, joints):

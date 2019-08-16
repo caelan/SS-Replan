@@ -11,7 +11,7 @@ from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, g
 from pddlstream.utils import Verbose
 
 from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
-from actionlib import SimpleActionClient
+from actionlib import SimpleActionClient, GoalStatus
 #from actionlib_msgs.msg import GoalStatus, GoalState, SimpleClientGoalState
 # http://docs.ros.org/jade/api/actionlib/html/classactionlib_1_1SimpleClientGoalState.html
 # http://docs.ros.org/kinetic/api/actionlib_msgs/html/msg/GoalStatus.html
@@ -142,7 +142,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
     publish_display_trajectory(interface.moveit, trajectory)
-    wait_for_user('Continue?')
+    #wait_for_user('Execute?')
+    # TODO: adjust to the actual current configuration
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
     goal.goal_time_tolerance = rospy.Duration.from_sec(1.0)
@@ -153,12 +154,14 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
     start_time = time.time()
     state = client.send_goal_and_wait(goal)  # send_goal_and_wait
+    #state = client.get_state() # get_comm_state, get_terminal_state
     print('State:', state)
-    state = client.get_state()
-    print('State:', state)
-    print('Status:', client.get_goal_status_text())
-    result = client.get_result()
-    print('Result:', result)
+    #result = client.get_result()
+    #print('Result:', result)
+    #text = client.get_goal_status_text()
+    text = GoalStatus.to_string(state)
+    print('Goal status:', text)
+    # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
     # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
 
     update_robot_conf(interface)
@@ -166,6 +169,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     print('Final error:', (np.array(end_conf) - np.array(path[-1])).round(5))
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
+    wait_for_user('Continue?')
+    # TODO: remove display messages
 
 ################################################################################
 

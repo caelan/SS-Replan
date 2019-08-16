@@ -36,7 +36,7 @@ def run_policy(task, args, observation_fn, transition_fn):
             print('Skeleton:', previous_skeleton)
             print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
             # TODO: could compare to the previous plan cost
-            plan, cost, certificate = solve_pddlstream(
+            plan, cost, certificate = solve_pddlstream(belief,
                 problem, args, max_time=30, skeleton=previous_skeleton)
             if plan is None:
                 wait_for_user('Failed to adhere to plan')
@@ -47,7 +47,7 @@ def run_policy(task, args, observation_fn, transition_fn):
                                                additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
-            plan, cost, certificate = solve_pddlstream(problem, args, max_time=args.max_time, max_cost=cost)
+            plan, cost, certificate = solve_pddlstream(belief, problem, args, max_time=args.max_time, max_cost=cost)
         if plan is None:
             print('Failure!')
             return False
