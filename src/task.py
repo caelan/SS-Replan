@@ -4,17 +4,16 @@ import numpy as np
 import random
 import time
 
-from pybullet_tools.pr2_utils import get_viewcone
-from pybullet_tools.utils import stable_z, link_from_name, set_pose, Pose, Point, Euler, multiply, get_pose, \
-    apply_alpha, RED, step_simulation, joint_from_name, set_all_static, \
-    WorldSaver, stable_z_on_aabb, wait_for_user, draw_aabb, get_aabb, pairwise_collision, elapsed_time, set_base_values
+from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
+    set_all_static, \
+    WorldSaver, stable_z_on_aabb, pairwise_collision, elapsed_time
 from src.stream import get_stable_gen
-from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, JOINT_TEMPLATE, COUNTERS, \
-    get_ycb_obj_path, DRAWER_JOINTS, ALL_JOINTS, LEFT_CAMERA, KINECT_DEPTH, \
-    KITCHEN_FROM_ZED_LEFT, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, ZED_LEFT_SURFACES
-from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
+from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
+    get_ycb_obj_path, ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
+    BLOCK_TEMPLATE, NAME_TEMPLATE, name_from_type
+from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
-from src.belief import Belief, create_surface_belief
+from src.belief import create_surface_belief
 
 class Task(object):
     def __init__(self, world, prior={}, skeletons=[],
@@ -73,19 +72,17 @@ def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
 
 def add_block(world, idx=0, **kwargs):
     # TODO: automatically produce a unique name
-    name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], idx)
-    entity_path = get_block_path(name)
-    #name = 'potted_meat_can'
-    #entity_path = get_ycb_obj_path(name)
-    world.add_body(name, entity_path)
+    block_type = BLOCK_TEMPLATE.format(BLOCK_SIZES[-1], BLOCK_COLORS[0])
+    #block_type = 'potted_meat_can'
+    name = name_from_type(block_type, idx)
+    world.add_body(name)
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
 def add_box(world, idx=0, **kwargs):
     ycb_type = 'cracker_box'
-    name = '{}{}'.format(ycb_type, idx)
-    obstruction_path = get_ycb_obj_path(ycb_type)
-    world.add_body(name, obstruction_path, color=np.ones(4))
+    name = name_from_type(ycb_type, idx)
+    world.add_body(name, color=np.ones(4))
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 

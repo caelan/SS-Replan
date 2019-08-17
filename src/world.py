@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import os
 from collections import namedtuple
@@ -17,7 +19,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf
+    ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf, get_obj_path, type_from_name
 from log_poses import POSES_PATH
 
 DISABLED_FRANKA_COLLISIONS = {
@@ -92,6 +94,7 @@ class World(object):
 
         self.body_from_name = {}
         self.path_from_name = {}
+        self.names_from_type = {}
         self.custom_limits = {}
         self.base_limits_handles = []
         self.cameras = {}
@@ -427,12 +430,17 @@ class World(object):
 
     #########################
 
-    def add_body(self, name, path, **kwargs):
+    def add_body(self, name, **kwargs):
         assert name not in self.body_from_name
+        obj_type = type_from_name(name)
+        self.names_from_type.setdefault(obj_type, []).append(name)
+        path = get_obj_path(obj_type)
         self.path_from_name[name] = path
-        self.body_from_name[name] = load_pybullet(path, **kwargs)
-        assert self.body_from_name[name] is not None
-        add_body_name(self.body_from_name[name], name)
+        print('Loading', path)
+        body = load_pybullet(path, **kwargs)
+        assert body is not None
+        add_body_name(body, name)
+        self.body_from_name[name] = body
         return name
     def get_body(self, name):
         return self.body_from_name[name]

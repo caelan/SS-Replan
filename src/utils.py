@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import numpy as np
 import yaml
+import string
 
 from collections import namedtuple
 
@@ -83,11 +84,16 @@ APPROACH_DISTANCE = 0.075 # 0.1
 
 ################################################################################
 
+NAME_TEMPLATE = '{}{}'
+BLOCK_TEMPLATE = '{}_{}_block'
+
 BLOCK_SIZES = ['small', 'big']
 BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf')
 YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 # TODO: ycb obj files have 6 vertex coordinates?
+
+################################################################################
 
 #KITCHEN_PATH = '/home/caelan/Programs/robot_kitchen/model/robot_kitchen.sdf'
 #KITCHEN_PATH = os.path.join(SRL_PATH, 'packages/kitchen_description/urdf/kitchen_part_right_gen_stl.urdf')
@@ -243,15 +249,30 @@ def get_ycb_obj_path(ycb_type):
     # texture_map.png textured.mtl textured.obj textured_simple.obj textured_simple.obj.mtl
     return os.path.join(YCB_PATH, path_from_type[ycb_type], 'textured_simple.obj')
 
-def load_ycb(ycb_type, **kwargs):
-    # TODO: simply geometry
+def load_ycb(ycb_name, **kwargs):
+    # TODO: simplify geometry
+    ycb_type = type_from_name(ycb_name)
     ycb_obj_path = get_ycb_obj_path(ycb_type)
     assert ycb_obj_path is not None
     # TODO: set color (as average) or texture
     return create_obj(ycb_obj_path, color=None, **kwargs)
 
-def surface_from_name(surface_name):
-    return SURFACE_FROM_NAME.get(surface_name, Surface(surface_name, SURFACE_TOP, []))
+def name_from_type(obj_type, suffix=''):
+    return NAME_TEMPLATE.format(obj_type, suffix)
+
+def type_from_name(name):
+    return name.strip(string.digits)
+
+def get_block_path(block_name):
+    block_type = type_from_name(block_name)
+    size, color, block = block_type.split('_')
+    assert block == 'block'
+    return BLOCK_PATH.format(size, color)
+
+def get_obj_path(obj_type):
+    if 'block' in obj_type:
+        return get_block_path(obj_type)
+    return get_ycb_obj_path(obj_type)
 
 #CABINET_PATH = os.path.join(SRL_PATH, 'packages/sektion_cabinet_model/urdf/sektion_cabinet.urdf')
 # Could recursively find all *.urdf | *.sdf
@@ -275,11 +296,6 @@ def load_yaml(path):
             return yaml.safe_load(f)
         except yaml.YAMLError as exc:
             raise exc
-
-def get_block_path(name):
-    size, color, block = name.split('_')
-    assert block.startswith('block')
-    return BLOCK_PATH.format(size, color)
 
 ################################################################################
 
@@ -350,6 +366,9 @@ class FConf(Conf):
         return '{}{}'.format(prefix, id(self) % 1000)
 
 ################################################################################
+
+def surface_from_name(surface_name):
+    return SURFACE_FROM_NAME.get(surface_name, Surface(surface_name, SURFACE_TOP, []))
 
 def create_surface_attachment(world, obj_name, surface_name):
     body = world.get_body(obj_name)

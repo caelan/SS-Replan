@@ -29,13 +29,12 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
     CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
-from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf
+from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, load_prior, display_kinect
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import simulate_plan
 from src.task import Task, CRACKER_POSE2D, SPAM_POSE2D, pose2d_on_surface, sample_placement
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
-#from src.issac import display_kinect
 from src.execution import franka_open_gripper
 
 def planning_loop(interface):
@@ -219,8 +218,10 @@ def main():
         interface = real_setup(domain, world, args)
     else:
         interface = simulation_setup(domain, world, args)
+    load_prior(interface.task)
+    for side in ['left']:
+        display_kinect(interface, side=side)
     franka_open_gripper(interface)
-    # display_kinect(interface, side='left')
     #test_carter(interface)
     #return
 

@@ -277,6 +277,16 @@ def detect_classes():
 
 ################################################################################
 
+def load_prior(task):
+    world = task.world
+    for name in task.objects:
+        #if name in world.body_from_name:
+        #    continue
+        world.add_body(name, color=np.ones(4), mass=0)
+        body = world.get_body(name)
+        set_pose(body, NULL_POSE)
+        draw_pose(unit_pose(), parent=body)
+
 def observe_world(interface):
     from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
     #dump_dict(world_state)
@@ -297,21 +307,15 @@ def observe_world(interface):
     world_aabb = world.get_world_aabb()
     observation = {}
     for name, entity in world_state.entities.items():
-        #dump_dict(entity)
         #entity.obj_type, entity.semantic_frames
         if isinstance(entity, RobotArm):
             pass
         elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
             # entity.is_tracked, entity.location_belief, entity.view
             if name not in world.task.objects:
+                # TODO: discard/correct later in the pipeline
                 continue
-            if name not in world.body_from_name:
-                ycb_obj_path = get_ycb_obj_path(entity.obj_type)
-                print('Loading', ycb_obj_path)
-                world.add_body(name, ycb_obj_path, color=np.ones(4), mass=0)
-                body = world.get_body(name)
-                set_pose(body, NULL_POSE)
-                draw_pose(unit_pose(), parent=body)
+            #entity.obj_type
             if (visible is None) or (name in visible):
                 frame_name = ISSAC_PREFIX + name
                 pose = lookup_pose(interface.observer.tf_listener, frame_name)
@@ -333,7 +337,6 @@ def observe_world(interface):
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
-    display_kinect(interface, side='left')
     return observation
 
 ################################################################################
