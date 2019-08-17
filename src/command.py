@@ -202,6 +202,7 @@ class ApproachTrajectory(Trajectory):
 
     def execute(self, interface):
         super(ApproachTrajectory, self).execute(interface)
+        # TODO: finish if error is still large
         return
 
         set_joint_positions(self.robot, self.joints, self.path[-1])
@@ -227,6 +228,7 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         self.door = door
         self.door_joints = tuple(door_joints)
         self.door_path = tuple(door_path)
+        self.do_pull = (door_path[0][0] < door_path[-1][0])
         assert len(self.robot_path) == len(self.door_path)
 
     @property
@@ -255,14 +257,17 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
     def execute(self, interface):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
-        franka_close_gripper(interface)
-        time.sleep(DEFAULT_SLEEP)
+        # TODO: do I still need these?
+        #if self.do_pull:
+        #    franka_close_gripper(interface)
+        #    time.sleep(DEFAULT_SLEEP)
 
         franka_control(self.robot, self.joints, self.path, interface)
         time.sleep(DEFAULT_SLEEP)
 
-        franka_open_gripper(interface)
-        time.sleep(DEFAULT_SLEEP)
+        #if self.do_pull:
+        #    franka_open_gripper(interface)
+        #    time.sleep(DEFAULT_SLEEP)
 
         #close_gripper(self.robot, moveit)
         #status = joint_state_control(self.robot, self.robot_joints, self.robot_path,
@@ -304,6 +309,7 @@ class Attach(Command):
         if self.world.robot != self.robot:
             return
         franka_close_gripper(interface)
+        time.sleep(DEFAULT_SLEEP)
         #return close_gripper(self.robot, moveit)
 
     def __repr__(self):
@@ -342,6 +348,7 @@ class Detach(Command):
         if self.world.robot != self.robot:
             return
         franka_open_gripper(interface)
+        time.sleep(DEFAULT_SLEEP)
         #return open_gripper(self.robot, moveit)
 
     def __repr__(self):

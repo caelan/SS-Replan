@@ -36,6 +36,7 @@ from src.planner import simulate_plan
 from src.task import Task, CRACKER_POSE2D, SPAM_POSE2D, pose2d_on_surface, sample_placement
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 #from src.issac import display_kinect
+from src.execution import franka_open_gripper
 
 def planning_loop(interface):
     args = interface.args
@@ -46,11 +47,11 @@ def planning_loop(interface):
 
     def transition_fn(belief, commands):
         sim_state = belief.sample_state()
-        wait_for_user()
         if args.watch or args.record:
+            wait_for_user()
             # simulate_plan(sim_state.copy(), commands, args)
             iterate_commands(sim_state.copy(), commands)
-        wait_for_user()
+            wait_for_user()
         sim_state.assign()
         if args.teleport or args.cfree:
             print('Some constraints were ignored. Skipping execution!')
@@ -82,7 +83,7 @@ def test_carter(interface):
     #carter.move_to_openloop(goal_pose)
     # move_to_open_loop | move_to_safe_followed_by_openloop
 
-    #carter.simple_move(0.1) # simple_move | simple_stop
+    carter.simple_move(-0.1) # simple_move | simple_stop
     # rospy.sleep(2.0)
     # carter.simple_stop()
     #domain.get_robot().carter_interface = interface.carter
@@ -142,14 +143,15 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     prior = {
         SPAM: DeltaDist(INDIGO_COUNTER),
-        #CHEEZIT: DeltaDist(INDIGO_COUNTER),
+        SUGAR: DeltaDist(INDIGO_COUNTER),
+        CHEEZIT: DeltaDist(INDIGO_COUNTER),
     }
     task = Task(world, prior=prior,
                 # goal_holding=[SPAM],
                 goal_on={SPAM: TOP_DRAWER},
-                # goal_closed=[],
+                #goal_closed=[],
                 goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)],  # , 'indigo_drawer_bottom_joint'],
-                # goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
+                #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
                 movable_base=not args.fixed,
                 return_init_bq=True, return_init_aq=True)
 
@@ -182,7 +184,12 @@ def main():
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
     np.set_printoptions(precision=3, suppress=True)
-    args.watch |= args.execute
+    #args.watch |= args.execute
+    # TODO: samples from the belief distribution likely don't have the init flag
+
+    # TODO: populate with initial objects even if not observed
+    # TODO: reobserve thee same scene until receive good observation
+    # TODO: integrate with deepim
 
     # srl_system/packages/isaac_bridge/configs/ycb_table_config.json
     # srl_system/packages/isaac_bridge/configs/ycb_table_graph.json
@@ -199,6 +206,8 @@ def main():
     with Verbose(False):
         domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
     robot_entity = domain.get_robot()
+    robot_entity.get_motion_interface().remove_obstacle()
+
     robot_entity.suppress_fixed_bases() # Not as much error?
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
@@ -210,8 +219,10 @@ def main():
         interface = real_setup(domain, world, args)
     else:
         interface = simulation_setup(domain, world, args)
+    franka_open_gripper(interface)
+    # display_kinect(interface, side='left')
     #test_carter(interface)
-    #display_kinect(interface, side='left')
+    #return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -261,8 +272,9 @@ if __name__ == '__main__':
 # 1) roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
 
 # Running on the real robot w/o LULA
-# 1) roslaunch franka_controllers lula_control.launch
+# 1) roslaunch franka_controllers start_control.launch
 # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+# 3) srl@vgilligan:~/srl_system/workspace/src/brain$ ./relay.sh
 # 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz
 # 4) killall move_group franka_control_node local_controller
 

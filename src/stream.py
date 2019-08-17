@@ -742,14 +742,19 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     gripper_conf = FConf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
-    cmd = Sequence(State(world, savers=[robot_saver]), commands=[
+
+    commands = [
         ApproachTrajectory(world, world.robot, world.arm_joints, approach_paths[0]),
-        finger_cmd.commands[0],
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
                        world.kitchen, [door_joint], door_path),
-        finger_cmd.commands[0].reverse(),
         ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
-    ], name='pull')
+    ]
+    door_path, _, _, _ = door_plan
+    pull = (door_path[0][0] < door_path[-1][0])
+    if pull:
+        commands.insert(1, finger_cmd.commands[0])
+        commands.insert(3, finger_cmd.commands[0].reverse())
+    cmd = Sequence(State(world, savers=[robot_saver]), commands, name='pull')
     yield (aq1, aq2, cmd,)
 
 ################################################################################

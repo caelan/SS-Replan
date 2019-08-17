@@ -221,7 +221,8 @@ def display_kinect(interface, side):
             camera_frame = ISSAC_PREFIX + camera_name
         else:
             camera_name = 'kinect1'
-            camera_frame = '{}_link'.format(camera_name)
+            camera_frame = 'depth_camera' # depth_camera_2
+            #camera_frame = '{}_link'.format(camera_name)
         print('Received camera info from camera', camera_name)
 
         world_from_camera = lookup_pose(observer.tf_listener, camera_frame)

@@ -136,7 +136,11 @@ def franka_control(robot, joints, path, interface, **kwargs):
 
     update_robot_conf(interface)
     start_conf = get_joint_positions(robot, joints)
-    trajectory = spline_parameterization(robot, joints, [start_conf] + path, **kwargs)
+    print('Initial error:', (np.array(start_conf) - np.array(path[0])).round(5))
+    # TODO: only add if the error is substantial
+    path = path
+    #path = [start_conf] + list(path)
+    trajectory = spline_parameterization(robot, joints, path, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(trajectory.points), trajectory.points[-1].time_from_start.to_sec()))
     # path_tolerance, goal_tolerance, goal_time_tolerance
@@ -146,7 +150,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # TODO: adjust to the actual current configuration
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
-    goal.goal_time_tolerance = rospy.Duration.from_sec(1.0)
+    #goal.goal_time_tolerance = rospy.Duration.from_sec(1.0)
     for joint in trajectory.joint_names:
         #goal.path_tolerance.append(JointTolerance(name=joint, position=1e-2)) # position | velocity | acceleration
         goal.goal_tolerance.append(JointTolerance(name=joint, position=1e-3)) # position | velocity | acceleration
@@ -164,12 +168,13 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
     # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
 
+    # TODO: extra effort to get to the final conf
     update_robot_conf(interface)
     end_conf = get_joint_positions(robot, joints)
     print('Final error:', (np.array(end_conf) - np.array(path[-1])).round(5))
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
-    wait_for_user('Continue?')
+    #wait_for_user('Continue?')
     # TODO: remove display messages
 
 ################################################################################

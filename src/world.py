@@ -345,9 +345,13 @@ class World(object):
     def get_door_sign(self, joint):
         return -1 if 'left' in get_joint_name(self.kitchen, joint) else +1
     def closed_conf(self, joint):
+        lower, upper = get_joint_limits(self.kitchen, joint)
+        if 'drawer' in get_joint_name(self.kitchen, joint):
+            fraction = 0.9
+            return fraction*lower + (1-fraction)*upper
         if 'left' in get_joint_name(self.kitchen, joint):
-            return get_max_limit(self.kitchen, joint)
-        return get_min_limit(self.kitchen, joint)
+            return upper
+        return lower
     def open_conf(self, joint):
         joint_name = get_joint_name(self.kitchen, joint)
         if 'left' in joint_name:
