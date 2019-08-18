@@ -10,12 +10,12 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    WorldSaver, get_difference_fn
+    get_difference_fn
 
 from src.inference import PoseDist
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, FConf
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, FConf, are_confs_close
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
-    get_base_motion_fn, base_cost_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
+    get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
@@ -116,27 +116,16 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
     # TODO: repackage stream outputs to avoid recomputation
 
-    carry_aq = world.carry_conf
-    calibrate_aq = world.calibrate_conf
-    base_difference_fn = get_difference_fn(world.robot, world.base_joints)
-    arm_difference_fn = get_difference_fn(world.robot, world.arm_joints)
-    gripper_difference_fn = get_difference_fn(world.robot, world.gripper_joints)
-
     # TODO: could replace objects for init_bq and init_gq instead of using closeto
     init_bq = FConf(world.robot, world.base_joints)
     init_aq = FConf(world.robot, world.arm_joints)
     init_gq = FConf(world.robot, world.gripper_joints)
-    # Despite the base not moving, it could be re-observed
+    # Despite the base not moving, it could be re-estimated
 
-    for aq in [carry_aq]: # calibrate_aq
-        if np.allclose(arm_difference_fn(init_aq.values, aq.values), np.zeros(len(aq.joints))):
-            init_aq = aq
-            print('Near carry arm config')
-            break
-    for gq in [world.open_gq]: #, world.closed_gq]:
-        if np.allclose(gripper_difference_fn(init_gq.values, gq.values), np.zeros(len(gq.joints))):
-            print('Near open gripper config')
-            init_gq = gq
+    carry_aq = init_aq if are_confs_close(init_aq, world.carry_conf) else world.carry_conf
+    calibrate_aq = init_aq if are_confs_close(init_aq, world.calibrate_conf) else world.calibrate_conf
+    open_gq = init_gq if are_confs_close(init_gq, world.open_gq) else world.open_gq
+    closed_gq = init_gq if are_confs_close(init_gq, world.closed_gq) else world.closed_gq
 
     constant_map = {
         '@world': 'world',
@@ -145,8 +134,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
         '@rest_aq': carry_aq,
         '@calibrate_aq': calibrate_aq,
-        '@open_gq': world.open_gq,
-        '@closed_gq': world.closed_gq,
+        '@open_gq': open_gq,
+        '@closed_gq': closed_gq,
         '@open': OPEN,
         '@closed': CLOSED,
     }
@@ -161,8 +150,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
 
-        ('GConf', world.open_gq),
-        ('GConf', world.closed_gq),
+        ('GConf', open_gq),
+        ('GConf', closed_gq),
 
         ('Grasp', None, None),
         ('AtGrasp', None, None),
@@ -204,15 +193,14 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
     if not task.movable_base or task.return_init_bq:
-        goal_bq = world.goal_bq
-        if not task.movable_base:
-            goal_bq = init_bq
+        goal_bq = world.goal_bq if task.movable_base else init_bq
         init.extend([
             ('BConf', goal_bq),
             ('AConf', goal_bq, carry_aq),
             ('CloseTo', goal_bq, goal_bq),
         ])
 
+        base_difference_fn = get_difference_fn(world.robot, world.base_joints)
         if np.less_equal(np.abs(base_difference_fn(init_bq.values, goal_bq.values)),
                          [0.05, 0.05, math.radians(10)]).all():
             print('Close to goal base configuration')
@@ -221,9 +209,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
 
         if task.return_init_aq:
-            goal_aq = world.goal_aq
-            if np.allclose(arm_difference_fn(goal_aq.values, carry_aq.values), np.zeros(len(carry_aq.joints))):
-                goal_aq = aq
+            goal_aq = init_aq if are_confs_close(init_aq, world.goal_aq) else world.goal_aq
+            arm_difference_fn = get_difference_fn(world.robot, world.arm_joints)
             if np.less_equal(np.abs(arm_difference_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
                 print('Close to goal arm configuration')
