@@ -119,7 +119,7 @@
   (:action      move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
     :precondition
-                (and (ArmMotion ?bq ?aq1 ?aq2 ?at) (not (= ?aq1 ?aq2)) ; Be careful with shared optimistic
+                (and (ArmMotion ?bq ?aq1 ?aq2 ?at) ; (not (= ?aq1 ?aq2)) ; Be careful with shared optimistic
                      (AtBConf ?bq) (AtAConf ?aq1)
                      (Calibrated) ; TODO: require calibration?
                      (CanMoveArm)
