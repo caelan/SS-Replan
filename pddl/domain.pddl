@@ -1,87 +1,89 @@
 (define (domain nvidia-tamp)
-  (:requirements :strips :equality)
-  (:constants @world @gripper @stove
+        (:requirements :strips :equality)
+        (:constants @world @gripper @stove
               @open @closed
               @rest_aq ; @calibrate_aq
               @open_gq @closed_gq)
-  (:predicates
-    (Stackable ?o ?r)
-    (Stove ?r)
-    (Type ?t ?b)
-    (NoisyBase)
-    (Obstacle ?o)
-    (Counter ?o ?p)
-    (Graspable ?o)
+        (:predicates
+          (Stackable ?o ?r)
+          (Stove ?r)
+          (Type ?t ?b)
+          (NoisyBase)
+          (Obstacle ?o)
+          (Counter ?o ?p)
+          (Graspable ?o)
 
-    (Pick ?o ?p ?g ?bq ?aq ?at)
-    (Pull ?j ?q1 ?q2 ?bq ?aq1 ?aq2 ?at)
-    (BaseMotion ?bq1 ?bq2 ?aq ?bt)
-    (ArmMotion ?bq ?aq1 ?aq2 ?at)
-    (GripperMotion ?gq1 ?gq2 ?gt)
-    (CalibrateMotion ?bq ?aq ?at)
+          (Pick ?o ?p ?g ?bq ?aq ?at)
+          (Pull ?j ?q1 ?q2 ?bq ?aq1 ?aq2 ?at)
+          (BaseMotion ?bq1 ?bq2 ?aq ?bt)
+          (ArmMotion ?bq ?aq1 ?aq2 ?at)
+          (GripperMotion ?gq1 ?gq2 ?gt)
+          (CalibrateMotion ?bq ?aq ?at)
 
-    (Detect ?o ?p ?r)
-    (Value ?p)
-    (DistSample ?rp1 ?rp2)
+          (Detect ?o ?p ?r)
+          (Value ?p)
+          (DistSample ?rp1 ?rp2)
 
-    (Grasp ?o ?g)
-    (BTraj ?bt)
-    (ATraj ?at)
-    (BConf ?bq)
-    (AConf ?bq ?aq)
-    (GConf ?gq)
-    (Angle ?j ?a)
-    (Ray ?r)
+          (Grasp ?o ?g)
+          (BTraj ?bt)
+          (ATraj ?at)
+          (BConf ?bq)
+          (AConf ?bq ?aq)
+          (GConf ?gq)
+          (Angle ?j ?a)
+          (Ray ?r)
 
-    (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s)
-    (CFreeBConfPose ?bq ?o2 ?p2)
-    (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
-    (CFreeTrajPose ?t ?o2 ?p2)
-    (OFreeRayPose ?r ?o ?p)
-    (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
+          (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s)
+          (CFreeBConfPose ?bq ?o2 ?p2)
+          (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
+          (CFreeTrajPose ?t ?o2 ?p2)
+          (OFreeRayPose ?r ?o ?p)
+          (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
 
-    (HandEmpty)
-    (AtBConf ?bq)
-    (AtAConf ?aq)
-    (AtGConf ?gq)
-    (AtRelPose ?o1 ?rp ?o2)
-    (AtWorldPose ?o ?p)
-    (AtGrasp ?o ?g)
-    (AtAngle ?j ?q)
+          (HandEmpty)
+          (AtBConf ?bq)
+          (AtAConf ?aq)
+          (AtGConf ?gq)
+          (AtRelPose ?o1 ?rp ?o2)
+          (AtWorldPose ?o ?p)
+          (AtGrasp ?o ?g)
+          (AtAngle ?j ?q)
 
-    (CanMoveBase)
-    (CanMoveArm)
-    (CanMoveGripper)
-    (Cooked ?o)
-    (Calibrated)
-    (Localized ?o)
+          (CanMoveBase)
+          (CanMoveArm)
+          (CanMoveGripper)
+          (Cooked ?o)
+          (Calibrated)
+          (Localized ?o)
 
-    (OpenGripper)
-    (OpenGConf ?gq)
+          (OpenGripper)
+          (OpenGConf ?gq)
 
-    (Status ?s)
-    (DoorStatus ?j ?s)
-    (AngleWithin ?j ?a ?s)
+          (Status ?s)
+          (DoorStatus ?j ?s)
+          (AngleWithin ?j ?a ?s)
 
-    (On ?o1 ?o2)
-    (Holding ?o)
-    (Accessible ?o ?p)
-    (UnsafeRelPose ?o ?rp ?s)
-    (UnsafeBConf ?bq)
-    (UnsafeApproach ?o ?p ?g)
-    (UnsafeATraj ?at)
-    (UnsafeBTraj ?bt)
-    (OccludedRay ?r)
-    (CloseTo ?q1 ?q2)
+          (On ?o1 ?o2)
+          (Holding ?o)
+          (Accessible ?o ?p)
+          (Unsafe)
+          (UnsafeRelPose ?o ?rp ?s)
+          (UnsafeBConf ?bq)
+          (UnsafeApproach ?o ?p ?g)
+          (UnsafeWorldPose ?o ?p2)
+          (UnsafeATraj ?at)
+          (UnsafeBTraj ?bt)
+          (OccludedRay ?r)
+          (CloseTo ?q1 ?q2)
 
-    (RelPose ?o1 ?rp ?o2)
-    (WorldPose ?o ?p)
-    (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
-    (Connected ?o ?j)
-    (AngleKin ?o ?p ?j ?a)
-    (AdmitsGrasp ?o1 ?g ?o2)
-  )
-  (:functions
+          (RelPose ?o1 ?rp ?o2)
+          (WorldPose ?o ?p)
+          (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
+          (Connected ?o ?j)
+          (AngleKin ?o ?p ?j ?a)
+          (AdmitsGrasp ?o1 ?g ?o2)
+          )
+        (:functions
     (Distance ?bq1 ?bq2)
     (MoveBaseCost)
     (MoveArmCost)
@@ -93,10 +95,10 @@
     (DetectCost ?rp1 ?rp2)
   )
 
-  ; TODO: prevent the robot from moving to the same spot?
-  ; TODO: force the search to select new base poses after one manipulation is performed
-  ; TODO: robot still needs to recalibrate after no base movement...
-  (:action move_base
+        ; TODO: prevent the robot from moving to the same spot?
+        ; TODO: force the search to select new base poses after one manipulation is performed
+        ; TODO: robot still needs to recalibrate after no base movement...
+        (:action move_base
     ;:parameters (?bq1 ?bq2 ?aq ?bt)
     ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     ;                   (AtBConf ?bq1) (AtAConf ?aq)
@@ -106,7 +108,7 @@
                        (CanMoveBase)
                        (Calibrated)
                        (not (UnsafeBConf ?bq2))
-                       )
+                       (not (Unsafe)))
     :effect (and (AtBConf ?bq2)
                  (CanMoveArm)
                  (not (AtBConf ?bq1))
@@ -116,42 +118,44 @@
                  ;(increase (total-cost) (Distance ?bq1 ?bq2)))
                  (increase (total-cost) (MoveBaseCost)))
     )
-  (:action move_arm
+        (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
     :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at) ; (not (= ?aq1 ?aq2)) ; Be careful with shared optimistic
                        (AtBConf ?bq) (AtAConf ?aq1)
                        (Calibrated) ; TODO: require calibration?
                        (CanMoveArm)
-                  )
+                       (not (Unsafe))
+                       )
     :effect (and (AtAConf ?aq2)
                  (not (AtAConf ?aq1)) (not (CanMoveArm))
                  (increase (total-cost) (MoveArmCost)))
     )
-  (:action move_gripper
+        (:action move_gripper
     :parameters (?gq1 ?gq2 ?gt)
     :precondition (and (GripperMotion ?gq1 ?gq2 ?gt) ; (not (= ?gq1 ?gq2))
                        (AtGConf ?gq1) (HandEmpty)
                        ;(CanMoveGripper)
-                  )
+                       (not (Unsafe))
+                       )
     :effect (and (AtGConf ?gq2)
                  (not (AtGConf ?gq1)) (not (CanMoveGripper))
                  (increase (total-cost) (MoveGripperCost)))
   )
 
-  (:action calibrate
-    ;:parameters (?bq ?aq ?at)
-    ;:precondition (and (CalibrateMotion ?bq ?aq ?at)
-    :parameters ()
-    :precondition (and ; (AConf ?bq @calibrate_aq)
-                       ; (AtBConf ?bq) (AtAConf @calibrate_aq)
-                       ; (not (Calibrated))
-                       ; TODO: visibility constraints
-                   )
-    :effect (and (Calibrated) (CanMoveArm)
-                 ; (not (AtBConf ?bq)) ; Could make this be a new pose ?bq2
-                 (increase (total-cost) (CalibrateCost)))
-  )
-  (:action pick
+        ;(:action calibrate
+        ;  ;:parameters (?bq ?aq ?at)
+        ;  ;:precondition (and (CalibrateMotion ?bq ?aq ?at)
+        ;  :parameters ()
+        ;  :precondition (and ; (AConf ?bq @calibrate_aq)
+        ;                     ; (AtBConf ?bq) (AtAConf @calibrate_aq)
+        ;                     ; (not (Calibrated))
+        ;                     ; TODO: visibility constraints
+        ;                 )
+        ;  :effect (and (Calibrated) (CanMoveArm)
+        ;               ; (not (AtBConf ?bq)) ; Could make this be a new pose ?bq2
+        ;               (increase (total-cost) (CalibrateCost)))
+        ;)
+        (:action pick
     :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?aq ?gq ?at)
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (OpenGConf ?gq)
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
@@ -160,8 +164,9 @@
                        (Accessible ?o2 ?p2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
-                       ; TODO: detect precondition
-                  )
+                       (not (Unsafe))
+                       ; TODO: detect precondition?
+                       )
     :effect (and (AtGrasp ?o1 ?g)
                  (CanMoveBase) (CanMoveArm)
                  ; (AtGConf @closed_gq) ; No need to save closed state
@@ -172,7 +177,7 @@
                  ; (not (Localized ?o1))
                  (increase (total-cost) (PickCost)))
   )
-  (:action place
+        (:action place
     :parameters (?o1 ?p1 ?g ?rp ?o2 ?p2 ?bq ?aq ?at) ; ?gq
     :precondition (and (Pick ?o1 ?p1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Value ?p1) ; (GConf ?gq)
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?p2)
@@ -181,7 +186,8 @@
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?p1 ?g))
                        (not (UnsafeATraj ?at))
-                  )
+                       (not (Unsafe))
+                       )
     :effect (and (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?p1) (HandEmpty)
                  (On ?o1 ?o2) (not (Holding ?o1))
                  (AtGConf @open_gq) ; (not (AtGConf ?gq))
@@ -190,18 +196,19 @@
                  ;(not (Localized ?o1))
                  (increase (total-cost) (PlaceCost)))
   )
-  (:action pull
+        (:action pull
     :parameters (?j ?a1 ?a2 ?o ?p1 ?p2 ?bq ?aq1 ?aq2 ?gq ?at)
     :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at) (OpenGConf ?gq)
                        (AngleKin ?o ?p1 ?j ?a1) (AngleKin ?o ?p2 ?j ?a2)
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?p1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
                        (Calibrated)
-                       ; TODO: instead check collisions with objects on the drawer
-                       (not (UnsafeATraj ?at))
+                       (not (UnsafeWorldPose ?o ?p2)) ; TODO: should actually be the full pull trajectory
+                       (not (Unsafe))
+                       ;(not (UnsafeATraj ?at))
                        ;(not (UnsafeBConf ?bq)) ; This was meant to capture ?p2
                        ;(CFreeBConfPose ?bq ?o2 ?p2)
-                  )
+                       )
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?p2) (AtAConf ?aq2)
                  ; (AtGConf @open_gq) (not (AtGConf ?gq))
                  (CanMoveBase) (CanMoveArm)
@@ -214,7 +221,7 @@
                  (increase (total-cost) (PullCost)))
   )
 
-  (:action detect
+        (:action detect
     :parameters (?o1 ?p1 ?rp1 ?p2 ?rp2 ?o0 ?p0 ?r)
     :precondition (and (PoseKin ?o1 ?p1 ?rp1 ?o0 ?p0) (PoseKin ?o1 ?p2 ?rp2 ?o0 ?p0)
                        (Detect ?o1 ?p2 ?r) (DistSample ?rp1 ?rp2)
@@ -222,7 +229,8 @@
                        (Accessible ?o0 ?p0)
                        ; (not (UnsafeRelPose ?o1 ?rp2 ?o0))
                        (not (OccludedRay ?r))
-                  )
+                       (not (Unsafe))
+                       )
     :effect (and (Localized ?o1) (On ?o1 ?o0)
                  (AtRelPose ?o1 ?rp2 ?o0) (AtWorldPose ?o1 ?p2)
                  ;(not (AtRelPose ?o1 ?rp1 ?o0)) (not (AtWorldPose ?o1 ?p1))
@@ -233,75 +241,61 @@
                  (increase (total-cost) (DetectCost ?rp1 ?rp2)))
   )
 
+        ;(:action cook
+        ;  :parameters (?r)
+        ;  :precondition (Type ?r @stove)
+        ;  :effect (and (forall (?o) (when (On ?o ?r) (Cooked ?o)))
+        ;               (increase (total-cost) (CookCost)))
+        ;)
+        ;(:derived (OpenGripper)
+        ;  ;(AtGConf @open_gq)
+        ;  (exists (?gq) (and (OpenGConf ?gq)
+        ;                     (AtGConf ?gq)))
+        ;)
 
-  ;(:action cook
-  ;  :parameters (?r)
-  ;  :precondition (Type ?r @stove)
-  ;  :effect (and (forall (?o) (when (On ?o ?r) (Cooked ?o)))
-  ;               (increase (total-cost) (CookCost)))
-  ;)
-
-  ;(:derived (On ?o1 ?o2)
-  ;  (exists (?rp) (and (RelPose ?o1 ?rp ?o2)
-  ;                     (AtRelPose ?o1 ?rp ?o2)))
-  ;)
-  ;(:derived (Holding ?o)
-  ;  (exists (?g) (and (Grasp ?o ?g)
-  ;                    (AtGrasp ?o ?g)))
-  ;)
-  ;(:derived (OpenGripper)
-  ;  ;(AtGConf @open_gq)
-  ;  (exists (?gq) (and (OpenGConf ?gq)
-  ;                     (AtGConf ?gq)))
-  ;)
-
-  (:derived (Accessible ?o ?p) (or
+        (:derived (Accessible ?o ?p) (or
     (Counter ?o ?p)
     (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
                          (AtAngle ?j ?a))))
   )
 
-  ;(:derived (DoorStatus ?j ?s)
-  ;  (exists (?a) (and (AngleWithin ?j ?a ?s)
-  ;                    (AtAngle ?j ?a)))
-  ;)
-  ;(:derived (AdmitsGrasp ?o ?g ?o2) ; Static fact
-  ;  (exists (?gty) (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty)))
-  ;)
+        ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
+        ;(:derived (AtWorldPose ?o1 ?p1) (or
+        ;  (and (RelPose ?o1 ?p1 @world)
+        ;       (AtRelPose ?o1 ?p1 @world))
+        ;  (exists (?rp ?o2 ?p2) (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
+        ;          (AtWorldPose ?o2 ?p2) (AtRelPose ?o1 ?rp ?o2)))
+        ;  (exists (?j ?a) (and (AngleKin ?o1 ?p1 ?j ?a)
+        ;          (AtAngle ?j ?a))) ; TODO: could compose arbitrary chains
+        ;))
 
-  ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
-  ;(:derived (AtWorldPose ?o1 ?p1) (or
-  ;  (and (RelPose ?o1 ?p1 @world)
-  ;       (AtRelPose ?o1 ?p1 @world))
-  ;  (exists (?rp ?o2 ?p2) (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
-  ;          (AtWorldPose ?o2 ?p2) (AtRelPose ?o1 ?rp ?o2)))
-  ;  (exists (?j ?a) (and (AngleKin ?o1 ?p1 ?j ?a)
-  ;          (AtAngle ?j ?a))) ; TODO: could compose arbitrary chains
-  ;))
+        ; TODO: general debug condition that disables these
 
-  ; TODO: general unsafe condition to disable these
-  (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
+        ;(:derived (UnsafeRelPose) (or
+        ;  ; TODO: define unsafe as state constraint
+        ;))
+        (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
     (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Graspable ?o2) (not (= ?o1 ?o2))
                             (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
                             (AtRelPose ?o2 ?rp2 ?s)))
   ))
-  (:derived (UnsafeBConf ?bq) (and (BConf ?bq)
+        (:derived (UnsafeBConf ?bq) (and (BConf ?bq)
     (exists (?o2 ?p2) (and (WorldPose ?o2 ?p2) (Obstacle ?o2)
                            (not (CFreeBConfPose ?bq ?o2 ?p2))
                            (AtWorldPose ?o2 ?p2)))
   ))
-  (:derived (UnsafeApproach ?o1 ?p1 ?g) (and (WorldPose ?o1 ?p1) (Grasp ?o1 ?g)
+        (:derived (UnsafeApproach ?o1 ?p1 ?g) (and (WorldPose ?o1 ?p1) (Grasp ?o1 ?g)
     (exists (?o2 ?p2) (and (WorldPose ?o2 ?p2) (Obstacle ?o2) (not (= ?o1 ?o2))
                            (not (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2))
                            (AtWorldPose ?o2 ?p2)))
   ))
-  (:derived (UnsafeATraj ?at) (and (ATraj ?at)
+        (:derived (UnsafeATraj ?at) (and (ATraj ?at)
     (exists (?o2 ?p2) (and (WorldPose ?o2 ?p2) (Obstacle ?o2)
                            (not (CFreeTrajPose ?at ?o2 ?p2))
                            (AtWorldPose ?o2 ?p2)))
   ))
 
-  (:derived (OccludedRay ?r) (and (Ray ?r) (or
+        (:derived (OccludedRay ?r) (and (Ray ?r) (or
     (exists (?o ?p) (and (WorldPose ?o ?p) (Obstacle ?o)
                          (not (OFreeRayPose ?r ?o ?p))
                          (AtWorldPose ?o ?p)))
@@ -309,4 +303,4 @@
                             (not (OFreeRayGrasp ?r ?bq ?aq ?o ?g))
                             (AtBConf ?bq) (AtAConf ?aq) (AtGrasp ?o ?g)))
   )))
-)
+        )

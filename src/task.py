@@ -169,11 +169,11 @@ def hold_block(world, num=5, **kwargs):
     prior = {}
     # green_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     green_name = add_cylinder(world, 'green', idx=0)
-    prior[green_name] = DeltaDist(initial_surface),
+    prior[green_name] = DeltaDist(initial_surface)
     sample_placement(world, green_name, initial_surface, learned=True)
     for idx in range(num):
         red_name = add_cylinder(world, 'red', idx=idx)
-        prior[red_name] = DeltaDist(initial_surface),
+        prior[red_name] = DeltaDist(initial_surface)
         sample_placement(world, red_name, initial_surface, learned=True)
 
     set_all_static()
@@ -187,6 +187,27 @@ def hold_block(world, num=5, **kwargs):
                 #goal_closed=ALL_JOINTS,
                 **kwargs)
 
+
+################################################################################
+
+def cracker_drawer(world, **kwargs):
+    initial_surface = 'indigo_drawer_top'
+    # initial_surface = 'indigo_drawer_bottom'
+    joint_name = JOINT_TEMPLATE.format(initial_surface)
+    world.open_door(joint_from_name(world.kitchen, joint_name))
+    # open_all_doors(world)
+
+    obj_name = add_cracker_box(world, idx=0)
+    prior = {obj_name: DeltaDist(initial_surface)}
+    sample_placement(world, obj_name, initial_surface, learned=True)
+
+    set_all_static()
+    add_kinect(world)
+
+    return Task(world, prior=prior, movable_base=True,
+                return_init_bq=True, return_init_aq=True,
+                goal_closed=ALL_JOINTS,
+                **kwargs)
 
 ################################################################################
 
@@ -268,4 +289,5 @@ TASKS = [
     hold_block,
     fixed_stow,
     stow_block,
+    cracker_drawer,
 ]

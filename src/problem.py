@@ -4,7 +4,7 @@ import numpy as np
 import math
 
 from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, \
-    And, Equal, PDDLProblem
+    And, Equal, PDDLProblem, Not
 from pddlstream.language.stream import DEBUG
 from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
@@ -186,7 +186,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     compute_angle_kin = get_compute_angle_kin(world)
 
     # TODO: order goals for serialization
-    goal_literals = []
+    goal_literals = [Not(('Unsafe',))]
     goal_literals += [('Holding', name) for name in task.goal_holding] + \
                      [('On', name, surface) for name, surface in task.goal_on.items()] + \
                      [('Cooked', name) for name in task.goal_cooked] + \
