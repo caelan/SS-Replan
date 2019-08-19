@@ -21,10 +21,9 @@ from src.stream import opt_detect_cost_fn
 # TODO: remove object to manipulate the drawer
 # TODO: use the same objects for poses and configs
 VIDEO_TEMPLATE = '{}.mp4'
-REPLAN_ACTIONS = tuple(['calibrate', 'detect', 'pull', 'place']) # 'pull', 'place']) #, 'pick'])
-# TODO: don't require replan if deterministic
 
-def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=REPLAN_ACTIONS, max_time=INF, max_cost=INF):
+
+def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
     reset_globals()
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
@@ -112,14 +111,14 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=REPLAN
 
 ################################################################################
 
-def extract_plan_prefix(plan):
+def extract_plan_prefix(plan, replan_actions=set()):
     if plan is None:
         return None
     prefix = []
     for action in plan:
         name, args = action
         prefix.append(action)
-        if name in REPLAN_ACTIONS:
+        if name in replan_actions:
             break
     return prefix
 

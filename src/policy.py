@@ -6,7 +6,11 @@ from src.planner import VIDEO_TEMPLATE, solve_pddlstream, extract_plan_prefix, c
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_wild_skeleton, make_exact_skeleton, reuse_facts
 
+OBSERVATION_ACTIONS = {'detect'}
+STOCHASTIC_ACTIONS = OBSERVATION_ACTIONS | {'move_base', 'pull', 'place'}  # 'calibrate', 'pick'])
+
 def run_policy(task, args, observation_fn, transition_fn):
+    replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     world = task.world
     if args.observable:
         belief = create_observable_belief(world)  # Fast
@@ -36,8 +40,8 @@ def run_policy(task, args, observation_fn, transition_fn):
             print('Skeleton:', previous_skeleton)
             print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
             # TODO: could compare to the previous plan cost
-            plan, cost, certificate = solve_pddlstream(belief,
-                problem, args, max_time=30, skeleton=previous_skeleton)
+            plan, cost, certificate = solve_pddlstream(belief, problem, args, max_time=30, skeleton=previous_skeleton,
+                                                       replan_actions=replan_actions)
             if plan is None:
                 wait_for_user('Failed to adhere to plan')
 
@@ -47,7 +51,8 @@ def run_policy(task, args, observation_fn, transition_fn):
                                                additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
-            plan, cost, certificate = solve_pddlstream(belief, problem, args, max_time=args.max_time, max_cost=cost)
+            plan, cost, certificate = solve_pddlstream(belief, problem, args, max_time=args.max_time,
+                                                       max_cost=cost, replan_actions=replan_actions)
         if plan is None:
             print('Failure!')
             return False
@@ -55,7 +60,7 @@ def run_policy(task, args, observation_fn, transition_fn):
         if not plan:
             break
         print_separator(n=25)
-        plan_prefix = extract_plan_prefix(plan)
+        plan_prefix = extract_plan_prefix(plan, replan_actions=replan_actions)
         print('Prefix:', plan_prefix)
         # sequences = [plan_prefix]
         sequences = [[action] for action in plan_prefix]
@@ -74,6 +79,7 @@ def run_policy(task, args, observation_fn, transition_fn):
                        belief.check_consistent()
         if success:
             plan_postfix = get_plan_postfix(plan, plan_prefix)
+            # TODO: exit if plan_postfix is empty
             previous_skeleton = make_exact_skeleton(world, plan_postfix)  # make_exact_skeleton | make_wild_skeleton
             previous_facts = reuse_facts(problem, certificate, previous_skeleton)  # []
         else:

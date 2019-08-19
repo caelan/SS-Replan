@@ -56,21 +56,6 @@ def create_parser():
 
 ################################################################################
 
-def run_plan(task, real_state, args):
-    world = task.world
-    belief = create_observable_belief(world)
-    #wait_for_user('Start?')
-
-    problem = pdddlstream_from_problem(belief,
-        collisions=not args.cfree, teleport=args.teleport)
-    solution = solve_pddlstream(belief, problem, args, replan_actions={})
-    plan, cost, evaluations = solution
-    commands = commands_from_plan(world, plan)
-    simulate_plan(real_state, commands, args)
-    wait_for_user()
-
-################################################################################
-
 def main():
     task_names = [fn.__name__ for fn in TASKS]
     print('Tasks:', task_names)
@@ -103,10 +88,6 @@ def main():
 
     # TODO: mechanism that pickles the state of the world
     real_state = create_state(world)
-    if args.deterministic and args.observable:
-        run_plan(task, real_state, args)
-        world.destroy()
-        return
 
     def observation_fn():
         return observe_pybullet(world)
