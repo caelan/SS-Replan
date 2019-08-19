@@ -20,8 +20,6 @@ from src.stream import opt_detect_cost_fn
 # TODO: tight region on drawer
 # TODO: remove object to manipulate the drawer
 # TODO: use the same objects for poses and configs
-VIDEO_TEMPLATE = '{}.mp4'
-
 
 def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
     reset_globals()
@@ -160,6 +158,8 @@ def commands_from_plan(world, plan):
     #return combine_commands(commands)
 
 ################################################################################
+
+VIDEO_TEMPLATE = '{}.mp4'
 
 def simulate_plan(state, commands, args, time_step=DEFAULT_TIME_STEP):
     wait_for_user()

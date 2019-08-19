@@ -10,14 +10,14 @@ from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pos
 from src.stream import get_stable_gen
 from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, NAME_TEMPLATE, name_from_type
+    BLOCK_TEMPLATE, NAME_TEMPLATE, name_from_type, GRASP_TYPES
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
 
 class Task(object):
     def __init__(self, world, prior={}, skeletons=[],
-                 movable_base=True, noisy_base=True,
+                 movable_base=True, noisy_base=True, grasp_types=GRASP_TYPES,
                  return_init_bq=True, return_init_aq=True,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
@@ -28,6 +28,7 @@ class Task(object):
         self.skeletons = list(skeletons)
         self.movable_base = movable_base
         self.noisy_base = noisy_base
+        self.grasp_types = tuple(grasp_types)
         self.return_init_bq = return_init_bq
         self.return_init_aq = return_init_aq
         self.goal_hand_empty = goal_hand_empty

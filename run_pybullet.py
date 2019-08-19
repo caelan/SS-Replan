@@ -11,16 +11,13 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, \
-    get_random_seed, get_numpy_seed
+    get_random_seed, get_numpy_seed, VideoSaver
 from src.command import create_state
 from src.visualization import add_markers
-from src.belief import create_observable_belief
 from src.observe import observe_pybullet
 #from src.debug import test_observation
-from src.planner import VIDEO_TEMPLATE, iterate_commands, \
-    solve_pddlstream, simulate_plan, commands_from_plan
+from src.planner import VIDEO_TEMPLATE, iterate_commands
 from src.world import World
-from src.problem import pdddlstream_from_problem
 from src.task import TASKS
 from src.policy import run_policy
 #from src.debug import dump_link_cross_sections, test_rays
@@ -79,7 +76,7 @@ def main():
     world._update_initial()
     if not args.record:
         with LockRenderer():
-            add_markers(world, inverse_place=False)
+            add_markers(task, inverse_place=False)
     #wait_for_user()
     # TODO: FD instantiation is slightly slow to a deepcopy
     # 4650801/25658    2.695    0.000    8.169    0.000 /home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/skeleton.py:114(do_evaluate_helper)
@@ -88,6 +85,10 @@ def main():
 
     # TODO: mechanism that pickles the state of the world
     real_state = create_state(world)
+    video = None
+    if args.record:
+        wait_for_user('Start?')
+        video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
 
     def observation_fn():
         return observe_pybullet(world)
@@ -101,6 +102,9 @@ def main():
         return iterate_commands(real_state, commands)
 
     run_policy(task, args, observation_fn, transition_fn)
+
+    if video:
+        video.restore()
     world.destroy()
     # TODO: make the sink extrude from the mesh
 

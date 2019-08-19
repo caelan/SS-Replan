@@ -1,8 +1,8 @@
 from __future__ import print_function
 
-from pybullet_tools.utils import wait_for_user, VideoSaver, print_separator, INF
+from pybullet_tools.utils import wait_for_user, print_separator, INF
 from src.belief import create_observable_belief, transition_belief_update
-from src.planner import VIDEO_TEMPLATE, solve_pddlstream, extract_plan_prefix, commands_from_plan
+from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_wild_skeleton, make_exact_skeleton, reuse_facts
 
@@ -17,10 +17,6 @@ def run_policy(task, args, observation_fn, transition_fn):
     else:
         belief = task.create_belief()
     print('Prior:', belief)
-    video = None
-    if args.record:
-        wait_for_user('Start?')
-        video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
 
     previous_facts = []
     previous_skeleton = None
@@ -87,6 +83,4 @@ def run_policy(task, args, observation_fn, transition_fn):
             previous_skeleton = None
 
     print('Success!')
-    if video:
-        video.restore()
     return True

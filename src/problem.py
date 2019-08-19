@@ -173,7 +173,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     init += [('Type', obj_name, 'stove') for obj_name in STOVES] + \
             [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Status', status) for status in DOOR_STATUSES] + \
-            [('GraspType', ty) for ty in GRASP_TYPES] # TODO: grasp_type per object
+            [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object
             #[('Camera', name) for name in world.cameras]
     if task.movable_base:
         init.append(('MovableBase',))
@@ -283,7 +283,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             #('InitPose', world_pose),
             ('Localized', surface_name),
         ])
-        for grasp_type in GRASP_TYPES:
+        for grasp_type in task.grasp_types:
             if has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 

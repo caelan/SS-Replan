@@ -4,7 +4,7 @@ from pybullet_tools.utils import get_point, convex_hull, Point, add_segments, co
     multiply, point_from_pose, get_pose, invert, link_from_name, grow_polygon, GREEN, get_link_pose
 from src.database import load_pull_base_poses, get_surface_reference_pose, load_placements, \
     load_place_base_poses, load_forward_placements, load_inverse_placements
-from src.utils import ALL_JOINTS, ALL_SURFACES, GRASP_TYPES, get_grasps, surface_from_name
+from src.utils import ALL_JOINTS, ALL_SURFACES, get_grasps, surface_from_name
 
 GROW_PLACEMENT = 0.05
 GROW_INVERSE_BASE = 0.05
@@ -29,14 +29,16 @@ def visualize_base_confs(world, name, base_confs, **kwargs):
     handles.append(add_text(name, position=centroid, **kwargs))
     return handles
 
-def add_markers(world, placements=True, forward_place=True, pull_bases=True, inverse_place=False):
+
+def add_markers(task, placements=True, forward_place=True, pull_bases=True, inverse_place=False):
+    world = task.world
     handles = []
     if placements:
         for surface_name in ALL_SURFACES:
             surface = surface_from_name(surface_name)
             surface_link = link_from_name(world.kitchen, surface.link)
             surface_point = point_from_pose(get_link_pose(world.kitchen, surface_link))
-            for grasp_type, color in zip(GRASP_TYPES, spaced_colors(len(GRASP_TYPES))):
+            for grasp_type, color in zip(task.grasp_types, spaced_colors(len(task.grasp_types))):
                 object_points = list(map(point_from_pose, load_placements(world, surface_name,
                                                                           grasp_types=[grasp_type])))
                 if placements and object_points:
