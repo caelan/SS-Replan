@@ -19,7 +19,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf, get_obj_path, type_from_name
+    get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf, are_confs_close
 from log_poses import POSES_PATH
 
 DISABLED_FRANKA_COLLISIONS = {
@@ -176,6 +176,8 @@ class World(object):
         self.initial_saver = WorldSaver()
         self.goal_bq = FConf(self.robot, self.base_joints)
         self.goal_aq = FConf(self.robot, self.arm_joints)
+        if are_confs_close(self.goal_aq, self.carry_conf):
+            self.goal_aq = self.carry_conf
         self.goal_gq = FConf(self.robot, self.gripper_joints)
         self.initial_confs = [self.goal_bq, self.goal_aq, self.goal_gq]
 

@@ -171,6 +171,7 @@ def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
                     surface_dist = surface_dist.condition(lambda s: s != surface_name)
                 else:
                     (rel_pose,) = result
+                    rel_pose.init = True
                     poses.append(rel_pose)
     return PoseDist(world, obj_name, UniformDist(poses))
 
