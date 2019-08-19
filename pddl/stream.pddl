@@ -44,7 +44,7 @@
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
-                    (AConf ?bq @rest_aq) (AConf ?bq @calibrate_aq)
+                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
                     (AConf ?bq ?aq)
                     (Pick ?o ?p ?g ?bq ?aq ?at)))
   (:stream plan-pull
@@ -54,7 +54,7 @@
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
                     ; TODO: strange effect with plan constraints
-                    (AConf ?bq @rest_aq) (AConf ?bq @calibrate_aq)
+                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
                     (AConf ?bq ?aq1) (AConf ?bq ?aq2)
                     (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)))
 

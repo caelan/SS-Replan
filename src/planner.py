@@ -17,8 +17,12 @@ from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoS
 from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
 from src.stream import opt_detect_cost_fn
 
+# TODO: tight region on drawer
+# TODO: remove object to manipulate the drawer
+# TODO: use the same objects for poses and configs
 VIDEO_TEMPLATE = '{}.mp4'
 REPLAN_ACTIONS = tuple(['calibrate', 'detect', 'pull', 'place']) # 'pull', 'place']) #, 'pick'])
+# TODO: don't require replan if deterministic
 
 def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=REPLAN_ACTIONS, max_time=INF, max_cost=INF):
     reset_globals()

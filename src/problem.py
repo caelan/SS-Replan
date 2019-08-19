@@ -122,8 +122,13 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     init_gq = FConf(world.robot, world.gripper_joints)
     # Despite the base not moving, it could be re-estimated
 
-    carry_aq = init_aq if are_confs_close(init_aq, world.carry_conf) else world.carry_conf
-    calibrate_aq = init_aq if are_confs_close(init_aq, world.calibrate_conf) else world.calibrate_conf
+    carry_aq = world.carry_conf
+    init_aq = carry_aq if are_confs_close(init_aq, carry_aq) else init_aq
+
+    # TODO: the following doesn't work. Maybe because carry_conf is used elsewhere
+    #carry_aq = init_aq if are_confs_close(init_aq, world.carry_conf) else world.carry_conf
+    #calibrate_aq = init_aq if are_confs_close(init_aq, world.calibrate_conf) else world.calibrate_conf
+
     open_gq = init_gq if are_confs_close(init_gq, world.open_gq) else world.open_gq
     closed_gq = init_gq if are_confs_close(init_gq, world.closed_gq) else world.closed_gq
 
@@ -133,7 +138,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         '@stove': 'stove',
 
         '@rest_aq': carry_aq,
-        '@calibrate_aq': calibrate_aq,
+        #'@calibrate_aq': calibrate_aq,
         '@open_gq': open_gq,
         '@closed_gq': closed_gq,
         '@open': OPEN,
@@ -144,8 +149,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         ('BConf', init_bq),
         ('AtBConf', init_bq),
         ('AConf', init_bq, carry_aq),
-        ('RestAConf', carry_aq),
-        ('AConf', init_bq, calibrate_aq),
+        #('RestAConf', carry_aq),
+        #('AConf', init_bq, calibrate_aq),
 
         ('AConf', init_bq, init_aq),
         ('AtAConf', init_aq),
@@ -192,7 +197,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
     if task.goal_hand_empty:
         goal_literals.append(('HandEmpty',))
-    if not task.movable_base or task.return_init_bq:
+    if not task.movable_base or task.return_init_bq: # fixed_base?
         goal_bq = world.goal_bq if task.movable_base else init_bq
         init.extend([
             ('BConf', goal_bq),

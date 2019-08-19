@@ -122,7 +122,8 @@ def detect_block(world, **kwargs):
     set_all_static()
     for side in CAMERAS[:1]:
         add_kinect(world, side)
-    initial_distribution = UniformDist(['indigo_drawer_top']) # indigo_tmp
+    goal_surface = 'indigo_drawer_top'
+    initial_distribution = UniformDist([goal_surface]) # indigo_tmp
     initial_surface = initial_distribution.sample()
     if random.random() < 0.:
         # TODO: sometimes base/arm failure causes the planner to freeze
@@ -131,15 +132,14 @@ def detect_block(world, **kwargs):
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     prior = {
-        entity_name: UniformDist(['indigo_tmp']),  # 'indigo_drawer_top'
+        entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
         obstruction_name: DeltaDist('indigo_tmp'),
-        # TODO: test multiple rays on the object itself from the viewcone of th ething
     }
     return Task(world, prior=prior, movable_base=True,
                 return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
                 #goal_holding=[entity_name],
-                goal_on={entity_name: 'indigo_drawer_top'},
+                goal_on={entity_name: goal_surface},
                 goal_closed=ALL_JOINTS,
                 **kwargs)
 
@@ -156,7 +156,7 @@ def hold_block(world, **kwargs):
         entity_name: DeltaDist(initial_surface),
     }
     return Task(world, prior=prior, movable_base=True,
-                return_init_bq=True, # return_init_aq=False,
+                return_init_bq=True, return_init_aq=True,
                 goal_holding=[entity_name],
                 #goal_closed=ALL_JOINTS,
                 **kwargs)
@@ -180,6 +180,7 @@ def fixed_stow(world, **kwargs):
     goal_surface = 'indigo_drawer_top'
     #sample_placement(world, entity_name, initial_surface, learned=True)
     # joint_name = JOINT_TEMPLATE.format(goal_surface)
+    #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     prior = {
         entity_name: DeltaDist(initial_surface),
@@ -187,6 +188,7 @@ def fixed_stow(world, **kwargs):
     return Task(world, prior=prior, movable_base=False,
                 goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
+                #goal_open=[joint_name],
                 goal_closed=ALL_JOINTS,
                 **kwargs)
 

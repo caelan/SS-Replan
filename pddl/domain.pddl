@@ -2,7 +2,7 @@
   (:requirements :strips :equality)
   (:constants @world @gripper @stove
               @open @closed
-              @rest_aq @calibrate_aq
+              @rest_aq ; @calibrate_aq
               @open_gq @closed_gq)
   (:predicates
     (Stackable ?o ?r)
@@ -96,35 +96,33 @@
   ; TODO: prevent the robot from moving to the same spot?
   ; TODO: force the search to select new base poses after one manipulation is performed
   ; TODO: robot still needs to recalibrate after no base movement...
-  (:action      move_base
+  (:action move_base
     ;:parameters (?bq1 ?bq2 ?aq ?bt)
     ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     ;                   (AtBConf ?bq1) (AtAConf ?aq)
     :parameters (?bq1 ?bq2 ?bt)
-    :precondition
-                (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt) (not (= ?bq1 ?bq2)) ; Be careful with shared optimistic
-                     (AtBConf ?bq1) (AtAConf @rest_aq)
-                     (Calibrated) (CanMoveBase)
-                     (not (UnsafeBConf ?bq2))
-                     )
-    :effect     (and (AtBConf ?bq2)
+    :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt) (not (= ?bq1 ?bq2)) ; Be careful with shared optimistic
+                       (AtBConf ?bq1) (AtAConf @rest_aq)
+                       (Calibrated) (CanMoveBase)
+                       (not (UnsafeBConf ?bq2))
+                  )
+    :effect (and (AtBConf ?bq2)
                  (CanMoveArm)
                  (not (AtBConf ?bq1))
                  (not (CanMoveBase))
-                 (not (Calibrated))
-                 ;(when (NoisyBase) (not (Calibrated)))
+                 ; (not (Calibrated))
+                 (when (NoisyBase) (not (Calibrated)))
                  ;(increase (total-cost) (Distance ?bq1 ?bq2)))
                  (increase (total-cost) (MoveBaseCost)))
     )
-  (:action      move_arm
+  (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
-    :precondition
-                (and (ArmMotion ?bq ?aq1 ?aq2 ?at) ; (not (= ?aq1 ?aq2)) ; Be careful with shared optimistic
-                     (AtBConf ?bq) (AtAConf ?aq1)
-                     (Calibrated) ; TODO: require calibration?
-                     (CanMoveArm)
-                     )
-    :effect     (and (AtAConf ?aq2)
+    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at) ; (not (= ?aq1 ?aq2)) ; Be careful with shared optimistic
+                       (AtBConf ?bq) (AtAConf ?aq1)
+                       (Calibrated) ; TODO: require calibration?
+                       (CanMoveArm)
+                  )
+    :effect (and (AtAConf ?aq2)
                  (not (AtAConf ?aq1)) (not (CanMoveArm))
                  (increase (total-cost) (MoveArmCost)))
     )
@@ -142,10 +140,10 @@
   (:action calibrate
     ;:parameters (?bq ?aq ?at)
     ;:precondition (and (CalibrateMotion ?bq ?aq ?at)
-    :parameters (?bq)
+    :parameters ()
     :precondition (and ; (AConf ?bq @calibrate_aq)
-                       (AtBConf ?bq) ; (AtAConf @calibrate_aq)
-                       (not (Calibrated))
+                       ; (AtBConf ?bq) (AtAConf @calibrate_aq)
+                       ; (not (Calibrated))
                        ; TODO: visibility constraints
                    )
     :effect (and (Calibrated) (CanMoveArm)
