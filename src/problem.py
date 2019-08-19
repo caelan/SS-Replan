@@ -13,7 +13,8 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
     get_difference_fn
 
 from src.inference import PoseDist
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, RelPose, FConf, are_confs_close
+from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, \
+    RelPose, FConf, are_confs_close, DRAWERS
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -21,7 +22,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
-    get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test
+    get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test, get_cfree_worldpose_worldpose_test
 from src.database import has_place_database
 
 
@@ -85,6 +86,7 @@ def get_streams(world, debug=False, **kwargs):
         'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
         'sample-belief': from_gen_fn(get_sample_belief_gen(world, **kwargs)),
 
+        'test-cfree-worldpose-worldpose': from_test(get_cfree_worldpose_worldpose_test(world, **kwargs)),
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-bconf-pose': from_test(get_cfree_bconf_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
@@ -263,6 +265,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                 ])
 
     for surface_name in ALL_SURFACES:
+        if surface_name in DRAWERS:
+            init.append(('Drawer', surface_name))
         surface = surface_from_name(surface_name)
         surface_link = link_from_name(world.kitchen, surface.link)
         parent_joint = parent_joint_from_link(surface_link)

@@ -21,8 +21,7 @@ from src.stream import opt_detect_cost_fn
 # TODO: remove object to manipulate the drawer
 # TODO: use the same objects for poses and configs
 
-def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
-    reset_globals()
+def get_stream_info():
     opt_gen_fn = PartialInputs(unique=False)
     stream_info = {
         'test-gripper': StreamInfo(p_success=0, eager=True),
@@ -33,7 +32,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
         # TODO: need to be careful about conditional effects
         'compute-pose-kin': StreamInfo(opt_gen_fn=PartialInputs(unique=True),
                                        p_success=0.5, eager=True),
-        #'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
+        # 'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
         'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
         'sample-nearby-pose': StreamInfo(opt_gen_fn=PartialInputs(unique=False)),
         'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
@@ -45,29 +44,36 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
         # TODO: can't defer this because collision streams depend on it
         'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False),
         'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
-        #'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
+        # 'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
         'plan-base-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e3, defer=True),
         'plan-arm-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e2, defer=True),
-        #'plan-gripper-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
+        # 'plan-gripper-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
 
+        'test-cfree-worldpose-worldpose': StreamInfo(p_success=1e-3, negate=True,
+                                                     verbose=False),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True,
-                                           verbose_success=False),
+                                           verbose=False),
         'test-cfree-bconf-pose': StreamInfo(p_success=1e-3, negate=True,
-                                            verbose_success=False),
+                                            verbose=False),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True,
-                                           verbose_success=False),
+                                               verbose=False),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True,
-                                           verbose_success=False),
+                                           verbose=False),
 
         'test-ofree-ray-pose': StreamInfo(p_success=1e-3, negate=True,
-                                           verbose_success=False),
+                                          verbose=False),
         'test-ofree-ray-grasp': StreamInfo(p_success=1e-3, negate=True,
-                                           verbose_success=False),
+                                           verbose=False),
 
         'DetectCost': FunctionInfo(opt_detect_cost_fn, eager=True),
-        #'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
-        #'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
+        # 'Distance': FunctionInfo(p_success=0.99, opt_fn=lambda bq1, bq2: BASE_CONSTANT),
+        # 'MoveCost': FunctionInfo(lambda t: BASE_CONSTANT),
     }
+    return stream_info
+
+def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
+    reset_globals()
+    stream_info = get_stream_info()
     #print(set(stream_map) - set(stream_info))
     skeletons = None if skeleton is None else [skeleton]
     max_cost = min(max_cost, MAX_COST)

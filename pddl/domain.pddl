@@ -1,9 +1,10 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
-  (:constants @world @gripper @stove
-        @open @closed
-        @rest_aq ; @calibrate_aq
-        @open_gq @closed_gq)
+  (:constants
+    @world @gripper @stove
+    @open @closed
+    @rest_aq ; @calibrate_aq
+    @open_gq @closed_gq)
   (:predicates
     (Stackable ?o ?r)
     (Stove ?r)
@@ -37,6 +38,7 @@
     (CFreeBConfPose ?bq ?o2 ?p2)
     (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
     (CFreeTrajPose ?t ?o2 ?p2)
+    (CFreeWorldPoseWorldPose ?o1 ?wp1)
     (OFreeRayPose ?r ?o ?p)
     (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
 
@@ -70,7 +72,7 @@
     (UnsafeRelPose ?o ?rp ?s)
     (UnsafeBConf ?bq)
     (UnsafeApproach ?o ?p ?g)
-    (UnsafeWorldPose ?o ?p2)
+    (UnsafeWorldPose ?o ?p)
     (UnsafeATraj ?at)
     (UnsafeBTraj ?bt)
     (OccludedRay ?r)
@@ -203,7 +205,7 @@
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?p1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
                        (Calibrated)
-                       (not (UnsafeWorldPose ?o ?p2)) ; TODO: should actually be the full pull trajectory
+                       (not (UnsafeWorldPose ?o ?p2)) ; TODO: use the full pull trajectory
                        (not (Unsafe))
                        ;(not (UnsafeATraj ?at))
                        ;(not (UnsafeBConf ?bq)) ; This was meant to capture ?p2
@@ -255,7 +257,7 @@
   ;)
 
   (:derived (Accessible ?o ?p) (or
-    (Counter ?o ?p)
+    (Counter ?o ?p) ; TODO: apply to just ?o
     (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
                          (AtAngle ?j ?a))))
   )
@@ -271,10 +273,14 @@
   ;))
 
   ; TODO: general debug condition that disables these
-
   ;(:derived (UnsafeRelPose) (or
   ;  ; TODO: define unsafe as state constraint
   ;))
+  (:derived (UnsafeWorldPose ?o2 ?wp2)
+    (exists (?o1 ?wp1 ?rp1) (and (PoseKin ?o1 ?wp1 ?rp1 ?o2 ?wp2)
+                                 (AtRelPose ?o1 ?rp1 ?o2)
+                                 (not (CFreeWorldPoseWorldPose ?o1 ?wp1)))
+  ))
   (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
     (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Graspable ?o2) (not (= ?o1 ?o2))
                             (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))

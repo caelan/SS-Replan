@@ -99,11 +99,13 @@ def opt_detect_cost_fn(rp_dist, rp_sample):
 # TODO: more general forward kinematics
 
 def get_compute_pose_kin(world):
+    #obstacles = world.static_obstacles
+
     def fn(o1, rp, o2, p2):
         if o1 == o2:
             return None
         if isinstance(rp, SurfaceDist):
-            p1 = rp.project(lambda x: fn(o1, x, o2, p2)[0])
+            p1 = rp.project(lambda x: fn(o1, x, o2, p2)[0]) # TODO: filter if any in collision
             return (p1,)
         #if np.allclose(p2.value, unit_pose()):
         #    return (rp,)
@@ -114,6 +116,9 @@ def get_compute_pose_kin(world):
         p1 = RelPose(body, #reference_body=p2.reference_body, reference_link=p2.reference_link,
                      support=rp.support, confs=(p2.confs + rp.confs),
                      init=(rp.init and p2.init))
+        #p1.assign()
+        #if any(pairwise_collision(body, obst) for obst in obstacles):
+        #    return None
         return (p1,)
     return fn
 
@@ -1033,6 +1038,19 @@ def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
         rp1.assign()
         rp2.assign()
         return not pairwise_collision(world.get_body(o1), world.get_body(o2))
+    return test
+
+def get_cfree_worldpose_worldpose_test(world, collisions=True, **kwargs):
+    obstacles = world.static_obstacles
+
+    def test(o1, wp1):
+        if not collisions: # or (o1 == o2):
+            return True
+        body = world.get_body(o1)
+        wp1.assign()
+        if any(pairwise_collision(body, obst) for obst in obstacles):
+            return False
+        return True
     return test
 
 def get_cfree_bconf_pose_test(world, collisions=True, **kwargs):
