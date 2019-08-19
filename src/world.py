@@ -93,7 +93,7 @@ class World(object):
         self.initial_saver = WorldSaver()
 
         self.body_from_name = {}
-        self.path_from_name = {}
+        # self.path_from_name = {}
         self.names_from_type = {}
         self.custom_limits = {}
         self.base_limits_handles = []
@@ -432,25 +432,28 @@ class World(object):
 
     #########################
 
-    def add_body(self, name, **kwargs):
+    def add(self, name, body):
         assert name not in self.body_from_name
-        obj_type = type_from_name(name)
-        self.names_from_type.setdefault(obj_type, []).append(name)
-        path = get_obj_path(obj_type)
-        self.path_from_name[name] = path
-        print('Loading', path)
-        body = load_pybullet(path, **kwargs)
-        assert body is not None
         add_body_name(body, name)
         self.body_from_name[name] = body
         return name
+    def add_body(self, name, **kwargs):
+        obj_type = type_from_name(name)
+        self.names_from_type.setdefault(obj_type, []).append(name)
+        path = get_obj_path(obj_type)
+        #self.path_from_name[name] = path
+        print('Loading', path)
+        body = load_pybullet(path, **kwargs)
+        assert body is not None
+        self.add(name, body)
     def get_body(self, name):
         return self.body_from_name[name]
-    def get_body_path(self, name):
-        return self.path_from_name[name]
-    def get_body_type(self, name):
-        filename, _ = os.path.splitext(os.path.basename(self.get_body_path(name)))
-        return filename
+
+    # def get_body_path(self, name):
+    #    return self.path_from_name[name]
+    # def get_body_type(self, name):
+    #    filename, _ = os.path.splitext(os.path.basename(self.get_body_path(name)))
+    #    return filename
     def get_name(self, name):
         inverse = {v: k for k, v in self.body_from_name.items()}
         return inverse.get(name, None)

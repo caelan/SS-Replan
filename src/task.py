@@ -195,27 +195,30 @@ def fixed_stow(world, **kwargs):
 
 ################################################################################
 
-def stow_block(world, **kwargs):
+def stow_block(world, num=2, **kwargs):
     #world.open_gq.assign()
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
     # wait_for_user()
 
-    entity_name = add_block(world, idx=0, pose2d=SPAM_POSE2D)
-    #entity_name = add_block(world, x=0.2, y=1.15, idx=1) # Will be randomized anyways
+    # initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
+    initial_surface = 'indigo_tmp'  # hitman_tmp | indigo_tmp | range
+    # initial_surface = 'indigo_drawer_top'
+    goal_surface = 'indigo_drawer_top'  # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
+    joint_name = 'indigo_drawer_top_joint'
+    print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
+
+    prior = {}
+    goal_on = {}
+    for idx in range(num):
+        entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
+        prior[entity_name] = DeltaDist(initial_surface)
+        goal_on[entity_name] = goal_surface
+        sample_placement(world, entity_name, initial_surface, learned=True)
     #obstruction_name = add_box(world, idx=0)
-    # test_grasps(world, entity_name)
+    #sample_placement(world, obstruction_name, 'hitman_tmp')
     set_all_static()
     add_kinect(world)  # TODO: this needs to be after set_all_static
 
-    #initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp | range
-    #initial_surface = 'indigo_drawer_top'
-    goal_surface = 'indigo_drawer_top' # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
-    print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
-    sample_placement(world, entity_name, initial_surface, learned=True)
-    #sample_placement(world, obstruction_name, 'hitman_tmp')
-
-    joint_name = 'indigo_drawer_top_joint'
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     #initial_surface = 'golf' # range | table | golf
@@ -225,12 +228,9 @@ def stow_block(world, **kwargs):
     #    sample_placement(world, entity_name, surface_name=initial_surface, learned=False)
     #    wait_for_user()
 
-    prior = {
-        entity_name: DeltaDist(initial_surface),
-    }
     return Task(world, prior=prior, movable_base=True,
                 #goal_holding=[entity_name],
-                goal_on={entity_name: goal_surface},
+                goal_on=goal_on,
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
                 goal_closed=ALL_JOINTS,
