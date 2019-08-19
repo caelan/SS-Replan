@@ -9,6 +9,7 @@ from pddlstream.utils import INF, implies, hash_or_id
 from src.utils import FConf
 from src.problem import ACTION_COSTS
 
+# TODO: reuse detect parameters
 REUSE_ARGUMENTS = {
     # TODO: this should really be done by type instead
     'pick': [0, 2],  # ?o1 ?g

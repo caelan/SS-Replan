@@ -108,8 +108,8 @@ OPEN_SURFACES = COUNTERS + STOVES
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
 
-LEFT_CABINETS = ['baker', 'chewie_left', 'chewie_right']
-RIGHT_CABINETS = ['dagger_left', 'dagger_right'] #'indigo_tmp_bottom',
+LEFT_CABINETS = ['baker', 'chewie_door_left', 'chewie_door_right']
+RIGHT_CABINETS = ['dagger_door_left', 'dagger_door_right']  # 'indigo_tmp_bottom',
 CABINETS = LEFT_CABINETS + RIGHT_CABINETS
 
 DRAWERS = [
@@ -125,6 +125,7 @@ ENV_SURFACES = [
 ]
 
 ZED_LEFT_SURFACES = [
+    'dagger_door_left',
     'indigo_tmp', # 'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
@@ -132,12 +133,13 @@ ZED_LEFT_SURFACES = [
 Surface = namedtuple('Surface', ['link', 'shape', 'joints'])
 
 SURFACE_FROM_NAME = {
+    # TODO: could infer joints from the name
     'baker': Surface('sektion', 'Cube.bottom.004_Cube.028', ['baker_joint']),
-    'chewie_left': Surface('sektion', 'Cube.bottom.002_Cube.020', ['chewie_door_left_joint']),
-    'chewie_right': Surface('sektion', 'Cube.bottom_Cube.000', ['chewie_door_right_joint']),
+    'chewie_door_left': Surface('sektion', 'Cube.bottom.002_Cube.020', ['chewie_door_left_joint']),
+    'chewie_door_right': Surface('sektion', 'Cube.bottom_Cube.000', ['chewie_door_right_joint']),
 
-    'dagger_left': Surface('dagger', 'Cube.bottom.008_Cube.044', ['dagger_door_left_joint']),
-    'dagger_right': Surface('dagger', 'Cube.bottom.012_Cube.060', ['dagger_door_right_joint']),
+    'dagger_door_left': Surface('dagger', 'Cube.bottom.008_Cube.044', ['dagger_door_left_joint']),
+    'dagger_door_right': Surface('dagger', 'Cube.bottom.012_Cube.060', ['dagger_door_right_joint']),
 
     'hitman_drawer_top': Surface('hitman_drawer_top', 'Cube_Cube.001', ['hitman_drawer_top_joint']),
     'hitman_drawer_bottom': Surface('hitman_drawer_bottom', 'Cube_Cube.001', ['hitman_drawer_bottom_joint']),
@@ -200,9 +202,11 @@ DRAWER_JOINTS = [
 #LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
 #                'dagger_door_left_joint', 'dagger_door_right_joint']
 
-ZED_LEFT_JOINTS = [
-    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
-]
+# ZED_LEFT_JOINTS = [
+#    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
+# ]
+ZED_LEFT_JOINTS = [JOINT_TEMPLATE.format(name) for name in ZED_LEFT_SURFACES
+                   if JOINT_TEMPLATE.format(name) in (CABINET_JOINTS + DRAWER_JOINTS)]
 
 ALL_JOINTS = ZED_LEFT_JOINTS
 #ALL_JOINTS = [] + DRAWER_JOINTS + CABINET_JOINTS

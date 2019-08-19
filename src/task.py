@@ -5,12 +5,12 @@ import random
 import time
 
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
-    set_all_static, \
-    WorldSaver, stable_z_on_aabb, pairwise_collision, elapsed_time
+    create_cylinder, create_box, set_all_static, COLOR_FROM_NAME, \
+    WorldSaver, stable_z_on_aabb, pairwise_collision, elapsed_time, wait_for_user
 from src.stream import get_stable_gen
-from src.utils import BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
+from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
     get_ycb_obj_path, ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, NAME_TEMPLATE, name_from_type, GRASP_TYPES
+    BLOCK_TEMPLATE, NAME_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -80,11 +80,24 @@ def add_block(world, idx=0, **kwargs):
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
-def add_box(world, idx=0, **kwargs):
+
+def add_cracker_box(world, idx=0, **kwargs):
     ycb_type = 'cracker_box'
     name = name_from_type(ycb_type, idx)
     world.add_body(name, color=np.ones(4))
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
+    return name
+
+
+def add_cylinder(world, color_name, idx=0, **kwargs):
+    height = 0.14
+    width = 0.07
+    name = name_from_type(color_name, idx)
+    # TODO: geometry type
+    body = create_box(w=width, l=width, h=height, color=COLOR_FROM_NAME[color_name])
+    # body = create_cylinder(radius=width/2, height=height, color=COLOR_FROM_NAME[color_name])
+    world.add(name, body)
+    # pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
 def add_kinect(world, camera_name=LEFT_CAMERA):
@@ -97,14 +110,12 @@ def add_kinect(world, camera_name=LEFT_CAMERA):
 def sample_placement(world, entity_name, surface_name, **kwargs):
     entity_body = world.get_body(entity_name)
     placement_gen = get_stable_gen(world, pos_scale=1e-3, rot_scale=1e-2, **kwargs)
-    with WorldSaver():
-        for pose, in placement_gen(entity_name, surface_name):
-            pose.assign()
-            if not any(pairwise_collision(entity_body, obst_body) for obst_body in
-                       world.body_from_name.values() if entity_body != obst_body):
-                break
-    pose.assign()
-    return pose
+    for pose, in placement_gen(entity_name, surface_name):
+        pose.assign()
+        if not any(pairwise_collision(entity_body, obst_body) for obst_body in
+                   world.body_from_name.values() if entity_body != obst_body):
+            return pose
+    raise RuntimeError('Unable to find a pose for object {} on surface {}'.format(entity_name, surface_name))
 
 def close_all_doors(world):
     for joint in world.kitchen_joints:
@@ -118,7 +129,7 @@ def open_all_doors(world):
 
 def detect_block(world, **kwargs):
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    obstruction_name = add_box(world, idx=0, pose2d=CRACKER_POSE2D)
+    obstruction_name = add_cracker_box(world, idx=0, pose2d=CRACKER_POSE2D)
     #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:
@@ -146,19 +157,33 @@ def detect_block(world, **kwargs):
 
 ################################################################################
 
-def hold_block(world, **kwargs):
+def hold_block(world, num=5, **kwargs):
+    # TODO: compare with the NN grasp prediction in clutter
+    # TODO: consider a task where most directions are blocked except for one
+    initial_surface = 'indigo_tmp'
+    # initial_surface = 'dagger_door_left'
+    # joint_name = JOINT_TEMPLATE.format(initial_surface)
+    #world.open_door(joint_from_name(world.kitchen, joint_name))
     #open_all_doors(world)
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    initial_surface = 'indigo_tmp' # hitman_tmp | indigo_tmp
+
+    prior = {}
+    # green_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    green_name = add_cylinder(world, 'green', idx=0)
+    prior[green_name] = DeltaDist(initial_surface),
+    sample_placement(world, green_name, initial_surface, learned=True)
+    for idx in range(num):
+        red_name = add_cylinder(world, 'red', idx=idx)
+        prior[red_name] = DeltaDist(initial_surface),
+        sample_placement(world, red_name, initial_surface, learned=True)
+
     set_all_static()
     add_kinect(world)
-    sample_placement(world, entity_name, initial_surface, learned=True)
-    prior = {
-        entity_name: DeltaDist(initial_surface),
-    }
+
     return Task(world, prior=prior, movable_base=True,
+                # grasp_types=GRASP_TYPES,
+                grasp_types=[SIDE_GRASP],
                 return_init_bq=True, return_init_aq=True,
-                goal_holding=[entity_name],
+                goal_holding=[green_name],
                 #goal_closed=ALL_JOINTS,
                 **kwargs)
 
