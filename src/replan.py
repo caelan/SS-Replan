@@ -9,11 +9,12 @@ from pddlstream.utils import INF, implies, hash_or_id
 from src.utils import FConf
 from src.problem import ACTION_COSTS
 
-# TODO: reuse detect parameters
 REUSE_ARGUMENTS = {
     # TODO: this should really be done by type instead
     'pick': [0, 2],  # ?o1 ?g
     'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
+    # TODO: need to maintain the original distribution as well then...
+    #'detect': [0, 4, 5], # ?o1 ?rp2 ?o0
     # The previous pick error I had was because it moved to the carry_aq and then detected
     # However, it was next constrained to move the base rather than the arm
 }

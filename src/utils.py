@@ -101,27 +101,27 @@ YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_convex.urdf')
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
 
-STOVES = [] # ['range']
-COUNTERS = ['indigo_tmp'] # + ['hitman_tmp'] + ['range']
-OPEN_SURFACES = COUNTERS + STOVES
+#STOVES = ['range']
+COUNTERS = ['indigo_tmp'] # + ['hitman_tmp']
+OPEN_SURFACES = COUNTERS
 
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
 
 LEFT_CABINETS = ['baker', 'chewie_door_left', 'chewie_door_right']
-RIGHT_CABINETS = ['dagger_door_left', 'dagger_door_right']  # 'indigo_tmp_bottom',
+RIGHT_CABINETS = ['dagger_door_left'] #, 'dagger_door_right', 'indigo_tmp_bottom']
 CABINETS = LEFT_CABINETS + RIGHT_CABINETS
 
 DRAWERS = [
-    #'hitman_drawer_top', #'hitman_drawer_bottom',
+    'hitman_drawer_top', #'hitman_drawer_bottom',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
 ENV_SURFACES = [
+    'echo',  # fox is covered by echo
+    'golf',
     'range',
     'table',
-    'golf',
-    'echo', # fox is covered by echo
 ]
 
 ZED_LEFT_SURFACES = [
@@ -151,8 +151,8 @@ SURFACE_FROM_NAME = {
     'indigo_drawer_bottom': Surface('indigo_drawer_bottom', SURFACE_BOTTOM, ['indigo_drawer_bottom_joint']),
 }
 
-ALL_SURFACES = ZED_LEFT_SURFACES
-#ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
+#ALL_SURFACES = ZED_LEFT_SURFACES
+ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
 #IKEA_PATH = '/home/caelan/Documents/IKEA/OBJ/'
 IKEA_PATH = os.path.join(MODELS_PATH, 'kitchen')
@@ -195,7 +195,7 @@ CABINET_JOINTS = [
 ] # door
 
 DRAWER_JOINTS = [
-    #'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
+    'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
     'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
 ] # drawer
 
@@ -208,8 +208,8 @@ DRAWER_JOINTS = [
 ZED_LEFT_JOINTS = [JOINT_TEMPLATE.format(name) for name in ZED_LEFT_SURFACES
                    if JOINT_TEMPLATE.format(name) in (CABINET_JOINTS + DRAWER_JOINTS)]
 
-ALL_JOINTS = ZED_LEFT_JOINTS
-#ALL_JOINTS = [] + DRAWER_JOINTS + CABINET_JOINTS
+#ALL_JOINTS = ZED_LEFT_JOINTS
+ALL_JOINTS = [] + DRAWER_JOINTS + CABINET_JOINTS
 
 ################################################################################
 

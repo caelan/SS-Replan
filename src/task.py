@@ -5,12 +5,12 @@ import random
 import time
 
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
-    create_cylinder, create_box, set_all_static, COLOR_FROM_NAME, \
-    WorldSaver, stable_z_on_aabb, pairwise_collision, elapsed_time, wait_for_user
-from src.stream import get_stable_gen
-from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, get_block_path, COUNTERS, \
-    get_ycb_obj_path, ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, NAME_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name
+    create_box, set_all_static, COLOR_FROM_NAME, \
+    stable_z_on_aabb, pairwise_collision, elapsed_time
+from src.stream import get_stable_gen, MAX_COST
+from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
+    ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
+    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -18,10 +18,10 @@ from src.belief import create_surface_belief
 class Task(object):
     def __init__(self, world, prior={}, skeletons=[],
                  movable_base=True, noisy_base=True, grasp_types=GRASP_TYPES,
-                 return_init_bq=True, return_init_aq=True,
+                 return_init_bq=False, return_init_aq=False,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
-                 init=[], goal=[]):
+                 init=[], goal=[], max_cost=MAX_COST):
         self.world = world
         world.task = self
         self.prior = dict(prior) # DiscreteDist over
@@ -40,6 +40,7 @@ class Task(object):
         self.goal_cooked = set(goal_cooked)
         self.init = init
         self.goal = goal
+        self.max_cost = max_cost # TODO: use instead of the default
     @property
     def objects(self):
         return set(self.prior.keys())
@@ -148,7 +149,7 @@ def detect_block(world, **kwargs):
         obstruction_name: DeltaDist('indigo_tmp'),
     }
     return Task(world, prior=prior, movable_base=True,
-                return_init_bq=True, return_init_aq=True,
+                #return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
                 #goal_holding=[entity_name],
                 goal_on={entity_name: goal_surface},
