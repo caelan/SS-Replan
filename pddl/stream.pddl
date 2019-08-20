@@ -4,17 +4,17 @@
     :domain (and (IsGraspType ?o ?g ?gty) (AdmitsGraspType ?o2 ?gty))
     :certified (AdmitsGrasp ?o ?g ?o2))
   (:rule
-    :inputs (?o1 ?p1 ?rp ?o2 ?p2)
-    :domain (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Value ?rp))
-    :certified (Value ?p1))
+    :inputs (?o1 ?wp1 ?rp ?o2 ?wp2)
+    :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Value ?rp))
+    :certified (Value ?wp1))
   (:rule
-    :inputs (?o1 ?p1 ?rp ?o2 ?p2)
-    :domain (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Sample ?rp))
-    :certified (Sample ?p1))
+    :inputs (?o1 ?wp1 ?rp ?o2 ?wp2)
+    :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Sample ?rp))
+    :certified (Sample ?wp1))
   (:rule
-    :inputs (?o1 ?p1 ?rp ?o2 ?p2)
-    :domain (and (PoseKin ?o1 ?p1 ?rp ?o2 ?p2) (Dist ?rp))
-    :certified (Dist ?p1))
+    :inputs (?o1 ?wp1 ?rp ?o2 ?wp2)
+    :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Dist ?rp))
+    :certified (Dist ?wp1))
 
   (:stream sample-grasp
     :inputs (?o ?gty)
@@ -29,24 +29,24 @@
     :outputs (?rp)
     :certified (and (RelPose ?o ?rp ?r) (Value ?rp) (Sample ?rp)))
   (:stream sample-nearby-pose
-    :inputs (?o1 ?o2 ?p2 ?bq)
-    :domain (and (NearPose ?o2 ?p2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure door is open?
-    :outputs (?p1 ?rp)
-    :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?p1 ?bq)
-                    (Value ?p1) (Sample ?p1)
+    :inputs (?o1 ?o2 ?wp2 ?bq)
+    :domain (and (NearPose ?o2 ?wp2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure door is open?
+    :outputs (?wp1 ?rp)
+    :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?wp1 ?bq)
+                    (Value ?wp1) (Sample ?wp1)
                     (Value ?rp) (Sample ?rp)
-                    (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)))
+                    (WorldPose ?o1 ?wp1) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2)))
 
   ; Movable base
   (:stream plan-pick
-    :inputs (?o ?p ?g) ; ?aq0)
-    :domain (and (MovableBase) (WorldPose ?o ?p) (Sample ?p) (Grasp ?o ?g)) ; (RestAConf ?aq0))
+    :inputs (?o ?wp ?g) ; ?aq0)
+    :domain (and (MovableBase) (WorldPose ?o ?wp) (Sample ?wp) (Grasp ?o ?g)) ; (RestAConf ?aq0))
     :outputs (?bq ?aq ?at)
     :certified (and (BConf ?bq) (ATraj ?at)
                     ; (AConf ?bq ?aq0)
                     (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
                     (AConf ?bq ?aq)
-                    (Pick ?o ?p ?g ?bq ?aq ?at)))
+                    (Pick ?o ?wp ?g ?bq ?aq ?at)))
   (:stream plan-pull
     :inputs (?j ?a1 ?a2) ; ?aq0)
     :domain (and (MovableBase) (Angle ?j ?a1) (Angle ?j ?a2)) ; (RestAConf ?aq0))
@@ -60,16 +60,16 @@
 
   ; Fixed base
   (:stream test-near-pose
-    :inputs (?o ?p ?bq)
-    :domain (and (WorldPose ?o ?p) (CheckNearby ?o) (Sample ?p) (InitBConf ?bq))
-    :certified (NearPose ?o ?p ?bq))
+    :inputs (?o ?wp ?bq)
+    :domain (and (WorldPose ?o ?wp) (CheckNearby ?o) (Sample ?wp) (InitBConf ?bq))
+    :certified (NearPose ?o ?wp ?bq))
   (:stream fixed-plan-pick
-    :inputs (?o ?p ?g ?bq)
-    :domain (and (NearPose ?o ?p ?bq) ; (InitBConf ?bq)
-                 (WorldPose ?o ?p) (Sample ?p) (Grasp ?o ?g))
+    :inputs (?o ?wp ?g ?bq)
+    :domain (and (NearPose ?o ?wp ?bq) ; (InitBConf ?bq)
+                 (WorldPose ?o ?wp) (Sample ?wp) (Grasp ?o ?g))
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
-                    (Pick ?o ?p ?g ?bq ?aq ?at)))
+                    (Pick ?o ?wp ?g ?bq ?aq ?at)))
 
   (:stream test-near-joint
     :inputs (?j ?bq)
@@ -115,23 +115,23 @@
     :outputs (?rp2)
     :certified (and (RelPose ?o1 ?rp2 ?o2) (DistSample ?rp1 ?rp2) (Sample ?rp2)))
   (:stream compute-detect
-    :inputs (?o ?p)
-    :domain (and (WorldPose ?o ?p) (Sample ?p))
+    :inputs (?o ?wp)
+    :domain (and (WorldPose ?o ?wp) (Sample ?wp))
     :outputs (?r)
-    :certified (and (Ray ?r) (Detect ?o ?p ?r)))
+    :certified (and (Ray ?r) (Detect ?o ?wp ?r)))
 
   (:stream compute-pose-kin
-    :inputs (?o1 ?rp ?o2 ?p2)
-    :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?p2))
-    :outputs (?p1)
-    :certified (and (WorldPose ?o1 ?p1) (PoseKin ?o1 ?p1 ?rp ?o2 ?p2))
-    ; (PoseTriplet ?o1 ?p1 ?rp) ; For instantiation?
+    :inputs (?o1 ?rp ?o2 ?wp2)
+    :domain (and (RelPose ?o1 ?rp ?o2) (WorldPose ?o2 ?wp2))
+    :outputs (?wp1)
+    :certified (and (WorldPose ?o1 ?wp1) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2))
+    ; (PoseTriplet ?o1 ?wp1 ?rp) ; For instantiation?
   )
   ;(:stream compute-angle-kin
   ;  :inputs (?o ?j ?a)
   ;  :domain (and (Connected ?o ?j) (Angle ?j ?a))
-  ;  :outputs (?p)
-  ;  :certified (and (WorldPose ?o ?p) (AngleKin ?o ?p ?j ?a))
+  ;  :outputs (?wp)
+  ;  :certified (and (WorldPose ?o ?wp) (AngleKin ?o ?wp ?j ?a))
   ;)
 
   (:stream test-cfree-worldpose
@@ -147,22 +147,22 @@
     :domain (and (RelPose ?o1 ?rp1 ?s) (RelPose ?o2 ?rp2 ?s))
     :certified (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
   (:stream test-cfree-approach-pose
-    :inputs (?o1 ?p1 ?g1 ?o2 ?p2)
-    :domain (and (WorldPose ?o1 ?p1) (Grasp ?o1 ?g1) (WorldPose ?o2 ?p2))
-    :certified (CFreeApproachPose ?o1 ?p1 ?g1 ?o2 ?p2))
+    :inputs (?o1 ?wp1 ?g1 ?o2 ?wp2)
+    :domain (and (WorldPose ?o1 ?wp1) (Grasp ?o1 ?g1) (WorldPose ?o2 ?wp2))
+    :certified (CFreeApproachPose ?o1 ?wp1 ?g1 ?o2 ?wp2))
   (:stream test-cfree-bconf-pose
-    :inputs (?bq ?o2 ?p2)
-    :domain (and (BConf ?bq) (WorldPose ?o2 ?p2))
-    :certified (CFreeBConfPose ?bq ?o2 ?p2))
+    :inputs (?bq ?o2 ?wp2)
+    :domain (and (BConf ?bq) (WorldPose ?o2 ?wp2))
+    :certified (CFreeBConfPose ?bq ?o2 ?wp2))
   (:stream test-cfree-traj-pose
-    :inputs (?at ?o2 ?p2)
-    :domain (and (ATraj ?at) (WorldPose ?o2 ?p2))
-    :certified (CFreeTrajPose ?at ?o2 ?p2))
+    :inputs (?at ?o2 ?wp2)
+    :domain (and (ATraj ?at) (WorldPose ?o2 ?wp2))
+    :certified (CFreeTrajPose ?at ?o2 ?wp2))
 
   (:stream test-ofree-ray-pose
-    :inputs (?r ?o ?p)
-    :domain (and (Ray ?r) (WorldPose ?o ?p))
-    :certified (OFreeRayPose ?r ?o ?p))
+    :inputs (?r ?o ?wp)
+    :domain (and (Ray ?r) (WorldPose ?o ?wp))
+    :certified (OFreeRayPose ?r ?o ?wp))
   (:stream test-ofree-ray-grasp
     :inputs (?r ?bq ?aq ?o ?g)
     :domain (and (Ray ?r) (AConf ?bq ?aq) (Grasp ?o ?g))

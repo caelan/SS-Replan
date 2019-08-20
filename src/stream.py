@@ -226,7 +226,7 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative 
         for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)
             cost = detect_cost_fn(pose_dist, rp)
-            if (min_prob <= prob) and (cost <= MAX_COST):
+            if (cost <= MAX_COST): # and (min_prob <= prob):
                 # pose = rp.get_world_from_body()
                 result = detect_fn(obj_name, rp)
                 if result is not None:
@@ -235,6 +235,7 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative 
                     valid_samples[rp] = prob
         if not valid_samples:
             return
+
         if mlo_only:
             rp = max(valid_samples, key=valid_samples.__getitem__)
             yield (rp,)
@@ -1044,6 +1045,8 @@ def get_cfree_worldpose_test(world, collisions=True, **kwargs):
     def test(o1, wp1):
         if not collisions:
             return True
+        if isinstance(wp1, SurfaceDist):
+            return True
         body = world.get_body(o1)
         wp1.assign()
         if any(pairwise_collision(body, obst) for obst in world.static_obstacles):
@@ -1055,6 +1058,8 @@ def get_cfree_worldpose_worldpose_test(world, collisions=True, **kwargs):
     def test(o1, wp1, o2, wp2):
         if not collisions or (o1 == o2):
             return True
+        if isinstance(wp1, SurfaceDist) or isinstance(wp2, SurfaceDist):
+            return True
         body = world.get_body(o1)
         wp1.assign()
         wp2.assign()
@@ -1064,14 +1069,14 @@ def get_cfree_worldpose_worldpose_test(world, collisions=True, **kwargs):
     return test
 
 def get_cfree_bconf_pose_test(world, collisions=True, **kwargs):
-    def test(bq, o2, p2):
+    def test(bq, o2, wp2):
         if not collisions:
             return True
-        if isinstance(p2, SurfaceDist):
+        if isinstance(wp2, SurfaceDist):
             return True # TODO: perform this probabilistically
         bq.assign()
         world.carry_conf.assign()
-        p2.assign()
+        wp2.assign()
         obstacles = get_link_obstacles(world, o2)
         return not any(pairwise_collision(world.robot, obst) for obst in obstacles)
     return test

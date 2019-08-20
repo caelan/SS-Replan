@@ -226,14 +226,16 @@ def fixed_stow(world, **kwargs):
 
     initial_surface = 'indigo_tmp'
     goal_surface = 'indigo_drawer_top'
-    #sample_placement(world, entity_name, initial_surface, learned=True)
+    sample_placement(world, entity_name, goal_surface, learned=True)
     # joint_name = JOINT_TEMPLATE.format(goal_surface)
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
+    # TODO: declare success if already believe it's in the drawer or require detection?
     prior = {
-        entity_name: DeltaDist(initial_surface),
+        entity_name: UniformDist([goal_surface]),
     }
     return Task(world, prior=prior, movable_base=False,
+                #goal_detected=[entity_name],
                 goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
