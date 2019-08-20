@@ -49,6 +49,8 @@ def get_stream_info():
         'plan-arm-motion': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e2, defer=True),
         # 'plan-gripper-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
 
+        'test-cfree-worldpose': StreamInfo(p_success=1e-3, negate=True,
+                                           verbose=False),
         'test-cfree-worldpose-worldpose': StreamInfo(p_success=1e-3, negate=True,
                                                      verbose=False),
         'test-cfree-pose-pose': StreamInfo(p_success=1e-3, negate=True,

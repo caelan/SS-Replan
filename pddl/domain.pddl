@@ -48,6 +48,7 @@
     (CFreeBConfPose ?bq ?o2 ?p2)
     (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
     (CFreeTrajPose ?t ?o2 ?p2)
+    (CFreeWorldPose ?o1 ?wp1)
     (CFreeWorldPoseWorldPose ?o1 ?wp1 ?o2 ?wp2)
 
     (OFreeRayPose ?r ?o ?p)
@@ -261,6 +262,9 @@
 
   ; TODO: general debug condition that disables these
   (:derived (Unsafe) (or
+     (exists (?o1 ?wp1) (and (WorldPose ?o1 ?wp1) (Entity ?o1)
+                             (not (CFreeWorldPose ?o1 ?wp1))
+                             (AtWorldPose ?o1 ?wp1)))
      (exists (?o1 ?wp1 ?o2 ?wp2) (and (WorldPose ?o1 ?wp1) (WorldPose ?o2 ?wp2)
                                       (Entity ?o1) (Drawer ?o2)
                                       (not (CFreeWorldPoseWorldPose ?o1 ?wp1 ?o2 ?wp2))

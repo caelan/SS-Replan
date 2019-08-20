@@ -1040,18 +1040,25 @@ def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
         return not pairwise_collision(world.get_body(o1), world.get_body(o2))
     return test
 
+def get_cfree_worldpose_test(world, collisions=True, **kwargs):
+    def test(o1, wp1):
+        if not collisions:
+            return True
+        body = world.get_body(o1)
+        wp1.assign()
+        if any(pairwise_collision(body, obst) for obst in world.static_obstacles):
+            return False
+        return True
+    return test
+
 def get_cfree_worldpose_worldpose_test(world, collisions=True, **kwargs):
     def test(o1, wp1, o2, wp2):
         if not collisions or (o1 == o2):
             return True
-        if o2 is None:
-            obstacles = world.static_obstacles
-        else:
-            obstacles = get_surface_obstacles(world, o2)
-            wp2.assign()
         body = world.get_body(o1)
         wp1.assign()
-        if any(pairwise_collision(body, obst) for obst in obstacles):
+        wp2.assign()
+        if any(pairwise_collision(body, obst) for obst in get_surface_obstacles(world, o2)):
             return False
         return True
     return test
