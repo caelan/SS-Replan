@@ -4,7 +4,7 @@ import cProfile
 import pstats
 
 #from examples.discrete_belief.run import MAX_COST
-from pddlstream.algorithms.constraints import PlanConstraints, linear_order, OrderedSkeleton
+from pddlstream.algorithms.constraints import PlanConstraints, linear_order, OrderedSkeleton, GOAL_INDEX
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.algorithm import reset_globals
 from pddlstream.algorithms.downward import set_cost_scale
@@ -17,6 +17,7 @@ from pddlstream.utils import INF
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver, wait_for_duration
 from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
 from src.stream import opt_detect_cost_fn, MAX_COST
+from src.replan import INTERNAL_ACTIONS
 
 # TODO: use the same objects for poses and configs
 
@@ -74,19 +75,27 @@ def get_stream_info():
     }
     return stream_info
 
+def create_ordered_skeleton(skeleton):
+    if skeleton is None:
+        return None
+    #skeletons = [skeleton]
+    #return skeletons
+    orders = set()
+    #orders = linear_order(skeleton)
+    last_step = None
+    for step, (name, args) in enumerate(skeleton):
+        if last_step is not None:
+            orders.add((last_step, step))
+        if name not in INTERNAL_ACTIONS:
+            last_step = step
+    return [OrderedSkeleton(skeleton, orders)]
+
 def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
     set_cost_scale(COST_SCALE)
     reset_globals()
     stream_info = get_stream_info()
     #print(set(stream_map) - set(stream_info))
-    skeletons = None
-    if skeleton is not None:
-        # TODO: partial ordering that allows some actions to be skipped
-        # Optional actions are ones that don't appear as a precondition
-        # Prevent actions from being used twice
-        #skeletons = [skeleton]
-        skeletons = [OrderedSkeleton(skeleton, set())]
-        #skeletons = [OrderedSkeleton(skeleton, linear_order(skeleton))]
+    skeletons = create_ordered_skeleton(skeleton)
     max_cost = min(max_cost, MAX_COST)
     print('Max cost: {:.3f} | Max runtime: {:.3f}'.format(max_cost, max_time))
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)

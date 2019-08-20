@@ -138,18 +138,18 @@ def detect_block(world, **kwargs):
     goal_surface = 'indigo_drawer_top'
     initial_distribution = UniformDist([goal_surface]) # indigo_tmp
     initial_surface = initial_distribution.sample()
-    if random.random() < 0.:
+    if random.random() < 1.:
         # TODO: sometimes base/arm failure causes the planner to freeze
         # Freezing is because the planner is struggling to find new samples
         sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     prior = {
-        entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
+        entity_name: UniformDist(['indigo_drawer_top']),  # 'indigo_tmp', 'indigo_drawer_top'
         obstruction_name: DeltaDist('indigo_tmp'),
     }
     return Task(world, prior=prior, movable_base=True,
-                #return_init_bq=True, return_init_aq=True,
+                return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
                 #goal_holding=[entity_name],
                 goal_on={entity_name: goal_surface},
