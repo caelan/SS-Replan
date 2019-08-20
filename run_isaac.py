@@ -19,17 +19,18 @@ from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
-from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta
+from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, INF, pose_from_tform
 from pddlstream.utils import Verbose
 
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
-from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, \
-    CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER
+from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, \
+    SUGAR, CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
-from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, load_prior, display_kinect
+from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, \
+    load_prior, display_kinect, ISSAC_WORLD_FRAME
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import simulate_plan
@@ -167,11 +168,15 @@ def real_setup(domain, world, args):
 
 ################################################################################
 
-INDEX_TEMPLATE = '{:02d}'
+from collections import defaultdict
+from itertools import product
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 
-INDEX_FROM_SIDE = {
-    'right': INDEX_TEMPLATE.format(0),
-    'left': INDEX_TEMPLATE.format(1),
+PREFIX_TEMPLATE = '{:02d}'
+
+PREFIX_FROM_SIDE = {
+    'right': PREFIX_TEMPLATE.format(0),
+    'left': PREFIX_TEMPLATE.format(1),
 }
 
 KINECT_TEMPLATE = 'kinect{}'
@@ -180,6 +185,51 @@ KINECT_FROM_SIDE = {
     'right': KINECT_TEMPLATE.format(1), # indexes from 1!
     'left': KINECT_TEMPLATE.format(2),
 }
+
+DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}'
+POSECNN_POSE_TEMPLATE = '/objects/prior_pose/{}_{}/decayable_weight'
+# https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
+
+RIGHT = 'right'
+LEFT = 'left'
+SIDES = [RIGHT, LEFT]
+
+from brain_ros.ros_world_state import make_pose_from_pose_msg
+
+import tf
+# TODO: it looks like DeepIM publishes each pose individually
+
+class DeepIM(object):
+    def __init__(self, sides=[], obj_types=[]):
+        self.sides = tuple(sides)
+        self.obj_types = tuple(obj_types)
+        self.tf_listener = tf.TransformListener()
+
+        self.subscribers = {}
+        self.observations = defaultdict(list)
+        for side, obj_type in product(self.sides, self.obj_types):
+            prefix = PREFIX_FROM_SIDE[side]
+            topic = DEEPIM_POSE_TEMPLATE.format(prefix, obj_type)
+            #print('Starting', topic)
+            cb = lambda data, s=side, ty=obj_type: self.callback(data, s, ty)
+            self.subscribers[side, obj_type] = rospy.Subscriber(
+                topic, PoseStamped, cb, queue_size=1)
+    def callback(self, pose_stamped, side, obj_type):
+        print('Received {} camera detection of {}'.format(side, obj_type))
+        self.observations[side, obj_type].append(pose_stamped)
+    def last_detected(self, side, obj_type):
+        if not self.observations[side, obj_type]:
+            return INF
+        pose_stamped = self.observations[side, obj_type][-1]
+        current_time = rospy.Time.now() # rospy.get_rostime()
+        return (current_time - pose_stamped.header.stamp).to_sec()
+    def last_world_pose(self, side, obj_type):
+        if not self.observations[side, obj_type]:
+            return None
+        # TODO: search over orientations
+        pose_kinect = self.observations[side, obj_type][-1]
+        tf_pose = self.tf_listener.transformPose(ISSAC_WORLD_FRAME, pose_kinect)
+        return pose_from_tform(make_pose_from_pose_msg(tf_pose))
 
 def detect_classes():
     from sensor_msgs.msg import Image
@@ -204,18 +254,19 @@ def detect_classes():
     # DeepIM trained on bowl, cracker_box, holiday_cup1, holiday_cup2, mustard_bottle
     # potted_meat_can, sugar_box, tomato_soup_can
     side = 'right'
+    prefix = PREFIX_FROM_SIDE[side]
     obj_type = SUGAR
 
     # kinect from side
     # kinect1_depth_optical_frame | kinect2_depth_optical_frame
-    DEEPIM_POSE_TOPIC = '/deepim/raw/objects/prior_pose/{}_{}'.format(side, obj_type)
+    DEEPIM_POSE_TOPIC = DEEPIM_POSE_TEMPLATE.format(prefix, obj_type)
     pose_subscriber = rospy.Subscriber(DEEPIM_POSE_TOPIC, PoseStamped, callback, queue_size=1)
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py
 
     # All of these are images
-    POSECNN_LABEL_TOPIC = '/posecnn_label_{}'.format(INDEX_FROM_SIDE[side])
-    POSECNN_POSE_TOPIC = '/posecnn_pose_{}'.format(INDEX_FROM_SIDE[side])
-    DEEPIM_IMAGE_TOPIC = '/deepim_pose_image_{}'.format(INDEX_FROM_SIDE[side])
+    POSECNN_LABEL_TOPIC = '/posecnn_label_{}'.format(side)
+    POSECNN_POSE_TOPIC = '/posecnn_pose_{}'.format(side)
+    DEEPIM_IMAGE_TOPIC = '/deepim_pose_image_{}'.format(side)
     image_topic = DEEPIM_IMAGE_TOPIC
 
     rospy.sleep(0.1) # This sleep is needed
@@ -260,6 +311,53 @@ def main():
     #if args.execute:
     #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     #else:
+
+    # # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
+    from lula_dartpy.object_administrator import ObjectAdministrator
+
+
+    deepim = DeepIM(sides=[RIGHT], obj_types=YCB_OBJECTS)
+
+    side = 'right'
+    prefix = PREFIX_FROM_SIDE[side]
+    #obj_type = SUGAR
+    obj_type = SPAM
+    base_frame = '{}_{}'.format(prefix, obj_type)
+    administrator = ObjectAdministrator(
+        base_frame, wait_for_connection=True) # wait_for_connection=False
+    print(administrator.is_active, administrator.is_detecting)
+
+    rate = rospy.Rate(1000)
+    while INF <= deepim.last_detected(side, obj_type):
+        rate.sleep()
+
+    #print(deepim.last_world_pose(side, obj_type))
+
+    # Could redetect on every step
+    print('Detected', obj_type)
+    # Doesn't look like the order matters actually
+    administrator.activate() # localize
+    administrator.detect_once() # detect
+    #administrator.detect_and_wait()
+    #administrator.wait_for_detection_complete()
+    #administrator.deactivate() # stop_localizing
+
+    #rospy.sleep(10)
+    # TODO: test how far away from deepim's estimate
+    # Redetect for a fixed number of times until close
+    #print('Redetecting', obj_type)
+    #administrator.detect_once() # Every redetect causes the objects to spaz
+
+    rospy.sleep(5)
+    #print('Finished detecting', obj_type)
+    #administrator.deactivate() # stop_localizing
+
+    # TODO: if orientation is bad and make not manipulable
+
+    rospy.spin()
+
+    return
+
     with Verbose(False):
         domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
     robot_entity = domain.get_robot()
