@@ -13,6 +13,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, get_aabb_extent, get_aabb_center, \
     child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine
+#from pddlstream.algorithms.downward import MAX_FD_COST, get_cost_scale
+
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, Detect
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
@@ -22,11 +24,13 @@ from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_
     get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
-from examples.discrete_belief.run import revisit_mdp_cost, MAX_COST, clip_cost, DDist
+from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
 
-DETECT_COST = 1.
+#MAX_COST = MAX_FD_COST / get_cost_scale()
+MAX_COST = 1000.0
+DETECT_COST = 1.0
 
-BASE_CONSTANT = 1. # 1 | 10
+BASE_CONSTANT = 1.0 # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 
@@ -78,8 +82,8 @@ def detect_cost_fn(rp_dist, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
     prob = rp_dist.discrete_prob(rp_sample)
     cost = clip_cost(compute_detect_cost(prob))
-    print('{}) Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(
-        rp_dist.surface_name, prob, cost))
+    #print('{}) Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(
+    #    rp_dist.surface_name, prob, cost))
     return cost
 
 def opt_detect_cost_fn(rp_dist, rp_sample):

@@ -3,10 +3,11 @@ from __future__ import print_function
 import cProfile
 import pstats
 
-from examples.discrete_belief.run import MAX_COST
-from pddlstream.algorithms.constraints import PlanConstraints
+#from examples.discrete_belief.run import MAX_COST
+from pddlstream.algorithms.constraints import PlanConstraints, linear_order, OrderedSkeleton
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.algorithm import reset_globals
+from pddlstream.algorithms.downward import set_cost_scale
 
 from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
@@ -15,11 +16,11 @@ from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver, wait_for_duration
 from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
-from src.stream import opt_detect_cost_fn
+from src.stream import opt_detect_cost_fn, MAX_COST
 
-# TODO: tight region on drawer
-# TODO: remove object to manipulate the drawer
 # TODO: use the same objects for poses and configs
+
+COST_SCALE = 1e3 # 3 decimal places
 
 def get_stream_info():
     opt_gen_fn = PartialInputs(unique=False)
@@ -74,11 +75,19 @@ def get_stream_info():
     return stream_info
 
 def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
+    set_cost_scale(COST_SCALE)
     reset_globals()
     stream_info = get_stream_info()
     #print(set(stream_map) - set(stream_info))
-    skeletons = None if skeleton is None else [skeleton]
+    skeletons = None
+    if skeleton is not None:
+        # TODO: partial ordering that allows some actions to be skipped'
+        # Optional actions are ones that don't appear as a precondition
+        # Prevent actions from being used twice
+        #skeletons = [OrderedSkeleton(skeleton, set())]
+        skeletons = [OrderedSkeleton(skeleton, linear_order(skeleton))]
     max_cost = min(max_cost, MAX_COST)
+    print('Max cost: {:.3f} | Max runtime: {:.3f}'.format(max_cost, max_time))
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
 
     success_cost = 0 if args.anytime else INF
