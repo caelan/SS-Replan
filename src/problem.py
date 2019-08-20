@@ -314,6 +314,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
     for obj_name in world.movable:
         init += [
+            ('Entity', obj_name),
             ('Obstacle', obj_name),
             ('Graspable', obj_name),
             ('CheckNearby', obj_name),
