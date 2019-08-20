@@ -4,11 +4,9 @@ from pybullet_tools.utils import wait_for_user, print_separator, INF
 from src.belief import create_observable_belief, transition_belief_update
 from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem
-from src.replan import get_plan_postfix, make_wild_skeleton, make_exact_skeleton, reuse_facts
+from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
+    STOCHASTIC_ACTIONS
 
-OBSERVATION_ACTIONS = {'detect'}
-STOCHASTIC_ACTIONS = OBSERVATION_ACTIONS | {'move_base', 'pull', 'place'}  # 'calibrate', 'pick'])
-INTERNAL_ACTIONS = {'detect', 'calibrate'} # Fake, skippable, etc...
 
 def run_policy(task, args, observation_fn, transition_fn):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS

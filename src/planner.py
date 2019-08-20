@@ -4,7 +4,7 @@ import cProfile
 import pstats
 
 #from examples.discrete_belief.run import MAX_COST
-from pddlstream.algorithms.constraints import PlanConstraints #, linear_order, OrderedSkeleton
+from pddlstream.algorithms.constraints import PlanConstraints, linear_order, OrderedSkeleton
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.algorithm import reset_globals
 from pddlstream.algorithms.downward import set_cost_scale
@@ -81,11 +81,11 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
     #print(set(stream_map) - set(stream_info))
     skeletons = None
     if skeleton is not None:
-        # TODO: partial ordering that allows some actions to be skipped'
+        # TODO: partial ordering that allows some actions to be skipped
         # Optional actions are ones that don't appear as a precondition
         # Prevent actions from being used twice
-        skeletons = [skeleton]
-        #skeletons = [OrderedSkeleton(skeleton, set())]
+        #skeletons = [skeleton]
+        skeletons = [OrderedSkeleton(skeleton, set())]
         #skeletons = [OrderedSkeleton(skeleton, linear_order(skeleton))]
     max_cost = min(max_cost, MAX_COST)
     print('Max cost: {:.3f} | Max runtime: {:.3f}'.format(max_cost, max_time))

@@ -13,7 +13,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
     get_difference_fn
 
 from src.inference import PoseDist
-from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, \
+from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
@@ -174,10 +174,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         function_name = '{}Cost'.format(title_from_snake(action_name))
         function = (function_name,)
         init.append(Equal(function, cost))
-    init += [('Type', obj_name, 'stove') for obj_name in STOVES] + \
-            [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
+    init += [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Status', status) for status in DOOR_STATUSES] + \
             [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object
+            #[('Type', obj_name, 'stove') for obj_name in STOVES] + \
             #[('Camera', name) for name in world.cameras]
     if task.movable_base:
         init.append(('MovableBase',))

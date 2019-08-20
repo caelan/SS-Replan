@@ -6,8 +6,13 @@ from pddlstream.language.object import OPT_PREFIX
 from pddlstream.algorithms.downward import get_fluents
 from pddlstream.algorithms.algorithm import parse_domain
 from pddlstream.utils import INF, implies, hash_or_id
-from src.utils import FConf
+#from src.utils import FConf
 from src.problem import ACTION_COSTS
+
+
+OBSERVATION_ACTIONS = {'detect'}
+STOCHASTIC_ACTIONS = OBSERVATION_ACTIONS | {'move_base', 'pull', 'place'}  # 'calibrate', 'pick'])
+INTERNAL_ACTIONS = {'detect', 'calibrate'} # Fake, skippable, etc...
 
 REUSE_ARGUMENTS = {
     # TODO: this should really be done by type instead
@@ -22,6 +27,8 @@ REUSE_ARGUMENTS = {
 # TODO: could keep around previous base plans as long as we don't reuse them
 # Don't need to replan safe plans form teh same location
 # My worry is that the ground plane will shift
+
+################################################################################
 
 def is_optimistic(arg):
     return isinstance(arg, str) and arg.startswith(OPT_PREFIX)
