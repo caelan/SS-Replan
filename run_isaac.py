@@ -141,7 +141,7 @@ def real_setup(domain, world, args):
     # TODO: detect if lula is active
     observer = RosObserver(domain)
     prior = {
-        SPAM: DeltaDist(INDIGO_COUNTER),
+        SPAM: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
         SUGAR: DeltaDist(INDIGO_COUNTER),
         CHEEZIT: DeltaDist(INDIGO_COUNTER),
     }
@@ -166,6 +166,64 @@ def real_setup(domain, world, args):
 
 
 ################################################################################
+
+INDEX_TEMPLATE = '{:02d}'
+
+INDEX_FROM_SIDE = {
+    'right': INDEX_TEMPLATE.format(0),
+    'left': INDEX_TEMPLATE.format(1),
+}
+
+KINECT_TEMPLATE = 'kinect{}'
+
+KINECT_FROM_SIDE = {
+    'right': KINECT_TEMPLATE.format(1), # indexes from 1!
+    'left': KINECT_TEMPLATE.format(2),
+}
+
+def detect_classes():
+    from sensor_msgs.msg import Image
+    from cv_bridge import CvBridge
+    from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+    cv_bridge = CvBridge()
+    #config_data = read_json(PANDA_FULL_CONFIG_PATH)
+    #camera_data = config_data['LeftCamera']['CameraComponent']
+    #segmentation_labels = [d['name'] for d in camera_data['segmentation_classes']['static_mesh']]
+    #print('Labels:', segmentation_labels)
+
+    detections = []
+    def callback(data):
+        segmentation = cv_bridge.imgmsg_to_cv2(data)
+        #frequency = Counter(segmentation.flatten().tolist()) # TODO: use the area
+        #print(frequency)
+        indices = np.unique(segmentation)
+        #print(indices)
+        #detections.append({segmentation_labels[i-1] for i in indices}) # wraps around [-1]
+        #subscriber.unregister()
+
+    # DeepIM trained on bowl, cracker_box, holiday_cup1, holiday_cup2, mustard_bottle
+    # potted_meat_can, sugar_box, tomato_soup_can
+    side = 'right'
+    obj_type = SUGAR
+
+    # kinect from side
+    # kinect1_depth_optical_frame | kinect2_depth_optical_frame
+    DEEPIM_POSE_TOPIC = '/deepim/raw/objects/prior_pose/{}_{}'.format(side, obj_type)
+    pose_subscriber = rospy.Subscriber(DEEPIM_POSE_TOPIC, PoseStamped, callback, queue_size=1)
+    # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py
+
+    # All of these are images
+    POSECNN_LABEL_TOPIC = '/posecnn_label_{}'.format(INDEX_FROM_SIDE[side])
+    POSECNN_POSE_TOPIC = '/posecnn_pose_{}'.format(INDEX_FROM_SIDE[side])
+    DEEPIM_IMAGE_TOPIC = '/deepim_pose_image_{}'.format(INDEX_FROM_SIDE[side])
+    image_topic = DEEPIM_IMAGE_TOPIC
+
+    rospy.sleep(0.1) # This sleep is needed
+    image_subscriber = rospy.Subscriber(image_topic, Image, callback, queue_size=1)
+    while not detections:
+        rospy.sleep(0.01)
+    print('Detections:', detections[-1])
+    return detections[-1]
 
 def main():
     parser = create_parser()
@@ -218,6 +276,8 @@ def main():
         interface = real_setup(domain, world, args)
     else:
         interface = simulation_setup(domain, world, args)
+    #interface.localize_all()
+    #interface.update_state()
     load_prior(interface.task)
     for side in ['left']:
         display_kinect(interface, side=side)
@@ -227,7 +287,7 @@ def main():
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
-    #localize_all(world_state)
+    #interface.localize_all()
     #wait_for_user()
     #print('Entities:', sorted(world_state.entities))
     with LockRenderer(lock=True):

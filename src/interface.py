@@ -97,4 +97,5 @@ class Interface(object):
         rospy.sleep(6.0)
         #wait_for_duration(2.0)
         print('Localized:', self.task.objects)
+        # TODO: stop_localizing
         # TODO: wait until the variance in estimates is low
