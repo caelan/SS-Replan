@@ -14,7 +14,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
 
 from src.inference import PoseDist
 from src.utils import STOVES, GRASP_TYPES, ALL_SURFACES, surface_from_name, COUNTERS, \
-    RelPose, FConf, are_confs_close, DRAWERS
+    RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -265,6 +265,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                 ])
 
     for surface_name in ALL_SURFACES:
+        if surface_name in OPEN_SURFACES:
+            init.append(('Counter', surface_name))  # Fixed surface
         if surface_name in DRAWERS:
             init.append(('Drawer', surface_name))
         surface = surface_from_name(surface_name)
@@ -274,7 +276,6 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             world_pose = RelPose(world.kitchen, surface_link, init=True)
             initial_poses[surface_name] = world_pose
             init += [
-                ('Counter', surface_name, world_pose),  # Fixed surface
                 #('RelPose', surface_name, world_pose, 'world'),
                 ('WorldPose', surface_name, world_pose),
                 #('AtRelPose', surface_name, world_pose, 'world'),

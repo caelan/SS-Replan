@@ -134,10 +134,10 @@
   ;  :certified (and (WorldPose ?o ?p) (AngleKin ?o ?p ?j ?a))
   ;)
 
-  (:stream test-cfree-worldpose-worldpose
-    :inputs (?o1 ?wp1)
-    :domain (WorldPose ?o1 ?wp1)
-    :certified (CFreeWorldPoseWorldPose ?o1 ?wp1))
+  (:stream     test-cfree-worldpose-worldpose
+    :inputs    (?o1 ?wp1 ?o2 ?wp2)
+    :domain    (and (WorldPose ?o1 ?wp1) (WorldPose ?o2 ?wp2))
+    :certified (CFreeWorldPoseWorldPose ?o1 ?wp1 ?o2 ?wp2))
   (:stream test-cfree-pose-pose
     :inputs (?o1 ?rp1 ?o2 ?rp2 ?s)
     :domain (and (RelPose ?o1 ?rp1 ?s) (RelPose ?o2 ?rp2 ?s))

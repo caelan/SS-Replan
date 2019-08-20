@@ -11,8 +11,15 @@
     (Type ?t ?b)
     (NoisyBase)
     (Obstacle ?o)
-    (Counter ?o ?p)
+    (Counter ?o)
+    (Drawer ?o)
     (Graspable ?o)
+    (Joint ?j)
+
+    (CheckNearby ?o)
+    (NearPose ?o2 ?p2 ?bq)
+    (NearJoint ?j ?bq)
+    (InitBConf ?bq)
 
     (Pick ?o ?p ?g ?bq ?aq ?at)
     (Pull ?j ?q1 ?q2 ?bq ?aq1 ?aq2 ?at)
@@ -22,6 +29,8 @@
     (CalibrateMotion ?bq ?aq ?at)
 
     (Detect ?o ?p ?r)
+    (Sample ?s)
+    (Dist ?d)
     (Value ?p)
     (DistSample ?rp1 ?rp2)
 
@@ -38,7 +47,8 @@
     (CFreeBConfPose ?bq ?o2 ?p2)
     (CFreeApproachPose ?o1 ?p1 ?g ?o2 ?p2)
     (CFreeTrajPose ?t ?o2 ?p2)
-    (CFreeWorldPoseWorldPose ?o1 ?wp1)
+    (CFreeWorldPoseWorldPose ?o1 ?wp1 ?o2 ?wp2)
+
     (OFreeRayPose ?r ?o ?p)
     (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
 
@@ -83,8 +93,11 @@
     (PoseKin ?o1 ?p1 ?rp ?o2 ?p2)
     (Connected ?o ?j)
     (AngleKin ?o ?p ?j ?a)
+
     (AdmitsGrasp ?o1 ?g ?o2)
-  )
+    (IsGraspType ?o ?g ?gty)
+    (AdmitsGraspType ?o2 ?gty)
+    )
   (:functions
     (Distance ?bq1 ?bq2)
     (MoveBaseCost)
@@ -202,9 +215,9 @@
     :parameters (?j ?a1 ?a2 ?o ?p1 ?p2 ?bq ?aq1 ?aq2 ?gq ?at)
     :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at) (OpenGConf ?gq)
                        (AngleKin ?o ?p1 ?j ?a1) (AngleKin ?o ?p2 ?j ?a2)
-                       (AtAngle ?j ?a1) (AtWorldPose ?o ?p1) (HandEmpty)
+                       (AtAngle ?j ?a1) (AtWorldPose ?o ?p1)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
-                       (Calibrated)
+                       (HandEmpty) (Calibrated)
                        (not (UnsafeWorldPose ?o ?p2)) ; TODO: use the full pull trajectory
                        (not (Unsafe))
                        ;(not (UnsafeATraj ?at))
@@ -257,8 +270,8 @@
   ;)
 
   (:derived (Accessible ?o ?p) (or
-    (Counter ?o ?p) ; TODO: apply to just ?o
-    (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
+                                (and (WorldPose ?o ?p) (Counter ?o))
+                                (exists (?j ?a) (and (AngleKin ?o ?p ?j ?a) (AngleWithin ?j ?a @open)
                          (AtAngle ?j ?a))))
   )
 
@@ -277,10 +290,12 @@
   ;  ; TODO: define unsafe as state constraint
   ;))
   (:derived (UnsafeWorldPose ?o2 ?wp2)
-    (exists (?o1 ?wp1 ?rp1) (and (PoseKin ?o1 ?wp1 ?rp1 ?o2 ?wp2)
-                                 (AtRelPose ?o1 ?rp1 ?o2)
-                                 (not (CFreeWorldPoseWorldPose ?o1 ?wp1)))
-  ))
+            (exists (?o1 ?wp1 ?rp1 ?o3 ?wp3)
+                    (and (PoseKin ?o1 ?wp1 ?rp1 ?o2 ?wp2) (WorldPose ?o3 ?wp3)
+                         (Drawer ?o2) (Drawer ?o3)
+                         (not (CFreeWorldPoseWorldPose ?o1 ?wp1 ?o3 ?wp3))
+                         (AtRelPose ?o1 ?rp1 ?o2) (AtWorldPose ?o3 ?wp3))
+                    ))
   (:derived (UnsafeRelPose ?o1 ?rp1 ?s) (and (RelPose ?o1 ?rp1 ?s)
     (exists (?o2 ?rp2) (and (RelPose ?o2 ?rp2 ?s) (Graspable ?o2) (not (= ?o1 ?o2))
                             (not (CFreeRelPoseRelPose ?o1 ?rp1 ?o2 ?rp2 ?s))
@@ -307,7 +322,7 @@
                          (not (OFreeRayPose ?r ?o ?p))
                          (AtWorldPose ?o ?p)))
     (exists (?bq ?aq ?o ?g) (and (AConf ?bq ?aq) (Grasp ?o ?g)
-                            (not (OFreeRayGrasp ?r ?bq ?aq ?o ?g))
-                            (AtBConf ?bq) (AtAConf ?aq) (AtGrasp ?o ?g)))
+                                 (not (OFreeRayGrasp ?r ?bq ?aq ?o ?g))
+                                 (AtBConf ?bq) (AtAConf ?aq) (AtGrasp ?o ?g)))
   )))
 )
