@@ -11,11 +11,14 @@ import time
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
+from itertools import product
+
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
     RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR, dump_body, safe_remove
 from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
-    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS
+    SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS, \
+    OPEN_SURFACES, ENV_SURFACES, CABINETS
 from src.world import World
 from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
 from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
@@ -129,31 +132,24 @@ def main():
                         help='When enabled, visualizes planning rather than the world (for debugging).')
     args = parser.parse_args()
 
-    # TODO: sample from set of objects?
-    object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
-    surface_names = ALL_SURFACES
-    #surface_names = DRAWERS
-    #surface_names = ['indigo_drawer_top']
-    grasp_types = GRASP_TYPES
-    #grasp_types = [TOP_GRASP]
-    #grasp_types = ['side']
-
     world = World(use_gui=args.visualize, robot_name=args.robot)
     #dump_body(world.robot)
     for joint in world.kitchen_joints:
         world.open_door(joint) # open_door | close_door
     world.open_gripper()
-    world.add_body(object_name, get_block_path(object_name))
-    # TODO: could constrain eve to be within a torso cone
+    # TODO: sample from set of objects?
+    object_name = '{}_{}_block{}'.format(BLOCK_SIZES[-1], BLOCK_COLORS[0], 0)
+    world.add_body(object_name)
+    # TODO: could constrain Eve to be within a torso cone
 
     grasp_colors = {
         TOP_GRASP: RED,
         SIDE_GRASP: BLUE,
     }
-    print('Surfaces:', surface_names)
-    print('Grasps:', grasp_types)
-    combinations = [(surface_name, grasp_type) for surface_name in surface_names
-                    for grasp_type in grasp_types]
+    combinations = list(product(OPEN_SURFACES, GRASP_TYPES)) \
+                   + [(surface_name, TOP_GRASP) for surface_name in DRAWERS] \
+                   + [(surface_name, SIDE_GRASP) for surface_name in CABINETS] # ENV_SURFACES
+
     # TODO: parallelize
     print('Combinations:', combinations)
     wait_for_user('Start?')
