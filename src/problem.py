@@ -23,7 +23,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
     get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test, \
-    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test
+    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn
 from src.database import has_place_database
 
 
@@ -85,7 +85,9 @@ def get_streams(world, debug=False, **kwargs):
         'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
         # 'compute-angle-kin': from_fn(compute_angle_kin),
         'compute-detect': from_fn(get_compute_detect(world, **kwargs)),
-        'sample-belief': from_gen_fn(get_sample_belief_gen(world, **kwargs)),
+
+        'sample-observation': from_gen_fn(get_sample_belief_gen(world, **kwargs)),
+        'update-belief': from_fn(update_belief_fn(world, **kwargs)),
 
         'test-cfree-worldpose': from_test(get_cfree_worldpose_test(world, **kwargs)),
         'test-cfree-worldpose-worldpose': from_test(get_cfree_worldpose_worldpose_test(world, **kwargs)),

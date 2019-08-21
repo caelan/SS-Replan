@@ -109,11 +109,16 @@
   ;                  (CalibrateMotion ?bq @rest_aq ?at))
   ;)
 
-  (:stream sample-belief
+  (:stream sample-observation
     :inputs (?o1 ?rp1 ?o2)
     :domain (and (RelPose ?o1 ?rp1 ?o2) (Dist ?rp1))
+    :outputs (?obs)
+    :certified (Observation ?o1 ?o2 ?obs))
+  (:stream update-belief
+    :inputs (?o1 ?rp1 ?o2 ?obs)
+    :domain (and (RelPose ?o1 ?rp1 ?o2) (Dist ?rp1) (Observation ?o1 ?o2 ?obs))
     :outputs (?rp2)
-    :certified (and (RelPose ?o1 ?rp2 ?o2) (DistSample ?rp1 ?rp2) (Sample ?rp2)))
+    :certified (and (RelPose ?o1 ?rp2 ?o2) (BeliefUpdate ?rp1 ?obs ?rp2) (Sample ?rp2)))
   (:stream compute-detect
     :inputs (?o ?wp)
     :domain (and (WorldPose ?o ?wp) (Sample ?wp))
@@ -178,8 +183,8 @@
     :domain (and (Angle ?j ?a) (Status ?s))
     :certified (AngleWithin ?j ?a ?s))
 
-  (:function (DetectCost ?rp1 ?rp2) ; TODO: pass in risk level
-             (DistSample ?rp1 ?rp2))
+  (:function (DetectCost ?rp1 ?obs ?rp2) ; TODO: pass in risk level
+             (BeliefUpdate ?rp1 ?obs ?rp2))
   ;(:function (Distance ?bq1 ?bq2)
   ;  (and (BConf ?bq1) (BConf ?bq2))
   ;)

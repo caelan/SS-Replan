@@ -78,7 +78,7 @@ def compute_detect_cost(prob):
     cost = revisit_mdp_cost(success_cost, failure_cost, prob)
     return cost
 
-def detect_cost_fn(rp_dist, rp_sample):
+def detect_cost_fn(rp_dist, obs, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
     prob = rp_dist.discrete_prob(rp_sample)
     cost = clip_cost(compute_detect_cost(prob))
@@ -86,11 +86,11 @@ def detect_cost_fn(rp_dist, rp_sample):
     #    rp_dist.surface_name, prob, cost))
     return cost
 
-def opt_detect_cost_fn(rp_dist, rp_sample):
+def opt_detect_cost_fn(rp_dist, obs, rp_sample):
     # TODO: prune these surfaces if the cost is already too high
     if isinstance(rp_sample, RelPose):
         # This shouldn't be needed if eager=True
-        return detect_cost_fn(rp_dist, rp_sample)
+        return detect_cost_fn(rp_dist, obs, rp_sample)
     prob = rp_dist.surface_prob(rp_dist.surface_name)
     #print(rp_dist.surface_name, prob)
     cost = clip_cost(compute_detect_cost(prob))
@@ -218,6 +218,12 @@ def get_ofree_ray_grasp_test(world, **kwargs):
         return not obstacles & ray.compute_occluding()
     return test
 
+class Observation(object):
+    # Primary motivation is to seperate the object
+    def __init__(self, value):
+        self.value = value
+    def __repr__(self):
+        return 'obs({})'.format(self.value)
 
 def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative instead?
                           mlo_only=False, ordered=False, **kwargs):
@@ -229,7 +235,8 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative 
         valid_samples = {}
         for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)
-            cost = detect_cost_fn(pose_dist, rp)
+            obs = None
+            cost = detect_cost_fn(pose_dist, obs, rp)
             if (cost <= MAX_COST): # and (min_prob <= prob):
                 # pose = rp.get_world_from_body()
                 result = detect_fn(obj_name, rp)
@@ -242,18 +249,27 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative 
 
         if mlo_only:
             rp = max(valid_samples, key=valid_samples.__getitem__)
-            yield (rp,)
+            obs = Observation(rp)
+            yield (obs,)
             return
         if ordered:
             for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
-                yield (rp,)
+                obs = Observation(rp)
+                yield (obs,)
         else:
             while valid_samples:
                 dist = DDist(valid_samples)
                 rp = dist.sample()
-                yield (rp,)
                 del valid_samples[rp]
+                obs = Observation(rp)
+                yield (obs,)
     return gen
+
+def update_belief_fn(world, **kwargs):
+    def fn(obj_name, pose_dist, surface_name, obs):
+        rp = obs.value # TODO: proper Bayesian update
+        return (rp,)
+    return fn
 
 ################################################################################
 

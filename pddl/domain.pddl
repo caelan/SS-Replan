@@ -33,7 +33,7 @@
     (Sample ?s)
     (Dist ?d)
     (Value ?wp)
-    (DistSample ?rp1 ?rp2)
+    (BeliefUpdate ?rp1 ?obs ?rp2)
 
     (Grasp ?o ?g)
     (BTraj ?bt)
@@ -105,7 +105,7 @@
     (PlaceCost)
     (PullCost)
     (CookCost)
-    (DetectCost ?rp1 ?rp2)
+    (DetectCost ?rp1 ?obs ?rp2)
   )
 
   ; TODO: prevent the robot from moving to the same spot?
@@ -216,9 +216,9 @@
                                                (AtWorldPose ?o4 ?wp4)))
                  (increase (total-cost) (PullCost))))
   (:action detect
-    :parameters (?o1 ?wp1 ?rp1 ?wp2 ?rp2 ?o0 ?wp0 ?r)
+    :parameters (?o1 ?wp1 ?rp1 ?obs ?wp2 ?rp2 ?o0 ?wp0 ?r)
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)
-                       (Detect ?o1 ?wp2 ?r) (DistSample ?rp1 ?rp2)
+                       (Detect ?o1 ?wp2 ?r) (BeliefUpdate ?rp1 ?obs ?rp2)
                        (AtWorldPose ?o1 ?wp1) ; (AtRelPose ?o1 ?rp1 ?o0) (AtWorldPose ?o0 ?wp0)
                        (Accessible ?o0 ?wp0)
                        ; (not (UnsafeRelPose ?o1 ?rp2 ?o0))
@@ -231,7 +231,7 @@
                                       (not (AtRelPose ?o3 ?rp3 ?o0))))
                  (forall (?wp3) (when (and (WorldPose ?o1 ?wp1) (AtWorldPose ?o1 ?wp1))
                                       (not (AtWorldPose ?o1 ?wp1))))
-                 (increase (total-cost) (DetectCost ?rp1 ?rp2))))
+                 (increase (total-cost) (DetectCost ?rp1 ?obs ?rp2))))
 
   ;(:action cook
   ;  :parameters (?r)

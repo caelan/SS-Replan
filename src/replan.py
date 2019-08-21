@@ -19,7 +19,7 @@ REUSE_ARGUMENTS = {
     'pick': [0, 2],  # ?o1 ?g
     'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
     # TODO: need to maintain the original distribution as well then...
-    #'detect': [0, 4, 5], # ?o1 ?rp2 ?o0
+    'detect': [0, 3, 6], # ?o1 ?obs ?o0
     # The previous pick error I had was because it moved to the carry_aq and then detected
     # However, it was next constrained to move the base rather than the arm
 }
