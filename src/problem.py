@@ -26,7 +26,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test
 from src.database import has_place_database
 
-MAX_ERROR = np.pi / 4
+MAX_ERROR = np.pi / 6
 
 def existential_quantification(goal_literals):
     # TODO: merge with pddlstream-experiments

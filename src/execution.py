@@ -7,14 +7,14 @@ from sensor_msgs.msg import JointState
 
 from src.retime import spline_parameterization, get_joint_names, linear_parameterization
 from src.issac import ISSAC_FRANKA_FRAME, update_observer, update_robot_conf
-from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, get_joint_positions
+from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, \
+    get_joint_positions, get_min_limits, get_max_limits
 from pddlstream.utils import Verbose
 
 from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
 from actionlib import SimpleActionClient, GoalStatus
 #from actionlib_msgs.msg import GoalStatus, GoalState, SimpleClientGoalState
 # http://docs.ros.org/jade/api/actionlib/html/classactionlib_1_1SimpleClientGoalState.html
-# http://docs.ros.org/kinetic/api/actionlib_msgs/html/msg/GoalStatus.html
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, \
     GripperCommandAction, GripperCommandGoal, JointTolerance
 
@@ -151,7 +151,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # TODO: adjust to the actual current configuration
 
     goal = FollowJointTrajectoryGoal(trajectory=trajectory)
-    #goal.goal_time_tolerance = rospy.Duration.from_sec(1.0)
+    goal.goal_time_tolerance = rospy.Duration.from_sec(2.0)
     for joint in trajectory.joint_names:
         #goal.path_tolerance.append(JointTolerance(name=joint, position=1e-2)) # position | velocity | acceleration
         goal.goal_tolerance.append(JointTolerance(name=joint, position=1e-3)) # position | velocity | acceleration
@@ -172,12 +172,18 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # TODO: extra effort to get to the final conf
     update_robot_conf(interface)
     end_conf = get_joint_positions(robot, joints)
+    print('Final conf:', np.array(end_conf).round(5))
+    print('Lower limits:', np.array(get_min_limits(robot, joints)).round(5))
+    print('Upper limits:', np.array(get_max_limits(robot, joints)).round(5))
     print('Final error:', (np.array(end_conf) - np.array(path[-1])).round(5))
     print('Execution took {:.3f} seconds (expected {:.3f} seconds)'.format(
         elapsed_time(start_time), total_duration))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
     #wait_for_user('Continue?')
     # TODO: remove display messages
+    # http://docs.ros.org/kinetic/api/actionlib_msgs/html/msg/GoalStatus.html
+
+    return state == GoalStatus.SUCCEEDED
 
 ################################################################################
 
@@ -279,13 +285,13 @@ def franka_open_gripper(interface, **kwargs):
         # return gripper.open(speed=0.1, wait=True)
         # return move_gripper_action(moveit.gripper.open_positions[0], **kwargs)
 
-def franka_close_gripper(interface):
+def franka_close_gripper(interface, force=40):
     if interface.simulation:
         interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
         interface.moveit.close_gripper()
     else:
         commander = FrankaGripperCommander()
-        commander.close(speed=0.1, force=60, wait=True)
+        commander.close(speed=0.1, force=force, wait=True)
         #gripper = FrankaGripper(is_physical_robot=True)
         #return gripper.close(attach_obj=None, speed=0.1, force=40, actuate_gripper=True, wait=True)
         #return move_gripper_action(moveit.gripper.closed_positions[0], effort=50)

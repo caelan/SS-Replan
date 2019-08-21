@@ -57,6 +57,9 @@ class Interface(object):
             self.paused = False
     def update_state(self):
         return update_observer(self.observer)
+    def stop_tracking(self, name):
+        assert self.deepim is not None
+        return self.deepim.stop_tracking(name)
     def localize_all(self):
         if self.simulation:
             return

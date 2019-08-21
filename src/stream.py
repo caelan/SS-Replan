@@ -15,7 +15,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine, get_aabb, draw_aabb
 #from pddlstream.algorithms.downward import MAX_FD_COST, get_cost_scale
 
-from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, Detect
+from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
+    Detect, AttachGripper
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
@@ -539,7 +540,7 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
         ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
         finger_cmd.commands[0],
         Detach(world, attachment.parent, attachment.parent_link, attachment.child),
-        Attach(world, world.robot, world.tool_link, obj_body, grasp=grasp),
+        AttachGripper(world, obj_body, grasp=grasp),
         ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
     ], name='pick')
     yield (aq, cmd,)
@@ -751,7 +752,6 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     gripper_motion_fn = get_gripper_motion_gen(world, teleport=teleport, collisions=collisions, **kwargs)
     gripper_conf = FConf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
-
 
     commands = [
         ApproachTrajectory(world, world.robot, world.arm_joints, approach_paths[0]),
