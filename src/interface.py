@@ -86,16 +86,17 @@ class Interface(object):
         for name in self.task.prior:
             obj = world_state.entities[name]
             #wait_for_duration(1.0)
-            obj.localize() # Needed to ensure detectable
             print('Localizing', name)
-            rospy.sleep(0.1)
-            obj.detect() # Actually applies the blue model
+            obj.localize() # Needed to ensure detectable
             print('Detecting', name)
+            for _ in range(1):
+                rospy.sleep(0.1)
+                obj.administrator.detect()
+                #obj.detect() # Actually applies the blue model
             #print(world_state.entities[name])
             #obj.administrator.detect()
             #print(obj.pose[:3, 3])
-        rospy.sleep(6.0)
-        #wait_for_duration(2.0)
+        rospy.sleep(5.0)
         print('Localized:', self.task.objects)
         # TODO: stop_localizing
         # TODO: wait until the variance in estimates is low

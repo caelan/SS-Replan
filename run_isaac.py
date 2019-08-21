@@ -143,11 +143,11 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     prior = {
         SPAM: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
-        SUGAR: DeltaDist(INDIGO_COUNTER),
-        CHEEZIT: DeltaDist(INDIGO_COUNTER),
+        SUGAR: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
+        CHEEZIT: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
     }
     task = Task(world, prior=prior,
-                # goal_holding=[SPAM],
+                #goal_holding=[SPAM],
                 goal_on={SPAM: TOP_DRAWER},
                 #goal_closed=[],
                 goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)],  # , 'indigo_drawer_bottom_joint'],
@@ -276,6 +276,50 @@ def detect_classes():
     print('Detections:', detections[-1])
     return detections[-1]
 
+def test_deepim():
+    # # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
+    from lula_dartpy.object_administrator import ObjectAdministrator
+
+    deepim = DeepIM(sides=[RIGHT], obj_types=YCB_OBJECTS)
+
+    side = 'right'
+    prefix = PREFIX_FROM_SIDE[side]
+    # obj_type = SUGAR
+    obj_type = SPAM
+    base_frame = '{}_{}'.format(prefix, obj_type)
+    administrator = ObjectAdministrator(
+        base_frame, wait_for_connection=True)  # wait_for_connection=False
+    print(administrator.is_active, administrator.is_detecting)
+
+    rate = rospy.Rate(1000)
+    while INF <= deepim.last_detected(side, obj_type):
+        rate.sleep()
+
+    # print(deepim.last_world_pose(side, obj_type))
+
+    # Could redetect on every step
+    print('Detected', obj_type)
+    # Doesn't look like the order matters actually
+    administrator.activate()  # localize
+    administrator.detect_once()  # detect
+    # administrator.detect_and_wait()
+    # administrator.wait_for_detection_complete()
+    # administrator.deactivate() # stop_localizing
+
+    # rospy.sleep(10)
+    # TODO: test how far away from deepim's estimate
+    # Redetect for a fixed number of times until close
+    # print('Redetecting', obj_type)
+    # administrator.detect_once() # Every redetect causes the objects to spaz
+
+    rospy.sleep(5)
+    # print('Finished detecting', obj_type)
+    # administrator.deactivate() # stop_localizing
+
+    # TODO: if orientation is bad and make not manipulable
+
+    rospy.spin()
+
 def main():
     parser = create_parser()
     parser.add_argument('-execute', action='store_true',
@@ -307,59 +351,12 @@ def main():
 
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/brain/src/brain_ros/lula_policies.py#L464
     rospy.init_node("STRIPStream")
-    #with HideOutput():
-    #if args.execute:
-    #    domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
-    #else:
-
-    # # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
-    from lula_dartpy.object_administrator import ObjectAdministrator
-
-
-    deepim = DeepIM(sides=[RIGHT], obj_types=YCB_OBJECTS)
-
-    side = 'right'
-    prefix = PREFIX_FROM_SIDE[side]
-    #obj_type = SUGAR
-    obj_type = SPAM
-    base_frame = '{}_{}'.format(prefix, obj_type)
-    administrator = ObjectAdministrator(
-        base_frame, wait_for_connection=True) # wait_for_connection=False
-    print(administrator.is_active, administrator.is_detecting)
-
-    rate = rospy.Rate(1000)
-    while INF <= deepim.last_detected(side, obj_type):
-        rate.sleep()
-
-    #print(deepim.last_world_pose(side, obj_type))
-
-    # Could redetect on every step
-    print('Detected', obj_type)
-    # Doesn't look like the order matters actually
-    administrator.activate() # localize
-    administrator.detect_once() # detect
-    #administrator.detect_and_wait()
-    #administrator.wait_for_detection_complete()
-    #administrator.deactivate() # stop_localizing
-
-    #rospy.sleep(10)
-    # TODO: test how far away from deepim's estimate
-    # Redetect for a fixed number of times until close
-    #print('Redetecting', obj_type)
-    #administrator.detect_once() # Every redetect causes the objects to spaz
-
-    rospy.sleep(5)
-    #print('Finished detecting', obj_type)
-    #administrator.deactivate() # stop_localizing
-
-    # TODO: if orientation is bad and make not manipulable
-
-    rospy.spin()
-
-    return
+    #test_deepim()
+    #return
 
     with Verbose(False):
         domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
+        #domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     robot_entity = domain.get_robot()
     robot_entity.get_motion_interface().remove_obstacle()
 
@@ -404,12 +401,6 @@ def main():
     print('Success:', success)
     world.destroy()
 
-# cpaxton@lokeefe:~/alice$ bazel run apps/samples/navigation_rosbridge
-# srl@carter:~/deploy/srl/carter-pkg$ ./apps/carter/carter -r 2 -m seattle_map_res02_181214
-# cpaxton@lokeefe:~$ roscore
-# cpaxton@lokeefe:~/srl_system/workspace/src/brain/src/brain_ros$ rosrun lula_dart object_administrator --detect --j=00_potted_meat_can
-# cpaxton@lokeefe:~$ franka world franka_center_right_kitchen.yaml
-
 ################################################################################
 
 if __name__ == '__main__':
@@ -430,10 +421,20 @@ if __name__ == '__main__':
 # Running in IsaacSim
 # 1) roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false
 
+# Running the carter
+# cpaxton@lokeefe:~$ ssh srl@carter
+# srl@carter:~/deploy/srl/carter-pkg$ ./apps/carter/carter -r 2 -m seattle_map_res02_181214
+# cpaxton@lokeefe:~/alice$ bazel run apps/samples/navigation_rosbridge
+
+# Running DART
+# cpaxton@lokeefe:~$ franka world franka_center_right_kitchen.yaml
+# cpaxton@lokeefe:~/srl_system/workspace/src/brain/src/brain_ros$ rosrun lula_dart object_administrator --detect --j=00_potted_meat_can
+
 # Running on the real robot w/o LULA
+# cpaxton@lokeefe:~$ roscore
 # 1) roslaunch franka_controllers start_control.launch
 # 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
-# 3) srl@vgilligan:~/srl_system/workspace/src/brain$ ./relay.sh
+# 3) srl@vgilligan:~$ ~/srl_system/workspace/src/brain/relay.sh
 # 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz
 # 4) killall move_group franka_control_node local_controller
 

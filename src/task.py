@@ -192,9 +192,9 @@ def hold_block(world, num=5, **kwargs):
 ################################################################################
 
 def cracker_drawer(world, **kwargs):
-    initial_surface = 'indigo_drawer_top'
-    # initial_surface = 'indigo_drawer_bottom'
-    joint_name = JOINT_TEMPLATE.format(initial_surface)
+    #initial_surface = 'indigo_drawer_top' # indigo_drawer_top | indigo_drawer_bottom
+    initial_surface = 'indigo_tmp'
+    joint_name = JOINT_TEMPLATE.format('indigo_drawer_bottom')
     world.open_door(joint_from_name(world.kitchen, joint_name))
     # open_all_doors(world)
 
@@ -206,9 +206,9 @@ def cracker_drawer(world, **kwargs):
     add_kinect(world)
 
     return Task(world, prior=prior, movable_base=True,
-                return_init_bq=True, return_init_aq=True,
-                # goal_open=[JOINT_TEMPLATE.format('indigo_drawer_top')],
-                goal_closed=ALL_JOINTS,
+                #return_init_bq=True, return_init_aq=True,
+                goal_open=[JOINT_TEMPLATE.format('indigo_drawer_top')],
+                #goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################
@@ -225,8 +225,8 @@ def fixed_stow(world, **kwargs):
     # set_base_values(world.robot, BASE_POSE2D)
     world.set_base_conf(BASE_POSE2D)
 
-    #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
-    initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
+    initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
+    #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
     if initial_surface == 'indigo_drawer_top':
         sample_placement(world, entity_name, initial_surface, learned=True)
     # joint_name = JOINT_TEMPLATE.format(goal_surface)

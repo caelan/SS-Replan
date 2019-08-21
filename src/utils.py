@@ -125,7 +125,7 @@ ENV_SURFACES = [
 ]
 
 ZED_LEFT_SURFACES = [
-    'dagger_door_left',
+    #'dagger_door_left',
     'indigo_tmp', # 'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
@@ -151,8 +151,8 @@ SURFACE_FROM_NAME = {
     'indigo_drawer_bottom': Surface('indigo_drawer_bottom', SURFACE_BOTTOM, ['indigo_drawer_bottom_joint']),
 }
 
-#ALL_SURFACES = ZED_LEFT_SURFACES
-ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
+ALL_SURFACES = ZED_LEFT_SURFACES
+#ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
 #IKEA_PATH = '/home/caelan/Documents/IKEA/OBJ/'
 IKEA_PATH = os.path.join(MODELS_PATH, 'kitchen')
@@ -208,8 +208,8 @@ DRAWER_JOINTS = [
 ZED_LEFT_JOINTS = [JOINT_TEMPLATE.format(name) for name in ZED_LEFT_SURFACES
                    if JOINT_TEMPLATE.format(name) in (CABINET_JOINTS + DRAWER_JOINTS)]
 
-#ALL_JOINTS = ZED_LEFT_JOINTS
-ALL_JOINTS = [] + DRAWER_JOINTS + CABINET_JOINTS
+ALL_JOINTS = ZED_LEFT_JOINTS
+#ALL_JOINTS = [] + DRAWER_JOINTS + CABINET_JOINTS
 
 ################################################################################
 

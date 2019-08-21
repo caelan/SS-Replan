@@ -36,7 +36,7 @@ from src.utils import create_relative_pose, RelPose
 # https://github.mit.edu/caelan/ss/blob/master/belief/belief_online.py
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
 
-MIN_GRASP_WIDTH = 0.01
+MIN_GRASP_WIDTH = 0.005
 
 ################################################################################
 

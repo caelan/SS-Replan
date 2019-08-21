@@ -12,7 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, get_aabb_extent, get_aabb_center, \
-    child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine
+    child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine, get_aabb, draw_aabb
 #from pddlstream.algorithms.downward import MAX_FD_COST, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, Detect
@@ -21,7 +21,7 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
@@ -1047,22 +1047,23 @@ def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
 
 def get_cfree_worldpose_test(world, collisions=True, **kwargs):
     def test(o1, wp1):
-        if not collisions:
-            return True
         if isinstance(wp1, SurfaceDist):
+            return True
+        if not collisions or (wp1.support not in DRAWERS):
             return True
         body = world.get_body(o1)
         wp1.assign()
-        if any(pairwise_collision(body, obst) for obst in world.static_obstacles):
+        obstacles = world.static_obstacles
+        if any(pairwise_collision(body, obst) for obst in obstacles):
             return False
         return True
     return test
 
 def get_cfree_worldpose_worldpose_test(world, collisions=True, **kwargs):
     def test(o1, wp1, o2, wp2):
-        if not collisions or (o1 == o2):
-            return True
         if isinstance(wp1, SurfaceDist) or isinstance(wp2, SurfaceDist):
+            return True
+        if not collisions or (o1 == o2) or (o2 == wp1.support): # DRAWERS
             return True
         body = world.get_body(o1)
         wp1.assign()
@@ -1086,18 +1087,18 @@ def get_cfree_bconf_pose_test(world, collisions=True, **kwargs):
     return test
 
 def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
-    def test(o1, p1, g1, o2, p2):
+    def test(o1, wp1, g1, o2, wp2):
         # o1 will always be a movable object
-        if not collisions or (o1 == o2):
-            return True
-        if isinstance(p2, SurfaceDist):
+        if isinstance(wp2, SurfaceDist):
             return True # TODO: perform this probabilistically
+        if not collisions or (o1 == o2) or (o2 == wp1.support):
+            return True
         body = world.get_body(o1)
-        p2.assign()
+        wp2.assign()
         obstacles = get_link_obstacles(world, o2) # - {body}
         if not obstacles:
             return True
-        for _ in iterate_approach_path(world, p1, g1, body=body):
+        for _ in iterate_approach_path(world, wp1, g1, body=body):
             if any(pairwise_collision(part, obst) for part in
                    [world.gripper, body] for obst in obstacles):
                 return False
@@ -1117,8 +1118,13 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
         p.assign()
         state = at.context.copy()
         state.assign()
+        all_bodies = {body for command in at.commands for body in command.bodies}
         for command in at.commands:
-            obstacles = get_link_obstacles(world, o) - command.bodies - p.bodies # Doesn't include o at p
+            obstacles = get_link_obstacles(world, o) - all_bodies
+            # TODO: why did I previously remove o at p?
+            #obstacles = get_link_obstacles(world, o) - command.bodies  # - p.bodies # Doesn't include o at p
+            if not obstacles:
+                continue
             for _ in command.iterate(state):
                 state.derive()
                 for attachment in state.attachments.values():
