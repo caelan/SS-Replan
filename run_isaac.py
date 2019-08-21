@@ -31,7 +31,7 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, \
-    load_prior, display_kinect, dump_dict
+    load_objects, display_kinect, dump_dict
 from src.world import World
 from run_pybullet import create_parser
 from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement
@@ -42,6 +42,8 @@ def planning_loop(interface):
     args = interface.args
 
     def observation_fn(belief):
+        # TODO: test if visibility is good enough
+        # TODO: sort by distance from camera
         assert interface.deepim is not None # TODO: IsaacSim analog
         if belief.holding is not None:
             interface.deepim.stop_tracking(belief.holding)
@@ -49,6 +51,7 @@ def planning_loop(interface):
         for obj in belief.placed:
             interface.deepim.detect(obj)
         rospy.sleep(5.0)
+        # Wait until convergence
         #interface.localize_all()
         return observe_world(interface)
 
@@ -157,7 +160,7 @@ def real_setup(domain, world, args):
     goal_drawer = BOTTOM_DRAWER
     task = Task(world, prior=prior,
                 #goal_holding=[SPAM],
-                #goal_on={SPAM: goal_drawer},
+                goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],  # , 'indigo_drawer_bottom_joint'],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
@@ -243,7 +246,7 @@ def main():
     with LockRenderer(lock=True):
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
-        load_prior(interface.task)
+        load_objects(interface.task)
         for side in SIDES: #[RIGHT]:
             display_kinect(interface, side=side)
         observe_world(interface)

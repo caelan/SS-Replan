@@ -141,8 +141,9 @@ def franka_control(robot, joints, path, interface, **kwargs):
     path = path
     #path = [start_conf] + list(path)
     trajectory = spline_parameterization(robot, joints, path, **kwargs)
+    total_duration = trajectory.points[-1].time_from_start.to_sec()
     print('Following {} waypoints in {:.3f} seconds'.format(
-        len(trajectory.points), trajectory.points[-1].time_from_start.to_sec()))
+        len(trajectory.points), total_duration))
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
     publish_display_trajectory(interface.moveit, trajectory)
@@ -172,7 +173,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     update_robot_conf(interface)
     end_conf = get_joint_positions(robot, joints)
     print('Final error:', (np.array(end_conf) - np.array(path[-1])).round(5))
-    print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
+    print('Execution took {:.3f} seconds (expected {:.3f} seconds)'.format(
+        elapsed_time(start_time), total_duration))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
     #wait_for_user('Continue?')
     # TODO: remove display messages
