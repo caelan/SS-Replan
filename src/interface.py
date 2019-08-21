@@ -89,7 +89,7 @@ class Interface(object):
             print('Localizing', name)
             obj.localize() # Needed to ensure detectable
             print('Detecting', name)
-            for _ in range(1):
+            for _ in range(5):
                 rospy.sleep(0.1)
                 obj.administrator.detect()
                 #obj.detect() # Actually applies the blue model

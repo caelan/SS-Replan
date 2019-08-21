@@ -144,7 +144,7 @@ def real_setup(domain, world, args):
     prior = {
         SPAM: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
         SUGAR: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
-        CHEEZIT: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
+        #CHEEZIT: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
     }
     task = Task(world, prior=prior,
                 #goal_holding=[SPAM],

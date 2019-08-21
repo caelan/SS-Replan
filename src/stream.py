@@ -1127,9 +1127,10 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
                 continue
             for _ in command.iterate(state):
                 state.derive()
-                for attachment in state.attachments.values():
-                    if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
-                        return False
+                # TODO: annote the surface in question
+                #for attachment in state.attachments.values():
+                #    if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
+                #        return False
                 # TODO: just check collisions with moving links
                 if any(pairwise_collision(world.robot, obst) for obst in obstacles):
                     return False
