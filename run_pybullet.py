@@ -90,7 +90,7 @@ def main():
         wait_for_user('Start?')
         video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
 
-    def observation_fn():
+    def observation_fn(belief):
         return observe_pybullet(world)
 
     def transition_fn(belief, commands):

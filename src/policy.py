@@ -21,7 +21,7 @@ def run_policy(task, args, observation_fn, transition_fn):
     previous_skeleton = None
     while True:
         print_separator(n=50)
-        observation = observation_fn()
+        observation = observation_fn(belief) # TODO: could allow this to be an arbitrary belief transformation
         print('Observation:', observation)
         belief.update(observation)
         print('Belief:', belief)

@@ -385,11 +385,17 @@ def create_surface_attachment(world, obj_name, surface_name):
         surface_link = link_from_name(surface_body, surface.link)
     return create_attachment(surface_body, surface_link, body)
 
+def pose_from_attachment(attachment, **kwargs):
+    return RelPose(attachment.child, reference_body=attachment.parent,
+                   reference_link=attachment.parent_link, confs=[attachment], **kwargs)
+
 def create_relative_pose(world, name, surface, **kwargs):
     attachment = create_surface_attachment(world, name, surface)
-    return RelPose(attachment.child, reference_body=attachment.parent,
-                   reference_link=attachment.parent_link, support=surface,
-                   confs=[attachment], **kwargs)
+    return pose_from_attachment(attachment, support=surface, **kwargs)
+
+def create_world_pose(world, name, **kwargs):
+    attachment = create_attachment(world.kitchen, BASE_LINK, world.get_body(name))
+    return pose_from_attachment(attachment, support=None, **kwargs)
 
 class RelPose(object):
 #class RelPose(Pose):

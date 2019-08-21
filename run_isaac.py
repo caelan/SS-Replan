@@ -22,12 +22,12 @@ from isaac_bridge.carter import Carter
 from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta
 from pddlstream.utils import Verbose
 
-from src.deepim import test_deepim
+from src.deepim import test_deepim, DeepIM, RIGHT, SIDES
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
 from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, \
-    SUGAR, INDIGO_COUNTER, TOP_DRAWER
+    SUGAR, INDIGO_COUNTER, TOP_DRAWER, YCB_OBJECTS, CHEEZIT, BOTTOM_DRAWER
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, \
@@ -41,8 +41,15 @@ from src.execution import franka_open_gripper
 def planning_loop(interface):
     args = interface.args
 
-    def observation_fn():
-        interface.localize_all()
+    def observation_fn(belief):
+        assert interface.deepim is not None # TODO: IsaacSim analog
+        if belief.holding is not None:
+            interface.deepim.stop_tracking(belief.holding)
+        rospy.sleep(1.0)
+        for obj in belief.placed:
+            interface.deepim.detect(obj)
+        rospy.sleep(5.0)
+        #interface.localize_all()
         return observe_world(interface)
 
     def transition_fn(belief, commands):
@@ -141,19 +148,23 @@ def simulation_setup(domain, world, args):
 def real_setup(domain, world, args):
     # TODO: detect if lula is active
     observer = RosObserver(domain)
+    deepim = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        SPAM: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
-        SUGAR: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
-        #CHEEZIT: UniformDist([INDIGO_COUNTER, TOP_DRAWER]),
+        SPAM: UniformDist([INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER]),
+        SUGAR: UniformDist([INDIGO_COUNTER]),
+        CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
+    goal_drawer = BOTTOM_DRAWER
     task = Task(world, prior=prior,
                 #goal_holding=[SPAM],
-                #goal_on={SPAM: TOP_DRAWER},
+                #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
-                goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)],  # , 'indigo_drawer_bottom_joint'],
-                #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
+                goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],  # , 'indigo_drawer_bottom_joint'],
+                #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
-                return_init_bq=True, return_init_aq=True)
+                goal_aq=world.carry_conf, #.values,
+                #return_init_aq=True,
+                return_init_bq=True)
 
     if not args.fixed:
         carter = Carter(goal_threshold_tra=0.10,
@@ -163,7 +174,7 @@ def real_setup(domain, world, args):
         robot_entity = domain.get_robot()
         robot_entity.carter_interface = carter
         robot_entity.unsuppress_fixed_bases()
-    return Interface(args, task, observer)
+    return Interface(args, task, observer, deepim=deepim)
 
 
 ################################################################################
@@ -204,15 +215,13 @@ def main():
         domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
         #domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     robot_entity = domain.get_robot()
-    robot_entity.get_motion_interface().remove_obstacle()
-
+    robot_entity.get_motion_interface().remove_obstacle() # TODO: doesn't remove
     robot_entity.suppress_fixed_bases() # Not as much error?
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
     #print(dump_dict(robot_entity))
-
-    test_deepim(domain)
-    return
+    #test_deepim(domain)
+    #return
 
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
     world = World(use_gui=True) # args.visualize)
@@ -220,12 +229,9 @@ def main():
         interface = real_setup(domain, world, args)
     else:
         interface = simulation_setup(domain, world, args)
+    franka_open_gripper(interface)
     #interface.localize_all()
     #interface.update_state()
-    load_prior(interface.task)
-    for side in ['left']:
-        display_kinect(interface, side=side)
-    franka_open_gripper(interface)
     #test_carter(interface)
     #return
 
@@ -237,6 +243,9 @@ def main():
     with LockRenderer(lock=True):
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
+        load_prior(interface.task)
+        for side in SIDES: #[RIGHT]:
+            display_kinect(interface, side=side)
         observe_world(interface)
         if interface.simulation:  # TODO: move to simulation instead?
             set_isaac_sim(interface)

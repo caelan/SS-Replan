@@ -391,6 +391,7 @@ class World(object):
     def get_supporting(self, obj_name):
         # is_placed_on_aabb | is_center_on_aabb
         # Only want to generate stable placements, but can operate on initially unstable ones
+        # TODO: could filter orientation as well
         body = self.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
             body, compute_surface_aabb(self, surface),

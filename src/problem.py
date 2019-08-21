@@ -217,8 +217,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         goal_literals.append(Exists(['?bq'], And(
             ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
 
+        goal_aq = task.goal_aq
         if task.return_init_aq:
             goal_aq = init_aq if are_confs_close(init_aq, world.goal_aq) else world.goal_aq
+        if goal_aq is not None:
             arm_difference_fn = get_difference_fn(world.robot, world.arm_joints)
             if np.less_equal(np.abs(arm_difference_fn(init_aq.values, goal_aq.values)),
                              math.radians(10)*np.ones(len(world.arm_joints))).all():
@@ -275,6 +277,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         surface_link = link_from_name(world.kitchen, surface.link)
         parent_joint = parent_joint_from_link(surface_link)
         if parent_joint not in world.kitchen_joints:
+            # TODO: attach to world frame?
             world_pose = RelPose(world.kitchen, surface_link, init=True)
             initial_poses[surface_name] = world_pose
             init += [
@@ -335,7 +338,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             surface_name = rel_pose.support
             if surface_name is None:
                 # Treats as obstacle
-                world_pose = RelPose(body, init=True)
+                # TODO: could temporarily add to fixed (unless on drawer)
+                world_pose = rel_pose
                 init += [
                     ('WorldPose', obj_name, world_pose),
                     ('AtWorldPose', obj_name, world_pose),

@@ -63,6 +63,8 @@ class DeepIM(object):
             cb = lambda data, s=side, ty=obj_type: self.callback(data, s, ty)
             self.subscribers[side, obj_type] = rospy.Subscriber(
                 topic, PoseStamped, cb, queue_size=1)
+        # TODO: use the pose_fixer topic to send DART a prior
+        # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py#L4
     def callback(self, pose_stamped, side, obj_type):
         #print('Received {} camera detection of {}'.format(side, obj_type))
         self.observations[side, obj_type].append(pose_stamped)
@@ -71,6 +73,7 @@ class DeepIM(object):
             return INF
         pose_stamped = self.observations[side, obj_type][-1]
         current_time = rospy.Time.now() # rospy.get_rostime()
+        # TODO: could call detect with every new observation
         return (current_time - pose_stamped.header.stamp).to_sec()
     def get_recent_observations(self, side, obj_type, duration):
         detections = []
@@ -88,6 +91,12 @@ class DeepIM(object):
         pose_kinect = self.observations[side, obj_type][-1]
         tf_pose = self.tf_listener.transformPose(ISSAC_WORLD_FRAME, pose_kinect)
         return pose_from_tform(make_pose_from_pose_msg(tf_pose))
+    def stop_tracking(self, obj_type):
+        # Nothing happens if already not tracked
+        entity = self.domain.root.entities[obj_type]
+        entity.stop_localizing()
+        #administrator = entity.administrator
+        #administrator.deactivate()
     def detect(self, obj_type):
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
@@ -95,16 +104,17 @@ class DeepIM(object):
         #self.domain.view_tags # {'right': '00', 'left': '01'}
         #dump_dict(self.domain)
         #dump_dict(self.domain.root)
+        #dump_dict(entity)
         entity = self.domain.root.entities[obj_type]
         administrator = entity.administrator
 
-        duration = 10.0
+        duration = 5.0
         expected_detections = duration * DETECTIONS_PER_SEC
         observations = self.get_recent_observations(RIGHT, obj_type, duration)
         print(len(observations), duration, len(observations) / duration)
 
         if len(observations) < 0.5*expected_detections:
-            return
+            return False
         detections_from_frame = {}
         for pose_stamped in observations:
             detections_from_frame.setdefault(pose_stamped.header.frame_id, []).append(pose_stamped)
@@ -123,24 +133,20 @@ class DeepIM(object):
         # TODO: small sleep after each detection to ensure time to converge
         # TODO: wait until DART convergence
 
-        #administrator.detect()
         administrator.activate() # entity.localize()
-        #entity.set_tracked() # entity.is_tracked = True
-        #entity.is_tracked # Doesn't do anything
+        #entity.set_tracked() # entity.is_tracked = True # Doesn't do anything
         #entity.detect() # administrator.detect_once()
-        #dump_dict(entity)
-        for _ in range(1):
+        for _ in range(2):
             rospy.sleep(DETECTIONS_PER_SEC)
             administrator.detect()
         #administrator.is_active
         #administrator.is_detecting
 
-        #entity.stop_localizing()
-
         #entity.is_tracked False
         #entity.last_clock None
         #entity.last_t None
         #entity.location_belief None
+        return True
 
 ################################################################################
 
