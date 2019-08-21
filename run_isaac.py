@@ -8,6 +8,9 @@ import rospy
 import traceback
 import numpy as np
 import math
+import time
+
+from collections import defaultdict
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
@@ -19,7 +22,8 @@ from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
-from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta
+from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, elapsed_time, \
+    get_distance, quat_angle_between, quat_from_pose, point_from_pose
 from pddlstream.utils import Verbose
 
 from src.deepim import test_deepim, DeepIM, RIGHT, SIDES
@@ -31,12 +35,39 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, \
-    load_objects, display_kinect, dump_dict
+    load_objects, display_kinect, dump_dict, update_objects
 from src.world import World
 from run_pybullet import create_parser
 from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 from src.execution import franka_open_gripper
+
+def wait_for_dart_convergence(interface, min_updates=5, timeout=10.0):
+    start_time = time.time()
+    history = defaultdict(list)
+    num_updates = 0
+    while elapsed_time(start_time) < timeout:
+        num_updates += 1
+        print('Update: {} | Time: {}'.format(num_updates, elapsed_time(start_time)))
+        world_state = interface.update_state()
+        observation = update_objects(interface, world_state)
+        # print(observation)
+        for name, pose in observation.items():
+            history[name].extend(pose)
+        if num_updates < min_updates:
+            continue
+        success = True
+        for name in history:
+            if 2 <= len(history[name]):
+                last, current = history[name][-2:]
+                pos_distance = get_distance(point_from_pose(last), point_from_pose(current))
+                ori_distance = math.degrees(quat_angle_between(quat_from_pose(last), quat_from_pose(current)))
+                print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(
+                    name, pos_distance, ori_distance))
+                success &= (pos_distance <= 0.005) and (ori_distance <= 5)
+        if success:
+            return True
+    return False
 
 def planning_loop(interface):
     args = interface.args
@@ -50,7 +81,10 @@ def planning_loop(interface):
         rospy.sleep(1.0)
         for obj in belief.placed:
             interface.deepim.detect(obj)
-        rospy.sleep(5.0)
+        start_time = time.time()
+        converged = wait_for_dart_convergence(interface)
+        print('Stabilized: {} | Time: {:.3f}'.format(converged, elapsed_time(start_time)))
+        #rospy.sleep(5.0)
         # Wait until convergence
         #interface.localize_all()
         return observe_world(interface)

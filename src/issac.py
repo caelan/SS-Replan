@@ -282,6 +282,7 @@ def detect_classes():
 
 def update_kitchen(world, world_state):
     position_from_joint = {}
+    # TODO: identify why the indigo bottom cabinets open
     for name, entity in world_state.entities.items():
         if isinstance(entity, RobotArm) or isinstance(entity, FloatingRigidBody):
             continue
@@ -322,7 +323,6 @@ def update_objects(interface, world_state):
         print('Visible:', sorted(visible))
     else:
         visible = set(world_state.entities.keys())
-    world_aabb = world.get_world_aabb()
     observation = {}
     for name, entity in world_state.entities.items():
         # entity.obj_type, entity.semantic_frames
@@ -341,8 +341,7 @@ def update_objects(interface, world_state):
                 # pose = pose_from_tform(entity.pose)
             else:
                 pose = NULL_POSE  # TODO: modify world_state directly?
-            if aabb_contains_point(point_from_pose(pose), world_aabb):
-                observation.setdefault(name, []).append(pose)
+            observation.setdefault(name, []).append(pose)
         elif isinstance(entity, Drawer):
             continue
         elif isinstance(entity, RigidBody):

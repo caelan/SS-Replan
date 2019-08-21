@@ -13,7 +13,7 @@ from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from brain_ros.ros_world_state import make_pose_from_pose_msg
 from lula_dartpy.object_administrator import ObjectAdministrator
 
-from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_difference, quat_from_pose, \
+from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_distance, quat_from_pose, \
     quat_angle_between
 from src.issac import ISSAC_WORLD_FRAME, CAMERA_PREFIX
 from src.parse_brain import SUGAR, YCB_OBJECTS, SPAM
@@ -126,7 +126,7 @@ class DeepIM(object):
         assert len(detections_from_frame) == 1
         poses = [pose_from_tform(make_pose_from_pose_msg(pose_stamped)) for pose_stamped in observations]
         points = [point_from_pose(pose) for pose in poses]
-        pos_deviation = np.mean([get_difference(*pair) for pair in combinations(points, r=2)])
+        pos_deviation = np.mean([get_distance(*pair) for pair in combinations(points, r=2)])
         quats = [quat_from_pose(pose) for pose in poses]
         ori_deviation = np.mean([quat_angle_between(*pair) for pair in combinations(quats, r=2)])
         print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(
@@ -140,9 +140,10 @@ class DeepIM(object):
         administrator.activate() # entity.localize()
         #entity.set_tracked() # entity.is_tracked = True # Doesn't do anything
         #entity.detect() # administrator.detect_once()
-        for _ in range(2):
-            rospy.sleep(DETECTIONS_PER_SEC)
-            administrator.detect()
+        administrator.detect_and_wait()
+        #for _ in range(1):
+        #    rospy.sleep(DETECTIONS_PER_SEC)
+        #    administrator.detect()
         #administrator.is_active
         #administrator.is_detecting
 
