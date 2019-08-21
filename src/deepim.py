@@ -15,7 +15,7 @@ from lula_dartpy.object_administrator import ObjectAdministrator
 
 from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_difference, quat_from_pose, \
     quat_angle_between
-from src.issac import ISSAC_WORLD_FRAME
+from src.issac import ISSAC_WORLD_FRAME, CAMERA_PREFIX
 from src.parse_brain import SUGAR, YCB_OBJECTS, SPAM
 
 PREFIX_TEMPLATE = '{:02d}'
@@ -28,8 +28,8 @@ KINECT_FROM_SIDE = {
     'right': KINECT_TEMPLATE.format(1), # indexes from 1!
     'left': KINECT_TEMPLATE.format(2),
 }
-DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
-#DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']
+#DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
+DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']
 POSECNN_POSE_TEMPLATE = '/objects/prior_pose/{}_{}/decayable_weight'
 
 RIGHT = 'right'
@@ -46,6 +46,8 @@ DETECTIONS_PER_SEC = 0.6 # /deepim/raw/objects/prior_pose
 # TODO: it looks like DeepIM publishes each pose individually
 
 ################################################################################
+
+# TODO: use the confidences that Chris added
 
 class DeepIM(object):
     def __init__(self, domain, sides=[], obj_types=[]):
@@ -67,6 +69,8 @@ class DeepIM(object):
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py#L4
     def callback(self, pose_stamped, side, obj_type):
         #print('Received {} camera detection of {}'.format(side, obj_type))
+        if not pose_stamped.header.frame_id.startswith(CAMERA_PREFIX):
+            return
         self.observations[side, obj_type].append(pose_stamped)
     def last_detected(self, side, obj_type):
         if not self.observations[side, obj_type]:
@@ -111,14 +115,14 @@ class DeepIM(object):
         duration = 5.0
         expected_detections = duration * DETECTIONS_PER_SEC
         observations = self.get_recent_observations(RIGHT, obj_type, duration)
-        print(len(observations), duration, len(observations) / duration)
-
+        print('{}) observations={}, duration={}, rate={}'.format(
+            obj_type, len(observations), duration, len(observations) / duration))
         if len(observations) < 0.5*expected_detections:
             return False
         detections_from_frame = {}
         for pose_stamped in observations:
             detections_from_frame.setdefault(pose_stamped.header.frame_id, []).append(pose_stamped)
-        print('Frames:', detections_from_frame.keys())
+        #print('Frames:', detections_from_frame.keys())
         assert len(detections_from_frame) == 1
         poses = [pose_from_tform(make_pose_from_pose_msg(pose_stamped)) for pose_stamped in observations]
         points = [point_from_pose(pose) for pose in poses]

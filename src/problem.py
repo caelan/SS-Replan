@@ -10,7 +10,7 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    get_difference_fn
+    get_difference_fn, euler_from_quat, quat_from_pose
 
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
@@ -26,6 +26,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test
 from src.database import has_place_database
 
+MAX_ERROR = np.pi / 4
 
 def existential_quantification(goal_literals):
     # TODO: merge with pddlstream-experiments
@@ -321,24 +322,29 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         init += [
             ('Entity', obj_name),
             ('Obstacle', obj_name),
-            ('Graspable', obj_name),
             ('CheckNearby', obj_name),
         ] + [('Stackable', obj_name, counter) for counter in set(ALL_SURFACES) & set(COUNTERS)]
 
     # TODO: track poses over time to produce estimates
     for obj_name, pose_dist in belief.pose_dists.items():
-        body = world.get_body(obj_name)
         dist_support = pose_dist.dist.support()
         localized = (len(dist_support) == 1)
         if localized:
             init.append(('Localized', obj_name))
+            [rel_pose] = dist_support
+            roll, pitch, yaw = euler_from_quat(quat_from_pose(rel_pose.get_reference_from_body()))
+            if (abs(roll) <= MAX_ERROR) and (abs(pitch) <= MAX_ERROR):
+                init.append(('Graspable', obj_name))
+            else:
+                print('{} has an invalid orientation: roll={:.3f}, pitch={:.3f}'.format(obj_name, roll, pitch))
+
         # Could also fully decompose into points (but many samples)
         # Could immediately add likely points for collision checking
         for rel_pose in (dist_support if localized else pose_dist.decompose()):
             surface_name = rel_pose.support
             if surface_name is None:
                 # Treats as obstacle
-                # TODO: could temporarily add to fixed (unless on drawer)
+                # TODO: could temporarily add to fixed
                 world_pose = rel_pose
                 init += [
                     ('WorldPose', obj_name, world_pose),

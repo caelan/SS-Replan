@@ -211,7 +211,9 @@ def transition_belief_update(belief, plan):
         elif action == 'place':
             o, p, g, rp = params[:4]
             belief.grasped = None
-            belief.pose_dists[o] = PoseDist(belief.world, o, DeltaDist(rp))
+            dist = DeltaDist(rp)
+            #dist = UniformDist([rp]) # TODO: add a copy of rp to allow uncertainty
+            belief.pose_dists[o] = PoseDist(belief.world, o, dist)
         elif action == 'cook':
             pass
         else:

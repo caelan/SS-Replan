@@ -6,8 +6,7 @@ import random
 
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import get_pose, point_from_pose, Ray, batch_ray_collision, has_gui, add_line, BLUE, \
-    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose, \
-    wait_for_user, WorldSaver, quat_from_pose, euler_from_quat
+    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose
 from src.utils import CAMERA_MATRIX, KINECT_DEPTH, create_relative_pose, create_world_pose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
@@ -15,7 +14,6 @@ OBS_P_FP, OBS_P_FN = 0.0, 0.0
 OBS_POS_STD, OBS_ORI_STD = 0., 0.
 ELSEWHERE = None # symbol for elsewhere pose
 
-MAX_ERROR = np.pi / 4
 
 ################################################################################
 
@@ -101,13 +99,8 @@ def relative_detections(belief, detections):
             continue
         body = world.get_body(name)
         for observed_pose in detections[name]:
-            support = None
             set_pose(body, observed_pose)
-            roll, pitch, yaw = euler_from_quat(quat_from_pose(observed_pose))
-            if (abs(roll) <= MAX_ERROR) and (abs(pitch) <= MAX_ERROR):
-                support = world.get_supporting(name)
-            else:
-                print('{} has an invalid orientation: roll={:.3f}, pitch={:.3f}'.format(name, roll, pitch))
+            support = world.get_supporting(name)
             #assert support is not None
             # Could also fix as relative to the world
             if support is None:

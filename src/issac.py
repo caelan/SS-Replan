@@ -200,6 +200,8 @@ def check_limits(world, entity):
 
 ################################################################################
 
+CAMERA_PREFIX = 'depth_camera'
+
 def display_kinect(interface, side):
     world = interface.world
     observer = interface.observer
@@ -221,7 +223,7 @@ def display_kinect(interface, side):
             camera_frame = ISSAC_PREFIX + camera_name
         else:
             camera_name = 'kinect1'
-            camera_frame = 'depth_camera' # depth_camera_2
+            camera_frame = CAMERA_PREFIX # depth_camera_2
             #camera_frame = '{}_link'.format(camera_name)
         print('Received camera info from camera', camera_name)
 
