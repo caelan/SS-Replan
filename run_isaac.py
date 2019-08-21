@@ -9,6 +9,8 @@ import traceback
 import numpy as np
 import math
 
+from itertools import combinations
+
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
@@ -19,7 +21,8 @@ from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
-from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, INF, pose_from_tform
+from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, INF, pose_from_tform, \
+    point_from_pose, quat_from_pose, quat_angle_between, get_difference
 from pddlstream.utils import Verbose
 
 from src.policy import run_policy
@@ -30,7 +33,7 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, \
-    load_prior, display_kinect, ISSAC_WORLD_FRAME
+    load_prior, display_kinect, ISSAC_WORLD_FRAME, dump_dict
 from src.world import World
 from run_pybullet import create_parser
 from src.planner import simulate_plan
@@ -148,7 +151,7 @@ def real_setup(domain, world, args):
     }
     task = Task(world, prior=prior,
                 #goal_holding=[SPAM],
-                goal_on={SPAM: TOP_DRAWER},
+                #goal_on={SPAM: TOP_DRAWER},
                 #goal_closed=[],
                 goal_closed=[JOINT_TEMPLATE.format(TOP_DRAWER)],  # , 'indigo_drawer_bottom_joint'],
                 #goal_open=[JOINT_TEMPLATE.format(TOP_DRAWER)],
@@ -186,7 +189,8 @@ KINECT_FROM_SIDE = {
     'left': KINECT_TEMPLATE.format(2),
 }
 
-DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}'
+DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
+#DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']
 POSECNN_POSE_TEMPLATE = '/objects/prior_pose/{}_{}/decayable_weight'
 # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
 
@@ -199,8 +203,15 @@ from brain_ros.ros_world_state import make_pose_from_pose_msg
 import tf
 # TODO: it looks like DeepIM publishes each pose individually
 
+# Detection time
+# min 0.292s max: 0.570s
+
+#DETECTIONS_PER_SEC = 2.5 # /objects/prior_pose/
+DETECTIONS_PER_SEC = 0.6 # /deepim/raw/objects/prior_pose
+
 class DeepIM(object):
-    def __init__(self, sides=[], obj_types=[]):
+    def __init__(self, domain, sides=[], obj_types=[]):
+        self.domain = domain
         self.sides = tuple(sides)
         self.obj_types = tuple(obj_types)
         self.tf_listener = tf.TransformListener()
@@ -223,6 +234,15 @@ class DeepIM(object):
         pose_stamped = self.observations[side, obj_type][-1]
         current_time = rospy.Time.now() # rospy.get_rostime()
         return (current_time - pose_stamped.header.stamp).to_sec()
+    def get_recent_observations(self, side, obj_type, duration):
+        detections = []
+        current_time = rospy.Time.now() # rospy.get_rostime()
+        for pose_stamped in self.observations[side, obj_type][::-1]:
+            time_passed = (current_time - pose_stamped.header.stamp).to_sec()
+            if duration < time_passed:
+                break
+            detections.append(pose_stamped)
+        return detections
     def last_world_pose(self, side, obj_type):
         if not self.observations[side, obj_type]:
             return None
@@ -230,6 +250,56 @@ class DeepIM(object):
         pose_kinect = self.observations[side, obj_type][-1]
         tf_pose = self.tf_listener.transformPose(ISSAC_WORLD_FRAME, pose_kinect)
         return pose_from_tform(make_pose_from_pose_msg(tf_pose))
+    def detect(self, obj_type):
+        # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
+        # https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
+        #self.domain.entities
+        #self.domain.view_tags # {'right': '00', 'left': '01'}
+        #dump_dict(self.domain)
+        #dump_dict(self.domain.root)
+        entity = self.domain.root.entities[obj_type]
+        administrator = entity.administrator
+
+        duration = 10.0
+        expected_detections = duration * DETECTIONS_PER_SEC
+        observations = self.get_recent_observations(RIGHT, obj_type, duration)
+        print(len(observations), duration, len(observations) / duration)
+
+        if len(observations) < 0.5*expected_detections:
+            return
+        detections_from_frame = {}
+        for pose_stamped in observations:
+            detections_from_frame.setdefault(pose_stamped.header.frame_id, []).append(pose_stamped)
+        print('Frames:', detections_from_frame.keys())
+        assert len(detections_from_frame) == 1
+        poses = [pose_from_tform(make_pose_from_pose_msg(pose_stamped)) for pose_stamped in observations]
+        points = [point_from_pose(pose) for pose in poses]
+        pos_deviation = np.mean([get_difference(*pair) for pair in combinations(points, r=2)])
+        quats = [quat_from_pose(pose) for pose in poses]
+        ori_deviation = np.mean([quat_angle_between(*pair) for pair in combinations(quats, r=2)])
+        print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(
+            obj_type, pos_deviation, np.math.degrees(ori_deviation)))
+        # TODO: symmetries
+        # TODO: prune if not on surface
+        # TODO: prune if incorrect orientation
+        # TODO: small sleep after each detection to ensure time to converge
+
+        administrator.activate() # entity.localize()
+        #entity.set_tracked() # entity.is_tracked = True
+        #entity.is_tracked # Doesn't do anything
+        #entity.detect() # administrator.detect_once()
+        #dump_dict(entity)
+        administrator.detect()
+        #administrator.is_active
+        #administrator.is_detecting
+
+        #entity.stop_localizing()
+
+        #entity.is_tracked False
+        #entity.last_clock None
+        #entity.last_t None
+        #entity.location_belief None
+
 
 def detect_classes():
     from sensor_msgs.msg import Image
@@ -276,11 +346,11 @@ def detect_classes():
     print('Detections:', detections[-1])
     return detections[-1]
 
-def test_deepim():
+def test_deepim(domain):
     # # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
     from lula_dartpy.object_administrator import ObjectAdministrator
 
-    deepim = DeepIM(sides=[RIGHT], obj_types=YCB_OBJECTS)
+    deepim = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
 
     side = 'right'
     prefix = PREFIX_FROM_SIDE[side]
@@ -290,6 +360,13 @@ def test_deepim():
     administrator = ObjectAdministrator(
         base_frame, wait_for_connection=True)  # wait_for_connection=False
     print(administrator.is_active, administrator.is_detecting)
+
+    rospy.sleep(2.0)
+    deepim.detect(SUGAR)
+    deepim.detect(SPAM)
+
+    rospy.spin()
+    return
 
     rate = rospy.Rate(1000)
     while INF <= deepim.last_detected(side, obj_type):
@@ -351,8 +428,6 @@ def main():
 
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/brain/src/brain_ros/lula_policies.py#L464
     rospy.init_node("STRIPStream")
-    #test_deepim()
-    #return
 
     with Verbose(False):
         domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
@@ -364,6 +439,9 @@ def main():
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
     #print(dump_dict(robot_entity))
+
+    test_deepim(domain)
+    return
 
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
     world = World(use_gui=True) # args.visualize)
@@ -450,3 +528,23 @@ if __name__ == '__main__':
 # /franka_control/set_joint_impedance
 # srl@vgilligan:~/srl_system/workspace/src/third_party/franka_controllers/scripts
 # rosed franka_controllers set_parameters
+
+# /objects/prior_pose/00_potted_meat_can (geometry_msgs/PoseStamped)
+# /objects/prior_pose/00_potted_meat_can/attachment (geometry_msgs/PoseStamped)
+# /objects/prior_pose/00_potted_meat_can/attachment/decayable_weight (lula_dart/DecayableWeight)
+# /objects/prior_pose/00_potted_meat_can/attachment/regulator (lula_dart/ModelPosePriorRegulator)
+# /objects/prior_pose/00_potted_meat_can/attachment/status (lula_dart/ModelPosePriorStatus)
+# /objects/prior_pose/00_potted_meat_can/attachment/weight
+# /objects/prior_pose/00_potted_meat_can/attachment/weight/status
+# /objects/prior_pose/00_potted_meat_can/decayable_weight
+# /objects/prior_pose/00_potted_meat_can/heartbeat (std_msgs/String)
+# /objects/prior_pose/00_potted_meat_can/inertia (geometry_msgs/PoseStamped)
+# /objects/prior_pose/00_potted_meat_can/inertia/decayable_weight
+# /objects/prior_pose/00_potted_meat_can/inertia/regulator
+# /objects/prior_pose/00_potted_meat_can/inertia/status
+# /objects/prior_pose/00_potted_meat_can/inertia/weight
+# /objects/prior_pose/00_potted_meat_can/inertia/weight/status
+# /objects/prior_pose/00_potted_meat_can/regulator
+# /objects/prior_pose/00_potted_meat_can/status
+# /objects/prior_pose/00_potted_meat_can/weight
+# /objects/prior_pose/00_potted_meat_can/weight/status
