@@ -310,6 +310,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         grasp = belief.grasped
         init += [
             # Static
+            ('Graspable', obj_name),
             ('Grasp', obj_name, grasp),
             ('IsGraspType', obj_name, grasp, grasp.grasp_type),
             # Fluent

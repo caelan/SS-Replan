@@ -190,16 +190,18 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     deepim = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
     goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior,
+                goal_detected=[SPAM],
                 #goal_holding=[SPAM], # TODO: why is this failing?
-                goal_on={SPAM: goal_drawer},
+                #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
-                goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
+                #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
