@@ -168,8 +168,12 @@ class World(object):
                             urdf_string=read(urdf_path))
         lower, upper = self.ik_solver.get_joint_limits()
         buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
-        buffer[-1] *= 2
-        self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
+        lower, upper = lower + buffer, upper - buffer
+        max_joint_7 = 1.89 # 1.891
+        lower[6] = -max_joint_7
+        upper[6] = +max_joint_7
+        #buffer[-1] *= 2
+        self.ik_solver.set_joint_limits(lower, upper)
 
     def _update_initial(self):
         # TODO: store initial poses as well?
@@ -382,7 +386,7 @@ class World(object):
 
     def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH):
         body = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
-                                          color=apply_alpha(RED, 0.1))
+                            color=apply_alpha(RED, 0.1), mass=0, collision=False)
         self.cameras[name] = Camera(body, camera_matrix, max_depth)
         set_pose(body, pose)
         step_simulation()
@@ -391,6 +395,7 @@ class World(object):
     def get_supporting(self, obj_name):
         # is_placed_on_aabb | is_center_on_aabb
         # Only want to generate stable placements, but can operate on initially unstable ones
+        # TODO: could filter orientation as well
         body = self.get_body(obj_name)
         supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
             body, compute_surface_aabb(self, surface),
@@ -418,7 +423,6 @@ class World(object):
         new_z = stable_z_on_aabb(body, surface_aabb)
         point = Point(x, y, new_z)
         set_point(body, point)
-        # TODO: rotate objects that are symmetrical about xy 180 to ensure the start upright
         print('{} error: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
             name, roll, pitch, new_z - z))
         new_pose = (point, quat)

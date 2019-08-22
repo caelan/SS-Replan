@@ -6,13 +6,14 @@ import random
 
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import get_pose, point_from_pose, Ray, batch_ray_collision, has_gui, add_line, BLUE, \
-    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose, wait_for_user, WorldSaver
-from src.utils import CAMERA_MATRIX, KINECT_DEPTH, create_relative_pose
+    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose, aabb_contains_point, tform_point, angle_between
+from src.utils import CAMERA_MATRIX, KINECT_DEPTH, create_relative_pose, create_world_pose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
 #OBS_POS_STD, OBS_ORI_STD = 0.01, np.pi / 8
 OBS_POS_STD, OBS_ORI_STD = 0., 0.
 ELSEWHERE = None # symbol for elsewhere pose
+
 
 ################################################################################
 
@@ -91,17 +92,26 @@ def fix_detections(belief, detections):
 def relative_detections(belief, detections):
     world = belief.world
     rel_detections = {}
+    world_aabb = world.get_world_aabb()
     for name in detections:
         if name == belief.holding:
             continue
         body = world.get_body(name)
         for observed_pose in detections[name]:
+            world_z_axis = np.array([0, 0, 1])
+            local_z_axis = tform_point(observed_pose, world_z_axis)
+            if np.pi/2 < angle_between(world_z_axis, local_z_axis):
+                observed_pose = multiply(observed_pose, Pose(euler=Euler(roll=np.pi)))
+            if not aabb_contains_point(point_from_pose(observed_pose), world_aabb):
+                continue
             set_pose(body, observed_pose)
             support = world.get_supporting(name)
             #assert support is not None
-            if support is not None:
-                # Could also fix as relative to the world
-                relative_pose = create_relative_pose(world, name, support, init=False)
-                rel_detections.setdefault(name, []).append(relative_pose)
-                # relative_pose.assign()
+            # Could also fix as relative to the world
+            if support is None:
+                relative_pose = create_world_pose(world, name, init=True)
+            else:
+                relative_pose = create_relative_pose(world, name, support, init=True)
+            rel_detections.setdefault(name, []).append(relative_pose)
+            # relative_pose.assign()
     return rel_detections

@@ -22,6 +22,7 @@ YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
 ECHO_COUNTER = 'echo'
 INDIGO_COUNTER = 'indigo_tmp'
 TOP_DRAWER = 'indigo_drawer_top'
+BOTTOM_DRAWER = 'indigo_drawer_bottom'
 
 ################################################################################
 

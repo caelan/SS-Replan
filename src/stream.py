@@ -15,7 +15,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     set_renderer, get_movable_joints, INF, apply_affine
 #from pddlstream.algorithms.downward import MAX_FD_COST, get_cost_scale
 
-from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, Detect
+from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
+    Detect, AttachGripper
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
@@ -172,8 +173,11 @@ def move_occluding(world, ray, obj_name):  # TODO: detect instead of ray
         set_pose(world.get_body(name), Pose(Point(z=-5.0)))
 
 def get_ofree_ray_pose_test(world, **kwargs):
+    # TODO: detect the configuration of joints
     def test(ray, obj_name, pose):
         if ray.name == obj_name:
+            return True
+        if isinstance(pose, SurfaceDist):
             return True
         # TODO: some of the rays clip the top of objects. Might be related to the slight z translation
         ray.pose.assign()
@@ -543,7 +547,7 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
         ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
         finger_cmd.commands[0],
         Detach(world, attachment.parent, attachment.parent_link, attachment.child),
-        Attach(world, world.robot, world.tool_link, obj_body, grasp=grasp),
+        AttachGripper(world, obj_body, grasp=grasp),
         ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
     ], name='pick')
     yield (aq, cmd,)
@@ -621,6 +625,7 @@ def get_handle_grasps(world, joint, pre_distance=APPROACH_DISTANCE):
     #half_extent = 1.0*FINGER_EXTENT[2] # Collides
     half_extent = 1.1*FINGER_EXTENT[2]
 
+    # TODO: move closer if performing a push rather than a pull
     grasps = []
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
@@ -643,6 +648,7 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, tel
     door_path = [door_conf1.values] + list(door_extend_fn(door_conf1.values, door_conf2.values))
     if teleport:
         door_path = [door_conf1.values, door_conf2.values]
+    # TODO: open until collision for the drawers
 
     # door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
     for handle_grasp in get_handle_grasps(world, door_joint):
@@ -756,7 +762,6 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     gripper_conf = FConf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
-
     commands = [
         ApproachTrajectory(world, world.robot, world.arm_joints, approach_paths[0]),
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
@@ -789,6 +794,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
             world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
                       if is_pull_safe(world, door_joint, door_plan, obstacles)]
         if not door_plans:
+            print('Unable to open door {} at fixed config'.format(joint_name))
             return
         while True:
             for i in range(max_attempts):

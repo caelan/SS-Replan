@@ -37,6 +37,7 @@ from src.utils import create_relative_pose, RelPose
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
 
 MIN_GRASP_WIDTH = 0.005
+REPAIR_DETECTIONS = False
 
 ################################################################################
 
@@ -48,19 +49,25 @@ class Belief(object):
         self.world = world
         self.pose_dists = pose_dists
         self.grasped = grasped # grasped or holding?
-        self.color_from_name = dict(zip(self.names, spaced_colors(len(self.names))))
+        self.color_from_name = dict(zip(self.objects, spaced_colors(len(self.objects))))
         self.observations = []
         self.handles = []
         # TODO: belief fluents
         # TODO: report grasp failure if gripper is ever fully closed
     @property
-    def names(self):
-        return sorted(self.pose_dists)
-    @property
     def holding(self):
         if self.grasped is None:
             return None
         return self.grasped.body_name
+    @property
+    def placed(self):
+        return sorted(set(self.pose_dists.keys()))
+    @property
+    def objects(self):
+        objects = set(self.placed)
+        if self.holding is not None:
+            objects.add(self.holding)
+        return sorted(objects)
     def is_gripper_closed(self):
         current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
         gripper_width = sum(current_gq)
@@ -86,7 +93,8 @@ class Belief(object):
         # Instead, let the moving object take on different poses
         with LockRenderer():
             with WorldSaver():
-                #detections = fix_detections(self, detections) # TODO: skip if in sim
+                if REPAIR_DETECTIONS:
+                    detections = fix_detections(self, detections) # TODO: skip if in sim
                 detections = relative_detections(self, detections)
                 order = [name for name in detections]  # Detected
                 order.extend(set(self.pose_dists) - set(order))  # Not detected
@@ -137,7 +145,7 @@ class Belief(object):
                             color=self.color_from_name[name], **kwargs))
     def __repr__(self):
         return '{}(holding={}, placed={})'.format(self.__class__.__name__, self.holding, str_from_object(
-            {name: self.pose_dists[name].surface_dist for name in self.names}))
+            {name: self.pose_dists[name].surface_dist for name in self.placed}))
 
 ################################################################################
 
@@ -203,7 +211,9 @@ def transition_belief_update(belief, plan):
         elif action == 'place':
             o, p, g, rp = params[:4]
             belief.grasped = None
-            belief.pose_dists[o] = PoseDist(belief.world, o, DeltaDist(rp))
+            dist = DeltaDist(rp)
+            #dist = UniformDist([rp]) # TODO: add a copy of rp to allow uncertainty
+            belief.pose_dists[o] = PoseDist(belief.world, o, dist)
         elif action == 'cook':
             pass
         else:

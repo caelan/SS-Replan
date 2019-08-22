@@ -13,6 +13,8 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
+from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
+from brain_ros.ros_world_state import make_pose
 
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
@@ -120,7 +122,6 @@ def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
 
 
 def lookup_pose(tf_listener, source_frame, target_frame=ISSAC_WORLD_FRAME):
-    from brain_ros.ros_world_state import make_pose
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/sim_test_tools.py
     try:
@@ -142,7 +143,8 @@ def update_robot_conf(interface, entity=None):
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/ea286e95d3e2d46ff5a3389085beb4f9f3fc3f84/packages/brain/src/brain_ros/ros_world_state.py#L494
     # Update joint positions
     if entity is None:
-        entity = interface.update_state().entities[interface.domain.robot]
+        world_state = interface.update_state()
+        entity = world_state.entities[interface.domain.robot]
     world = interface.world
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
@@ -200,6 +202,8 @@ def check_limits(world, entity):
 
 ################################################################################
 
+CAMERA_PREFIX = 'depth_camera'
+
 def display_kinect(interface, side):
     world = interface.world
     observer = interface.observer
@@ -221,7 +225,7 @@ def display_kinect(interface, side):
             camera_frame = ISSAC_PREFIX + camera_name
         else:
             camera_name = 'kinect1'
-            camera_frame = 'depth_camera' # depth_camera_2
+            camera_frame = CAMERA_PREFIX # depth_camera_2
             #camera_frame = '{}_link'.format(camera_name)
         print('Received camera info from camera', camera_name)
 
@@ -277,7 +281,31 @@ def detect_classes():
 
 ################################################################################
 
-def load_prior(task):
+def update_kitchen(world, world_state):
+    position_from_joint = {}
+    for name, entity in world_state.entities.items():
+        if isinstance(entity, RobotArm) or isinstance(entity, FloatingRigidBody):
+            continue
+        elif isinstance(entity, Drawer):
+            # https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
+            # TODO: ArticulatedRigidBody, Drawer
+            # /tracker/axe/joint_states
+            # /tracker/baker/joint_states
+            joint = joint_from_name(world.kitchen, entity.joint_name)
+            set_joint_position(world.kitchen, joint, entity.q)
+            position_from_joint[entity.joint_name] = entity.q
+            #entity.closed_dist
+            #entity.open_dist
+        elif isinstance(entity, RigidBody):
+            # TODO: indigo_countertop does not exist
+            print("Warning! {} was not processed".format(name))
+        else:
+            raise NotImplementedError(entity.__class__)
+    return position_from_joint
+
+################################################################################
+
+def load_objects(task):
     world = task.world
     for name in task.objects:
         #if name in world.body_from_name:
@@ -287,57 +315,54 @@ def load_prior(task):
         set_pose(body, NULL_POSE)
         draw_pose(unit_pose(), parent=body)
 
-def observe_world(interface):
-    from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
-    #dump_dict(world_state)
-    #print(world_state.get_frames())
-    # Using state is nice because it applies noise
-
+def update_objects(interface, world_state, visible=set()):
+    # domain.entities
     world = interface.world
-    world_state = interface.update_state()
-    print('Entities:', sorted(world_state.entities))
-    #world.reset()
-    if interface.simulation and not interface.observable:
-        visible = detect_classes()
-    else:
-        visible = set(world_state.entities.keys())
+    if interface.simulation:
+        if interface.observable:
+            visible = set(world_state.entities.keys())
+        else:
+            visible = detect_classes()
     print('Visible:', sorted(visible))
-
-    update_robot(interface)
-    world_aabb = world.get_world_aabb()
     observation = {}
     for name, entity in world_state.entities.items():
-        #entity.obj_type, entity.semantic_frames
+        # entity.obj_type, entity.semantic_frames
         if isinstance(entity, RobotArm):
-            pass
-        elif isinstance(entity, FloatingRigidBody): # Must come before RigidBody
+            continue
+        elif isinstance(entity, FloatingRigidBody):  # Must come before RigidBody
             # entity.is_tracked, entity.location_belief, entity.view
             if name not in world.task.objects:
                 # TODO: discard/correct later in the pipeline
                 continue
-            #entity.obj_type
-            if (visible is None) or (name in visible):
+            # entity.obj_type
+            if name in visible:
                 frame_name = ISSAC_PREFIX + name
                 pose = lookup_pose(interface.observer.tf_listener, frame_name)
-                #pose = get_world_from_model(observer, entity, body)
-                #pose = pose_from_tform(entity.pose)
+                # pose = get_world_from_model(observer, entity, body)
+                # pose = pose_from_tform(entity.pose)
             else:
-                pose = NULL_POSE  # TODO: modify world_state directly?
-            if aabb_contains_point(point_from_pose(pose), world_aabb):
-                observation.setdefault(name, []).append(pose)
+                #pose = NULL_POSE  # TODO: modify world_state directly?
+                continue
+            observation.setdefault(name, []).append(pose)
         elif isinstance(entity, Drawer):
-            # /tracker/axe/joint_states
-            # /tracker/baker/joint_states
-            joint = joint_from_name(world.kitchen, entity.joint_name)
-            set_joint_position(world.kitchen, joint, entity.q)
-            #entity.closed_dist
-            #entity.open_dist
+            continue
         elif isinstance(entity, RigidBody):
             # TODO: indigo_countertop does not exist
             print("Warning! {} was not processed".format(name))
         else:
             raise NotImplementedError(entity.__class__)
     return observation
+
+def observe_world(interface, **kwargs):
+    #dump_dict(world_state)
+    #print(world_state.get_frames())
+    # Using state is nice because it applies noise
+    world_state = interface.update_state()
+    print('Entities:', sorted(world_state.entities))
+    #world.reset()
+    update_robot(interface)
+    print('Kitchen joints:', update_kitchen(interface.world, world_state))
+    return update_objects(interface, world_state, **kwargs)
 
 ################################################################################
 

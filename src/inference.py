@@ -26,7 +26,7 @@ MODEL_POS_STD, MODEL_ORI_STD = 0.01, np.pi / 8
 DIM = 2
 assert DIM in (2, 3)
 
-NUM_PARTICLES = 150 # 100 | 250
+NUM_PARTICLES = 100 # 100 | 250
 NEARBY_RADIUS = 5e-2
 Neighborhood = namedtuple('Neighborhood', ['poses', 'prob'])
 

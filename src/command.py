@@ -23,6 +23,13 @@ FORCE = 50 # 20 | 50 | 100
 CARTER_X = 33.1
 CARTER_Y = 7.789
 
+EFFORT_FROM_OBJECT = {
+    'potted_meat_can': 60,
+    'tomato_soup_can': 60,
+    'sugar_box': 40,
+    'cracker_box': 40,
+}
+
 class State(object):
     # TODO: rename to be world state?
     def __init__(self, world, savers=[], attachments=[]):
@@ -67,21 +74,16 @@ def create_state(world):
 class Command(object):
     def __init__(self, world):
         self.world = world
-
     #@property
     #def robot(self):
     #    return self.world.robot
-
     @property
     def bodies(self):
         raise NotImplementedError()
-
     def reverse(self):
         raise NotImplementedError()
-
     def iterate(self, state):
         raise NotImplementedError()
-
     def execute(self, interface):
         raise NotImplementedError()
 
@@ -111,21 +113,17 @@ class Trajectory(Command):
         self.joints = tuple(joints)
         self.path = tuple(path)
         self.speed = speed
-
     @property
     def bodies(self):
         # TODO: decompose into dependents and moving?
         return flatten_links(self.robot, get_moving_links(self.robot, self.joints))
-
     def reverse(self):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
-
     def iterate(self, state):
         #time_parameterization(self.robot, self.joints, self.path)
         for positions in self.path:
             set_joint_positions(self.robot, self.joints, positions)
             yield
-
     def execute_base(self, interface):
         assert self.joints == self.world.base_joints
         # assert not moveit.use_lula
@@ -160,6 +158,7 @@ class Trajectory(Command):
             # carter.simple_stop()
             world_state[domain.robot].unsuppress_fixed_bases()
             # carter.pub_disable_deadman_switch.publish(True)
+        return True
 
     def execute_gripper(self, interface):
         assert self.joints == self.world.gripper_joints
@@ -171,18 +170,19 @@ class Trajectory(Command):
             franka_close_gripper(interface)
         else:
             franka_open_gripper(interface)
+        return True
 
     def execute(self, interface):
         # TODO: ensure the same joint name order
         if self.joints == self.world.base_joints:
-            self.execute_base(interface)
+            success = self.execute_base(interface)
         elif self.joints == self.world.gripper_joints:
-            self.execute_gripper(interface)
+            success = self.execute_gripper(interface)
         else:
-            franka_control(self.robot, self.joints, self.path, interface)
+            success = franka_control(self.robot, self.joints, self.path, interface)
         #status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         time.sleep(DEFAULT_SLEEP)
-        #return status
+        return success
 
         # if self.joints == self.world.arm_joints:
         #    #world_state = observer.current_state
@@ -199,11 +199,9 @@ class ApproachTrajectory(Trajectory):
     def __init__(self, *args, **kwargs):
         super(ApproachTrajectory, self).__init__(*args, **kwargs)
         assert self.joints == self.world.arm_joints
-
     def execute(self, interface):
-        super(ApproachTrajectory, self).execute(interface)
+        return super(ApproachTrajectory, self).execute(interface)
         # TODO: finish if error is still large
-        return
 
         set_joint_positions(self.robot, self.joints, self.path[-1])
         target_pose = get_link_pose(self.robot, self.world.tool_link)
@@ -211,10 +209,8 @@ class ApproachTrajectory(Trajectory):
         interface.robot_entity.unsuppress_fixed_bases()
 
         world_state[domain.robot].suppress_fixed_bases()
-
         interface.update_state()
         update_robot(interface)
-
         time.sleep(DEFAULT_SLEEP)
 
 
@@ -230,30 +226,24 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         self.door_path = tuple(door_path)
         self.do_pull = (door_path[0][0] < door_path[-1][0])
         assert len(self.robot_path) == len(self.door_path)
-
     @property
     def joints(self):
         return self.robot_joints
-
     @property
     def path(self):
         return self.robot_path
-
     @property
     def bodies(self):
         return flatten_links(self.robot, get_moving_links(self.robot, self.robot_joints)) | \
                flatten_links(self.world.kitchen, get_moving_links(self.world.kitchen, self.door_joints))
-
     def reverse(self):
         return self.__class__(self.world, self.robot, self.robot_joints, self.robot_path[::-1],
                               self.door, self.door_joints, self.door_path[::-1])
-
     def iterate(self, state):
         for robot_conf, door_conf in zip(self.robot_path, self.door_path):
             set_joint_positions(self.robot, self.robot_joints, robot_conf)
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
-
     def execute(self, interface):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
@@ -261,10 +251,9 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         #if self.do_pull:
         #    franka_close_gripper(interface)
         #    time.sleep(DEFAULT_SLEEP)
-
-        franka_control(self.robot, self.joints, self.path, interface)
+        success = franka_control(self.robot, self.joints, self.path, interface)
         time.sleep(DEFAULT_SLEEP)
-
+        return success
         #if self.do_pull:
         #    franka_open_gripper(interface)
         #    time.sleep(DEFAULT_SLEEP)
@@ -273,8 +262,6 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         #status = joint_state_control(self.robot, self.robot_joints, self.robot_path,
         #                             domain, moveit, observer)
         #open_gripper(self.robot, moveit)
-        #return status
-
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.robot_joints) + len(self.door_joints),
                                   len(self.robot_path))
@@ -282,38 +269,41 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
 ################################################################################s
 
 class Attach(Command):
-    def __init__(self, world, robot, link, body, grasp=None):
+    def __init__(self, world, robot, link, body):
         # TODO: names or bodies?
         super(Attach, self).__init__(world)
         self.robot = robot
         self.link = link
         self.body = body
-        self.grasp = grasp
-
     @property
     def bodies(self):
         return set()
         #return {self.robot, self.body}
-
     def reverse(self):
         return Detach(self.world, self.robot, self.link, self.body)
-
     def attach(self):
         return create_attachment(self.robot, self.link, self.body)
-
     def iterate(self, state):
         state.attachments[self.body] = self.attach()
         yield
-
     def execute(self, interface):
-        if self.world.robot != self.robot:
-            return
-        franka_close_gripper(interface)
-        time.sleep(DEFAULT_SLEEP)
-        #return close_gripper(self.robot, moveit)
-
+        return True
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
+
+class AttachGripper(Attach):
+    def __init__(self, world, body, grasp=None):
+        super(AttachGripper, self).__init__(world, world.robot, world.tool_link, body)
+        self.grasp = grasp
+    def execute(self, interface):
+        name = self.world.get_name(self.body)
+        effort = EFFORT_FROM_OBJECT[name]
+        print('Grasping {} with effort {}'.format(name, effort))
+        franka_close_gripper(interface, effort=effort)
+        interface.stop_tracking(name)
+        time.sleep(DEFAULT_SLEEP)
+        #return close_gripper(self.robot, moveit)
+        return True
 
 #class AttachSurface(Attach):
 #    def __init__(self, world, obj_name, surface_name):
@@ -330,27 +320,22 @@ class Detach(Command):
         self.robot = robot
         self.link = link
         self.body = body
-
     @property
     def bodies(self):
         return set()
         #return {self.robot, self.body}
-
     def reverse(self):
         return Attach(self.world, self.robot, self.link, self.body)
-
     def iterate(self, state):
         assert self.body in state.attachments
         del state.attachments[self.body]
         yield
-
     def execute(self, interface):
-        if self.world.robot != self.robot:
-            return
-        franka_open_gripper(interface)
-        time.sleep(DEFAULT_SLEEP)
-        #return open_gripper(self.robot, moveit)
-
+        if self.world.robot == self.robot:
+            franka_open_gripper(interface)
+            time.sleep(DEFAULT_SLEEP)
+            #return open_gripper(self.robot, moveit)
+        return True
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.world.get_name(self.body))
 
@@ -358,7 +343,6 @@ class Detach(Command):
 
 class Detect(Command):
     duration = 2.0
-
     def __init__(self, world, camera, name, pose, rays):
         super(Detect, self).__init__(world)
         self.camera = camera
@@ -366,34 +350,27 @@ class Detect(Command):
         self.pose = pose # Object pose
         self.rays = tuple(rays)
         # TODO: could instead use cones for full detection
-
     @property
     def surface_name(self):
         return self.pose.support
-
     def ray_collision(self):
         return batch_ray_collision(self.rays)
-
     def compute_occluding(self):
         return {(result.objectUniqueId, frozenset([result.linkIndex]))
                 for result in self.ray_collision() if result.objectUniqueId != -1}
-
     def draw(self):
         handles = []
         for ray, result in zip(self.rays, self.ray_collision()):
             handles.extend(draw_ray(ray, result))
         return handles
-
     def iterate(self, state):
         handles = self.draw()
         steps = int(math.ceil(self.duration / 0.02))
         for _ in range(steps):
             yield
         remove_handles(handles)
-
     def execute(self, interface):
-        pass
-
+        return True
     def __repr__(self):
         return '{}({}, {}, {})'.format(
             self.__class__.__name__, self.camera, self.name, self.surface_name)
@@ -402,21 +379,16 @@ class Wait(Command):
     def __init__(self, world, steps):
         super(Wait, self).__init__(world)
         self.steps = steps
-
     @property
     def bodies(self):
         return set()
-
     def reverse(self):
         return self
-
     def iterate(self, state):
         for _ in range(self.steps):
             yield
-
     def execute(self, interface):
-        pass
-
+        return True
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.steps)
 
@@ -449,5 +421,10 @@ def execute_commands(interface, commands):
     if commands is None:
         return False
     for command in commands:
-        command.execute(interface)
+        success = command.execute(interface)
+        if success:
+            print('Successfully executed command', command)
+        else:
+            print('Failed to execute command', command)
+            return False
     return True

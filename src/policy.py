@@ -21,12 +21,12 @@ def run_policy(task, args, observation_fn, transition_fn):
     previous_skeleton = None
     while True:
         print_separator(n=50)
-        observation = observation_fn()
+        observation = observation_fn(belief) # TODO: could allow this to be an arbitrary belief transformation
         print('Observation:', observation)
         belief.update(observation)
         print('Belief:', belief)
         belief.draw()
-        # wait_for_user('Plan?')
+        wait_for_user('Plan?')
         problem = pdddlstream_from_problem(belief, fixed_base=True, additional_init=previous_facts,
                                            collisions=not args.cfree, teleport=args.teleport)
         print_separator(n=25)
@@ -38,7 +38,8 @@ def run_policy(task, args, observation_fn, transition_fn):
             plan, cost, certificate = solve_pddlstream(belief, problem, args, max_time=30, skeleton=previous_skeleton,
                                                        replan_actions=replan_actions)
             if plan is None:
-                wait_for_user('Failed to adhere to plan')
+                print('Failed to adhere to plan')
+                wait_for_user()
 
         # TODO: store history of stream evaluations
         if plan is None:

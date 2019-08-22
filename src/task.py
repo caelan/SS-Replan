@@ -19,6 +19,7 @@ class Task(object):
     def __init__(self, world, prior={}, skeletons=[],
                  movable_base=True, noisy_base=True, grasp_types=GRASP_TYPES,
                  return_init_bq=False, return_init_aq=False,
+                 goal_aq=None,
                  goal_hand_empty=False, goal_holding=[], goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
                  init=[], goal=[], max_cost=MAX_COST):
@@ -29,6 +30,8 @@ class Task(object):
         self.movable_base = movable_base
         self.noisy_base = noisy_base
         self.grasp_types = tuple(grasp_types)
+        assert (goal_aq is None) or not return_init_aq
+        self.goal_aq = goal_aq
         self.return_init_bq = return_init_bq
         self.return_init_aq = return_init_aq
         self.goal_hand_empty = goal_hand_empty

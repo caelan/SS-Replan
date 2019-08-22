@@ -5,11 +5,12 @@ import rospy
 from src.issac import update_observer
 
 class Interface(object):
-    def __init__(self, args, task, observer, trial_manager=None):
+    def __init__(self, args, task, observer, trial_manager=None, deepim=None):
         self.args = args
         self.task = task
         self.observer = observer
         self.trial_manager = trial_manager
+        self.deepim = deepim
         self.paused = False
     @property
     def simulation(self):
@@ -56,6 +57,9 @@ class Interface(object):
             self.paused = False
     def update_state(self):
         return update_observer(self.observer)
+    def stop_tracking(self, name):
+        assert self.deepim is not None
+        return self.deepim.stop_tracking(name)
     def localize_all(self):
         if self.simulation:
             return

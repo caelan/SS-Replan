@@ -212,6 +212,7 @@
                        (HandEmpty) (Calibrated)
                        (not (UnsafeATraj ?at))
                        (not (Unsafe)))
+                       ; TODO: approach pull trajectories
     ; TODO: use the full pull trajectory
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?wp2) (AtAConf ?aq2)
                  ; (AtGConf @open_gq) (not (AtGConf ?gq))
