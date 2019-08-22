@@ -116,7 +116,9 @@
     ;:precondition (and (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     ;                   (AtBConf ?bq1) (AtAConf ?aq)
     :parameters (?bq1 ?bq2 ?bt)
-    :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt) (not (= ?bq1 ?bq2)) ; Be careful with shared optimistic
+    :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt)
+                       ; (not (= ?bq1 ?bq2)) ; Causes shared optimistic failure when pick/place two objects
+                       ; TODO: could a (!= ?o1 ?o2) predicate
                        (AtBConf ?bq1) (AtAConf @rest_aq)
                        (CanMoveBase) (Calibrated)
                        (not (Unsafe)))
@@ -130,7 +132,8 @@
                  (increase (total-cost) (MoveBaseCost))))
   (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
-    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at) ; (not (= ?aq1 ?aq2)) ; Be careful with shared optimistic
+    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at)
+                       ; (not (= ?aq1 ?aq2)) ; Causes shared optimistic failure
                        (AtBConf ?bq) (AtAConf ?aq1)
                        (CanMoveArm) (Calibrated) ; TODO: require calibration?
                        (not (Unsafe)))
@@ -146,6 +149,11 @@
     :effect (and (AtGConf ?gq2)
                  (not (AtGConf ?gq1)) (not (CanMoveGripper))
                  (increase (total-cost) (MoveGripperCost))))
+  ;(:action replan
+  ;  :parameters ()
+  ;  :precondition (and)
+  ;  :effect (and )
+  ;)
   ;(:action calibrate
   ;  ;:parameters (?bq ?aq ?at)
   ;  ;:precondition (and (CalibrateMotion ?bq ?aq ?at)

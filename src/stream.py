@@ -3,7 +3,7 @@ import random
 from itertools import islice, cycle
 from collections import namedtuple
 
-from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb, is_visible_aabb
+from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, \
     set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
@@ -11,8 +11,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
-    is_point_in_polygon, grow_polygon, Pose, user_input, get_moving_links, get_aabb_extent, get_aabb_center, \
-    child_link_from_joint, set_renderer, get_movable_joints, INF, draw_ray, apply_affine, get_aabb, draw_aabb
+    is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
+    set_renderer, get_movable_joints, INF, apply_affine
 #from pddlstream.algorithms.downward import MAX_FD_COST, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, Detect
@@ -84,18 +84,6 @@ def detect_cost_fn(rp_dist, obs, rp_sample):
     cost = clip_cost(compute_detect_cost(prob))
     #print('{}) Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(
     #    rp_dist.surface_name, prob, cost))
-    return cost
-
-def opt_detect_cost_fn(rp_dist, obs, rp_sample):
-    # TODO: prune these surfaces if the cost is already too high
-    if isinstance(rp_sample, RelPose):
-        # This shouldn't be needed if eager=True
-        return detect_cost_fn(rp_dist, obs, rp_sample)
-    prob = rp_dist.surface_prob(rp_dist.surface_name)
-    #print(rp_dist.surface_name, prob)
-    cost = clip_cost(compute_detect_cost(prob))
-    print('{}) Opt Detect Prob: {:.3f} | Opt Detect Cost: {:.3f} | Type: {}'.format(
-        rp_dist.surface_name, prob, cost, rp_sample.__class__.__name__))
     return cost
 
 ################################################################################

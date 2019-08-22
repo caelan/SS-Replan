@@ -16,6 +16,11 @@
     :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Dist ?rp))
     :certified (Dist ?wp1))
 
+  ;(:stream test-not-equal
+  ;  :inputs (?o1 ?2)
+  ;  :domain (and (Object ?o1) (Object ?o2))
+  ;  :certified (NEq ?o1 ?o2))
+
   (:stream sample-grasp
     :inputs (?o ?gty)
     :domain (and (Graspable ?o) (GraspType ?gty))

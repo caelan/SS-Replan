@@ -138,21 +138,21 @@ def detect_block(world, **kwargs):
     goal_surface = 'indigo_drawer_top'
     initial_distribution = UniformDist([goal_surface]) # indigo_tmp
     initial_surface = initial_distribution.sample()
-    if random.random() < 1.:
+    if random.random() < 0.:
         # TODO: sometimes base/arm failure causes the planner to freeze
         # Freezing is because the planner is struggling to find new samples
         sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     prior = {
-        entity_name: UniformDist(['indigo_drawer_top']),  # 'indigo_tmp', 'indigo_drawer_top'
+        entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
         obstruction_name: DeltaDist('indigo_tmp'),
     }
     return Task(world, prior=prior, movable_base=True,
                 return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
-                #goal_holding=[entity_name],
-                goal_on={entity_name: goal_surface},
+                goal_holding=[entity_name],
+                #goal_on={entity_name: goal_surface},
                 goal_closed=ALL_JOINTS,
                 **kwargs)
 
@@ -192,23 +192,28 @@ def hold_block(world, num=5, **kwargs):
 ################################################################################
 
 def cracker_drawer(world, **kwargs):
-    #initial_surface = 'indigo_drawer_top' # indigo_drawer_top | indigo_drawer_bottom
-    initial_surface = 'indigo_tmp'
-    joint_name = JOINT_TEMPLATE.format('indigo_drawer_bottom')
+    initial_surface = 'indigo_drawer_top' # indigo_drawer_top | indigo_drawer_bottom
+    #initial_surface = 'indigo_tmp'
+    joint_name = JOINT_TEMPLATE.format(initial_surface)
     world.open_door(joint_from_name(world.kitchen, joint_name))
     # open_all_doors(world)
+    # TODO: approach for pull
+    prior = {}
+    block_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    prior[block_name] = DeltaDist('indigo_tmp')
 
-    obj_name = add_cracker_box(world, idx=0)
-    prior = {obj_name: DeltaDist(initial_surface)}
-    sample_placement(world, obj_name, initial_surface, learned=True)
+    cracker_name = add_cracker_box(world, idx=0)
+    prior[cracker_name] = DeltaDist(initial_surface)
+    sample_placement(world, cracker_name, initial_surface, learned=True)
 
     set_all_static()
     add_kinect(world)
 
     return Task(world, prior=prior, movable_base=True,
-                #return_init_bq=True, return_init_aq=True,
-                goal_open=[JOINT_TEMPLATE.format('indigo_drawer_top')],
-                #goal_closed=ALL_JOINTS,
+                goal_on={block_name: initial_surface},
+                return_init_bq=True, return_init_aq=True,
+                #goal_open=[JOINT_TEMPLATE.format('indigo_drawer_top')],
+                goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################
@@ -225,8 +230,8 @@ def fixed_stow(world, **kwargs):
     # set_base_values(world.robot, BASE_POSE2D)
     world.set_base_conf(BASE_POSE2D)
 
-    initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
-    #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
+    #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
+    initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
     if initial_surface == 'indigo_drawer_top':
         sample_placement(world, entity_name, initial_surface, learned=True)
     # joint_name = JOINT_TEMPLATE.format(goal_surface)
