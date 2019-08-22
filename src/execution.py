@@ -124,6 +124,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
     print('Starting', action_topic)
     client.wait_for_server()
     client.cancel_all_goals()
+    #time.sleep(0.1)
     print('Finished', action_topic)
     # TODO: create this action client once
 
@@ -158,16 +159,19 @@ def franka_control(robot, joints, path, interface, **kwargs):
 
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
     start_time = time.time()
-    state = client.send_goal_and_wait(goal)  # send_goal_and_wait
-    #state = client.get_state() # get_comm_state, get_terminal_state
-    print('State:', state)
-    #result = client.get_result()
-    #print('Result:', result)
-    #text = client.get_goal_status_text()
-    text = GoalStatus.to_string(state)
-    print('Goal status:', text)
-    # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
-    # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
+    while True:
+        state = client.send_goal_and_wait(goal)  # send_goal_and_wait
+        #state = client.get_state() # get_comm_state, get_terminal_state
+        print('State:', state)
+        #result = client.get_result()
+        #print('Result:', result)
+        #text = client.get_goal_status_text()
+        text = GoalStatus.to_string(state)
+        print('Goal status:', text)
+        if state != GoalStatus.PREEMPTED:
+            break
+        # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
+        # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
 
     # TODO: different joint distance metric. The last joint seems to move slowly
     # TODO: extra effort to get to the final conf

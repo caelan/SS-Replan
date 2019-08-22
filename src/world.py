@@ -423,7 +423,6 @@ class World(object):
         new_z = stable_z_on_aabb(body, surface_aabb)
         point = Point(x, y, new_z)
         set_point(body, point)
-        # TODO: rotate objects that are symmetrical about xy 180 to ensure the start upright
         print('{} error: roll={:.3f}, pitch={:.3f}, z-delta: {:.3f}'.format(
             name, roll, pitch, new_z - z))
         new_pose = (point, quat)

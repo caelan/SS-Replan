@@ -315,14 +315,15 @@ def load_objects(task):
         set_pose(body, NULL_POSE)
         draw_pose(unit_pose(), parent=body)
 
-def update_objects(interface, world_state):
+def update_objects(interface, world_state, visible=set()):
     # domain.entities
     world = interface.world
-    if interface.simulation and not interface.observable:
-        visible = detect_classes()
-        print('Visible:', sorted(visible))
-    else:
-        visible = set(world_state.entities.keys())
+    if interface.simulation:
+        if interface.observable:
+            visible = set(world_state.entities.keys())
+        else:
+            visible = detect_classes()
+    print('Visible:', sorted(visible))
     observation = {}
     for name, entity in world_state.entities.items():
         # entity.obj_type, entity.semantic_frames
@@ -340,7 +341,8 @@ def update_objects(interface, world_state):
                 # pose = get_world_from_model(observer, entity, body)
                 # pose = pose_from_tform(entity.pose)
             else:
-                pose = NULL_POSE  # TODO: modify world_state directly?
+                #pose = NULL_POSE  # TODO: modify world_state directly?
+                continue
             observation.setdefault(name, []).append(pose)
         elif isinstance(entity, Drawer):
             continue
@@ -351,7 +353,7 @@ def update_objects(interface, world_state):
             raise NotImplementedError(entity.__class__)
     return observation
 
-def observe_world(interface):
+def observe_world(interface, **kwargs):
     #dump_dict(world_state)
     #print(world_state.get_frames())
     # Using state is nice because it applies noise
@@ -360,7 +362,7 @@ def observe_world(interface):
     #world.reset()
     update_robot(interface)
     print('Kitchen joints:', update_kitchen(interface.world, world_state))
-    return update_objects(interface, world_state)
+    return update_objects(interface, world_state, **kwargs)
 
 ################################################################################
 

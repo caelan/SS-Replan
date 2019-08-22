@@ -337,6 +337,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                 init.append(('Graspable', obj_name))
             else:
                 print('{} has an invalid orientation: roll={:.3f}, pitch={:.3f}'.format(obj_name, roll, pitch))
+        else:
+            init.append(('Graspable', obj_name))
 
         # Could also fully decompose into points (but many samples)
         # Could immediately add likely points for collision checking

@@ -6,7 +6,7 @@ import random
 
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import get_pose, point_from_pose, Ray, batch_ray_collision, has_gui, add_line, BLUE, \
-    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose, aabb_contains_point
+    wait_for_duration, remove_handles, Pose, Point, Euler, multiply, set_pose, aabb_contains_point, tform_point, angle_between
 from src.utils import CAMERA_MATRIX, KINECT_DEPTH, create_relative_pose, create_world_pose
 
 OBS_P_FP, OBS_P_FN = 0.0, 0.0
@@ -98,6 +98,10 @@ def relative_detections(belief, detections):
             continue
         body = world.get_body(name)
         for observed_pose in detections[name]:
+            world_z_axis = np.array([0, 0, 1])
+            local_z_axis = tform_point(observed_pose, world_z_axis)
+            if np.pi/2 < angle_between(world_z_axis, local_z_axis):
+                observed_pose = multiply(observed_pose, Pose(euler=Euler(roll=np.pi)))
             if not aabb_contains_point(point_from_pose(observed_pose), world_aabb):
                 continue
             set_pose(body, observed_pose)

@@ -47,7 +47,7 @@ from src.execution import franka_open_gripper
 # TODO: ignore grasped objects in the update
 # TODO: avoid redetects on hard surfaces
 
-def wait_for_dart_convergence(interface, min_updates=10, timeout=10.0):
+def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0):
     start_time = time.time()
     history = defaultdict(list)
     num_updates = 0
@@ -55,7 +55,7 @@ def wait_for_dart_convergence(interface, min_updates=10, timeout=10.0):
         num_updates += 1
         print('Update: {} | Time: {}'.format(num_updates, elapsed_time(start_time)))
         world_state = interface.update_state()
-        observation = update_objects(interface, world_state)
+        observation = update_objects(interface, world_state, detected)
         # print(observation)
         for name, pose in observation.items():
             history[name].extend(pose)
@@ -70,6 +70,7 @@ def wait_for_dart_convergence(interface, min_updates=10, timeout=10.0):
                 success &= (pos_deviation <= 0.005) and (ori_deviation <= math.radians(1))
         if success:
             return True
+    # TODO: return last observation?
     return False
 
 def planning_loop(interface):
@@ -82,15 +83,14 @@ def planning_loop(interface):
         if belief.holding is not None:
             interface.stop_tracking(belief.holding)
         rospy.sleep(1.0)
-        for obj in belief.placed:
-            interface.deepim.detect(obj)
+        detected = {obj for obj in belief.placed if interface.deepim.detect(obj)}
         start_time = time.time()
-        converged = wait_for_dart_convergence(interface)
+        converged = wait_for_dart_convergence(interface, detected)
         print('Stabilized: {} | Time: {:.3f}'.format(converged, elapsed_time(start_time)))
         #rospy.sleep(5.0)
         # Wait until convergence
         #interface.localize_all()
-        return observe_world(interface)
+        return observe_world(interface, visible=detected)
 
     def transition_fn(belief, commands):
         sim_state = belief.sample_state()
@@ -190,13 +190,13 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     deepim = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        SPAM: UniformDist([INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER]),
+        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
-    goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
+    goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior,
-                #goal_holding=[SPAM],
+                #goal_holding=[SPAM], # TODO: why is this failing?
                 goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],

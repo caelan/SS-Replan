@@ -38,7 +38,8 @@ def run_policy(task, args, observation_fn, transition_fn):
             plan, cost, certificate = solve_pddlstream(belief, problem, args, max_time=30, skeleton=previous_skeleton,
                                                        replan_actions=replan_actions)
             if plan is None:
-                wait_for_user('Failed to adhere to plan')
+                print('Failed to adhere to plan')
+                wait_for_user()
 
         # TODO: store history of stream evaluations
         if plan is None:

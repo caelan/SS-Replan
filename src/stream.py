@@ -185,8 +185,11 @@ def move_occluding(world, ray, obj_name):  # TODO: detect instead of ray
         set_pose(world.get_body(name), Pose(Point(z=-5.0)))
 
 def get_ofree_ray_pose_test(world, **kwargs):
+    # TODO: detect the configuration of joints
     def test(ray, obj_name, pose):
         if ray.name == obj_name:
+            return True
+        if isinstance(pose, SurfaceDist):
             return True
         # TODO: some of the rays clip the top of objects. Might be related to the slight z translation
         ray.pose.assign()
@@ -618,6 +621,7 @@ def get_handle_grasps(world, joint, pre_distance=APPROACH_DISTANCE):
     #half_extent = 1.0*FINGER_EXTENT[2] # Collides
     half_extent = 1.1*FINGER_EXTENT[2]
 
+    # TODO: move closer if performing a push rather than a pull
     grasps = []
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):

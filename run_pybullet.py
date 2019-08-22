@@ -34,7 +34,7 @@ def create_parser():
                         help='Treats actions as fully deterministic')
     parser.add_argument('-observable', action='store_true',
                         help='Treats the state as fully observable')
-    parser.add_argument('-max_time', default=3*60, type=int,
+    parser.add_argument('-max_time', default=5*60, type=int,
                         help='The max computation time')
     parser.add_argument('-record', action='store_true',
                         help='When enabled, records and saves a video at {}'.format(
