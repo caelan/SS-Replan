@@ -8,7 +8,7 @@ from sensor_msgs.msg import JointState
 from src.retime import spline_parameterization, get_joint_names, linear_parameterization
 from src.issac import ISSAC_FRANKA_FRAME, update_observer, update_robot_conf
 from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, \
-    get_joint_positions, get_min_limits, get_max_limits
+    get_joint_positions, get_min_limits, get_max_limits, get_length
 from pddlstream.utils import Verbose
 
 from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
@@ -169,13 +169,18 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
     # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
 
+    # TODO: different joint distance metric. The last joint seems to move slowly
     # TODO: extra effort to get to the final conf
     update_robot_conf(interface)
     end_conf = get_joint_positions(robot, joints)
+    print('Target conf:', np.array(path[-1]).round(5))
     print('Final conf:', np.array(end_conf).round(5))
     print('Lower limits:', np.array(get_min_limits(robot, joints)).round(5))
     print('Upper limits:', np.array(get_max_limits(robot, joints)).round(5))
-    print('Final error:', (np.array(end_conf) - np.array(path[-1])).round(5))
+    error = np.array(end_conf) - np.array(path[-1])
+    print('Final error:', error.round(5))
+    magnitude = get_length(error)
+    print('Error magnitude: {:.3f}'.format(magnitude))
     print('Execution took {:.3f} seconds (expected {:.3f} seconds)'.format(
         elapsed_time(start_time), total_duration))
     #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
@@ -183,7 +188,9 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # TODO: remove display messages
     # http://docs.ros.org/kinetic/api/actionlib_msgs/html/msg/GoalStatus.html
 
-    return state == GoalStatus.SUCCEEDED
+    max_error = 0.1
+    return magnitude <= max_error
+    #return state == GoalStatus.SUCCEEDED
 
 ################################################################################
 
@@ -285,13 +292,13 @@ def franka_open_gripper(interface, **kwargs):
         # return gripper.open(speed=0.1, wait=True)
         # return move_gripper_action(moveit.gripper.open_positions[0], **kwargs)
 
-def franka_close_gripper(interface, force=40):
+def franka_close_gripper(interface, effort=40):
     if interface.simulation:
         interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
         interface.moveit.close_gripper()
     else:
         commander = FrankaGripperCommander()
-        commander.close(speed=0.1, force=force, wait=True)
+        commander.close(speed=0.1, force=effort, wait=True)
         #gripper = FrankaGripper(is_physical_robot=True)
         #return gripper.close(attach_obj=None, speed=0.1, force=40, actuate_gripper=True, wait=True)
         #return move_gripper_action(moveit.gripper.closed_positions[0], effort=50)

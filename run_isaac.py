@@ -23,10 +23,11 @@ from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, elapsed_time, \
-    get_distance, quat_angle_between, quat_from_pose, point_from_pose
+    get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, link_from_name, get_link_pose
 from pddlstream.utils import Verbose
 
-from src.deepim import test_deepim, DeepIM, RIGHT, SIDES
+from src.deepim import DeepIM, RIGHT, SIDES, mean_pose_deviation
+#from retired.perception import test_deepim
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
@@ -42,7 +43,11 @@ from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement
 from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 from src.execution import franka_open_gripper
 
-def wait_for_dart_convergence(interface, min_updates=5, timeout=10.0):
+# TODO: prevent grasp if open
+# TODO: ignore grasped objects in the update
+# TODO: avoid redetects on hard surfaces
+
+def wait_for_dart_convergence(interface, min_updates=10, timeout=10.0):
     start_time = time.time()
     history = defaultdict(list)
     num_updates = 0
@@ -58,13 +63,11 @@ def wait_for_dart_convergence(interface, min_updates=5, timeout=10.0):
             continue
         success = True
         for name in history:
-            if 2 <= len(history[name]):
-                last, current = history[name][-2:]
-                pos_distance = get_distance(point_from_pose(last), point_from_pose(current))
-                ori_distance = math.degrees(quat_angle_between(quat_from_pose(last), quat_from_pose(current)))
+            if min_updates <= len(history[name]):
+                pos_deviation, ori_deviation = mean_pose_deviation(history[name][-min_updates:])
                 print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(
-                    name, pos_distance, ori_distance))
-                success &= (pos_distance <= 0.005) and (ori_distance <= 5)
+                    name, pos_deviation, math.degrees(ori_deviation)))
+                success &= (pos_deviation <= 0.005) and (ori_deviation <= math.radians(2))
         if success:
             return True
     return False
@@ -77,7 +80,7 @@ def planning_loop(interface):
         # TODO: sort by distance from camera
         assert interface.deepim is not None # TODO: IsaacSim analog
         if belief.holding is not None:
-            interface.deepim.stop_tracking(belief.holding)
+            interface.stop_tracking(belief.holding)
         rospy.sleep(1.0)
         for obj in belief.placed:
             interface.deepim.detect(obj)
@@ -262,6 +265,12 @@ def main():
 
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
     world = World(use_gui=True) # args.visualize)
+    if args.fixed:
+        target_point = point_from_pose(get_link_pose(
+            world.kitchen, link_from_name(world.kitchen, 'indigo_tmp')))
+        offset = np.array([1, -1, 1])
+        camera_point = target_point + offset
+        set_camera_pose(camera_point, target_point)
     if args.execute:
         interface = real_setup(domain, world, args)
     else:
@@ -318,6 +327,7 @@ if __name__ == '__main__':
 
 # Running the carter
 # cpaxton@lokeefe:~$ ssh srl@carter
+# srl@carter:~$ cd ~/deploy/srl/carter-pkg
 # srl@carter:~/deploy/srl/carter-pkg$ ./apps/carter/carter -r 2 -m seattle_map_res02_181214
 # cpaxton@lokeefe:~/alice$ bazel run apps/samples/navigation_rosbridge
 
@@ -327,8 +337,8 @@ if __name__ == '__main__':
 
 # Running on the real robot w/o LULA
 # cpaxton@lokeefe:~$ roscore
-# 1) roslaunch franka_controllers start_control.launch
-# 2) roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+# 1) srl@vgilligan:~$ roslaunch franka_controllers start_control.launch
+# 2) srl@vgilligan:~$ roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
 # 3) srl@vgilligan:~$ ~/srl_system/workspace/src/brain/relay.sh
 # 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz
 # 4) killall move_group franka_control_node local_controller

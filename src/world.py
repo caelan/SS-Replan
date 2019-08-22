@@ -168,8 +168,12 @@ class World(object):
                             urdf_string=read(urdf_path))
         lower, upper = self.ik_solver.get_joint_limits()
         buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
-        buffer[-1] *= 2
-        self.ik_solver.set_joint_limits(lower + buffer, upper - buffer)
+        lower, upper = lower + buffer, upper - buffer
+        max_joint_7 = 1.89 # 1.891
+        lower[6] = -max_joint_7
+        upper[6] = +max_joint_7
+        #buffer[-1] *= 2
+        self.ik_solver.set_joint_limits(lower, upper)
 
     def _update_initial(self):
         # TODO: store initial poses as well?

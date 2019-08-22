@@ -143,7 +143,8 @@ def update_robot_conf(interface, entity=None):
     # https://gitlab-master.nvidia.com/srl/srl_system/blob/ea286e95d3e2d46ff5a3389085beb4f9f3fc3f84/packages/brain/src/brain_ros/ros_world_state.py#L494
     # Update joint positions
     if entity is None:
-        entity = interface.update_state().entities[interface.domain.robot]
+        world_state = interface.update_state()
+        entity = world_state.entities[interface.domain.robot]
     world = interface.world
     arm_joints = joints_from_names(world.robot, entity.joints)
     set_joint_positions(world.robot, arm_joints, entity.q)
