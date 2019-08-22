@@ -640,6 +640,7 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, tel
     door_path = [door_conf1.values] + list(door_extend_fn(door_conf1.values, door_conf2.values))
     if teleport:
         door_path = [door_conf1.values, door_conf2.values]
+    # TODO: open until collision for the drawers
 
     # door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
     for handle_grasp in get_handle_grasps(world, door_joint):
@@ -785,6 +786,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
             world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
                       if is_pull_safe(world, door_joint, door_plan, obstacles)]
         if not door_plans:
+            print('Unable to open door {} at fixed config'.format(joint_name))
             return
         while True:
             for i in range(max_attempts):

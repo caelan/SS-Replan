@@ -67,7 +67,7 @@ def wait_for_dart_convergence(interface, min_updates=10, timeout=10.0):
                 pos_deviation, ori_deviation = mean_pose_deviation(history[name][-min_updates:])
                 print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(
                     name, pos_deviation, math.degrees(ori_deviation)))
-                success &= (pos_deviation <= 0.005) and (ori_deviation <= math.radians(2))
+                success &= (pos_deviation <= 0.005) and (ori_deviation <= math.radians(1))
         if success:
             return True
     return False
@@ -194,12 +194,12 @@ def real_setup(domain, world, args):
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
-    goal_drawer = BOTTOM_DRAWER
+    goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior,
                 #goal_holding=[SPAM],
                 goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
-                goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],  # , 'indigo_drawer_bottom_joint'],
+                goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,

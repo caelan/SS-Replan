@@ -283,7 +283,6 @@ def detect_classes():
 
 def update_kitchen(world, world_state):
     position_from_joint = {}
-    # TODO: identify why the indigo bottom cabinets open
     for name, entity in world_state.entities.items():
         if isinstance(entity, RobotArm) or isinstance(entity, FloatingRigidBody):
             continue

@@ -386,7 +386,7 @@ class World(object):
 
     def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH):
         body = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
-                                          color=apply_alpha(RED, 0.1))
+                            color=apply_alpha(RED, 0.1), mass=0, collision=False)
         self.cameras[name] = Camera(body, camera_matrix, max_depth)
         set_pose(body, pose)
         step_simulation()
