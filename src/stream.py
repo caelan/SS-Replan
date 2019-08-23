@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
     set_renderer, get_movable_joints, INF, apply_affine
-#from pddlstream.algorithms.downward import MAX_FD_COST, get_cost_scale
+from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
     Detect, AttachGripper
@@ -27,10 +27,12 @@ from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
 
+COST_SCALE = 1e3 # 3 decimal places
+MAX_COST = MAX_FD_COST / COST_SCALE
 #MAX_COST = MAX_FD_COST / get_cost_scale()
-MAX_COST = 1000.0
-DETECT_COST = 1.0
+# TODO: move this to FD
 
+DETECT_COST = 1.0
 BASE_CONSTANT = 1.0 # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
@@ -81,8 +83,9 @@ def compute_detect_cost(prob):
 
 def detect_cost_fn(rp_dist, obs, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
+    # TODO: count samples in a nearby vicinity to be invariant to number of samples
     prob = rp_dist.discrete_prob(rp_sample)
-    cost = clip_cost(compute_detect_cost(prob))
+    cost = clip_cost(compute_detect_cost(prob), max_cost=MAX_COST)
     #print('{}) Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(
     #    rp_dist.surface_name, prob, cost))
     return cost
@@ -217,7 +220,7 @@ class Observation(object):
     def __repr__(self):
         return 'obs({})'.format(self.value)
 
-def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative instead?
+def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relative instead?
                           mlo_only=False, ordered=False, **kwargs):
     # TODO: incorporate ray tracing
     detect_fn = get_compute_detect(world, ray_trace=False, **kwargs)
@@ -229,7 +232,7 @@ def get_sample_belief_gen(world, min_prob=1. / NUM_PARTICLES,  # TODO: relative 
             prob = pose_dist.discrete_prob(rp)
             obs = None
             cost = detect_cost_fn(pose_dist, obs, rp)
-            if (cost <= MAX_COST): # and (min_prob <= prob):
+            if (cost < MAX_COST): # and (min_prob < prob):
                 # pose = rp.get_world_from_body()
                 result = detect_fn(obj_name, rp)
                 if result is not None:

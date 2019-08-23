@@ -21,6 +21,7 @@ from src.utils import create_relative_pose, RelPose
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
 # TODO: use a proper probabilistic programming library rather than dist.py
+# TODO: the really can just be viewed as a change in the kernel applied
 
 # Detect preconditions and cost
 # * Most general would be conditioning the success prob on the full state via a cost

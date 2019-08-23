@@ -135,7 +135,8 @@
     :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at)
                        ; (not (= ?aq1 ?aq2)) ; Causes shared optimistic failure
                        (AtBConf ?bq) (AtAConf ?aq1)
-                       (CanMoveArm) (Calibrated) ; TODO: require calibration?
+                       ; (CanMoveArm)
+                       (Calibrated) ; TODO: require calibration?
                        (not (Unsafe)))
     :effect (and (AtAConf ?aq2)
                  (not (AtAConf ?aq1)) (not (CanMoveArm))

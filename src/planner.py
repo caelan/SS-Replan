@@ -5,7 +5,7 @@ import pstats
 
 #from examples.discrete_belief.run import MAX_COST
 from examples.discrete_belief.run import clip_cost
-from pddlstream.algorithms.constraints import PlanConstraints, linear_order, OrderedSkeleton, GOAL_INDEX
+from pddlstream.algorithms.constraints import PlanConstraints, OrderedSkeleton
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.algorithms.algorithm import reset_globals
 from pddlstream.algorithms.downward import set_cost_scale
@@ -13,18 +13,19 @@ from pddlstream.algorithms.downward import set_cost_scale
 from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
 from pddlstream.language.function import FunctionInfo
-from pddlstream.language.object import UniqueOptValue, SharedOptValue
+from pddlstream.language.object import SharedOptValue
 from pddlstream.utils import INF
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver, wait_for_duration
 from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
-from src.stream import MAX_COST, detect_cost_fn, compute_detect_cost
+from src.stream import detect_cost_fn, compute_detect_cost, COST_SCALE
 from src.replan import INTERNAL_ACTIONS
 
 # TODO: use the same objects for poses and configs
 from src.utils import RelPose
 
-COST_SCALE = 1e3 # 3 decimal places
+COST_BOUND = 1000.0
+# TODO: multiple cost bounds
 
 ################################################################################
 
@@ -129,7 +130,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
     stream_info = get_stream_info()
     #print(set(stream_map) - set(stream_info))
     skeletons = create_ordered_skeleton(skeleton)
-    max_cost = min(max_cost, MAX_COST)
+    max_cost = min(max_cost, COST_BOUND)
     print('Max cost: {:.3f} | Max runtime: {:.3f}'.format(max_cost, max_time))
     constraints = PlanConstraints(skeletons=skeletons, max_cost=max_cost, exact=True)
 
