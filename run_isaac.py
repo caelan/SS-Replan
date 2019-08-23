@@ -197,8 +197,8 @@ def real_setup(domain, world, args):
     }
     goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior,
-                goal_detected=[SPAM],
-                #goal_holding=[SPAM], # TODO: why is this failing?
+                #goal_detected=[SPAM],
+                goal_holding=SPAM,
                 #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],

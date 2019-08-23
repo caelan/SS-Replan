@@ -20,7 +20,7 @@ class Task(object):
                  movable_base=True, noisy_base=True, grasp_types=GRASP_TYPES,
                  return_init_bq=False, return_init_aq=False,
                  goal_aq=None,
-                 goal_hand_empty=False, goal_holding=[], goal_detected=[],
+                 goal_hand_empty=False, goal_holding=None, goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
                  init=[], goal=[], max_cost=MAX_COST):
         self.world = world
@@ -35,7 +35,7 @@ class Task(object):
         self.return_init_bq = return_init_bq
         self.return_init_aq = return_init_aq
         self.goal_hand_empty = goal_hand_empty
-        self.goal_holding = set(goal_holding)
+        self.goal_holding = goal_holding
         self.goal_on = dict(goal_on)
         self.goal_detected = set(goal_detected)
         self.goal_open = set(goal_open)
@@ -154,7 +154,7 @@ def detect_block(world, **kwargs):
     return Task(world, prior=prior, movable_base=True,
                 return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
-                goal_holding=[entity_name],
+                goal_holding=entity_name,
                 #goal_on={entity_name: goal_surface},
                 goal_closed=ALL_JOINTS,
                 **kwargs)
@@ -187,7 +187,7 @@ def hold_block(world, num=5, **kwargs):
                 # grasp_types=GRASP_TYPES,
                 grasp_types=[SIDE_GRASP],
                 return_init_bq=True, return_init_aq=True,
-                goal_holding=[green_name],
+                goal_holding=green_name,
                 #goal_closed=ALL_JOINTS,
                 **kwargs)
 
@@ -234,8 +234,10 @@ def fixed_stow(world, **kwargs):
     world.set_base_conf(BASE_POSE2D)
 
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
-    initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
-    if initial_surface == 'indigo_drawer_top':
+    #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
+    #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_bottom'
+    initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
+    if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)
     # joint_name = JOINT_TEMPLATE.format(goal_surface)
     #world.open_door(joint_from_name(world.kitchen, joint_name))
@@ -243,13 +245,15 @@ def fixed_stow(world, **kwargs):
     # TODO: declare success if already believe it's in the drawer or require detection?
     prior = {
         entity_name: UniformDist([initial_surface]),
+        #entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top', 'indigo_drawer_bottom']),
     }
     return Task(world, prior=prior, movable_base=False,
                 #goal_detected=[entity_name],
-                goal_on={entity_name: goal_surface},
-                return_init_bq=True, return_init_aq=True,
+                goal_holding=entity_name,
+                #goal_on={entity_name: goal_surface},
+                #return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
-                goal_closed=ALL_JOINTS,
+                #goal_closed=ALL_JOINTS,
                 **kwargs)
 
 ################################################################################
@@ -288,7 +292,7 @@ def stow_block(world, num=2, **kwargs):
     #    wait_for_user()
 
     return Task(world, prior=prior, movable_base=True,
-                #goal_holding=[entity_name],
+                #goal_holding=entity_name,
                 goal_on=goal_on,
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],

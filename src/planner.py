@@ -30,8 +30,6 @@ COST_SCALE = 1e3 # 3 decimal places
 
 def opt_detect_cost_fn(rp_dist, obs, rp_sample):
     # TODO: prune these surfaces if the cost is already too high
-    print(rp_dist, obs, rp_sample)
-    raw_input('awef')
     if isinstance(rp_sample, RelPose):
         # This shouldn't be needed if eager=True
         return detect_cost_fn(rp_dist, obs, rp_sample)
