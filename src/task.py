@@ -251,7 +251,7 @@ def fixed_stow(world, **kwargs):
                 #goal_detected=[entity_name],
                 goal_holding=entity_name,
                 #goal_on={entity_name: goal_surface},
-                #return_init_bq=True, return_init_aq=True,
+                return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
                 #goal_closed=ALL_JOINTS,
                 **kwargs)

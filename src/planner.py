@@ -29,11 +29,11 @@ COST_BOUND = 1000.0
 
 ################################################################################
 
-def opt_detect_cost_fn(rp_dist, obs, rp_sample):
+def opt_detect_cost_fn(obj_name, rp_dist, obs, rp_sample):
     # TODO: prune these surfaces if the cost is already too high
     if isinstance(rp_sample, RelPose):
         # This shouldn't be needed if eager=True
-        return detect_cost_fn(rp_dist, obs, rp_sample)
+        return detect_cost_fn(obj_name, rp_dist, obs, rp_sample)
     prob = rp_dist.surface_prob(rp_dist.surface_name)
     #print(rp_dist.surface_name, prob)
     cost = clip_cost(compute_detect_cost(prob))
@@ -66,7 +66,7 @@ def get_stream_info():
                                        p_success=0.5, eager=True),
         # 'compute-angle-kin': StreamInfo(p_success=0.5, eager=True),
         'sample-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
-        'sample-nearby-pose': StreamInfo(opt_gen_fn=PartialInputs(unique=False)),
+        'sample-nearby-pose': StreamInfo(opt_gen_fn=opt_gen_fn),
         'sample-grasp': StreamInfo(opt_gen_fn=opt_gen_fn),
 
         'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-4),
