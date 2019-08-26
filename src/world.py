@@ -52,6 +52,12 @@ TABLE_Y = 3.53 # meters
 # +x distance to computer tables: 240cm
 COMPUTER_X = 2.40
 
+MAX_FRANKA_JOINT7 = 1.89  # 1.8973
+# rosparam get /robot_description > robot_description.urdf
+# packages/third_party/franka_ros/franka_description/robots/panda_arm.xacro
+# https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/third_party/franka_ros/franka_description/robots/panda_arm.xacro#L157
+# https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/third_party/franka_ros/franka_control/launch/franka_control_lula.launch#L7
+
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.task = None
@@ -169,9 +175,8 @@ class World(object):
         lower, upper = self.ik_solver.get_joint_limits()
         buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
         lower, upper = lower + buffer, upper - buffer
-        max_joint_7 = 1.89 # 1.891
-        lower[6] = -max_joint_7
-        upper[6] = +max_joint_7
+        lower[6] = -MAX_FRANKA_JOINT7
+        upper[6] = +MAX_FRANKA_JOINT7
         #buffer[-1] *= 2
         self.ik_solver.set_joint_limits(lower, upper)
 

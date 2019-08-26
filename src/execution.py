@@ -35,6 +35,7 @@ def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAM
     #display_trajectory.model_id = 'pr2'
     display_trajectory.trajectory_start = moveit.robot.get_current_state()
     robot_trajectory = RobotTrajectory(joint_trajectory=joint_trajectory)
+    # TODO: get this in the base_link frame
     robot_trajectory.joint_trajectory.header.frame_id = frame
     display_trajectory.trajectory.append(robot_trajectory)
     display_trajectory_pub.publish(display_trajectory)
@@ -61,6 +62,7 @@ def joint_state_control(robot, joints, path, interface,
     # http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py#L398
 
+    # TODO: recently causes problems in IsaacSim
     # TODO: separate path and goal thresholds
     assert interface.simulation
     # max_velocities = np.array([get_max_velocity(robot, joint) for joint in joints])
@@ -111,9 +113,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #joint_command_control(robot, joints, path, **kwargs)
     #follow_control(robot, joints, path, **kwargs)
     if interface.simulation:
-        return joint_state_control(robot, joints, path, interface)
-        #return moveit_control(robot, joints, path, interface)
         #return joint_state_control(robot, joints, path, interface)
+        return moveit_control(robot, joints, path, interface)
 
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
     action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
@@ -227,7 +228,7 @@ def moveit_control(robot, joints, path, interface, **kwargs):
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     publish_display_trajectory(interface.moveit, trajectory)
-    wait_for_user('Continue?')
+    #wait_for_user('Continue?')
     # /move_base_simple/goal - no listeners
     # /move_group/goal
     # ABORTED: Cannot execute trajectory since ~allow_trajectory_execution was set to false
@@ -243,16 +244,19 @@ def moveit_control(robot, joints, path, interface, **kwargs):
 
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
-    moveit.dilation = 0.5
+    #moveit.dilation = 1.0
     start_time = time.time()
     # /move_group/display_planned_path
     # TODO: display base motions?
-    #publish_display_trajectory(moveit, plan) # TODO: get this in the base_link frame
     with Verbose(False):
+        # TODO: execute is out of date
+        # moveit.step_plan, moveit.go_local
         moveit.execute(plan, required_orig_err=0.005, timeout=5.0,
                        publish_display_trajectory=False)
         #moveit.go_local(q=path[-1], ...)
     print('Execution took {:.3f} seconds'.format(elapsed_time(start_time)))
+    # TODO: check the final error
+    return True
 
 ################################################################################
 
@@ -287,7 +291,10 @@ def franka_move_gripper(position, effort=20):
 def franka_open_gripper(interface, **kwargs):
     if interface.simulation:
         # https://gitlab-master.nvidia.com/srl/srl_system/compare/9d2455ccd4c97b49f85f86cb2af80fc34e0b66cc...master
-        interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
+        if not interface.moveit.use_lula:
+            #interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
+            interface.moveit.gripper_cmd_pub = interface.moveit.desired_joint_cmd_pub
+        #interface.moveit.use_gripper_server = True
         interface.moveit.open_gripper()
     else:
         commander = FrankaGripperCommander()
@@ -298,7 +305,10 @@ def franka_open_gripper(interface, **kwargs):
 
 def franka_close_gripper(interface, effort=40):
     if interface.simulation:
-        interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
+        if not interface.moveit.use_lula:
+            #interface.moveit.gripper_cmd_pub = interface.moveit.goal_joint_cmd_pub
+            interface.moveit.gripper_cmd_pub = interface.moveit.desired_joint_cmd_pub
+        #interface.moveit.use_gripper_server = True
         interface.moveit.close_gripper()
     else:
         commander = FrankaGripperCommander()

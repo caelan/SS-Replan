@@ -283,7 +283,6 @@ def load_objects(task):
         draw_pose(unit_pose(), parent=body)
 
 def update_objects(interface, world_state, visible): #=set()):
-    print('Visible:', sorted(visible))
     observation = {}
     for name, entity in world_state.entities.items():
         # entity.obj_type, entity.semantic_frames
@@ -319,6 +318,7 @@ def observe_world(interface, visible=set(), **kwargs):
     # Using state is nice because it applies noise
     world_state = interface.update_state()
     print('Entities:', sorted(world_state.entities))
+    print('Visible:', sorted(visible))
     #world.reset()
     update_robot(interface)
     print('Kitchen joints:', update_kitchen(interface.world, world_state))
