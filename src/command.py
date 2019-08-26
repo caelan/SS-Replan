@@ -10,7 +10,8 @@ from pybullet_tools.utils import get_moving_links, set_joint_positions, create_a
 from src.base import follow_base_trajectory
 from src.execution import moveit_control, \
     franka_open_gripper, franka_close_gripper, franka_control
-from src.issac import update_robot, update_isaac_robot
+from src.issac import update_robot
+from src.update_isaac import update_isaac_robot
 from src.utils import create_surface_attachment
 
 DEFAULT_SLEEP = 0.5

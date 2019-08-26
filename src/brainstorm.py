@@ -1,7 +1,7 @@
 import numpy as np
 import brain_ros.kitchen_policies as kitchen_policies
 
-from src.issac import update_isaac_sim
+from src.update_isaac import update_isaac_sim
 from pybullet_tools.utils import wait_for_user, set_point, get_point, get_movable_joints, set_joint_positions, \
     get_sample_fn
 

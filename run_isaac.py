@@ -35,8 +35,9 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
     SUGAR, INDIGO_COUNTER, TOP_DRAWER, YCB_OBJECTS, CHEEZIT, BOTTOM_DRAWER
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
-from src.issac import observe_world, kill_lula, update_isaac_sim, update_robot_conf, \
+from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, dump_dict, update_objects
+from src.update_isaac import update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
 from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement
