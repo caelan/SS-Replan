@@ -26,7 +26,7 @@ from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, e
     get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, link_from_name, get_link_pose
 from pddlstream.utils import Verbose
 
-from src.deepim import DeepIM, RIGHT, SIDES, mean_pose_deviation
+from src.deepim import DeepIM, RIGHT, SIDES, mean_pose_deviation, Segmentator, FullObserver
 #from retired.perception import test_deepim
 from src.policy import run_policy
 from src.interface import Interface
@@ -82,8 +82,7 @@ def planning_loop(interface):
         assert interface.deepim is not None # TODO: IsaacSim analog
         if belief.holding is not None:
             interface.stop_tracking(belief.holding)
-        rospy.sleep(1.0)
-        detected = {obj for obj in belief.placed if interface.deepim.detect(obj)}
+        detected = interface.perception.detect_all(belief.placed)
         start_time = time.time()
         converged = wait_for_dart_convergence(interface, detected)
         print('Stabilized: {} | Time: {:.3f}'.format(converged, elapsed_time(start_time)))
@@ -170,7 +169,7 @@ def set_isaac_sim(interface):
 ################################################################################
 
 def simulation_setup(domain, world, args):
-    # TODO: forcibly reset robot configuration
+    # TODO: forcibly reset robot arm configuration
     # trial_args = parse.parse_kitchen_args()
     trial_args = create_trial_args()
     with Verbose(False):
@@ -178,17 +177,19 @@ def simulation_setup(domain, world, args):
     observer = trial_manager.observer
     task_name = args.problem.replace('_', ' ')
     task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
-    interface = Interface(args, task, observer, trial_manager=trial_manager)
+    perception = FullObserver(domain) if args.observable else Segmentator(domain)
+    interface = Interface(args, task, observer, trial_manager=trial_manager, deepim=perception)
     if args.jump:
         robot_entity = domain.get_robot()
         robot_entity.carter_interface = interface.sim_manager
     return interface
 
+################################################################################
 
 def real_setup(domain, world, args):
     # TODO: detect if lula is active
     observer = RosObserver(domain)
-    deepim = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
+    perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
         #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
         SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
@@ -198,8 +199,8 @@ def real_setup(domain, world, args):
     goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior,
                 #goal_detected=[SPAM],
-                goal_holding=SPAM,
-                #goal_on={SPAM: goal_drawer},
+                #goal_holding=SPAM,
+                goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
@@ -216,7 +217,7 @@ def real_setup(domain, world, args):
         robot_entity = domain.get_robot()
         robot_entity.carter_interface = carter
         robot_entity.unsuppress_fixed_bases()
-    return Interface(args, task, observer, deepim=deepim)
+    return Interface(args, task, observer, deepim=perception)
 
 
 ################################################################################
@@ -299,6 +300,7 @@ def main():
             set_isaac_sim(interface)
         world._update_initial()
         add_markers(interface.task, inverse_place=False)
+    #wait_for_user()
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return

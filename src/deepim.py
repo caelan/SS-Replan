@@ -6,13 +6,15 @@ from itertools import product, combinations
 import numpy as np
 import rospy
 import tf
+from cv_bridge import CvBridge
 
 from geometry_msgs.msg import PoseStamped
 from brain_ros.ros_world_state import make_pose_from_pose_msg
 
 from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_distance, quat_from_pose, \
-    quat_angle_between
-from src.issac import ISSAC_WORLD_FRAME, CAMERA_PREFIX
+    quat_angle_between, read_json
+from sensor_msgs.msg import Image
+from src.issac import ISSAC_WORLD_FRAME, CAMERA_PREFIX, PANDA_FULL_CONFIG_PATH
 
 PREFIX_TEMPLATE = '{:02d}'
 PREFIX_FROM_SIDE = {
@@ -42,8 +44,6 @@ DETECTIONS_PER_SEC = 0.6 # /deepim/raw/objects/prior_pose
 
 # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
 
-# TODO: it looks like DeepIM publishes each pose individually
-
 def mean_pose_deviation(poses):
     points = [point_from_pose(pose) for pose in poses]
     pos_deviation = np.mean([get_distance(*pair) for pair in combinations(points, r=2)])
@@ -53,13 +53,67 @@ def mean_pose_deviation(poses):
 
 ################################################################################
 
-class DeepIM(object):
-    def __init__(self, domain, sides=[], obj_types=[]):
+class Perception(object):
+    def __init__(self, domain):
         self.domain = domain
+    def detect_all(self, obj_types=None):
+        raise NotImplementedError()
+
+class FullObserver(Perception):
+    def __init__(self, domain):
+        super(FullObserver, self).__init__(domain)
+    @property
+    def obj_types(self):
+        return set(self.domain.entities)
+        #return set(self.domain.root.entities)
+    def detect_all(self, obj_types=None):
+        return self.obj_types
+
+################################################################################
+
+#SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/instance_image' # {0, 1}
+SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/label_image' # {0, ..., 13}
+
+class Segmentator(object):
+    def __init__(self, domain):
+        super(Segmentator, self).__init__(domain)
+        # from brain.scripts.logger import Logger
+        # logger = Logger()
+        self.cv_bridge = CvBridge()
+        config_data = read_json(PANDA_FULL_CONFIG_PATH)
+        camera_data = config_data['LeftCamera']['CameraComponent']
+        self.segmentation_labels = [d['name'] for d in camera_data['segmentation_classes']['static_mesh']]
+        print('Labels:', self.segmentation_labels)
+        # https://gitlab-master.nvidia.com/srl/srl_system/blob/a1255229910a30f9c510bad1c4719c1c59c7b8ec/packages/isaac_bridge/configs/panda_full_config.json#L411
+        # python packages/brain/scripts/segmentation_visualizer.py
+
+        self.detections = []
+        self.subscriber = rospy.Subscriber(SEGMENTATION_TOPIC, Image, self.callback, queue_size=1)
+    def callback(self, data):
+        segmentation = self.cv_bridge.imgmsg_to_cv2(data)
+        # frequency = Counter(segmentation.flatten().tolist()) # TODO: use the area
+        # print(frequency)
+        indices = np.unique(segmentation)
+        # print(indices)
+        self.detections.append({self.segmentation_labels[i - 1] for i in indices})  # wraps around [-1]
+        #self.subscriber.unregister()
+    def detect_all(self, obj_types=None):
+        #rospy.sleep(0.1)  # This sleep is needed
+        while not self.detections:
+            rospy.sleep(0.01)
+        print('Detections:', self.detections[-1])
+        return self.detections[-1]
+
+################################################################################
+
+# TODO: it looks like DeepIM publishes each pose individually
+
+class DeepIM(Perception):
+    def __init__(self, domain, sides=[], obj_types=[]):
+        super(DeepIM, self).__init__(domain)
         self.sides = tuple(sides)
         self.obj_types = tuple(obj_types)
         self.tf_listener = tf.TransformListener()
-
         self.subscribers = {}
         self.observations = defaultdict(list)
         for side, obj_type in product(self.sides, self.obj_types):
@@ -117,11 +171,12 @@ class DeepIM(object):
         administrator = entity.administrator
 
         duration = 5.0
+        min_fraction = 0.5
         expected_detections = duration * DETECTIONS_PER_SEC
         observations = self.get_recent_observations(RIGHT, obj_type, duration)
         print('{}) observations={}, duration={}, rate={}'.format(
             obj_type, len(observations), duration, len(observations) / duration))
-        if len(observations) < 0.5*expected_detections:
+        if len(observations) < min_fraction*expected_detections:
             return False
         detections_from_frame = {}
         for pose_stamped in observations:
@@ -136,7 +191,6 @@ class DeepIM(object):
         # TODO: prune if not on surface
         # TODO: prune if incorrect orientation
         # TODO: small sleep after each detection to ensure time to converge
-        # TODO: wait until DART convergence
 
         administrator.activate() # entity.localize()
         #entity.set_tracked() # entity.is_tracked = True # Doesn't do anything
@@ -153,3 +207,8 @@ class DeepIM(object):
         #entity.last_t None
         #entity.location_belief None
         return True
+    def detect_all(self, obj_types=None):
+        if obj_types is None:
+            obj_types = self.obj_types
+        rospy.sleep(1.0)
+        return {obj_type for obj_type in obj_types if self.detect(obj_types)}

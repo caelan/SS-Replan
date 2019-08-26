@@ -13,6 +13,9 @@ class Interface(object):
         self.deepim = deepim
         self.paused = False
     @property
+    def perception(self):
+        return self.deepim
+    @property
     def simulation(self):
         return self.trial_manager is not None
     @property

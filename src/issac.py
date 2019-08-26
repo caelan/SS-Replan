@@ -9,8 +9,6 @@ import rospy
 import tf2_ros
 
 #from collections import Counter
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
 from brain_ros.ros_world_state import RobotArm, FloatingRigidBody, Drawer, RigidBody
@@ -19,10 +17,10 @@ from brain_ros.ros_world_state import make_pose
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_pose, tform_from_pose, \
     get_movable_joints, get_joint_names, get_joint_positions, get_links, \
-    BASE_LINK, LockRenderer, base_values_from_pose, unit_pose, \
-    pose_from_base_values, INF, wait_for_user, violates_limits, get_joint_limits, violates_limit, \
-    set_renderer, draw_pose, read_json, Pose, Point, point_from_pose, aabb_contains_point
-from src.utils import CAMERAS, LEFT_CAMERA, SRL_PATH, get_ycb_obj_path, CAMERA_TEMPLATE
+    BASE_LINK, base_values_from_pose, unit_pose, \
+    pose_from_base_values, INF, wait_for_user, get_joint_limits, violates_limit, \
+    set_renderer, draw_pose, Pose, Point
+from src.utils import LEFT_CAMERA, SRL_PATH, CAMERA_TEMPLATE
 
 ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
 ISSAC_FRANKA_FRAME = 'base_link' # Robot base
@@ -35,8 +33,6 @@ TEMPLATE = '%s_1'
 NULL_POSE = Pose(Point(z=-2))
 
 PANDA_FULL_CONFIG_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/configs/panda_full_config.json')
-#SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/instance_image' # {0, 1}
-SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/label_image' # {0, ..., 13}
 
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
@@ -251,33 +247,6 @@ def display_kinect(interface, side):
         calibration_topic,  # TODO: right as well
         CameraInfo, callback, queue_size=1) # right, depth
 
-def detect_classes():
-    # from brain.scripts.logger import Logger
-    # logger = Logger()
-    cv_bridge = CvBridge()
-    config_data = read_json(PANDA_FULL_CONFIG_PATH)
-    camera_data = config_data['LeftCamera']['CameraComponent']
-    segmentation_labels = [d['name'] for d in camera_data['segmentation_classes']['static_mesh']]
-    print('Labels:', segmentation_labels)
-    # https://gitlab-master.nvidia.com/srl/srl_system/blob/a1255229910a30f9c510bad1c4719c1c59c7b8ec/packages/isaac_bridge/configs/panda_full_config.json#L411
-    # python packages/brain/scripts/segmentation_visualizer.py
-
-    detections = []
-    def callback(data):
-        segmentation = cv_bridge.imgmsg_to_cv2(data)
-        #frequency = Counter(segmentation.flatten().tolist()) # TODO: use the area
-        #print(frequency)
-        indices = np.unique(segmentation)
-        #print(indices)
-        detections.append({segmentation_labels[i-1] for i in indices}) # wraps around [-1]
-        subscriber.unregister()
-
-    rospy.sleep(0.1) # This sleep is needed
-    subscriber = rospy.Subscriber(SEGMENTATION_TOPIC, Image, callback, queue_size=1)
-    while not detections:
-        rospy.sleep(0.01)
-    print('Detections:', detections[-1])
-    return detections[-1]
 
 ################################################################################
 
@@ -315,14 +284,7 @@ def load_objects(task):
         set_pose(body, NULL_POSE)
         draw_pose(unit_pose(), parent=body)
 
-def update_objects(interface, world_state, visible=set()):
-    # domain.entities
-    world = interface.world
-    if interface.simulation:
-        if interface.observable:
-            visible = set(world_state.entities.keys())
-        else:
-            visible = detect_classes()
+def update_objects(interface, world_state, visible): #=set()):
     print('Visible:', sorted(visible))
     observation = {}
     for name, entity in world_state.entities.items():
@@ -331,7 +293,7 @@ def update_objects(interface, world_state, visible=set()):
             continue
         elif isinstance(entity, FloatingRigidBody):  # Must come before RigidBody
             # entity.is_tracked, entity.location_belief, entity.view
-            if name not in world.task.objects:
+            if name not in interface.world.task.objects:
                 # TODO: discard/correct later in the pipeline
                 continue
             # entity.obj_type
@@ -353,7 +315,7 @@ def update_objects(interface, world_state, visible=set()):
             raise NotImplementedError(entity.__class__)
     return observation
 
-def observe_world(interface, **kwargs):
+def observe_world(interface, visible=set(), **kwargs):
     #dump_dict(world_state)
     #print(world_state.get_frames())
     # Using state is nice because it applies noise
@@ -362,7 +324,7 @@ def observe_world(interface, **kwargs):
     #world.reset()
     update_robot(interface)
     print('Kitchen joints:', update_kitchen(interface.world, world_state))
-    return update_objects(interface, world_state, **kwargs)
+    return update_objects(interface, world_state, visible=visible, **kwargs)
 
 ################################################################################
 
