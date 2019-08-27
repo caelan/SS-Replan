@@ -1,7 +1,7 @@
 import numpy as np
 import rospy
 
-from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn
+from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn, INF
 from src.issac import ISSAC_FRANKA_FRAME
 
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -9,14 +9,15 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
 
-ARM_SPEED = 0.15*np.pi # 0.2 is too high
+#ARM_SPEED = 0.15*np.pi # radians / sec
+ARM_SPEED = 0.5 # percent
 
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
             for joint in joints]
 
-def get_duration_fn(body, joints, velocities=None, norm=2):
+def get_duration_fn(body, joints, velocities=None, norm=INF):
     if velocities is None:
         velocities = np.array([get_max_velocity(body, joint) for joint in joints])
     difference_fn = get_difference_fn(body, joints)
@@ -29,7 +30,8 @@ def get_duration_fn(body, joints, velocities=None, norm=2):
 ################################################################################
 
 def retime_path(robot, joints, path, speed=ARM_SPEED):
-    duration_fn = get_distance_fn(robot, joints)
+    #duration_fn = get_distance_fn(robot, joints)
+    duration_fn = get_duration_fn(robot, joints)
     mid_durations = [duration_fn(*pair) for pair in zip(path[:-1], path[1:])]
     durations = [0.] + mid_durations
     time_from_starts = np.cumsum(durations) / speed
@@ -45,7 +47,6 @@ def slow_trajectory(robot, joints, path, **kwargs):
     mid_durations = [t2 - t1 for t1, t2 in zip(time_from_starts[:-1], time_from_starts[1:])]
     new_time_from_starts = [0.]
     for mid_time, mid_duration in zip(mid_times, mid_durations):
-        # TODO: slow down based on mid_duration or time
         time_from_start = mid_time - time_from_starts[0]
         up_fraction = clip(time_from_start / ramp_duration, min_value=min_fraction, max_value=1.)
         time_from_end = time_from_starts[-1] - mid_time
@@ -87,6 +88,7 @@ def spline_parameterization(robot, joints, path, **kwargs):
     # BPoly.from_derivatives
     # PPoly.from_spline # PPoly.from_bernstein_basis
     path = list(path)
+    #time_from_starts = retime_path(robot, joints, path, **kwargs)
     time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
     ensure_increasing(path, time_from_starts)
     #positions = interp1d(time_from_starts, path, kind='linear')
