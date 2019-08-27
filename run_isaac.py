@@ -31,18 +31,20 @@ from src.deepim import DeepIM, mean_pose_deviation, Segmentator, FullObserver
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
-from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, SPAM, MUSTARD, TOMATO_SOUP, \
-    SUGAR, INDIGO_COUNTER, TOP_DRAWER, YCB_OBJECTS, CHEEZIT, BOTTOM_DRAWER
+from src.parse_brain import task_from_trial_manager, create_trial_args, TRIAL_MANAGER_TASKS, SPAM, MUSTARD, TOMATO_SOUP, \
+    SUGAR, INDIGO_COUNTER, TOP_DRAWER, YCB_OBJECTS, CHEEZIT, BOTTOM_DRAWER, ECHO_COUNTER
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, dump_dict, update_objects, RIGHT, SIDES, LEFT
 from src.update_isaac import update_isaac_sim
 from src.world import World
-from run_pybullet import create_parser
 from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement
-from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 from src.execution import franka_open_gripper
+from run_pybullet import create_parser
+
+from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
+
 
 # TODO: prevent grasp if open
 # TODO: ignore grasped objects in the update
@@ -153,7 +155,6 @@ def set_isaac_sim(interface):
     assert interface.simulation
     task = interface.task
     world = task.world
-    task = world.task
     # close_all_doors(world)
     if task.movable_base:
         world.set_base_conf([2.0, 0, -np.pi / 2])
@@ -161,7 +162,8 @@ def set_isaac_sim(interface):
     else:
         for name, dist in task.prior.items():
             surface = dist.sample()
-            sample_placement(world, name, surface, learned=False)
+            learned = surface != ECHO_COUNTER
+            sample_placement(world, name, surface, learned=learned)
         # pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
         # pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
     update_isaac_sim(interface, world)
@@ -176,8 +178,31 @@ def simulation_setup(domain, world, args):
     with Verbose(False):
         trial_manager = TrialManager(trial_args, domain, lula=args.lula)
     observer = trial_manager.observer
+
     task_name = args.problem.replace('_', ' ')
-    task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
+    if task_name in TRIAL_MANAGER_TASKS:
+        task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
+    else:
+        prior = {
+            SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]),
+            #SPAM: UniformDist([INDIGO_COUNTER]),
+            SUGAR: UniformDist([INDIGO_COUNTER]),
+            CHEEZIT: UniformDist([INDIGO_COUNTER]),
+        }
+        prior.update({name: DeltaDist(ECHO_COUNTER) for name in YCB_OBJECTS if name not in prior})
+        goal_drawer = TOP_DRAWER  # TOP_DRAWER | BOTTOM_DRAWER
+        task = Task(world, prior=prior,
+                    # goal_detected=[SPAM],
+                    goal_holding=SPAM,
+                    #goal_on={SPAM: goal_drawer},
+                    # goal_closed=[],
+                    # goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
+                    # goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
+                    movable_base=not args.fixed,
+                    goal_aq=world.carry_conf,  # .values,
+                    # return_init_aq=True,
+                    return_init_bq=True)
+
     perception = FullObserver(domain) if args.observable else Segmentator(domain)
     interface = Interface(args, task, observer, trial_manager=trial_manager, deepim=perception)
     if args.jump:
@@ -188,7 +213,7 @@ def simulation_setup(domain, world, args):
 ################################################################################
 
 def real_setup(domain, world, args):
-    # TODO: detect if lula is active
+    # TODO: detect if lula is active via rosparam
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
@@ -233,7 +258,7 @@ def main():
                         help="When enabled, skips base control")
     parser.add_argument('-lula', action='store_true',
                         help='When enabled, uses LULA instead of JointState control')
-    parser.add_argument('-problem', default=TASKS[2], choices=TASKS,
+    parser.add_argument('-problem', default=TRIAL_MANAGER_TASKS[2], #choices=TRIAL_MANAGER_TASKS,
                         help='The name of the task')
     parser.add_argument('-watch', action='store_true',
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
@@ -296,7 +321,8 @@ def main():
         load_objects(interface.task)
         for side in SIDES:
             display_kinect(interface, side=side)
-        world.cameras.pop(LEFT)
+        if LEFT in world.cameras:
+            del world.cameras[LEFT]
         observe_world(interface, visible=set())
         if interface.simulation:  # TODO: move to simulation instead?
             set_isaac_sim(interface)

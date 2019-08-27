@@ -224,7 +224,6 @@ def check_limits(world, entity):
 
 def display_kinect(interface, side):
     world = interface.world
-    observer = interface.observer
     if world.cameras:
         return
     camera_infos = []
@@ -247,12 +246,12 @@ def display_kinect(interface, side):
             #camera_frame = '{}_link'.format(camera_name)
         print('Received camera info from camera', camera_name)
 
-        world_from_camera = lookup_pose(observer.tf_listener, camera_frame)
+        world_from_camera = lookup_pose(interface.observer.tf_listener, camera_frame)
         if world_from_camera is None:
             print('Failed to detect pose for camera ', camera_name)
         else:
             world.add_camera(camera_name, world_from_camera, camera_matrix)
-        observer.camera_sub.unregister()
+        camera_sub.unregister()
         # draw_viewcone(world_from_camera)
         # /sim/left_color_camera/camera_info
         # /sim/left_depth_camera/camera_info
@@ -264,7 +263,7 @@ def display_kinect(interface, side):
         camera_name = KINECT_FROM_SIDE[side]
         calibration_topic = '/{}/rgb/camera_info'.format(camera_name)
 
-    observer.camera_sub = rospy.Subscriber(
+    camera_sub = rospy.Subscriber(
         calibration_topic,
         CameraInfo, callback, queue_size=1) # right, depth
 

@@ -44,6 +44,8 @@ class Perception(object):
         self.domain = domain
     def detect_all(self, obj_types=None):
         raise NotImplementedError()
+    def stop_tracking(self, name):
+        return True
 
 class FullObserver(Perception):
     def __init__(self, domain):
@@ -60,7 +62,7 @@ class FullObserver(Perception):
 #SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/instance_image' # {0, 1}
 SEGMENTATION_TOPIC = '/sim/left_segmentation_camera/label_image' # {0, ..., 13}
 
-class Segmentator(object):
+class Segmentator(Perception):
     def __init__(self, domain):
         super(Segmentator, self).__init__(domain)
         # from brain.scripts.logger import Logger
