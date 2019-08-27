@@ -37,6 +37,7 @@ BASE_CONSTANT = 1.0 # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 
+PAUSE_MOTION_FAILURES = False
 PRINT_FAILURES = True
 MOVE_ARM = True
 ARM_RESOLUTION = 0.05
@@ -189,7 +190,6 @@ def get_ofree_ray_pose_test(world, **kwargs):
             return True
         if isinstance(pose, SurfaceDist):
             return True
-        return True
         move_occluding(world)
         detect.pose.assign()
         pose.assign()
@@ -206,7 +206,6 @@ def get_ofree_ray_grasp_test(world, **kwargs):
     def test(detect, bconf, aconf, obj_name, grasp):
         if detect.name == obj_name:
             return True
-        return True
         move_occluding(world)
         bconf.assign()
         aconf.assign()
@@ -216,8 +215,8 @@ def get_ofree_ray_grasp_test(world, **kwargs):
             obstacles = get_link_obstacles(world, obj_name)
         else:
             obstacles = get_descendant_obstacles(world.robot)
-        detect.draw()
-        wait_for_user()
+        #detect.draw()
+        #wait_for_user()
         return not obstacles & detect.compute_occluding()
     return test
 
@@ -915,12 +914,13 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
                 print('Failed to find a base motion plan!')
-                set_renderer(enable=True)
-                #print(fluents)
-                for bq in [bq1, bq2]:
-                    bq.assign()
-                    wait_for_user()
-                set_renderer(enable=False)
+                if PAUSE_MOTION_FAILURES:
+                    set_renderer(enable=True)
+                    #print(fluents)
+                    for bq in [bq1, bq2]:
+                        bq.assign()
+                        wait_for_user()
+                    set_renderer(enable=False)
                 return None
         # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(world, savers=[robot_saver]), commands=[
@@ -966,12 +966,13 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      restarts=2, iterations=50, smooth=50)
             if path is None:
                 print('Failed to find an arm motion plan!')
-                set_renderer(enable=True)
-                #print(fluents)
-                for bq in [aq1, aq2]:
-                    bq.assign()
-                    wait_for_user()
-                set_renderer(enable=False)
+                if PAUSE_MOTION_FAILURES:
+                    set_renderer(enable=True)
+                    #print(fluents)
+                    for bq in [aq1, aq2]:
+                        bq.assign()
+                        wait_for_user()
+                    set_renderer(enable=False)
                 return None
         cmd = Sequence(State(world, savers=[robot_saver]), commands=[
             Trajectory(world, world.robot, world.arm_joints, path),
@@ -1122,6 +1123,33 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
             if any(pairwise_collision(part, obst) for part in
                    [world.gripper, body] for obst in obstacles):
                 return False
+        return True
+    return test
+
+def get_cfree_angle_angle_test(world, collisions=True, **kwargs):
+    def test(j1, a1, j2, a2):
+        if not collisions or (j1 == j2):
+            return True
+        # TODO: check pregrasp path as well
+        a1.assign()
+        a2.assign()
+        door_joint = joint_from_name(world.kitchen, j1)
+        door_joints = [door_joint]
+        door_path = [a1.values]
+        obstacles = get_descendant_obstacles(world.kitchen, joint_from_name(world.kitchen, j2))
+        set_configuration(world.gripper, world.open_gq.values)
+        for link, grasp, pregrasp in get_handle_grasps(world, door_joint):
+            for door_conf in door_path:
+                set_joint_positions(world.kitchen, door_joints, door_conf)
+                # The drawers themselves will never collide
+                # if any(pairwise_collision(door_obst, obst)
+                #       for door_obst, obst in product(door_obstacles, obstacles)):
+                #    return
+                handle_pose = get_link_pose(world.kitchen, link)
+                tool_pose = multiply(handle_pose, invert(grasp))
+                set_tool_pose(world, tool_pose)
+                if any(pairwise_collision(world.gripper, obst) for obst in obstacles):
+                    return False
         return True
     return test
 

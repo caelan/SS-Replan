@@ -228,7 +228,7 @@ def real_setup(domain, world, args):
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
-    goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
+    goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior,
                 #goal_detected=[SPAM],
                 #goal_holding=SPAM,

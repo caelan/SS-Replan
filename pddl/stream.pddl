@@ -165,6 +165,10 @@
     :inputs (?o1 ?wp1 ?g1 ?o2 ?wp2)
     :domain (and (WorldPose ?o1 ?wp1) (Grasp ?o1 ?g1) (WorldPose ?o2 ?wp2))
     :certified (CFreeApproachPose ?o1 ?wp1 ?g1 ?o2 ?wp2))
+  (:stream test-cfree-angle-angle
+    :inputs (?j1 ?a1 ?j2 ?a2)
+    :domain (and (Angle ?j1 ?a1) (Angle ?j2 ?a2))
+    :certified (CFreeAngleAngle ?j1 ?a1 ?j2 ?a2))
   (:stream test-cfree-bconf-pose
     :inputs (?bq ?o2 ?wp2)
     :domain (and (BConf ?bq) (WorldPose ?o2 ?wp2))

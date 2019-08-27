@@ -93,6 +93,8 @@ def get_stream_info():
                                             verbose=False),
         'test-cfree-approach-pose': StreamInfo(p_success=1e-2, negate=True,
                                                verbose=False),
+        'test-cfree-angle-angle': StreamInfo(p_success=1e-2, negate=True,
+                                             verbose=False),
         'test-cfree-traj-pose': StreamInfo(p_success=1e-1, negate=True,
                                            verbose=False),
 

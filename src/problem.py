@@ -23,7 +23,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
     get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test, \
-    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn
+    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, get_cfree_angle_angle_test
 from src.database import has_place_database
 
 MAX_ERROR = np.pi / 6
@@ -95,6 +95,7 @@ def get_streams(world, debug=False, **kwargs):
         'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
         'test-cfree-bconf-pose': from_test(get_cfree_bconf_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
+        'test-cfree-angle-angle': from_test(get_cfree_angle_angle_test(world, **kwargs)),
         'test-cfree-traj-pose': from_test(get_cfree_traj_pose_test(world, **kwargs)),
 
         'test-ofree-ray-pose': from_test(get_ofree_ray_pose_test(world, **kwargs)),

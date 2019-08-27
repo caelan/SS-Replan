@@ -50,6 +50,7 @@
     (CFreeTrajPose ?t ?o2 ?wp2)
     (CFreeWorldPose ?o1 ?wp1)
     (CFreeWorldPoseWorldPose ?o1 ?wp1 ?o2 ?wp2)
+    (CFreeAngleAngle ?j1 ?a1 ?j2 ?a2)
 
     (OFreeRayPose ?r ?o ?wp)
     (OFreeRayGrasp ?r ?bq ?aq ?o ?g)
@@ -83,6 +84,7 @@
     (Unsafe)
     (UnsafeRelPose ?o ?rp ?s)
     (UnsafeApproach ?o ?wp ?g)
+    (UnsafeAngle ?j ?a)
     (UnsafeATraj ?at)
     (OccludedRay ?r)
     (CloseTo ?q1 ?q2)
@@ -211,9 +213,10 @@
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?wp1)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
                        (HandEmpty) (Calibrated)
-                       (not (UnsafeATraj ?at))
+                       (not (UnsafeAngle ?j ?a1)) ; analog of UnsafeApproach
+                       (not (UnsafeAngle ?j ?a2))
+                       (not (UnsafeATraj ?at)) ; TODO: approach pull trajectories
                        (not (Unsafe)))
-                       ; TODO: approach pull trajectories
     ; TODO: use the full pull trajectory
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?wp2) (AtAConf ?aq2)
                  ; (AtGConf @open_gq) (not (AtGConf ?gq))
@@ -292,6 +295,11 @@
     (exists (?o2 ?wp2) (and (WorldPose ?o2 ?wp2) (Obstacle ?o2) (not (= ?o1 ?o2))
                            (not (CFreeApproachPose ?o1 ?wp1 ?g ?o2 ?wp2))
                            (AtWorldPose ?o2 ?wp2)))
+  ))
+  (:derived (UnsafeAngle ?j1 ?a1) (and (Angle ?j1 ?a1) (Drawer ?j1)
+    (exists (?j2 ?a2) (and (Angle ?j2 ?a2) (Drawer ?j2) (not (= ?j1 ?j2))
+                           (not (CFreeAngleAngle ?j1 ?a1 ?j2 ?a2))
+                           (AtAngle ?j2 ?a2)))
   ))
   (:derived (UnsafeATraj ?at) (and (ATraj ?at)
     (exists (?o2 ?wp2) (and (WorldPose ?o2 ?wp2) (Obstacle ?o2)
