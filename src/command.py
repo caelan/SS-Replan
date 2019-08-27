@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import math
 import numpy as np
 import time
@@ -402,6 +404,7 @@ DEFAULT_TIME_STEP = 0.02
 def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
     if commands is None:
         return False
+    # TODO: spline interpolation for visualization
     for i, command in enumerate(commands):
         print('\nCommand {:2}/{:2}: {}'.format(i + 1, len(commands), command))
         # TODO: skip to end
