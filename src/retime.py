@@ -10,7 +10,7 @@ from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInter
 
 
 #ARM_SPEED = 0.15*np.pi # radians / sec
-ARM_SPEED = 0.5 # percent
+ARM_SPEED = 0.25 # percent
 
 
 def get_joint_names(body, joints):

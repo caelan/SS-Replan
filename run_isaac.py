@@ -15,6 +15,9 @@ from collections import defaultdict
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
+#import brain_ros.moveit
+#brain_ros.moveit.USE_MOVEIT = True
+
 from brain_ros.kitchen_domain import KitchenDomain
 #from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain
 #from grasps import *
@@ -220,8 +223,8 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
-        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
+        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        #SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
@@ -232,6 +235,7 @@ def real_setup(domain, world, args):
                 goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
+                goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
@@ -287,7 +291,7 @@ def main():
         domain = KitchenDomain(sim=not args.execute, sigma=0, lula=args.lula)
         #domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     robot_entity = domain.get_robot()
-    robot_entity.get_motion_interface().remove_obstacle() # TODO: doesn't remove
+    #robot_entity.get_motion_interface().remove_obstacle() # TODO: doesn't remove
     robot_entity.suppress_fixed_bases() # Not as much error?
     #robot_entity.unsuppress_fixed_bases() # Significant error
     # Significant error without either
@@ -331,7 +335,7 @@ def main():
             set_isaac_sim(interface)
         world._update_initial()
         add_markers(interface.task, inverse_place=False)
-    wait_for_user()
+    #wait_for_user()
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
@@ -352,6 +356,10 @@ if __name__ == '__main__':
     finally:
         kill_lula()
 
+# srl@vgilligan:~$ find . -name panda_control_moveit_rviz.launch
+# ./srl_system/packages/panda_moveit_config/launch/panda_control_moveit_rviz.launch
+# ./catkin_ws/src/panda_moveit_config/launch/panda_control_moveit_rviz.launch
+
 # 3 real robot control options:
 # 1) LULA + RMP
 # 2) Position joint trajectory controller
@@ -368,14 +376,15 @@ if __name__ == '__main__':
 
 # Running DART
 # cpaxton@lokeefe:~$ franka world franka_center_right_kitchen.yaml
+# cpaxton@lokeefe:~$ roslaunch lula_dart kitchen_dart_kinect1_kinect2.launch
 # cpaxton@lokeefe:~/srl_system/workspace/src/brain/src/brain_ros$ rosrun lula_dart object_administrator --detect --j=00_potted_meat_can
 
 # Running on the real robot w/o LULA
 # cpaxton@lokeefe:~$ roscore
 # 1) srl@vgilligan:~$ roslaunch franka_controllers start_control.launch
-# 2) srl@vgilligan:~$ roslaunch panda_moveit_config panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+# 2) srl@vgilligan:~/srl_system/packages/panda_moveit_config/launch$ roslaunch panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
 # 3) srl@vgilligan:~$ ~/srl_system/workspace/src/brain/relay.sh
-# 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz
+# 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz (REQUIRED!!!)
 # 4) killall move_group franka_control_node local_controller
 
 # Running on the real robot w/ lula

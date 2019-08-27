@@ -15,7 +15,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, draw_aabb, \
-    disable_gravity
+    disable_gravity, set_all_static
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
@@ -189,6 +189,7 @@ class World(object):
             self.goal_aq = self.carry_conf
         self.goal_gq = FConf(self.robot, self.gripper_joints)
         self.initial_confs = [self.goal_bq, self.goal_aq, self.goal_gq]
+        set_all_static()
 
     @property
     def constants(self):

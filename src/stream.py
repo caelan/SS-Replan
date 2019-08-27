@@ -12,7 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
-    set_renderer, get_movable_joints, INF, apply_affine
+    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
@@ -136,6 +136,7 @@ def get_compute_detect(world, ray_trace=True, **kwargs):
         # TODO: incorporate probability mass
         # Ether sample observation (control) or target belief (next state)
         body = world.get_body(obj_name)
+        open_surface_joints(world, pose.support)
         for camera_name in world.cameras:
             camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
             camera_pose = get_pose(camera_body)
@@ -149,13 +150,16 @@ def get_compute_detect(world, ray_trace=True, **kwargs):
             # print(is_visible_aabb(view_aabb, camera_matrix=camera_matrix))
             obj_points = apply_affine(camera_pose, support_from_aabb(view_aabb)) + [obj_point]
             # obj_points = [obj_point]
-            if not all(is_visible_point(camera_matrix, camera_depth, point, camera_pose) for point in obj_points):
+            if not all(is_visible_point(camera_matrix, camera_depth, point, camera_pose)
+                       for point in obj_points):
                 continue
             rays = [Ray(camera_point, point) for point in obj_points]
             detect = Detect(world, camera_name, obj_name, pose, rays)
             if ray_trace:
                 # TODO: how should doors be handled?
-                move_occluding(world, detect, obj_name=None)
+                move_occluding(world)
+                open_surface_joints(world, pose.support)
+                detect.pose.assign()
                 if obstacles & detect.compute_occluding():
                     continue
             #detect.draw()
@@ -165,52 +169,56 @@ def get_compute_detect(world, ray_trace=True, **kwargs):
     return fn
 
 
-def move_occluding(world, ray, obj_name):  # TODO: detect instead of ray
-    if obj_name is None:
-        movable = world.movable - {ray.name}
-    else:
-        world.set_base_conf([-5.0, 0, 0])
-        movable = world.movable - {ray.name, obj_name}
+def move_occluding(world):
     # Prevent obstruction by other objects
-    for name in movable:
+    # TODO: this is a bit of a hack due to pybullet
+    world.set_base_conf([-5.0, 0, 0])
+    for joint in world.kitchen_joints:
+        joint_name = get_joint_name(world.kitchen, joint)
+        if joint_name in DRAWERS:
+            world.open_door(joint)
+        else:
+            world.close_door(joint)
+    for name in world.movable:
         set_pose(world.get_body(name), Pose(Point(z=-5.0)))
 
 def get_ofree_ray_pose_test(world, **kwargs):
     # TODO: detect the configuration of joints
-    def test(ray, obj_name, pose):
-        if ray.name == obj_name:
+    def test(detect, obj_name, pose):
+        if detect.name == obj_name:
             return True
         if isinstance(pose, SurfaceDist):
             return True
-        # TODO: some of the rays clip the top of objects. Might be related to the slight z translation
-        ray.pose.assign()
+        return True
+        move_occluding(world)
+        detect.pose.assign()
         pose.assign()
-        body = world.get_body(ray.name)
+        body = world.get_body(detect.name)
         obstacles = get_link_obstacles(world, obj_name)
         if any(pairwise_collision(body, obst) for obst in obstacles):
             return False
-        move_occluding(world, ray, obj_name)
         #ray.draw()
         #wait_for_user()
-        return not obstacles & ray.compute_occluding()
+        return not obstacles & detect.compute_occluding()
     return test
 
 def get_ofree_ray_grasp_test(world, **kwargs):
-    def test(ray, bconf, aconf, obj_name, grasp):
-        if ray.name == obj_name:
+    def test(detect, bconf, aconf, obj_name, grasp):
+        if detect.name == obj_name:
             return True
+        return True
+        move_occluding(world)
         bconf.assign()
         aconf.assign()
-        ray.pose.assign()
+        detect.pose.assign()
         if obj_name is not None:
             grasp.assign()
             obstacles = get_link_obstacles(world, obj_name)
         else:
             obstacles = get_descendant_obstacles(world.robot)
-        move_occluding(world, ray, obj_name)
-        #ray.draw()
-        #wait_if_unlocked()
-        return not obstacles & ray.compute_occluding()
+        detect.draw()
+        wait_for_user()
+        return not obstacles & detect.compute_occluding()
     return test
 
 class Observation(object):
@@ -226,7 +234,6 @@ def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relativ
     detect_fn = get_compute_detect(world, ray_trace=False, **kwargs)
     def gen(obj_name, pose_dist, surface_name):
         # TODO: apply these checks to the whole surfaces
-        open_surface_joints(world, surface_name)
         valid_samples = {}
         for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)

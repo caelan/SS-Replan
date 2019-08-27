@@ -198,4 +198,4 @@ class DeepIM(Perception):
         if obj_types is None:
             obj_types = self.obj_types
         rospy.sleep(1.0)
-        return {obj_type for obj_type in obj_types if self.detect(obj_types)}
+        return {obj_type for obj_type in obj_types if self.detect(obj_type)}
