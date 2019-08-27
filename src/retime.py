@@ -53,7 +53,6 @@ def slow_trajectory(robot, joints, path, **kwargs):
         down_fraction = clip(time_from_end / ramp_duration, min_value=min_fraction, max_value=1.)
         new_fraction = min(up_fraction, down_fraction)
         new_duration = mid_duration / new_fraction
-        print(mid_duration, new_fraction, new_duration)
         #print(new_time_from_starts[-1], up_fraction, down_fraction, new_duration)
         new_time_from_starts.append(new_time_from_starts[-1] + new_duration)
     # print(time_from_starts)

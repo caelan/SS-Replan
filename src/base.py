@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 
 from pybullet_tools.utils import get_closest_angle_fn, INF, point_from_pose, wrap_angle, euler_from_quat, \
     quat_from_pose, get_angle, circular_difference, waypoints_from_path, get_link_pose, remove_handles, draw_pose
-from src.issac import lookup_pose, ISSAC_PREFIX, ISSAC_CARTER_FRAME, ISSAC_WORLD_FRAME
+from src.issac import lookup_pose, RIGHT_PREFIX, ISSAC_CARTER_FRAME, ISSAC_WORLD_FRAME
 from src.utils import WHEEL_JOINTS
 
 def ROSPose(pose):
@@ -63,7 +63,7 @@ def base_control(world, goal_values, moveit, observer,
         #robot_entity.base_link
         #print(pose_from_tform(robot_entity.pose))
 
-        base_pose = lookup_pose(observer.tf_listener, ISSAC_PREFIX + ISSAC_CARTER_FRAME)
+        base_pose = lookup_pose(observer.tf_listener, RIGHT_PREFIX + ISSAC_CARTER_FRAME)
         current_values = np.array(point_from_pose(base_pose))
         current_pos = current_values[:2]
         x, y, _ = point_from_pose(base_pose)

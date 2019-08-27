@@ -20,13 +20,37 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     set_renderer, draw_pose, Pose, Point
 from src.utils import SRL_PATH, CAMERA_TEMPLATE
 
-ISSAC_PREFIX = '00_' # Prefix of 00 for movable objects and camera
+RIGHT = 'right'
+LEFT = 'left'
+SIDES = [RIGHT, LEFT]
+
+PREFIX_TEMPLATE = '{:02d}'
+PREFIX_FROM_SIDE = {
+    RIGHT: PREFIX_TEMPLATE.format(0),
+    LEFT: PREFIX_TEMPLATE.format(1),
+}
+# self.domain.view_tags # {'right': '00', 'left': '01'}
+
+KINECT_TEMPLATE = 'kinect{}'
+KINECT_FROM_SIDE = {
+    RIGHT: KINECT_TEMPLATE.format(1), # indexes from 1
+    LEFT: KINECT_TEMPLATE.format(2),
+}
+
+DEPTH_PREFIX = 'depth_camera'
+DEPTH_FROM_SIDE = {
+    RIGHT: DEPTH_PREFIX, # indexes from 1
+    LEFT: '{}_2'.format(DEPTH_PREFIX),
+}
+
+RIGHT_PREFIX = '{}_'.format(PREFIX_FROM_SIDE[RIGHT])
+
+# TODO: rosparam get /world_frame
 ISSAC_FRANKA_FRAME = 'base_link' # Robot base
 UNREAL_WORLD_FRAME = 'ue_world'
 ISSAC_WORLD_FRAME = 'world' # world | walls | sektion
 ISSAC_CARTER_FRAME = 'chassis_link' # The link after theta
-CONTROL_TOPIC = '/sim/desired_joint_states'
-TEMPLATE = '%s_1'
+#CONTROL_TOPIC = '/sim/desired_joint_states'
 
 NULL_POSE = Pose(Point(z=-2))
 
@@ -34,6 +58,8 @@ PANDA_FULL_CONFIG_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/configs/p
 
 # current_view = view  # Current environment area we are in
 # view_root = "%s_base_link" % view_tags[view]
+
+################################################################################
 
 def update_observer(observer):
     while not observer.update(noise=False):
@@ -61,9 +87,9 @@ def dump_dict(obj):
 
 KEYPOINT_PATH = 'package://lula_franka/data/keypoint_frames/'
 LOCALIZATION_ROSPATHS = {
-    'left': os.path.join(KEYPOINT_PATH, 'dart_localization_frame_right2.pkl'),
+    LEFT: os.path.join(KEYPOINT_PATH, 'dart_localization_frame_right2.pkl'),
     #'open_chewie': os.path.join(keypoint_dir, 'dart_localization_frame_left.pkl'),
-    'right': os.path.join(KEYPOINT_PATH, 'dart_localization_frame_left.pkl'),
+    RIGHT: os.path.join(KEYPOINT_PATH, 'dart_localization_frame_left.pkl'),
 }
 RETRACT_POSTURE_PATH = os.path.join(KEYPOINT_PATH, 'retract_posture.pkl')
 # TODO: could use pickled grasps as well
@@ -196,8 +222,6 @@ def check_limits(world, entity):
 
 ################################################################################
 
-CAMERA_PREFIX = 'depth_camera'
-
 def display_kinect(interface, side):
     world = interface.world
     observer = interface.observer
@@ -216,10 +240,10 @@ def display_kinect(interface, side):
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
         if interface.simulation:
             camera_name = CAMERA_TEMPLATE.format(side)
-            camera_frame = ISSAC_PREFIX + camera_name
+            camera_frame = RIGHT_PREFIX + camera_name
         else:
-            camera_name = 'kinect1'
-            camera_frame = CAMERA_PREFIX # depth_camera_2
+            camera_name = KINECT_FROM_SIDE[side] # 'kinect1'
+            camera_frame = DEPTH_FROM_SIDE[side] # depth_camera_2
             #camera_frame = '{}_link'.format(camera_name)
         print('Received camera info from camera', camera_name)
 
@@ -233,16 +257,15 @@ def display_kinect(interface, side):
         # /sim/left_color_camera/camera_info
         # /sim/left_depth_camera/camera_info
         # /sim/right_color_camera/camera_info
-        # TODO: would be cool to display the kinect2 as well
 
     if interface.simulation:
         calibration_topic = "/sim/{}_{}_camera/camera_info".format(side, 'color')
     else:
-        # Using kinect2 instead of kinect1
-        calibration_topic = '/kinect1/rgb/camera_info'
+        camera_name = KINECT_FROM_SIDE[side]
+        calibration_topic = '/{}/rgb/camera_info'.format(camera_name)
 
     observer.camera_sub = rospy.Subscriber(
-        calibration_topic,  # TODO: right as well
+        calibration_topic,
         CameraInfo, callback, queue_size=1) # right, depth
 
 
@@ -295,7 +318,7 @@ def update_objects(interface, world_state, visible): #=set()):
                 continue
             # entity.obj_type
             if name in visible:
-                frame_name = ISSAC_PREFIX + name
+                frame_name = RIGHT_PREFIX + name
                 pose = lookup_pose(interface.observer.tf_listener, frame_name)
                 # pose = get_world_from_model(observer, entity, body)
                 # pose = pose_from_tform(entity.pose)

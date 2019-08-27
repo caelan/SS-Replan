@@ -26,7 +26,7 @@ from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, e
     get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, link_from_name, get_link_pose
 from pddlstream.utils import Verbose
 
-from src.deepim import DeepIM, RIGHT, SIDES, mean_pose_deviation, Segmentator, FullObserver
+from src.deepim import DeepIM, mean_pose_deviation, Segmentator, FullObserver
 #from retired.perception import test_deepim
 from src.policy import run_policy
 from src.interface import Interface
@@ -36,7 +36,7 @@ from src.parse_brain import task_from_trial_manager, create_trial_args, TASKS, S
 from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
-    load_objects, display_kinect, dump_dict, update_objects
+    load_objects, display_kinect, dump_dict, update_objects, RIGHT, SIDES, LEFT
 from src.update_isaac import update_isaac_sim
 from src.world import World
 from run_pybullet import create_parser
@@ -294,9 +294,10 @@ def main():
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
         load_objects(interface.task)
-        for side in SIDES: #[RIGHT]:
+        for side in SIDES:
             display_kinect(interface, side=side)
-        observe_world(interface)
+        world.cameras.pop(LEFT)
+        observe_world(interface, visible=set())
         if interface.simulation:  # TODO: move to simulation instead?
             set_isaac_sim(interface)
         world._update_initial()

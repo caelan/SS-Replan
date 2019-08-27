@@ -14,28 +14,14 @@ from brain_ros.ros_world_state import make_pose_from_pose_msg
 from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_distance, quat_from_pose, \
     quat_angle_between, read_json
 from sensor_msgs.msg import Image
-from src.issac import ISSAC_WORLD_FRAME, CAMERA_PREFIX, PANDA_FULL_CONFIG_PATH
+from src.issac import ISSAC_WORLD_FRAME, DEPTH_PREFIX, PANDA_FULL_CONFIG_PATH, PREFIX_FROM_SIDE, RIGHT
 
-PREFIX_TEMPLATE = '{:02d}'
-PREFIX_FROM_SIDE = {
-    'right': PREFIX_TEMPLATE.format(0),
-    'left': PREFIX_TEMPLATE.format(1),
-}
-KINECT_TEMPLATE = 'kinect{}'
-KINECT_FROM_SIDE = {
-    'right': KINECT_TEMPLATE.format(1), # indexes from 1!
-    'left': KINECT_TEMPLATE.format(2),
-}
 #DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
 DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']
 
 # TODO: use the confidences that Chris added
 POSECNN_POSE_TEMPLATE = '/posecnn/{}/info' # /posecnn/00/info # posecnn_pytorch/DetectionList
 #POSECNN_POSE_TEMPLATE = '/objects/prior_pose/{}_{}/decayable_weight'
-
-RIGHT = 'right'
-LEFT = 'left'
-SIDES = [RIGHT, LEFT]
 
 # Detection time
 # min 0.292s max: 0.570s
@@ -127,7 +113,7 @@ class DeepIM(Perception):
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py#L4
     def callback(self, pose_stamped, side, obj_type):
         #print('Received {} camera detection of {}'.format(side, obj_type))
-        if not pose_stamped.header.frame_id.startswith(CAMERA_PREFIX):
+        if not pose_stamped.header.frame_id.startswith(DEPTH_PREFIX):
             return
         self.observations[side, obj_type].append(pose_stamped)
     def last_detected(self, side, obj_type):
@@ -163,7 +149,6 @@ class DeepIM(Perception):
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
         #self.domain.entities
-        #self.domain.view_tags # {'right': '00', 'left': '01'}
         #dump_dict(self.domain)
         #dump_dict(self.domain.root)
         #dump_dict(entity)

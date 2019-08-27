@@ -3,9 +3,10 @@ import time
 import rospy
 from pybullet_tools.utils import link_from_name, get_link_pose, multiply, tform_from_pose, get_pose, get_movable_joints, \
     get_joint_names, get_joint_positions
-from src.issac import lookup_pose, ISSAC_WORLD_FRAME, UNREAL_WORLD_FRAME, TEMPLATE, ISSAC_CARTER_FRAME
+from src.issac import lookup_pose, ISSAC_WORLD_FRAME, UNREAL_WORLD_FRAME, ISSAC_CARTER_FRAME
 from src.utils import LEFT_CAMERA
 
+TEMPLATE = '{}_1'
 
 def set_isaac_camera(sim_manager, camera_pose):
     # TODO: could make the camera follow the robot_entity around
@@ -21,7 +22,7 @@ def update_isaac_robot(observer, sim_manager, world):
     unreal_from_world = lookup_pose(observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
                                     target_frame=UNREAL_WORLD_FRAME)
     # robot_name = domain.robot # arm
-    robot_name = TEMPLATE % sim_manager.robot_name
+    robot_name = TEMPLATE.format(sim_manager.robot_name)
     carter_link = link_from_name(world.robot, ISSAC_CARTER_FRAME)
     world_from_carter = get_link_pose(world.robot, carter_link)
     unreal_from_carter = multiply(unreal_from_world, world_from_carter)
@@ -32,7 +33,7 @@ def update_isaac_poses(interface, world):
     unreal_from_world = lookup_pose(interface.observer.tf_listener, source_frame=ISSAC_WORLD_FRAME,
                                     target_frame=UNREAL_WORLD_FRAME)
     for name, body in world.body_from_name.items():
-        full_name = TEMPLATE % name
+        full_name = TEMPLATE.format(name)
         world_from_urdf = get_pose(body)
         unreal_from_urdf = multiply(unreal_from_world, world_from_urdf)
         interface.sim_manager.set_pose(full_name, tform_from_pose(unreal_from_urdf), do_correction=False)
