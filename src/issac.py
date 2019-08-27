@@ -238,17 +238,16 @@ def display_kinect(interface, side):
 
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/perception_tools/ros_perception.py
         if interface.simulation:
-            camera_name = CAMERA_TEMPLATE.format(side)
-            camera_frame = RIGHT_PREFIX + camera_name
+            camera_frame = RIGHT_PREFIX + CAMERA_TEMPLATE.format(side)
         else:
-            camera_name = KINECT_FROM_SIDE[side] # 'kinect1'
+            #camera_frame = KINECT_FROM_SIDE[side] # 'kinect1'
             camera_frame = DEPTH_FROM_SIDE[side] # depth_camera_2
             #camera_frame = '{}_link'.format(camera_name)
+        camera_name = '{}'.format(side)
         print('Received camera info from camera', camera_name)
-
         world_from_camera = lookup_pose(interface.observer.tf_listener, camera_frame)
         if world_from_camera is None:
-            print('Failed to detect pose for camera ', camera_name)
+            print('Failed to detect pose for camera', camera_name)
         else:
             world.add_camera(camera_name, world_from_camera, camera_matrix)
         camera_sub.unregister()

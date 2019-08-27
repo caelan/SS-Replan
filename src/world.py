@@ -393,6 +393,7 @@ class World(object):
         body = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
                             color=apply_alpha(RED, 0.1), mass=0, collision=False)
         self.cameras[name] = Camera(body, camera_matrix, max_depth)
+        draw_pose(pose)
         set_pose(body, pose)
         step_simulation()
         return name

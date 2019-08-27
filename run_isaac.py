@@ -37,9 +37,9 @@ from src.utils import JOINT_TEMPLATE
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, dump_dict, update_objects, RIGHT, SIDES, LEFT
-from src.update_isaac import update_isaac_sim
+from src.update_isaac import update_isaac_sim, set_isaac_camera
 from src.world import World
-from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement
+from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement, close_all_doors
 from src.execution import franka_open_gripper
 from run_pybullet import create_parser
 
@@ -155,15 +155,17 @@ def set_isaac_sim(interface):
     assert interface.simulation
     task = interface.task
     world = task.world
-    # close_all_doors(world)
+    #close_all_doors(world)
     if task.movable_base:
         world.set_base_conf([2.0, 0, -np.pi / 2])
         # world.set_initial_conf()
     else:
         for name, dist in task.prior.items():
-            surface = dist.sample()
-            learned = surface != ECHO_COUNTER
-            sample_placement(world, name, surface, learned=learned)
+            if name in task.prior:
+                surface = task.prior[name].sample()
+                sample_placement(world, name, surface, learned=True)
+            else:
+                sample_placement(world, name, ECHO_COUNTER, learned=False)
         # pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
         # pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
     update_isaac_sim(interface, world)
@@ -178,6 +180,8 @@ def simulation_setup(domain, world, args):
     with Verbose(False):
         trial_manager = TrialManager(trial_args, domain, lula=args.lula)
     observer = trial_manager.observer
+    #set_isaac_camera(trial_manager.sim_manager)
+    trial_manager.set_camera(randomize=False)
 
     task_name = args.problem.replace('_', ' ')
     if task_name in TRIAL_MANAGER_TASKS:
@@ -189,7 +193,6 @@ def simulation_setup(domain, world, args):
             SUGAR: UniformDist([INDIGO_COUNTER]),
             CHEEZIT: UniformDist([INDIGO_COUNTER]),
         }
-        prior.update({name: DeltaDist(ECHO_COUNTER) for name in YCB_OBJECTS if name not in prior})
         goal_drawer = TOP_DRAWER  # TOP_DRAWER | BOTTOM_DRAWER
         task = Task(world, prior=prior,
                     # goal_detected=[SPAM],
@@ -319,16 +322,16 @@ def main():
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
         load_objects(interface.task)
-        for side in SIDES:
-            display_kinect(interface, side=side)
-        if LEFT in world.cameras:
-            del world.cameras[LEFT]
         observe_world(interface, visible=set())
+        for side in [LEFT] if interface.simulation else [RIGHT]: # TODO: simulation naming inconsistency
+            display_kinect(interface, side=side)
+        #if LEFT in world.cameras:
+        #    del world.cameras[LEFT]
         if interface.simulation:  # TODO: move to simulation instead?
             set_isaac_sim(interface)
         world._update_initial()
         add_markers(interface.task, inverse_place=False)
-    #wait_for_user()
+    wait_for_user()
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
