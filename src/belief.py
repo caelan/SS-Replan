@@ -61,6 +61,7 @@ class Belief(object):
         self.arm_conf = None
         self.gripper_conf = None
         self.door_confs = {}
+        self.cooked = set()
     def update_state(self):
         # TODO: apply this directly from observations
         # No use applying this to base confs
@@ -234,6 +235,9 @@ def transition_belief_update(belief, plan):
     for action, params in plan:
         if action in ['move_base', 'calibrate', 'detect']:
             pass
+        elif action == 'press':
+            s, k, o, bq, aq, gq, at = params
+            belief.cooked.add(o)
         elif action == 'move_arm':
             bq, aq1, aq2, at = params
             belief.arm_conf = aq2

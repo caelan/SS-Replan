@@ -3,7 +3,7 @@ import random
 from itertools import islice, cycle
 from collections import namedtuple
 
-from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb
+from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb, get_top_presses
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, \
     set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
     get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
@@ -12,7 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
-    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name
+    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, get_aabb, draw_aabb
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
@@ -22,7 +22,7 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES, TOOL_POSE, Grasp, TOP_GRASP
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
@@ -862,6 +862,91 @@ def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, lea
                     break
             else:
                 if PRINT_FAILURES: print('Pull failure')
+                yield None
+    return gen
+
+################################################################################
+
+def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=True, **kwargs):
+    base_conf.assign()
+    world.close_gripper()
+    robot_saver = BodySaver(world.robot)
+
+    if randomize:
+        sample_fn = get_sample_fn(world.robot, world.arm_joints)
+        set_joint_positions(world.robot, world.arm_joints, sample_fn())
+    else:
+        world.carry_conf.assign()
+    gripper_pose = multiply(pose, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
+    #set_joint_positions(world.gripper, get_movable_joints(world.gripper), world.closed_gq.values)
+    #set_tool_pose(world, gripper_pose)
+    full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
+    #wait_for_user()
+    if full_grasp_conf is None:
+        # if PRINT_FAILURES: print('Grasp kinematic failure')
+        return
+    robot_obstacle = (world.robot, frozenset(get_moving_links(world.robot, world.arm_joints)))
+    if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
+        #if PRINT_FAILURES: print('Grasp collision failure')
+        return
+    approach_pose = multiply(pose, invert(grasp.pregrasp_pose))
+    approach_path = plan_approach(world, approach_pose, obstacles=obstacles, **kwargs)
+    if approach_path is None:
+        return
+    aq = FConf(world.robot, world.arm_joints, approach_path[0]) if MOVE_ARM else world.carry_conf
+
+    gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
+    finger_cmd, = gripper_motion_fn(world.open_gq, world.closed_gq)
+    cmd = Sequence(State(world, savers=[robot_saver]), commands=[
+        finger_cmd.commands[0],
+        ApproachTrajectory(world, world.robot, world.arm_joints, approach_path + approach_path[::-1]),
+        finger_cmd.commands[0].reverse(),
+    ], name='press')
+    yield (aq, cmd,)
+
+def get_grasp_presses(world, knob, pre_distance=APPROACH_DISTANCE):
+    knob_link = link_from_name(world.kitchen, knob)
+    pre_direction = pre_distance * get_unit_vector([0, 0, 1])
+    post_direction = unit_point()
+    for i, grasp_pose in enumerate(get_top_presses(world.kitchen, link=knob_link,
+                                                   tool_pose=TOOL_POSE, top_offset=FINGER_EXTENT[0]/2 + 5e-3)):
+        pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose,
+                                 Pose(point=post_direction))
+        grasp = Grasp(world, knob, TOP_GRASP, i, grasp_pose, pregrasp_pose)
+        yield grasp
+
+def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=False, **kwargs):
+    def gen(knob_name):
+        obstacles = world.static_obstacles
+        knob_link = link_from_name(world.kitchen, knob_name)
+        pose = get_link_pose(world.kitchen, knob_link)
+        #pose = RelPose(world.kitchen, knob_link, init=True)
+        presses = cycle(get_grasp_presses(world, knob_name))
+        grasp = next(presses)
+        gripper_pose = multiply(pose, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
+        if learned:
+            #base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
+            raise NotImplementedError()
+        else:
+            base_generator = uniform_pose_generator(world.robot, gripper_pose)
+        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+        while True:
+            for i in range(max_attempts):
+                try:
+                    base_conf, = next(safe_base_generator)
+                except StopIteration:
+                    return
+                grasp = next(presses)
+                randomize = (random.random() < P_RANDOMIZE_IK)
+                ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, obstacles,
+                                             randomize=randomize, **kwargs), None)
+                if ik_outputs is not None:
+                    yield (base_conf,) + ik_outputs
+                    break
+            else:
+                if PRINT_FAILURES: print('Pick failure')
+                if not pose.init:
+                    break
                 yield None
     return gen
 

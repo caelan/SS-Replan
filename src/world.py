@@ -69,7 +69,7 @@ class World(object):
 
         self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         with HideOutput(enable=True):
-            self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True)
+            self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True, cylinder=True)
 
         self.floor = load_pybullet('plane.urdf', fixed_base=True)
         z = stable_z(self.kitchen, self.floor) - get_point(self.floor)[2]

@@ -76,6 +76,9 @@ def get_stream_info():
         # TODO: can't defer this because collision streams depend on it
         'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False),
         'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+
+        'plan-press': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False),
+
         # 'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
         'plan-base-motion': StreamInfo(opt_gen_fn=PartialInputs(test=opt_move_base_test),
                                        overhead=1e3, defer=True),
@@ -138,7 +141,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
 
     success_cost = 0 if args.anytime else INF
     planner = 'ff-astar' if args.anytime else 'ff-wastar2'
-    search_sample_ratio = 1.0 # 0.5
+    search_sample_ratio = 0.5 # 0.5
     max_planner_time = 10
 
     pr = cProfile.Profile()
@@ -204,7 +207,7 @@ def commands_from_plan(world, plan):
     commands = []
     for action, params in plan:
         # TODO: break if the action is a StreamAction
-        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull']:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'press']:
             commands.extend(params[-1].commands)
         elif action == 'detect':
             commands.append(params[-1])

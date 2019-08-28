@@ -67,6 +67,8 @@ WHEEL_JOINTS = ['left_wheel', 'right_wheel']
 
 FRANKA_CARTER = 'franka_carter'
 FRANKA_TOOL_LINK = 'right_gripper'  # right_gripper | panda_wrist_end_pt | panda_forearm_end_pt
+TOOL_POSE = unit_pose()
+
 # +z: pointing, +y: left finger
 FINGER_EXTENT = np.array([0.02, 0.01, 0.02]) # 2cm x 1cm x 2cm
 FRANKA_GRIPPER_LINK = 'panda_link7' # panda_link7 | panda_link8 | panda_hand
@@ -354,7 +356,7 @@ def get_tool_link(robot):
         return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
-def create_gripper(robot, visual=False):
+def create_gripper(robot, visual=True):
     gripper_link = link_from_name(robot, get_gripper_link(robot))
     links = get_link_descendants(robot, gripper_link) # get_link_descendants | get_link_subtree
     with LockRenderer():
@@ -516,24 +518,23 @@ class Grasp(object):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
-def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTANCE, **kwargs):
+def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTANCE, fraction=0.5, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
-    fraction = 0.5
     #fraction = 0.25
 
     for grasp_type in grasp_types:
         if grasp_type == TOP_GRASP:
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
-            generator = get_top_grasps(body, under=True, tool_pose=unit_pose(),
+            generator = get_top_grasps(body, under=True, tool_pose=TOOL_POSE,
                                        grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf, **kwargs)
         elif grasp_type == SIDE_GRASP:
             x, z = pre_distance * get_unit_vector([3, -1])
             pre_direction = [0, 0, x]
             post_direction = [0, 0, z]
             # Under grasps are actually easier for this robot
-            generator = get_side_grasps(body, under=False, tool_pose=unit_pose(),
+            generator = get_side_grasps(body, under=False, tool_pose=TOOL_POSE,
                                         grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf,
                                         top_offset=fraction*FINGER_EXTENT[0], **kwargs)
             #generator = grasps[4:]

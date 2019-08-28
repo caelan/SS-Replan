@@ -25,7 +25,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
     get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test, \
-    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, get_cfree_angle_angle_test
+    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, get_cfree_angle_angle_test, get_press_gen_fn
 from src.database import has_place_database
 
 MAX_ERROR = np.pi / 6
@@ -74,6 +74,7 @@ def get_streams(world, debug=False, teleport_base=False, **kwargs):
 
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
+        'plan-press': from_gen_fn(get_press_gen_fn(world, **kwargs)),
 
         'plan-base-motion': from_fn(get_base_motion_fn(world, teleport_base=teleport_base, **kwargs)),
         'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
@@ -183,6 +184,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         init.append(Equal(function, cost))
     init += [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Stackable', name, stove) for name, stove in product(task.goal_cooked, STOVES)] + \
+            [('Cooked', name) for name in belief.cooked] + \
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
             [('StoveKnob', STOVE_TEMPLATE.format(loc), KNOB_TEMPLATE.format(loc)) for loc in STOVE_LOCATIONS] + \

@@ -67,6 +67,16 @@
                     (AConf ?bq ?aq1) (AConf ?bq ?aq2)
                     (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)))
 
+  (:stream plan-press
+    :inputs (?k)
+    :domain (and (MovableBase) (Knob ?k)) ; TODO: (WorldPose ?o ?wp)
+    :outputs (?bq ?aq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at)
+                    ; (AConf ?bq ?aq0)
+                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
+                    (AConf ?bq ?aq)
+                    (Press ?k ?bq ?aq ?at)))
+
   ; Fixed base
   (:stream test-near-pose
     :inputs (?o ?wp ?bq)

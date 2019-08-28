@@ -26,7 +26,7 @@
 
     (Pick ?o ?wp ?g ?bq ?aq ?at)
     (Pull ?j ?q1 ?q2 ?bq ?aq1 ?aq2 ?at)
-    (Press ?k ?bq ?aq ?gq ?at)
+    (Press ?k ?bq ?aq ?at)
     (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
@@ -217,6 +217,7 @@
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?wp1)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
                        (HandEmpty) (Calibrated)
+                       ; TODO: require adjacent doors to be closed
                        (not (UnsafeAngle ?j ?a1)) ; analog of UnsafeApproach
                        (not (UnsafeAngle ?j ?a2))
                        (not (UnsafeATraj ?at)) ; TODO: approach pull trajectories
@@ -253,15 +254,16 @@
 
 
   (:action press
-    :parameters (?s ?k ?bq ?aq ?gq ?at)
-    :precondition (and (Press ?k ?bq ?aq ?gq ?at) (StoveKnob ?s ?k) (OpenGConf ?gq) ; TODO: @closed_gq
+    :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
+    :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o) (OpenGConf ?gq) ; TODO: @closed_gq
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
-                       (HandEmpty) (Calibrated)
+                       (HandEmpty) (Calibrated) (On ?o ?s)
                        (not (UnsafeATraj ?at))
                        (not (Unsafe)))
     :effect (and (CanMoveBase) (CanMoveArm)
-                 (forall (?o) (when (and (Cookable ?o) (On ?o ?s))
-                                    (Cooked ?o)))
+                 (Cooked ?o)
+                 ;(forall (?o) (when (and (Cookable ?o) (On ?o ?s))
+                 ;                   (Cooked ?o)))
                  (increase (total-cost) (PressCost))))
 
   ;(:derived (OpenGripper)
@@ -271,6 +273,7 @@
   ;)
 
   (:derived (Accessible ?o ?wp) (or
+    ; TODO: require above surfaces to not be accessible
     (and (WorldPose ?o ?wp) (Counter ?o))
     (exists (?j ?a) (and (AngleKin ?o ?wp ?j ?a) (AngleWithin ?j ?a @open)
                          (AtAngle ?j ?a)))))

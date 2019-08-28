@@ -295,7 +295,8 @@ def stow_block(world, num=1, **kwargs):
 
     return Task(world, prior=prior, movable_base=True,
                 #goal_holding=list(prior)[0],
-                goal_on=goal_on,
+                #goal_on=goal_on,
+                goal_cooked=list(prior),
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
                 goal_closed=ALL_JOINTS,
