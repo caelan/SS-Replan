@@ -6,7 +6,7 @@ STRIPStream planning for SRL's Franka Panda Robot in a kitchen environment.
 
 * `sudo apt install cmake g++ make python`
 * `pip install numpy scipy pybullet sklearn`
-* `git lfs clone --recurse-submodules https://gitlab-master.nvidia.com/cgarrett/srl-stripstream.git`
+* `git lfs clone --branch stable --recurse-submodules https://gitlab-master.nvidia.com/cgarrett/srl-stripstream.git`
 * `cd srl-stripstream`
 * `./pddlstream/FastDownward/build.py release64`
 
