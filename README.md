@@ -4,11 +4,13 @@ STRIPStream planning for SRL's Franka Panda Robot in a kitchen environment.
 
 # Installation
 
-* `sudo apt install cmake g++ make python`
+* `sudo apt install cmake g++ make python ros-kinetic-trac-ik`
 * `pip install numpy scipy pybullet sklearn`
 * `git lfs clone --branch stable --recurse-submodules https://gitlab-master.nvidia.com/cgarrett/srl-stripstream.git`
 * `cd srl-stripstream`
 * `./pddlstream/FastDownward/build.py release64`
+
+<!--https://bitbucket.org/traclabs/trac_ik/src/master/-->
 
 # PyBullet Examples
 
