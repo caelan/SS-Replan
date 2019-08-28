@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import time
+import math
 
 from pddlstream.utils import str_from_object
 from examples.discrete_belief.dist import UniformDist, DeltaDist
@@ -10,12 +11,13 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.utils import BodySaver, joint_from_name, LockRenderer, spaced_colors, WorldSaver, \
-    pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user, get_joint_positions
+    pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user, \
+    get_joint_positions, get_joint_name, get_joint_position
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, relative_detections, ELSEWHERE
 from src.stream import get_stable_gen
-from src.utils import create_relative_pose, RelPose, FConf
+from src.utils import create_relative_pose, RelPose, FConf, are_confs_close
 
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
@@ -59,10 +61,28 @@ class Belief(object):
         self.arm_conf = None
         self.gripper_conf = None
         self.door_confs = {}
+    def update_state(self):
+        # TODO: apply this directly from observations
+        self.base_conf = FConf(self.world.robot, self.world.base_joints, init=True)
+        arm_conf = FConf(self.world.robot, self.world.arm_joints, init=True)
+        if (self.arm_conf is None) or not are_confs_close(arm_conf, self.arm_conf, tol=math.radians(1)):
+            self.arm_conf = arm_conf
+        gripper_conf = FConf(self.world.robot, self.world.gripper_joints, init=True)
+        if (self.gripper_conf is None) or not are_confs_close(gripper_conf, self.gripper_conf, tol=1e-2):
+            self.gripper_conf = gripper_conf
+
+        # TODO: do I still need to test if the current values are equal to the last ones?
+        for joint in self.world.kitchen_joints:
+            name = get_joint_name(self.world.kitchen, joint)
+            position = get_joint_position(self.world.kitchen, joint)
+            self.update_door_conf(name, position)
+        return self.check_consistent()
     def update_door_conf(self, name, position):
-        # TODO: could make a generic update world conf
         joint = joint_from_name(self.world.kitchen, name)
-        self.door_confs[name] = FConf(self.world.kitchen, [joint], [position], init=True)
+        conf = FConf(self.world.kitchen, [joint], [position], init=True)
+        if (name not in self.door_confs) or not are_confs_close(conf, self.door_confs[name], tol=1e-3):
+            # TODO: different threshold for drawers and doors
+            self.door_confs[name] = conf
         return self.door_confs[name]
     @property
     def holding(self):
@@ -79,6 +99,7 @@ class Belief(object):
             objects.add(self.holding)
         return sorted(objects)
     def is_gripper_closed(self):
+        # each joint in [0.00, 0.04] (units coincide with meters on the physical gripper)
         current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
         gripper_width = sum(current_gq)
         return gripper_width <= MIN_GRASP_WIDTH
@@ -86,9 +107,6 @@ class Belief(object):
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/d1e6024c5c13df7edeab3a271b745e656a794b02/control_tools/execution.py#L163
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/pr2_controller.py#L93
         # https://github.mit.edu/caelan/mudfish/blob/master/scripts/planner.py#L346
-        # each joint in [0.00, 0.04] (units coincide with the physical gripper)
-        current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
-        gripper_width = sum(current_gq)
         if (self.grasped is not None) and self.is_gripper_closed():
             # TODO: need to add the grasp object back into the dist
             self.grasped = None
@@ -111,6 +129,7 @@ class Belief(object):
                 for name in order:
                     self.pose_dists[name] = self.pose_dists[name].update(
                         self, detections, n_samples=n_samples)
+        self.update_state()
         print('Update time: {:.3f} sec for {} objects and {} samples'.format(
             elapsed_time(start_time), len(order), n_samples))
         return self
@@ -204,12 +223,20 @@ def create_surface_belief(world, surface_dists, **kwargs):
 def transition_belief_update(belief, plan):
     if plan is None:
         return False
-    # TODO: check that actually holding
     success = True
     for action, params in plan:
-        if action in ['move_base', 'move_arm', 'move_gripper', 'pull',
-                      'calibrate', 'detect']:
+        if action in ['move_base', 'calibrate', 'detect']:
             pass
+        elif action == 'move_arm':
+            bq, aq1, aq2, at = params
+            belief.arm_conf = aq2
+        elif action == 'move_gripper':
+            gq1, gq2, gt = params
+            belief.gripper_conf = gq2
+        elif action == 'pull':
+            j, a1, a2, o, wp1, wp2, bq, aq1, aq2, gq, at = params
+            belief.door_confs[j] = a2
+            belief.arm_conf = aq2
         elif action == 'pick':
             o, p, g, rp = params[:4]
             if not belief.is_gripper_closed():
@@ -228,4 +255,5 @@ def transition_belief_update(belief, plan):
             pass
         else:
             raise NotImplementedError(action)
+    # TODO: replan after every action
     return success
