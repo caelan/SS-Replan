@@ -78,6 +78,7 @@ def get_stream_info():
         'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
 
         'plan-press': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False),
+        'fixed-plan-press': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
 
         # 'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
         'plan-base-motion': StreamInfo(opt_gen_fn=PartialInputs(test=opt_move_base_test),

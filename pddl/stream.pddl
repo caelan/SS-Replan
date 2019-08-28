@@ -76,6 +76,12 @@
                     (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
                     (AConf ?bq ?aq)
                     (Press ?k ?bq ?aq ?at)))
+  (:stream fixed-plan-press
+    :inputs (?k ?bq)
+    :domain (NearJoint ?k ?bq)
+    :outputs (?aq ?at)
+    :certified (and (ATraj ?at) (AConf ?bq ?aq)
+                    (Press ?k ?bq ?aq ?at)))
 
   ; Fixed base
   (:stream test-near-pose

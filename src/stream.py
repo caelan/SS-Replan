@@ -22,7 +22,7 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES, TOOL_POSE, Grasp, TOP_GRASP
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES, TOOL_POSE, Grasp, TOP_GRASP, KNOBS
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
@@ -315,6 +315,8 @@ def get_test_near_joint(world, **kwargs):
     vertices_from_joint = {}
 
     def test(joint_name, base_conf):
+        if joint_name in KNOBS:
+            return False # TODO: address this
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
             vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_INVERSE_BASE)
@@ -947,6 +949,26 @@ def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, le
                 if PRINT_FAILURES: print('Pick failure')
                 if not pose.init:
                     break
+                yield None
+    return gen
+
+def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=False, **kwargs):
+
+    def gen(knob_name, base_conf):
+        knob_link = link_from_name(world.kitchen, knob_name)
+        pose = get_link_pose(world.kitchen, knob_link)
+        presses = cycle(get_grasp_presses(world, knob_name))
+        while True:
+            for i in range(max_attempts):
+                grasp = next(presses)
+                randomize = (random.random() < P_RANDOMIZE_IK)
+                ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, world.static_obstacles,
+                                             randomize=randomize, **kwargs), None)
+                if ik_outputs is not None:
+                    yield (base_conf,) + ik_outputs
+                    break
+            else:
+                if PRINT_FAILURES: print('Fixed pull failure')
                 yield None
     return gen
 

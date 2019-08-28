@@ -24,7 +24,7 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
-    get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test, \
+    get_sample_belief_gen, detect_cost_fn, get_fixed_press_gen_fn, get_cfree_bconf_pose_test, \
     get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, get_cfree_angle_angle_test, get_press_gen_fn
 from src.database import has_place_database
 
@@ -86,6 +86,7 @@ def get_streams(world, debug=False, teleport_base=False, **kwargs):
 
         'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
+        'fixed-plan-press': from_gen_fn(get_fixed_press_gen_fn(world, **kwargs)),
 
         'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
         # 'compute-angle-kin': from_fn(compute_angle_kin),
@@ -187,6 +188,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             [('Cooked', name) for name in belief.cooked] + \
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
+            [('Joint', knob) for knob in KNOBS] + \
             [('StoveKnob', STOVE_TEMPLATE.format(loc), KNOB_TEMPLATE.format(loc)) for loc in STOVE_LOCATIONS] + \
             [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object
             #[('Type', obj_name, 'stove') for obj_name in STOVES] + \
