@@ -120,7 +120,7 @@ DRAWERS = [
 ENV_SURFACES = [
     'echo',  # fox is covered by echo
     'golf',
-    'range',
+    #'range',
     'table',
 ]
 

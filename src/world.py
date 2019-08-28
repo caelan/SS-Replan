@@ -135,6 +135,8 @@ class World(object):
         self.environment_poses = read_json(POSES_PATH)
         root_from_world = get_link_pose(self.kitchen, self.world_link)
         for name, world_from_part in self.environment_poses.items():
+            if name in ['range']:
+                continue
             visual_path = os.path.join(IKEA_PATH, '{}.obj'.format(name))
             collision_path = os.path.join(IKEA_PATH, '{}_collision.obj'.format(name))
             mesh_path = None

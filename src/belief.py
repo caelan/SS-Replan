@@ -63,13 +63,18 @@ class Belief(object):
         self.door_confs = {}
     def update_state(self):
         # TODO: apply this directly from observations
+        # No use applying this to base confs
         self.base_conf = FConf(self.world.robot, self.world.base_joints, init=True)
         arm_conf = FConf(self.world.robot, self.world.arm_joints, init=True)
         if (self.arm_conf is None) or not are_confs_close(arm_conf, self.arm_conf, tol=math.radians(1)):
             self.arm_conf = arm_conf
+        else:
+            print('At anticipated arm conf')
         gripper_conf = FConf(self.world.robot, self.world.gripper_joints, init=True)
         if (self.gripper_conf is None) or not are_confs_close(gripper_conf, self.gripper_conf, tol=1e-2):
             self.gripper_conf = gripper_conf
+        else:
+            print('At anticipated gripper conf')
 
         # TODO: do I still need to test if the current values are equal to the last ones?
         for joint in self.world.kitchen_joints:
@@ -83,6 +88,8 @@ class Belief(object):
         if (name not in self.door_confs) or not are_confs_close(conf, self.door_confs[name], tol=1e-3):
             # TODO: different threshold for drawers and doors
             self.door_confs[name] = conf
+        else:
+            print('At anticipated conf for door {}'.format(name))
         return self.door_confs[name]
     @property
     def holding(self):
