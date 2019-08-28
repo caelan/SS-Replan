@@ -109,6 +109,7 @@ def relative_detections(belief, detections):
             #assert support is not None
             # Could also fix as relative to the world
             if support is None:
+                # TODO: prune if nowhere near a surface (e.g. on the robot)
                 relative_pose = create_world_pose(world, name, init=True)
             else:
                 relative_pose = create_relative_pose(world, name, support, init=True)

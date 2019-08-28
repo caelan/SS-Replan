@@ -8,6 +8,7 @@
   (:predicates
     (Type ?t ?b)
     (Stackable ?o ?r)
+    (Cookable ?o)
     (Stove ?r)
     (NoisyBase)
     (Obstacle ?o)
@@ -16,6 +17,7 @@
     (Entity ?o)
     (Graspable ?o)
     (Joint ?j)
+    (StoveKnob ?s ?k)
 
     (CheckNearby ?o)
     (NearPose ?o2 ?wp2 ?bq)
@@ -24,6 +26,7 @@
 
     (Pick ?o ?wp ?g ?bq ?aq ?at)
     (Pull ?j ?q1 ?q2 ?bq ?aq1 ?aq2 ?at)
+    (Press ?k ?bq ?aq ?gq ?at)
     (BaseMotion ?bq1 ?bq2 ?aq ?bt)
     (ArmMotion ?bq ?aq1 ?aq2 ?at)
     (GripperMotion ?gq1 ?gq2 ?gt)
@@ -98,6 +101,7 @@
     (AdmitsGrasp ?o1 ?g ?o2)
     (IsGraspType ?o ?g ?gty)
     (AdmitsGraspType ?o2 ?gty))
+
   (:functions
     (Distance ?bq1 ?bq2)
     (MoveBaseCost)
@@ -106,7 +110,7 @@
     (PickCost)
     (PlaceCost)
     (PullCost)
-    (CookCost)
+    (PressCost)
     (DetectCost ?o ?rp1 ?obs ?rp2)
   )
 
@@ -247,12 +251,19 @@
                                       (not (AtWorldPose ?o1 ?wp3))))
                  (increase (total-cost) (DetectCost ?o1 ?rp1 ?obs ?rp2))))
 
-  ;(:action cook
-  ;  :parameters (?r)
-  ;  :precondition (Type ?r @stove)
-  ;  :effect (and (forall (?o) (when (On ?o ?r) (Cooked ?o)))
-  ;               (increase (total-cost) (CookCost)))
-  ;)
+
+  (:action press
+    :parameters (?s ?k ?bq ?aq ?gq ?at)
+    :precondition (and (Press ?k ?bq ?aq ?gq ?at) (StoveKnob ?s ?k) (OpenGConf ?gq) ; TODO: @closed_gq
+                       (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
+                       (HandEmpty) (Calibrated)
+                       (not (UnsafeATraj ?at))
+                       (not (Unsafe)))
+    :effect (and (CanMoveBase) (CanMoveArm)
+                 (forall (?o) (when (and (Cookable ?o) (On ?o ?s))
+                                    (Cooked ?o)))
+                 (increase (total-cost) (PressCost))))
+
   ;(:derived (OpenGripper)
   ;  ;(AtGConf @open_gq)
   ;  (exists (?gq) (and (OpenGConf ?gq)

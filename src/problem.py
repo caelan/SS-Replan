@@ -3,6 +3,8 @@ from __future__ import print_function
 import numpy as np
 import math
 
+from itertools import product
+
 from pddlstream.language.constants import get_args, is_parameter, get_parameter_name, Exists, \
     And, Equal, PDDLProblem, Not
 from pddlstream.language.stream import DEBUG
@@ -14,7 +16,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
 
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
-    RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES
+    RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, KNOBS
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -51,6 +53,7 @@ ACTION_COSTS = {
     'pick': 1,
     'place': 1,
     'pull': 1,
+    'press': 1,
     'cook': 1,
 }
 
@@ -136,6 +139,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     #carry_aq = init_aq if are_confs_close(init_aq, world.carry_conf) else world.carry_conf
     #calibrate_aq = init_aq if are_confs_close(init_aq, world.calibrate_conf) else world.calibrate_conf
 
+    # TODO: likely don't need this now that returning to old confs
     open_gq = init_gq if are_confs_close(init_gq, world.open_gq) else world.open_gq
     closed_gq = init_gq if are_confs_close(init_gq, world.closed_gq) else world.closed_gq
 
@@ -178,7 +182,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         function = (function_name,)
         init.append(Equal(function, cost))
     init += [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
+            [('Stackable', name, stove) for name, stove in product(task.goal_cooked, STOVES)] + \
             [('Status', status) for status in DOOR_STATUSES] + \
+            [('Knob', knob) for knob in KNOBS] + \
+            [('StoveKnob', STOVE_TEMPLATE.format(loc), KNOB_TEMPLATE.format(loc)) for loc in STOVE_LOCATIONS] + \
             [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object
             #[('Type', obj_name, 'stove') for obj_name in STOVES] + \
             #[('Camera', name) for name in world.cameras]
@@ -293,7 +300,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             ('Localized', surface_name),
         ])
         for grasp_type in task.grasp_types:
-            if has_place_database(world.robot_name, surface_name, grasp_type):
+            if (surface_name in OPEN_SURFACES) or has_place_database(world.robot_name, surface_name, grasp_type):
                 init.append(('AdmitsGraspType', surface_name, grasp_type))
 
     if belief.grasped is None:
@@ -320,6 +327,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     for obj_name in world.movable:
         init += [
             ('Entity', obj_name),
+            ('Cookable', obj_name), # TODO: only things that are cookable
             ('Obstacle', obj_name),
             ('CheckNearby', obj_name),
         ] + [('Stackable', obj_name, counter) for counter in set(ALL_SURFACES) & set(COUNTERS)]

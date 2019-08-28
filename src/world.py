@@ -94,7 +94,8 @@ class World(object):
         self.set_initial_conf()
         self.gripper = create_gripper(self.robot)
 
-        self._initialize_environment()
+        self.environment_bodies = {}
+        #self._initialize_environment()
         self._initialize_ik(urdf_path)
         self.initial_saver = WorldSaver()
 
@@ -131,7 +132,6 @@ class World(object):
         # fridge to goal: 1.5cm
         # hitman to range: 3.5cm
         # range to indigo: 3.5cm
-        self.environment_bodies = {}
         self.environment_poses = read_json(POSES_PATH)
         root_from_world = get_link_pose(self.kitchen, self.world_link)
         for name, world_from_part in self.environment_poses.items():
@@ -290,7 +290,8 @@ class World(object):
         base_limits[1][1] -= 0.1
         for handle in self.base_limits_handles:
             remove_debug(handle)
-        self.base_limits_handles = draw_aabb(world_aabb)
+        self.base_limits_handles = []
+        #self.base_limits_handles.extend(draw_aabb(world_aabb))
         z = get_point(self.floor)[2] + 1e-2
         self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
         self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)
