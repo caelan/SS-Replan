@@ -410,9 +410,12 @@ class World(object):
         # Only want to generate stable placements, but can operate on initially unstable ones
         # TODO: could filter orientation as well
         body = self.get_body(obj_name)
-        supporting = [surface for surface in ALL_SURFACES if is_center_on_aabb(
+        supporting = {surface for surface in ALL_SURFACES if is_center_on_aabb(
             body, compute_surface_aabb(self, surface),
-            above_epsilon=5e-2, below_epsilon=5e-2)]
+            above_epsilon=5e-2, below_epsilon=5e-2)}
+        if ('range' in supporting) and (len(supporting) == 2):
+            # TODO: small hack for now
+            supporting -= {'range'}
         if len(supporting) != 1:
             print('{} is not supported by a single surface ({})!'.format(obj_name, supporting))
             return None

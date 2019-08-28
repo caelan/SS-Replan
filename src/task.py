@@ -260,13 +260,13 @@ def fixed_stow(world, **kwargs):
 
 ################################################################################
 
-def stow_block(world, num=2, **kwargs):
+def stow_block(world, num=1, **kwargs):
     #world.open_gq.assign()
     # dump_link_cross_sections(world, link_name='indigo_drawer_top')
     # wait_for_user()
 
     # initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    initial_surface = 'indigo_tmp'  # hitman_tmp | indigo_tmp | range
+    initial_surface = 'front_right_stove'  # hitman_tmp | indigo_tmp | range | front_right_stove
     # initial_surface = 'indigo_drawer_top'
     goal_surface = 'indigo_drawer_top'  # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     joint_name = 'indigo_drawer_top_joint'
@@ -294,7 +294,7 @@ def stow_block(world, num=2, **kwargs):
     #    wait_for_user()
 
     return Task(world, prior=prior, movable_base=True,
-                #goal_holding=entity_name,
+                #goal_holding=list(prior)[0],
                 goal_on=goal_on,
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],

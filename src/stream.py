@@ -22,7 +22,7 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
@@ -342,14 +342,19 @@ def get_stable_gen(world, max_attempts=100,
         if surface_name in ENV_SURFACES:
             surface_body = world.environment_bodies[surface_name]
         surface_aabb = compute_surface_aabb(world, surface_name)
-        learned_poses = None
-        if learned:
-            learned_poses = load_placements(world, surface_name) # TODO: GROW_PLACEMENT
-            if not learned_poses:
-                return
+        learned_poses = load_placements(world, surface_name) if learned else [] # TODO: GROW_PLACEMENT
         while True:
             for _ in range(max_attempts):
-                if learned:
+                if surface_name in STOVES:
+                    surface_link = link_from_name(world.kitchen, surface_name)
+                    world_from_surface = get_link_pose(world.kitchen, surface_link)
+                    z = stable_z_on_aabb(obj_body, surface_aabb) - point_from_pose(world_from_surface)[2]
+                    theta = random.uniform(-np.pi, +np.pi)
+                    body_pose_surface = Pose(Point(z=z + z_offset), Euler(yaw=theta))
+                    body_pose_world = multiply(world_from_surface, body_pose_surface)
+                elif learned:
+                    if not learned_poses:
+                        return
                     surface_pose_world = get_surface_reference_pose(surface_body, surface_name)
                     sampled_pose_surface = multiply(surface_pose_world, random.choice(learned_poses))
                     [x, y, _] = point_from_pose(sampled_pose_surface)

@@ -101,10 +101,6 @@ YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_convex.urdf')
 KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
 
-#STOVES = ['range']
-COUNTERS = ['indigo_tmp'] # + ['hitman_tmp']
-OPEN_SURFACES = COUNTERS
-
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
 
@@ -117,6 +113,17 @@ DRAWERS = [
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
+STOVE_LOCATIONS = [
+    #'back_left', 'back_right',
+    'front_left', 'front_right',
+]
+
+STOVE_TEMPLATE = '{}_stove'
+STOVES = [STOVE_TEMPLATE.format(location) for location in STOVE_LOCATIONS]
+
+KNOB_TEMPLATE = '{}_knob'
+KNOBS = [KNOB_TEMPLATE.format(location) for location in STOVE_LOCATIONS]
+
 ENV_SURFACES = [
     'echo',  # fox is covered by echo
     'golf',
@@ -124,11 +131,8 @@ ENV_SURFACES = [
     'table',
 ]
 
-ZED_LEFT_SURFACES = [
-    #'dagger_door_left',
-    'indigo_tmp', # 'range',
-    'indigo_drawer_top', 'indigo_drawer_bottom',
-]
+COUNTERS = ['indigo_tmp'] # + ['range'] + ['hitman_tmp']
+OPEN_SURFACES = COUNTERS + STOVES
 
 Surface = namedtuple('Surface', ['link', 'shape', 'joints'])
 
@@ -150,6 +154,13 @@ SURFACE_FROM_NAME = {
     'indigo_drawer_top': Surface('indigo_drawer_top', SURFACE_BOTTOM, ['indigo_drawer_top_joint']),
     'indigo_drawer_bottom': Surface('indigo_drawer_bottom', SURFACE_BOTTOM, ['indigo_drawer_bottom_joint']),
 }
+
+ZED_LEFT_SURFACES = [
+    #'dagger_door_left',
+    'indigo_tmp',
+    'range',
+    'indigo_drawer_top', 'indigo_drawer_bottom',
+] + STOVES
 
 ALL_SURFACES = ZED_LEFT_SURFACES
 #ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
