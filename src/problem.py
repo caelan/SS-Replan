@@ -158,6 +158,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         '@open': OPEN,
         '@closed': CLOSED,
     }
+    top_joint = JOINT_TEMPLATE.format(TOP_DRAWER)
+    bottom_joint = JOINT_TEMPLATE.format(BOTTOM_DRAWER)
 
     init = [
         ('BConf', init_bq),
@@ -174,7 +176,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
         ('Grasp', None, None),
         ('AtGrasp', None, None),
-        ('Above', JOINT_TEMPLATE.format(TOP_DRAWER), JOINT_TEMPLATE.format(BOTTOM_DRAWER)),
+
+        ('Above', top_joint, bottom_joint),
+        ('Adjacent', top_joint, bottom_joint),
+        ('Adjacent', bottom_joint, top_joint),
 
         ('Calibrated',),
         ('CanMoveBase',),

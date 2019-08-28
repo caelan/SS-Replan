@@ -17,10 +17,16 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, draw_aabb, \
     disable_gravity, set_all_static
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
-    KITCHEN_PATH, KITCHEN_YAML, USE_TRACK_IK, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
+    KITCHEN_PATH, KITCHEN_YAML, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
     get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf, are_confs_close
-from log_poses import POSES_PATH
+
+USE_TRACK_IK = True
+try:
+    import trac_ik_python
+except ImportError:
+    USE_TRACK_IK = False
+print('Use Track IK:', USE_TRACK_IK)
 
 DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
@@ -132,6 +138,7 @@ class World(object):
         # fridge to goal: 1.5cm
         # hitman to range: 3.5cm
         # range to indigo: 3.5cm
+        from log_poses import POSES_PATH
         self.environment_poses = read_json(POSES_PATH)
         root_from_world = get_link_pose(self.kitchen, self.world_link)
         for name, world_from_part in self.environment_poses.items():

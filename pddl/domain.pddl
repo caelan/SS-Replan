@@ -19,6 +19,7 @@
     (Joint ?j)
     (StoveKnob ?s ?k)
     (Above ?j1 ?j2)
+    (Adjacent ?j1 ?j2)
 
     (CheckNearby ?o)
     (NearPose ?o2 ?wp2 ?bq)
@@ -91,6 +92,7 @@
     (UnsafeAngleTraj ?j ?a1 ?a2)
     (UnsafeATraj ?at)
 
+    (UnsafePull ?j)
     (Occluded ?j)
     (OccludedRay ?r)
     (CloseTo ?q1 ?q2)
@@ -144,7 +146,7 @@
     :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at)
                        ; (not (= ?aq1 ?aq2)) ; Causes shared optimistic failure
                        (AtBConf ?bq) (AtAConf ?aq1)
-                       ; (CanMoveArm)
+                       (CanMoveArm)
                        (Calibrated) ; TODO: require calibration?
                        (not (Unsafe)))
     :effect (and (AtAConf ?aq2)
@@ -220,6 +222,7 @@
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?wp1)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
                        (HandEmpty) (Calibrated)
+                       (not (UnsafePull ?j))
                        ; (not (UnsafeAngle ?j ?a1)) (not (UnsafeAngle ?j ?a2))
                        (not (UnsafeAngleTraj ?j ?a1 ?a2))
                        (not (UnsafeATraj ?at)) ; TODO: approach pull trajectories
@@ -235,7 +238,7 @@
                  (forall (?o4 ?wp4 ?rp4) (when (and (PoseKin ?o4 ?wp4 ?rp4 ?o ?wp2) (AtRelPose ?o4 ?rp4 ?o))
                                                (AtWorldPose ?o4 ?wp4)))
                  (increase (total-cost) (PullCost))))
-  (:action detect
+  (:action detect ; TODO: only allow detect in carry conf
     :parameters (?o1 ?wp1 ?rp1 ?obs ?wp2 ?rp2 ?o0 ?wp0 ?r)
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)
                        (Detect ?o1 ?wp2 ?r) (BeliefUpdate ?o1 ?rp1 ?obs ?rp2)
@@ -281,9 +284,15 @@
                          (AtAngle ?j ?a)))))
   (:derived (Occluded ?j1) (and (Drawer ?j1)
     (exists (?j2 ?a2) (and (Angle ?j2 ?a2) (Above ?j2 ?j1)
-                           (AngleWithin ?j2 ?a2 @open)
-                           ; (not (AngleWithin ?j2 ?a2 @closed))
+                           ; (AngleWithin ?j2 ?a2 @open)
+                           (not (AngleWithin ?j2 ?a2 @closed))
                            (AtAngle ?j2 ?a2)))))
+  (:derived (UnsafePull ?j1) (and (Drawer ?j1)
+    (exists (?j2 ?a2) (and (Angle ?j2 ?a2) (Adjacent ?j1 ?j2)
+                           ; (AngleWithin ?j2 ?a2 @open)
+                           (not (AngleWithin ?j2 ?a2 @closed))
+                           (AtAngle ?j2 ?a2)))))
+
 
   ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
   ;(:derived (AtWorldPose ?o1 ?wp1) (or

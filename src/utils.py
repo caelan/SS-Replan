@@ -18,13 +18,6 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input, \
     get_difference_fn
 
-try:
-    import trac_ik_python
-    USE_TRACK_IK = True
-except ImportError:
-    USE_TRACK_IK = False
-print('Use Track IK:', USE_TRACK_IK)
-
 ################################################################################
 
 SRL_VAR = 'SRL_PROJECT_DIR'
@@ -94,6 +87,18 @@ BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf')
 YCB_PATH = os.path.join(SRL_PATH, 'packages/kitchen_demo_visualization/ycb/')
 # TODO: ycb obj files have 6 vertex coordinates?
+
+SPAM = 'potted_meat_can'
+MUSTARD = 'mustard_bottle'
+TOMATO_SOUP = 'tomato_soup_can'
+SUGAR = 'sugar_box'
+CHEEZIT = 'cracker_box'
+YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
+
+ECHO_COUNTER = 'echo'
+INDIGO_COUNTER = 'indigo_tmp'
+TOP_DRAWER = 'indigo_drawer_top'
+BOTTOM_DRAWER = 'indigo_drawer_bottom'
 
 ################################################################################
 
@@ -619,15 +624,3 @@ def are_confs_close(conf1, conf2, tol=1e-8):
     difference_fn = get_difference_fn(conf1.body, conf1.joints)
     difference = difference_fn(conf1.values, conf2.values)
     return np.allclose(difference, np.zeros(len(conf1.joints)), rtol=0., atol=tol)
-
-
-SPAM = 'potted_meat_can'
-MUSTARD = 'mustard_bottle'
-TOMATO_SOUP = 'tomato_soup_can'
-SUGAR = 'sugar_box'
-CHEEZIT = 'cracker_box'
-YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-ECHO_COUNTER = 'echo'
-INDIGO_COUNTER = 'indigo_tmp'
-TOP_DRAWER = 'indigo_drawer_top'
-BOTTOM_DRAWER = 'indigo_drawer_bottom'
