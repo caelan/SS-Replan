@@ -221,7 +221,7 @@ def cracker_drawer(world, **kwargs):
 
 ################################################################################
 
-BASE_POSE2D = (0.73, 0.80, -np.pi)
+BASE_POSE2D = (0.74, 0.80, -np.pi)
 
 
 def fixed_stow(world, **kwargs):
@@ -237,6 +237,7 @@ def fixed_stow(world, **kwargs):
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
     initial_surface, goal_surface = drawers
+    #initial_surface, goal_surface = reversed(drawers)
     #initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
     if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)

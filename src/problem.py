@@ -16,7 +16,8 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
 
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
-    RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, KNOBS
+    RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
+    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -173,6 +174,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
         ('Grasp', None, None),
         ('AtGrasp', None, None),
+        ('Above', JOINT_TEMPLATE.format(TOP_DRAWER), JOINT_TEMPLATE.format(BOTTOM_DRAWER)),
 
         ('Calibrated',),
         ('CanMoveBase',),
@@ -250,6 +252,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
     initial_poses = {}
     for joint_name, init_conf in belief.door_confs.items():
+        if joint_name in DRAWER_JOINTS:
+            init.append(('Drawer', joint_name))
         joint = joint_from_name(world.kitchen, joint_name)
         #joint_name = str(joint_name.decode('UTF-8'))
         # Relies on the fact that drawers have identical surface and link names

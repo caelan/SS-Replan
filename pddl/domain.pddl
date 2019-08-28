@@ -18,6 +18,7 @@
     (Graspable ?o)
     (Joint ?j)
     (StoveKnob ?s ?k)
+    (Above ?j1 ?j2)
 
     (CheckNearby ?o)
     (NearPose ?o2 ?wp2 ?bq)
@@ -89,6 +90,8 @@
     (UnsafeApproach ?o ?wp ?g)
     (UnsafeAngle ?j ?a)
     (UnsafeATraj ?at)
+
+    (Occluded ?j)
     (OccludedRay ?r)
     (CloseTo ?q1 ?q2)
 
@@ -217,7 +220,6 @@
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?wp1)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
                        (HandEmpty) (Calibrated)
-                       ; TODO: require adjacent doors to be closed
                        (not (UnsafeAngle ?j ?a1)) ; analog of UnsafeApproach
                        (not (UnsafeAngle ?j ?a2))
                        (not (UnsafeATraj ?at)) ; TODO: approach pull trajectories
@@ -273,10 +275,15 @@
   ;)
 
   (:derived (Accessible ?o ?wp) (or
-    ; TODO: require above surfaces to not be accessible
     (and (WorldPose ?o ?wp) (Counter ?o))
     (exists (?j ?a) (and (AngleKin ?o ?wp ?j ?a) (AngleWithin ?j ?a @open)
+                         (not (Occluded ?j))
                          (AtAngle ?j ?a)))))
+  (:derived (Occluded ?j1) (and (Drawer ?j1)
+    (exists (?j2 ?a2) (and (Angle ?j2 ?a2) (Above ?j2 ?j1)
+                           (AngleWithin ?j2 ?a2 @open)
+                           ; (not (AngleWithin ?j2 ?a2 @closed))
+                           (AtAngle ?j2 ?a2)))))
 
   ; https://github.mit.edu/mtoussai/KOMO-stream/blob/master/03-Caelans-pddlstreamExample/retired/domain.pddl
   ;(:derived (AtWorldPose ?o1 ?wp1) (or

@@ -82,7 +82,7 @@ GRASP_TYPES = [
     TOP_GRASP,
     SIDE_GRASP,
 ]
-APPROACH_DISTANCE = 0.075 # 0.1
+APPROACH_DISTANCE = 0.1 # 0.075 | 0.1
 
 ################################################################################
 
@@ -200,17 +200,8 @@ CAMERA_POSES = {
 
 JOINT_TEMPLATE = '{}_joint'
 
-CABINET_JOINTS = [
-    'baker_joint',
-    'chewie_door_left_joint', 'chewie_door_right_joint',
-    'dagger_door_left_joint', #'dagger_door_right_joint',
-    #'indigo_door_left_joint', 'indigo_door_right_joint',
-] # door
-
-DRAWER_JOINTS = [
-    'hitman_drawer_top_joint', #'hitman_drawer_bottom_joint',
-    'indigo_drawer_top_joint', 'indigo_drawer_bottom_joint',
-] # drawer
+CABINET_JOINTS = [JOINT_TEMPLATE.format(name) for name in CABINETS]
+DRAWER_JOINTS = [JOINT_TEMPLATE.format(name) for name in DRAWERS]
 
 #LEFT_VISIBLE = ['chewie_door_left_joint', # chewie isn't in the viewcone though
 #                'dagger_door_left_joint', 'dagger_door_right_joint']
@@ -628,3 +619,15 @@ def are_confs_close(conf1, conf2, tol=1e-8):
     difference_fn = get_difference_fn(conf1.body, conf1.joints)
     difference = difference_fn(conf1.values, conf2.values)
     return np.allclose(difference, np.zeros(len(conf1.joints)), rtol=0., atol=tol)
+
+
+SPAM = 'potted_meat_can'
+MUSTARD = 'mustard_bottle'
+TOMATO_SOUP = 'tomato_soup_can'
+SUGAR = 'sugar_box'
+CHEEZIT = 'cracker_box'
+YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
+ECHO_COUNTER = 'echo'
+INDIGO_COUNTER = 'indigo_tmp'
+TOP_DRAWER = 'indigo_drawer_top'
+BOTTOM_DRAWER = 'indigo_drawer_bottom'

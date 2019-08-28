@@ -11,7 +11,8 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 from pybullet_tools.utils import INF
-from src.parse_brain import SUGAR, YCB_OBJECTS, SPAM
+from src.utils import SPAM, SUGAR, YCB_OBJECTS
+
 
 def detect_classes():
 

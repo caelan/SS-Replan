@@ -35,9 +35,9 @@ from src.deepim import DeepIM, mean_pose_deviation, Segmentator, FullObserver
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
-from src.parse_brain import task_from_trial_manager, create_trial_args, TRIAL_MANAGER_TASKS, SPAM, MUSTARD, TOMATO_SOUP, \
-    SUGAR, INDIGO_COUNTER, TOP_DRAWER, YCB_OBJECTS, CHEEZIT, BOTTOM_DRAWER, ECHO_COUNTER
-from src.utils import JOINT_TEMPLATE
+from src.parse_brain import task_from_trial_manager, create_trial_args, TRIAL_MANAGER_TASKS
+from src.utils import JOINT_TEMPLATE, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, \
+    INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, dump_dict, update_objects, RIGHT, SIDES, LEFT

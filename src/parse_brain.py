@@ -4,7 +4,8 @@ from pddlstream.language.constants import Not
 from pddlstream.utils import Verbose
 from src.task import Task
 from src.problem import door_closed_formula, door_open_formula
-from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
+from examples.discrete_belief.dist import DeltaDist
+from src.utils import SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, ECHO_COUNTER, INDIGO_COUNTER
 
 TRIAL_MANAGER_TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
@@ -12,17 +13,6 @@ TRIAL_MANAGER_TASKS = [
     'put_spam',
 ]
 
-SPAM = 'potted_meat_can'
-MUSTARD = 'mustard_bottle'
-TOMATO_SOUP = 'tomato_soup_can'
-SUGAR = 'sugar_box'
-CHEEZIT = 'cracker_box'
-YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-
-ECHO_COUNTER = 'echo'
-INDIGO_COUNTER = 'indigo_tmp'
-TOP_DRAWER = 'indigo_drawer_top'
-BOTTOM_DRAWER = 'indigo_drawer_bottom'
 
 ################################################################################
 

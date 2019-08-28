@@ -359,6 +359,7 @@ class Detect(Command):
     def ray_collision(self):
         return batch_ray_collision(self.rays)
     def compute_occluding(self):
+        # TODO: compute as a fraction of the rays
         return {(result.objectUniqueId, frozenset([result.linkIndex]))
                 for result in self.ray_collision() if result.objectUniqueId != -1}
     def draw(self):

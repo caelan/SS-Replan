@@ -12,7 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
-    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, get_aabb, draw_aabb
+    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, get_aabb, draw_aabb, remove_handles
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
@@ -131,7 +131,7 @@ def get_compute_angle_kin(world):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
-    scale = 0.5
+    scale = 0.05 # 0.5
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass
@@ -197,9 +197,12 @@ def get_ofree_ray_pose_test(world, **kwargs):
         obstacles = get_link_obstacles(world, obj_name)
         if any(pairwise_collision(body, obst) for obst in obstacles):
             return False
-        #ray.draw()
-        #wait_for_user()
-        return not obstacles & detect.compute_occluding()
+        visible = not obstacles & detect.compute_occluding()
+        #if not visible:
+        #    handles = detect.draw()
+        #    wait_for_user()
+        #    remove_handles(handles)
+        return visible
     return test
 
 def get_ofree_ray_grasp_test(world, **kwargs):
@@ -215,9 +218,12 @@ def get_ofree_ray_grasp_test(world, **kwargs):
             obstacles = get_link_obstacles(world, obj_name)
         else:
             obstacles = get_descendant_obstacles(world.robot)
-        #detect.draw()
-        #wait_for_user()
-        return not obstacles & detect.compute_occluding()
+        visible = not obstacles & detect.compute_occluding()
+        #if not visible:
+        #    handles = detect.draw()
+        #    wait_for_user()
+        #    remove_handles(handles)
+        return visible
     return test
 
 class Observation(object):
@@ -274,8 +280,8 @@ def update_belief_fn(world, **kwargs):
 
 ################################################################################
 
-def get_test_near_pose(world, **kwargs):
-    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=GROW_FORWARD_RADIUS)
+def get_test_near_pose(world, grow_entity=GROW_FORWARD_RADIUS, **kwargs):
+    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=grow_entity)
     vertices_from_surface = {}
     # TODO: alternatively, distance to hull
 
@@ -387,7 +393,7 @@ def get_stable_gen(world, max_attempts=100,
 
 def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
     stable_gen = get_stable_gen(world, **kwargs)
-    test_near_pose = get_test_near_pose(world, **kwargs)
+    test_near_pose = get_test_near_pose(world, grow_entity=0.0, **kwargs)
     compute_pose_kin = get_compute_pose_kin(world)
 
     def gen(obj_name, surface_name, pose2, base_conf):
@@ -697,7 +703,8 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, tel
             door_paths.append(DoorPath(door_path, handle_path, handle_grasp, tool_path))
     return door_paths
 
-def is_pull_safe(world, door_joint, door_plan, obstacles):
+def is_pull_safe(world, door_joint, door_plan):
+    obstacles = get_descendant_obstacles(world.kitchen, door_joint)
     door_path, handle_path, handle_plan, tool_path = door_plan
     for door_conf in [door_path[0], door_path[-1]]:
         # TODO: check the whole door trajectory
@@ -721,7 +728,7 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     world.open_gripper()
     world.carry_conf.assign()
     robot_saver = BodySaver(world.robot) # TODO: door_saver?
-    if not is_pull_safe(world, door_joint, door_plan, obstacles):
+    if not is_pull_safe(world, door_joint, door_plan):
         return
 
     # Assuming that pairs of fixed things aren't in collision at this point
@@ -808,7 +815,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
         world.carry_conf.assign()
         door_plans = [door_plan for door_plan in compute_door_paths(
             world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
-                      if is_pull_safe(world, door_joint, door_plan, obstacles)]
+                      if is_pull_safe(world, door_joint, door_plan)]
         if not door_plans:
             print('Unable to open door {} at fixed config'.format(joint_name))
             return
@@ -1226,6 +1233,7 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
             return True # TODO: perform this probabilistically
         if not collisions or (o1 == o2) or (o2 == wp1.support):
             return True
+        # TODO: could define these on sets of samples to prune all at once
         body = world.get_body(o1)
         wp2.assign()
         obstacles = get_link_obstacles(world, o2) # - {body}
@@ -1234,6 +1242,8 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
         for _ in iterate_approach_path(world, wp1, g1, body=body):
             if any(pairwise_collision(part, obst) for part in
                    [world.gripper, body] for obst in obstacles):
+                #print(o1, wp1.support, o2, wp2.support)
+                #wait_for_user()
                 return False
         return True
     return test
@@ -1293,6 +1303,8 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
                 #        return False
                 # TODO: just check collisions with moving links
                 if any(pairwise_collision(world.robot, obst) for obst in obstacles):
+                    #print(at, o, p)
+                    #wait_for_user()
                     return False
         return True
     return test
