@@ -360,6 +360,8 @@ def create_gripper(robot, visual=False):
 class FConf(Conf):
     def __repr__(self):
         if len(self.joints) == 2:
+            prefix = 'dq'
+        elif len(self.joints) == 2:
             prefix = 'gq'
         elif len(self.joints) == 3:
             prefix = 'bq'

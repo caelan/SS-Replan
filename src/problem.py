@@ -57,7 +57,7 @@ ACTION_COSTS = {
 def title_from_snake(s):
     return ''.join(x.title() for x in s.split('_'))
 
-def get_streams(world, debug=False, **kwargs):
+def get_streams(world, debug=False, teleport_base=False, **kwargs):
     stream_pddl = read(get_file_path(__file__, '../pddl/stream.pddl'))
     if debug:
         return stream_pddl, DEBUG
@@ -72,7 +72,7 @@ def get_streams(world, debug=False, **kwargs):
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
 
-        'plan-base-motion': from_fn(get_base_motion_fn(world, **kwargs)),
+        'plan-base-motion': from_fn(get_base_motion_fn(world, teleport_base=teleport_base, **kwargs)),
         'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
         'plan-gripper-motion': from_fn(get_gripper_motion_gen(world, **kwargs)),
         'plan-calibrate-motion': from_fn(get_calibrate_gen(world, **kwargs)),
@@ -386,7 +386,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     #bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
 
     goal_formula = existential_quantification(goal_literals)
-    stream_pddl, stream_map = get_streams(world, **kwargs)
+    stream_pddl, stream_map = get_streams(world, teleport_base=task.teleport_base, **kwargs)
 
     print('Constants:', constant_map)
     print('Init:', sorted(init, key=lambda f: f[0]))

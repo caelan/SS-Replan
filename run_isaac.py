@@ -215,7 +215,7 @@ def simulation_setup(domain, world, args):
             CHEEZIT: UniformDist([INDIGO_COUNTER]),
         }
         goal_drawer = TOP_DRAWER  # TOP_DRAWER | BOTTOM_DRAWER
-        task = Task(world, prior=prior,
+        task = Task(world, prior=prior, teleport_base=True,
                     # goal_detected=[SPAM],
                     goal_holding=SPAM,
                     #goal_on={SPAM: goal_drawer},
@@ -247,7 +247,7 @@ def real_setup(domain, world, args):
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
     goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
-    task = Task(world, prior=prior,
+    task = Task(world, prior=prior, teleport_base=True,
                 #goal_detected=[SPAM],
                 #goal_holding=SPAM,
                 goal_on={SPAM: goal_drawer},
@@ -331,8 +331,8 @@ def main():
     franka_open_gripper(interface)
     #interface.localize_all()
     #interface.update_state()
-    test_carter(interface)
-    return
+    #test_carter(interface)
+    #return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints

@@ -418,7 +418,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
             bq = FConf(world.robot, world.base_joints, base_conf)
             bq.assign()
             for conf in world.special_confs:
-                # TODO: ensure the end-effector is visible at the calibrate_conf
+                # TODO: ensure the base and/or end-effector is visible at the calibrate_conf
                 # Could even sample a special visible conf for this base_conf
                 conf.assign()
                 if any(pairwise_collision(world.robot, b, max_distance=min_distance) for b in obstacles):
@@ -890,7 +890,7 @@ def parse_fluents(world, fluents):
             raise NotImplementedError(predicate)
     return attachments, obstacles
 
-def get_base_motion_fn(world, collisions=True, teleport=False,
+def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
     # TODO: lazy planning on a common base roadmap
 
@@ -904,7 +904,7 @@ def get_base_motion_fn(world, collisions=True, teleport=False,
             obstacles = set()
         obstacles.update(world.static_obstacles)
         robot_saver = BodySaver(world.robot)
-        if (bq1 == bq2) or teleport:
+        if (bq1 == bq2) or teleport_base or teleport:
             path = [bq1.values, bq2.values]
         else:
             # It's important that the extend function is reversible to avoid getting trapped

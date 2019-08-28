@@ -16,10 +16,9 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 from src.belief import create_surface_belief
 
 class Task(object):
-    def __init__(self, world, prior={}, skeletons=[],
-                 movable_base=True, noisy_base=True, grasp_types=GRASP_TYPES,
-                 return_init_bq=False, return_init_aq=False,
-                 goal_aq=None,
+    def __init__(self, world, prior={}, skeletons=[], grasp_types=GRASP_TYPES,
+                 movable_base=True, noisy_base=True, teleport_base=False,
+                 return_init_bq=False, return_init_aq=False, goal_aq=None,
                  goal_hand_empty=False, goal_holding=None, goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
                  init=[], goal=[], max_cost=MAX_COST):
@@ -27,9 +26,10 @@ class Task(object):
         world.task = self
         self.prior = dict(prior) # DiscreteDist over
         self.skeletons = list(skeletons)
+        self.grasp_types = tuple(grasp_types)
         self.movable_base = movable_base
         self.noisy_base = noisy_base
-        self.grasp_types = tuple(grasp_types)
+        self.teleport_base = teleport_base
         assert (goal_aq is None) or not return_init_aq
         self.goal_aq = goal_aq
         self.return_init_bq = return_init_bq
@@ -233,24 +233,26 @@ def fixed_stow(world, **kwargs):
     # set_base_values(world.robot, BASE_POSE2D)
     world.set_base_conf(BASE_POSE2D)
 
+    drawers = ['indigo_drawer_top', 'indigo_drawer_bottom']
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
-    #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_bottom'
-    initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
+    initial_surface, goal_surface = drawers
+    #initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
     if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)
-    # joint_name = JOINT_TEMPLATE.format(goal_surface)
-    #world.open_door(joint_from_name(world.kitchen, joint_name))
+    #joint_name = JOINT_TEMPLATE.format(goal_surface)
+    world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(goal_surface)))
 
     # TODO: declare success if already believe it's in the drawer or require detection?
     prior = {
-        entity_name: UniformDist([initial_surface]),
+        #entity_name: UniformDist([initial_surface]),
+        entity_name: UniformDist(drawers),
         #entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top', 'indigo_drawer_bottom']),
     }
     return Task(world, prior=prior, movable_base=False,
                 #goal_detected=[entity_name],
-                goal_holding=entity_name,
-                #goal_on={entity_name: goal_surface},
+                #goal_holding=entity_name,
+                goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
                 #goal_closed=ALL_JOINTS,

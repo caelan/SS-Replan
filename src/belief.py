@@ -9,14 +9,13 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask
 
 #from examples.discrete_belief.run import geometric_cost
-from pybullet_tools.utils import BodySaver, \
-    LockRenderer, spaced_colors, WorldSaver, \
+from pybullet_tools.utils import BodySaver, joint_from_name, LockRenderer, spaced_colors, WorldSaver, \
     pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user, get_joint_positions
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, relative_detections, ELSEWHERE
 from src.stream import get_stable_gen
-from src.utils import create_relative_pose, RelPose
+from src.utils import create_relative_pose, RelPose, FConf
 
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
@@ -44,6 +43,7 @@ REPAIR_DETECTIONS = False
 
 # TODO: point estimates and confidence intervals/regions
 # TODO: mixture between discrete and growing Mixture of Gaussian
+# TODO: belief fluents
 
 class Belief(object):
     def __init__(self, world, pose_dists={}, grasped=None):
@@ -53,8 +53,17 @@ class Belief(object):
         self.color_from_name = dict(zip(self.objects, spaced_colors(len(self.objects))))
         self.observations = []
         self.handles = []
-        # TODO: belief fluents
-        # TODO: report grasp failure if gripper is ever fully closed
+
+        # TODO: store state history
+        self.base_conf = None
+        self.arm_conf = None
+        self.gripper_conf = None
+        self.door_confs = {}
+    def update_door_conf(self, name, position):
+        # TODO: could make a generic update world conf
+        joint = joint_from_name(self.world.kitchen, name)
+        self.door_confs[name] = FConf(self.world.kitchen, [joint], [position], init=True)
+        return self.door_confs[name]
     @property
     def holding(self):
         if self.grasped is None:
