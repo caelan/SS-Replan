@@ -10,7 +10,7 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path
 
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    get_difference_fn, euler_from_quat, quat_from_pose
+    get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name
 
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
@@ -124,11 +124,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     domain_pddl = read(get_file_path(__file__, '../pddl/domain.pddl'))
     # TODO: repackage stream outputs to avoid recomputation
 
-    # TODO: could replace objects for init_bq and init_gq instead of using closeto
-    init_bq = FConf(world.robot, world.base_joints)
-    init_aq = FConf(world.robot, world.arm_joints)
-    init_gq = FConf(world.robot, world.gripper_joints)
     # Despite the base not moving, it could be re-estimated
+    init_bq = belief.base_conf
+    init_aq = belief.arm_conf
+    init_gq = belief.gripper_conf
 
     carry_aq = world.carry_conf
     init_aq = carry_aq if are_confs_close(init_aq, carry_aq) else init_aq
@@ -239,19 +238,14 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                 ('CloseTo', '?aq', goal_aq), ('AtAConf', '?aq'))))
 
     initial_poses = {}
-    for joint in world.kitchen_joints:
-        joint_name = get_joint_name(world.kitchen, joint)
+    for joint_name, init_conf in belief.door_confs.items():
+        joint = joint_from_name(world.kitchen, joint_name)
         #joint_name = str(joint_name.decode('UTF-8'))
-        link = child_link_from_joint(joint)
         # Relies on the fact that drawers have identical surface and link names
-        link_name = get_link_name(world.kitchen, link)
+        link_name = get_link_name(world.kitchen, child_link_from_joint(joint))
         #link_name = str(link_name.decode('UTF-8'))
         #link_name = str(link_name.encode('ascii','ignore'))
-        init_conf = FConf(world.kitchen, [joint], init=True)
-        open_conf = FConf(world.kitchen, [joint], [world.open_conf(joint)])
-        #init_conf = open_conf
-        closed_conf = FConf(world.kitchen, [joint], [world.closed_conf(joint)])
-        for conf in [init_conf, open_conf, closed_conf]:
+        for conf in [init_conf, world.open_kitchen_confs[joint], world.closed_kitchen_confs[joint]]:
             # TODO: return to initial poses?
             world_pose, = compute_angle_kin(link_name, joint_name, conf)
             init.extend([

@@ -611,7 +611,8 @@ def get_link_obstacles(world, link_name):
     return set()
 
 
-def are_confs_close(conf1, conf2):  # , tol=None):
+def are_confs_close(conf1, conf2, tol=1e-8):
     assert (conf1.body == conf2.body) and (conf1.joints == conf2.joints)
     difference_fn = get_difference_fn(conf1.body, conf1.joints)
-    return np.allclose(difference_fn(conf1.values, conf2.values), np.zeros(len(conf1.joints)))
+    difference = difference_fn(conf1.values, conf2.values)
+    return np.allclose(difference, np.zeros(len(conf1.joints)), rtol=0., atol=tol)

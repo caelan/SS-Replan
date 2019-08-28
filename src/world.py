@@ -119,6 +119,10 @@ class World(object):
         self.closed_gq = FConf(self.robot, self.gripper_joints,
                               get_min_limits(self.robot, self.gripper_joints))
         self.gripper_confs = [self.open_gq, self.closed_gq]
+        self.open_kitchen_confs = {joint: FConf(self.kitchen, [joint], [self.open_conf(joint)])
+                                   for joint in self.kitchen_joints}
+        self.closed_kitchen_confs = {joint: FConf(self.kitchen, [joint], [self.closed_conf(joint)])
+                                     for joint in self.kitchen_joints}
         self._update_custom_limits()
         self._update_initial()
 

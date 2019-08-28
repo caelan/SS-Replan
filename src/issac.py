@@ -282,6 +282,7 @@ def update_kitchen(world, world_state):
             joint = joint_from_name(world.kitchen, entity.joint_name)
             set_joint_position(world.kitchen, joint, entity.q)
             position_from_joint[entity.joint_name] = entity.q
+            #belief.update_door_conf(entity.joint_name, entity.q)
             #entity.closed_dist
             #entity.open_dist
         elif isinstance(entity, RigidBody):
