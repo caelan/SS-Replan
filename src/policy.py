@@ -39,7 +39,7 @@ def run_policy(task, args, observation_fn, transition_fn):
                                                        replan_actions=replan_actions)
             if plan is None:
                 print('Failed to adhere to plan')
-                wait_for_user()
+                #wait_for_user()
 
         # TODO: store history of stream evaluations
         if plan is None:

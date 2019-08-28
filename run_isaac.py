@@ -26,7 +26,8 @@ from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, elapsed_time, \
-    get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, link_from_name, get_link_pose
+    get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, \
+    link_from_name, get_link_pose
 from pddlstream.utils import Verbose
 
 from src.deepim import DeepIM, mean_pose_deviation, Segmentator, FullObserver
@@ -120,22 +121,39 @@ def planning_loop(interface):
 
 def test_carter(interface):
     carter = interface.carter
+    # /isaac_navigation2D_status
+    # /isaac_navigation2D_request
 
     assert carter is not None
     carter_pose = carter.current_pose
     print('Carter pose:', carter_pose)
     x, y, theta = carter_pose  # current_velocity
     pos = np.array([x, y])
-    goal_pos = pos + 1.0 * unit_from_theta(theta)
+    goal_pos = pos - 1.0 * unit_from_theta(theta)
     goal_pose = np.append(goal_pos, [theta])
     #goal_pose = np.append(pos, [0.])
+    goal_pose = np.array([33.1, 7.789, 0.0])
 
+    #pose_deadman_topic = '/isaac/disable_deadman_switch'
+    #velocity_deadman_topic = '/isaac/enable_ros_segway_cmd'
     # carter.move_to(goal_pose) # recursion bug
-    carter.move_to_safe(goal_pose)  # move_to_async | move_to_safe
+    robot_entity = interface.domain.get_robot()
+    robot_entity.unfix_bases() # suppressor.deactivate() => unfix
+    start_time = time.time()
+    timeout = 100
+    while elapsed_time(start_time) < timeout:
+        carter.pub_disable_deadman_switch.publish(True) # must send repeatedly
+        carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
+        rospy.sleep(0.01)
+    carter.pub_disable_deadman_switch.publish(False)
+    robot_entity.fix_bases() # suppressor.activate() => fix
+    # Towards the kitchen is +x (yaw=0)
+    # fix base of Panda with DART is overwritten by the published message
+
     #carter.move_to_openloop(goal_pose)
     # move_to_open_loop | move_to_safe_followed_by_openloop
 
-    carter.simple_move(-0.1) # simple_move | simple_stop
+    #carter.simple_move(-0.1) # simple_move | simple_stop
     # rospy.sleep(2.0)
     # carter.simple_stop()
     #domain.get_robot().carter_interface = interface.carter
@@ -249,7 +267,7 @@ def real_setup(domain, world, args):
                         vel_threshold_ang=math.radians(1.0))
         robot_entity = domain.get_robot()
         robot_entity.carter_interface = carter
-        robot_entity.unsuppress_fixed_bases()
+        #robot_entity.fix_bases()
     return Interface(args, task, observer, deepim=perception)
 
 
@@ -292,9 +310,8 @@ def main():
         #domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     robot_entity = domain.get_robot()
     #robot_entity.get_motion_interface().remove_obstacle() # TODO: doesn't remove
-    robot_entity.suppress_fixed_bases() # Not as much error?
-    #robot_entity.unsuppress_fixed_bases() # Significant error
-    # Significant error without either
+    robot_entity.fix_bases()
+    #robot_entity.unfix_bases()
     #print(dump_dict(robot_entity))
     #test_deepim(domain)
     #return
@@ -314,8 +331,8 @@ def main():
     franka_open_gripper(interface)
     #interface.localize_all()
     #interface.update_state()
-    #test_carter(interface)
-    #return
+    test_carter(interface)
+    return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
