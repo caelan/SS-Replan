@@ -12,7 +12,8 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
-    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, get_aabb, draw_aabb, remove_handles
+    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, \
+    get_aabb, draw_aabb, remove_handles
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
@@ -22,7 +23,8 @@ from src.database import load_placements, get_surface_reference_pose, load_place
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
     set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
     compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES, TOOL_POSE, Grasp, TOP_GRASP, KNOBS
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES, \
+    TOOL_POSE, Grasp, TOP_GRASP, KNOBS, JOINT_TEMPLATE
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist, NUM_PARTICLES
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
@@ -280,8 +282,8 @@ def update_belief_fn(world, **kwargs):
 
 ################################################################################
 
-def get_test_near_pose(world, grow_entity=GROW_FORWARD_RADIUS, **kwargs):
-    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world)), radius=grow_entity)
+def get_test_near_pose(world, grow_entity=GROW_FORWARD_RADIUS, collisions=False, teleport=False, **kwargs):
+    base_from_objects = grow_polygon(map(point_from_pose, load_forward_placements(world, **kwargs)), radius=grow_entity)
     vertices_from_surface = {}
     # TODO: alternatively, distance to hull
 
@@ -393,7 +395,8 @@ def get_stable_gen(world, max_attempts=100,
 
 def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
     stable_gen = get_stable_gen(world, **kwargs)
-    test_near_pose = get_test_near_pose(world, grow_entity=0.0, **kwargs)
+    test_near_pose = get_test_near_pose(world, #surface_names=[],
+                                        grasp_types=[TOP_GRASP], grow_entity=0.0)
     compute_pose_kin = get_compute_pose_kin(world)
 
     def gen(obj_name, surface_name, pose2, base_conf):
@@ -659,7 +662,7 @@ def get_handle_grasps(world, joint, pre_distance=APPROACH_DISTANCE):
                 grasps.append(HandleGrasp(link, handle_grasp, handle_pregrasp))
     return grasps
 
-def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, teleport=False):
+def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles=set(), teleport=False):
     door_paths = []
     if door_conf1 == door_conf2:
         return door_paths
@@ -1242,6 +1245,7 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
         for _ in iterate_approach_path(world, wp1, g1, body=body):
             if any(pairwise_collision(part, obst) for part in
                    [world.gripper, body] for obst in obstacles):
+                # TODO: some collisions the bottom drawer and the top drawer handle
                 #print(o1, wp1.support, o2, wp2.support)
                 #wait_for_user()
                 return False
@@ -1249,30 +1253,14 @@ def get_cfree_approach_pose_test(world, collisions=True, **kwargs):
     return test
 
 def get_cfree_angle_angle_test(world, collisions=True, **kwargs):
-    def test(j1, a1, j2, a2):
-        if not collisions or (j1 == j2):
+    def test(j1, a1, a2, o2, wp):
+        if not collisions or (o2 in j1): # (j1 == JOINT_TEMPLATE.format(o2)):
             return True
         # TODO: check pregrasp path as well
-        a1.assign()
-        a2.assign()
-        door_joint = joint_from_name(world.kitchen, j1)
-        door_joints = [door_joint]
-        door_path = [a1.values]
-        obstacles = get_descendant_obstacles(world.kitchen, joint_from_name(world.kitchen, j2))
+        # TODO: pull path collisions
+        wp.assign()
         set_configuration(world.gripper, world.open_gq.values)
-        for link, grasp, pregrasp in get_handle_grasps(world, door_joint):
-            for door_conf in door_path:
-                set_joint_positions(world.kitchen, door_joints, door_conf)
-                # The drawers themselves will never collide
-                # if any(pairwise_collision(door_obst, obst)
-                #       for door_obst, obst in product(door_obstacles, obstacles)):
-                #    return
-                handle_pose = get_link_pose(world.kitchen, link)
-                tool_pose = multiply(handle_pose, invert(grasp))
-                set_tool_pose(world, tool_pose)
-                if any(pairwise_collision(world.gripper, obst) for obst in obstacles):
-                    return False
-        return True
+        return compute_door_paths(world, j1, a1, a2, obstacles=get_link_obstacles(world, o2))
     return test
 
 ################################################################################
