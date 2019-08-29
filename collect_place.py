@@ -20,7 +20,7 @@ from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TO
     SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS, \
     OPEN_SURFACES, ENV_SURFACES, CABINETS
 from src.world import World
-from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen
+from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen, Z_EPSILON
 from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
 
 
@@ -32,7 +32,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
     # TODO: this assumes the drawer is open
 
-    stable_gen_fn = get_stable_gen(world, learned=False, collisions=not args.cfree)
+    stable_gen_fn = get_stable_gen(world, z_offset=Z_EPSILON, learned=False, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world)
     ik_ir_gen = get_pick_gen_fn(world, learned=False, collisions=not args.cfree, teleport=args.teleport)
 

@@ -9,6 +9,7 @@ from src.utils import GRASP_TYPES, surface_from_name, BASE_JOINTS, joint_from_na
 DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
 PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
+PRESS_IR_FILENAME = '{robot_name}-{knob_name}-press.json'
 
 
 def get_surface_reference_pose(kitchen, surface_name):
