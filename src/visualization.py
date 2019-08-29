@@ -4,7 +4,7 @@ from pybullet_tools.utils import get_point, convex_hull, Point, add_segments, co
     multiply, point_from_pose, get_pose, invert, link_from_name, grow_polygon, GREEN, get_link_pose
 from src.database import load_pull_base_poses, get_surface_reference_pose, load_placements, \
     load_place_base_poses, load_forward_placements, load_inverse_placements
-from src.utils import ALL_JOINTS, ALL_SURFACES, get_grasps, surface_from_name
+from src.utils import ALL_JOINTS, ALL_SURFACES, get_grasps, surface_from_name, STOVES
 
 GROW_PLACEMENT = 0.05
 GROW_INVERSE_BASE = 0.05
@@ -35,6 +35,8 @@ def add_markers(task, placements=True, forward_place=True, pull_bases=True, inve
     handles = []
     if placements:
         for surface_name in ALL_SURFACES:
+            if surface_name in STOVES:
+                continue
             surface = surface_from_name(surface_name)
             surface_link = link_from_name(world.kitchen, surface.link)
             surface_point = point_from_pose(get_link_pose(world.kitchen, surface_link))

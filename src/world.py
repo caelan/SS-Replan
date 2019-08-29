@@ -15,9 +15,9 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, draw_aabb, \
-    disable_gravity, set_all_static
-from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, FRANKA_YAML, EVE, EVE_PATH, load_yaml, create_gripper, \
-    KITCHEN_PATH, KITCHEN_YAML, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
+    disable_gravity, set_all_static, get_movable_joints, get_joint_names
+from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, load_yaml, create_gripper, \
+    KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
     get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf, are_confs_close
 
@@ -73,7 +73,7 @@ class World(object):
         set_camera_pose(camera_point=[2, -1.5, 1])
         draw_pose(Pose(), length=3)
 
-        self.kitchen_yaml = load_yaml(KITCHEN_YAML)
+        #self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         with HideOutput(enable=True):
             self.kitchen = load_pybullet(KITCHEN_PATH, fixed_base=True, cylinder=True)
 
@@ -84,7 +84,8 @@ class World(object):
 
         self.robot_name = robot_name
         if self.robot_name == FRANKA_CARTER:
-            urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
+            urdf_path, yaml_path = FRANKA_CARTER_PATH, None
+            #urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
         elif self.robot_name == EVE:
             urdf_path, yaml_path = EVE_PATH, None
         else:
@@ -217,18 +218,24 @@ class World(object):
     def arm_joints(self):
         if self.robot_name == EVE:
             return get_eve_arm_joints(self.robot, arm=DEFAULT_ARM)
-        return joints_from_names(self.robot, self.robot_yaml['cspace'])
+        joint_names = ['panda_joint{}'.format(1+i) for i in range(7)]
+        #joint_names = self.robot_yaml['cspace']
+        return joints_from_names(self.robot, joint_names)
     @property
     def gripper_joints(self):
-        if self.robot_yaml is None:
-            return []
-        return tuple(joint_from_name(self.robot, rule['name'])
-                for rule in self.robot_yaml['cspace_to_urdf_rules'])
+        #if self.robot_yaml is None:
+        #    return []
+        joint_names = ['panda_finger_joint{}'.format(1+i) for i in range(2)]
+        #joint_names = [joint_from_name(self.robot, rule['name'])
+        #               for rule in self.robot_yaml['cspace_to_urdf_rules']]
+        return joints_from_names(self.robot, joint_names)
+
     @property
     def kitchen_joints(self):
-        #return joints_from_names(self.kitchen, self.kitchen_yaml['cspace'])
-        return joints_from_names(self.kitchen, filter(
-            ALL_JOINTS.__contains__, self.kitchen_yaml['cspace']))
+        joint_names = get_joint_names(self.kitchen, get_movable_joints(self.kitchen))
+        #joint_names = self.kitchen_yaml['cspace']
+        #return joints_from_names(self.kitchen, joint_names)
+        return joints_from_names(self.kitchen, filter(ALL_JOINTS.__contains__, joint_names))
     @property
     def base_link(self):
         return child_link_from_joint(self.base_joints[-1])

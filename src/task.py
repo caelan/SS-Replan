@@ -6,7 +6,7 @@ import time
 
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
     create_box, set_all_static, COLOR_FROM_NAME, \
-    stable_z_on_aabb, pairwise_collision, elapsed_time
+    stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
@@ -75,12 +75,17 @@ def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
     set_pose(body, pose)
     return pose
 
+
 def add_block(world, idx=0, **kwargs):
     # TODO: automatically produce a unique name
     block_type = BLOCK_TEMPLATE.format(BLOCK_SIZES[-1], BLOCK_COLORS[0])
     #block_type = 'potted_meat_can'
     name = name_from_type(block_type, idx)
-    world.add_body(name)
+    #world.add_body(name)
+    #print(get_aabb_extent(get_aabb(world.get_body(name))))
+    side = 0.065
+    body = create_box(w=side, l=side, h=side, color=COLOR_FROM_NAME['red'])
+    world.add(name, body)
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
@@ -267,7 +272,7 @@ def stow_block(world, num=1, **kwargs):
     # wait_for_user()
 
     # initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
-    initial_surface = 'front_right_stove'  # hitman_tmp | indigo_tmp | range | front_right_stove
+    initial_surface = 'indigo_tmp'  # hitman_tmp | indigo_tmp | range | front_right_stove
     # initial_surface = 'indigo_drawer_top'
     goal_surface = 'indigo_drawer_top'  # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
     joint_name = 'indigo_drawer_top_joint'

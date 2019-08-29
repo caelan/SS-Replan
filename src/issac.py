@@ -18,7 +18,9 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     BASE_LINK, base_values_from_pose, unit_pose, \
     pose_from_base_values, INF, wait_for_user, get_joint_limits, violates_limit, \
     set_renderer, draw_pose, Pose, Point, set_all_static
-from src.utils import SRL_PATH, CAMERA_TEMPLATE
+from src.utils import get_srl_path, CAMERA_TEMPLATE
+
+SRL_PATH = get_srl_path()
 
 RIGHT = 'right'
 LEFT = 'left'
