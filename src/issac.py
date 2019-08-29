@@ -71,7 +71,7 @@ def update_observer(observer):
         rospy.sleep(0.1)
         if 1 < elapsed_time(last_time):
             print('Waiting for observer update')
-            last_time = time.time
+            last_time = time.time()
     return observer.current_state
 
 def kill_lula():

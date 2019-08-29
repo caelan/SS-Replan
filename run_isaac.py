@@ -27,7 +27,7 @@ from isaac_bridge.carter import Carter
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, elapsed_time, \
     get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, \
-    link_from_name, get_link_pose
+    link_from_name, get_link_pose, get_joint_positions, pose2d_from_pose, pose_from_pose2d
 from pddlstream.utils import Verbose
 
 from src.deepim import DeepIM, mean_pose_deviation, Segmentator, FullObserver
@@ -131,7 +131,52 @@ def seed_dart_with_carter(interface):
     robot_entity.fix_bases() # suppressor.activate() => fix
 
 HOME_BASE_POSE = [31.797, 9.118, -0.12]
-INDIGO_BASE_POSE = [33.1, 7.789, 0.0]
+#INDIGO_BASE_POSE = [33.1, 7.789, 0.0]
+INDIGO_BASE_POSE = [33.05, 7.789, 0.0]
+
+# Middle
+#Carter pose: [ 25.928  11.541   2.4  ]
+# BB8
+# Carter pose: [ 17.039  13.291  -2.721]
+
+def command_carter(interface, goal_pose, timeout=30):
+    # pose_deadman_topic = '/isaac/disable_deadman_switch'
+    # velocity_deadman_topic = '/isaac/enable_ros_segway_cmd'
+    # carter.move_to(goal_pose) # recursion bug
+    robot_entity = interface.domain.get_robot()
+    robot_entity.unfix_bases()  # suppressor.deactivate() => unfix
+    start_time = time.time()
+    reached_goal = False
+    carter = interface.carter
+    while elapsed_time(start_time) < timeout:
+        print('Error:', np.array(carter.pose_error).round(3))
+        if carter.at_goal():
+            print('At goal configuration!')
+            reached_goal = True
+            break
+        carter.pub_disable_deadman_switch.publish(True)  # must send repeatedly
+        carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
+        rospy.sleep(0.01)
+
+    start_time = time.time()
+    while elapsed_time(start_time) < 1.:
+        carter.move_to_async(carter.current_pose)  # move_to_async | move_to_safe
+        carter.pub_disable_deadman_switch.publish(False)
+        rospy.sleep(0.01)
+    # TODO: wait until it doesn't move for a certain amount of time
+
+    carter.pub_disable_deadman_switch.publish(False)
+    robot_entity.fix_bases()  # suppressor.activate() => fix
+    # Towards the kitchen is +x (yaw=0)
+    # fix base of Panda with DART is overwritten by the published message
+    return reached_goal
+
+def heading_stuff(carter, distance):
+    x, y, theta = carter.current_pose # current_velocity
+    pos = np.array([x, y])
+    goal_pos = pos + distance * unit_from_theta(theta)
+    goal_pose = np.append(goal_pos, [theta])
+    return goal_pose
 
 def test_carter(interface):
     carter = interface.carter
@@ -142,47 +187,15 @@ def test_carter(interface):
     initial_pose = carter.current_pose
     print('Carter pose:', initial_pose)
     x, y, theta = initial_pose  # current_velocity
-    pos = np.array([x, y])
-    goal_pos = pos - 1.0 * unit_from_theta(theta)
-    goal_pose = np.append(goal_pos, [theta])
-    #goal_pose = np.append(pos, [0.])
-    #goal_pose = np.array(INDIGO_BASE_POSE)
-    goal_pose = np.array(HOME_BASE_POSE)
+    #goal_pose = np.array([x, y, 0])
+    #goal_pose = heading_stuff(carter, -1.0)
+    goal_pose = np.array(INDIGO_BASE_POSE)
+    #goal_pose = np.array(HOME_BASE_POSE)
+    command_carter(interface, goal_pose, timeout=120)
 
-    world = interface.world
-    base_difference_fn = get_difference_fn(world.robot, world.base_joints)
-
-    #pose_deadman_topic = '/isaac/disable_deadman_switch'
-    #velocity_deadman_topic = '/isaac/enable_ros_segway_cmd'
-    # carter.move_to(goal_pose) # recursion bug
-    robot_entity = interface.domain.get_robot()
-    robot_entity.unfix_bases() # suppressor.deactivate() => unfix
-    start_time = time.time()
-    timeout = 100
-    reached_goal = False
-    pos_error = 0.05
-    ori_error = math.radians(10)
-    while elapsed_time(start_time) < timeout:
-        current_pose = carter.current_pose
-        if reached_goal:
-            print('At goal configuration!')
-        else:
-            error = base_difference_fn(current_pose, goal_pose)
-            print('Error:', np.array(error).round(3))
-            if np.less_equal(np.abs(error), [pos_error, pos_error, ori_error]).all():
-                reached_goal = True
-                goal_pose = current_pose
-                start_time = time.time()
-                timeout = 1.
-                #break
-        carter.pub_disable_deadman_switch.publish(True) # must send repeatedly
-        carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
-        rospy.sleep(0.01)
-
-    carter.pub_disable_deadman_switch.publish(False)
-    robot_entity.fix_bases() # suppressor.activate() => fix
-    # Towards the kitchen is +x (yaw=0)
-    # fix base of Panda with DART is overwritten by the published message
+    #while True:
+    #    print('Carter pose:', carter.current_pose)
+    #    rospy.sleep(0.1)
 
     #carter.move_to_openloop(goal_pose)
     # move_to_open_loop | move_to_safe_followed_by_openloop
@@ -308,6 +321,9 @@ def real_setup(domain, world, args):
 
 ################################################################################
 
+CARRY_CONF = [0.020760029206411876, -1.0611899273529857, -0.052402929133539944, -2.567198461037754,
+              -0.06013280179334339, 1.5917587080266737, -2.3553707114303295]
+
 def main():
     parser = create_parser()
     parser.add_argument('-execute', action='store_true',
@@ -345,7 +361,6 @@ def main():
     #robot_entity.unfix_bases()
     #print(dump_dict(robot_entity))
     #test_deepim(domain)
-    #return
 
     # /home/cpaxton/srl_system/workspace/src/external/lula_franka
     world = World(use_gui=True) # args.visualize)
@@ -363,8 +378,8 @@ def main():
     franka_open_gripper(interface)
     #interface.localize_all()
     #interface.update_state()
-    test_carter(interface)
-    return
+    #test_carter(interface)
+    #return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -376,6 +391,9 @@ def main():
         # due to the LULA overhead (e.g. loading complex meshes)
         load_objects(interface.task)
         observe_world(interface, visible=set())
+        print('Base conf:', get_joint_positions(world.robot, world.base_joints))
+        print('Arm conf:', get_joint_positions(world.robot, world.arm_joints))
+        print('Gripper conf:', get_joint_positions(world.robot, world.gripper_joints))
         for side in [LEFT] if interface.simulation else [RIGHT]: # TODO: simulation naming inconsistency
             display_kinect(interface, side=side)
         #if LEFT in world.cameras:
@@ -385,6 +403,9 @@ def main():
         world._update_initial()
         add_markers(interface.task, inverse_place=False)
     #wait_for_user()
+
+    test_carter(interface)
+    return
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
