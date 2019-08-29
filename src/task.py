@@ -315,6 +315,6 @@ TASKS = [
     detect_block,
     hold_block,
     fixed_stow,
-    stow_block,
     cracker_drawer,
+    stow_block,
 ]

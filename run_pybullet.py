@@ -57,7 +57,7 @@ def main():
     task_names = [fn.__name__ for fn in TASKS]
     print('Tasks:', task_names)
     parser = create_parser()
-    parser.add_argument('-problem', default=task_names[0], choices=task_names,
+    parser.add_argument('-problem', default=task_names[-1], choices=task_names,
                         help='The name of the problem to solve.')
     args = parser.parse_args()
     #if args.seed is not None:
