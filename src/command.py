@@ -4,16 +4,9 @@ import math
 import numpy as np
 import time
 
-from isaac_bridge.manager import SimulationManager
-
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, flatten_links, remove_handles, \
     get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, get_link_pose
-from src.base import follow_base_trajectory
-from src.execution import moveit_control, \
-    franka_open_gripper, franka_close_gripper, franka_control
-from src.issac import update_robot
-from src.update_isaac import update_isaac_robot
 from src.utils import create_surface_attachment
 
 DEFAULT_SLEEP = 0.5
@@ -132,16 +125,20 @@ class Trajectory(Command):
         # assert not moveit.use_lula
         domain = interface.domain
         carter = domain.carter
+        #from src.base import follow_base_trajectory
+        # from src.update_isaac import update_isaac_robot
+        # from isaac_bridge.manager import SimulationManager
         if carter is None:
-            follow_base_trajectory(self.world, self.path, interface.moveit, interface.observer)
-        elif isinstance(carter, SimulationManager):
-            sim_manager = carter
-            interface.pause_simulation()
-            set_joint_positions(self.robot, self.joints, self.path[-1])
-            update_isaac_robot(interface.observer, sim_manager, self.world)
-            time.sleep(DEFAULT_SLEEP)
-            interface.resume_simulation()
-            # TODO: teleport attached
+            pass
+            #follow_base_trajectory(self.world, self.path, interface.moveit, interface.observer)
+        #elif isinstance(carter, SimulationManager):
+        #    sim_manager = carter
+        #    interface.pause_simulation()
+        #    set_joint_positions(self.robot, self.joints, self.path[-1])
+        #    update_isaac_robot(interface.observer, sim_manager, self.world)
+        #    time.sleep(DEFAULT_SLEEP)
+        #    interface.resume_simulation()
+        #    # TODO: teleport attached
         else:
             world_state = domain.root
             # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter_sim.py
@@ -169,6 +166,7 @@ class Trajectory(Command):
         # move_gripper_action(position)
         joint = self.joints[0]
         average = np.average(get_joint_limits(self.robot, joint))
+        from src.execution import franka_open_gripper, franka_close_gripper
         if position < average:
             franka_close_gripper(interface)
         else:
@@ -182,6 +180,7 @@ class Trajectory(Command):
         elif self.joints == self.world.gripper_joints:
             success = self.execute_gripper(interface)
         else:
+            from src.execution import franka_control
             success = franka_control(self.robot, self.joints, self.path, interface)
         #status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         time.sleep(DEFAULT_SLEEP)
@@ -206,15 +205,16 @@ class ApproachTrajectory(Trajectory):
         return super(ApproachTrajectory, self).execute(interface)
         # TODO: finish if error is still large
 
-        set_joint_positions(self.robot, self.joints, self.path[-1])
-        target_pose = get_link_pose(self.robot, self.world.tool_link)
-        interface.robot_entity.suppress_fixed_bases()
-        interface.robot_entity.unsuppress_fixed_bases()
+        #from src.issac import update_robot
+        #set_joint_positions(self.robot, self.joints, self.path[-1])
+        #target_pose = get_link_pose(self.robot, self.world.tool_link)
+        #interface.robot_entity.suppress_fixed_bases()
+        #interface.robot_entity.unsuppress_fixed_bases()
 
-        world_state[domain.robot].suppress_fixed_bases()
-        interface.update_state()
-        update_robot(interface)
-        time.sleep(DEFAULT_SLEEP)
+        #world_state[domain.robot].suppress_fixed_bases()
+        #interface.update_state()
+        #update_robot(interface)
+        #time.sleep(DEFAULT_SLEEP)
 
 
 class DoorTrajectory(Command):  # TODO: extend Trajectory
@@ -254,6 +254,7 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         #if self.do_pull:
         #    franka_close_gripper(interface)
         #    time.sleep(DEFAULT_SLEEP)
+        from src.execution import franka_control
         success = franka_control(self.robot, self.joints, self.path, interface)
         time.sleep(DEFAULT_SLEEP)
         return success
@@ -302,6 +303,7 @@ class AttachGripper(Attach):
         name = self.world.get_name(self.body)
         effort = EFFORT_FROM_OBJECT[name]
         print('Grasping {} with effort {}'.format(name, effort))
+        from src.execution import franka_close_gripper
         franka_close_gripper(interface, effort=effort)
         interface.stop_tracking(name)
         time.sleep(DEFAULT_SLEEP)
@@ -334,6 +336,7 @@ class Detach(Command):
         del state.attachments[self.body]
         yield
     def execute(self, interface):
+        from src.execution import franka_open_gripper
         if self.world.robot == self.robot:
             franka_open_gripper(interface)
             time.sleep(DEFAULT_SLEEP)

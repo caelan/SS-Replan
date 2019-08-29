@@ -120,7 +120,7 @@ RIGHT_CABINETS = ['dagger_door_left'] #, 'dagger_door_right', 'indigo_tmp_bottom
 CABINETS = LEFT_CABINETS + RIGHT_CABINETS
 
 DRAWERS = [
-    'hitman_drawer_top', #'hitman_drawer_bottom',
+    #'hitman_drawer_top', #'hitman_drawer_bottom',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ]
 
@@ -142,7 +142,7 @@ ENV_SURFACES = [
     'table',
 ]
 
-COUNTERS = ['indigo_tmp'] # + ['range'] + ['hitman_tmp']
+COUNTERS = ['hitman_tmp', 'indigo_tmp', 'range']
 OPEN_SURFACES = COUNTERS + STOVES
 
 Surface = namedtuple('Surface', ['link', 'shape', 'joints'])
@@ -581,7 +581,7 @@ def get_descendant_obstacles(body, link=BASE_LINK):
 
 ################################################################################
 
-Z_EPSILON = 5e-3
+Z_EPSILON = 2.5e-3
 
 
 def open_surface_joints(world, surface_name, joint_names=ALL_JOINTS):
