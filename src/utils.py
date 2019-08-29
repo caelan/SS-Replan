@@ -97,6 +97,7 @@ TOMATO_SOUP = 'tomato_soup_can'
 SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
+# pudding_box banana bowl
 
 ECHO_COUNTER = 'echo'
 INDIGO_COUNTER = 'indigo_tmp'
@@ -255,16 +256,17 @@ def ycb_type_from_file(path):
     return path.split('_', 1)[-1]
 
 def get_ycb_types():
-    path = os.path.join(get_srl_path(), YCB_SRL_PATH)
-    return sorted(map(ycb_type_from_file, os.listdir(path)))
+    ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
+    return sorted(map(ycb_type_from_file, os.listdir(ycb_path)))
 
 def get_ycb_obj_path(ycb_type):
     # TODO: simplify geometry (although pybullet does this automatically)
-    path_from_type = {ycb_type_from_file(path): path for path in os.listdir(YCB_SRL_PATH)}
+    ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
+    path_from_type = {ycb_type_from_file(path): path for path in os.listdir(ycb_path)}
     if ycb_type not in path_from_type:
         return None
     # texture_map.png textured.mtl textured.obj textured_simple.obj textured_simple.obj.mtl
-    return os.path.join(get_srl_path(), YCB_SRL_PATH, path_from_type[ycb_type], 'textured_simple.obj')
+    return os.path.join(ycb_path, path_from_type[ycb_type], 'textured_simple.obj')
 
 def load_ycb(ycb_name, **kwargs):
     # TODO: simplify geometry

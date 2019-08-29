@@ -6,6 +6,7 @@ import signal
 import pickle
 import rospy
 import tf2_ros
+import time
 
 #from collections import Counter
 from image_geometry import PinholeCameraModel
@@ -17,7 +18,7 @@ from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_fr
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_links, \
     BASE_LINK, base_values_from_pose, unit_pose, \
     pose_from_base_values, INF, wait_for_user, get_joint_limits, violates_limit, \
-    set_renderer, draw_pose, Pose, Point, set_all_static
+    set_renderer, draw_pose, Pose, Point, set_all_static, elapsed_time
 from src.utils import get_srl_path, CAMERA_TEMPLATE
 
 SRL_PATH = get_srl_path()
@@ -64,8 +65,13 @@ PANDA_FULL_CONFIG_PATH = os.path.join(SRL_PATH, 'packages/isaac_bridge/configs/p
 ################################################################################
 
 def update_observer(observer):
+    #print('Waiting for observer update')
+    last_time = time.time()
     while not observer.update(noise=False):
         rospy.sleep(0.1)
+        if 1 < elapsed_time(last_time):
+            print('Waiting for observer update')
+            last_time = time.time
     return observer.current_state
 
 def kill_lula():

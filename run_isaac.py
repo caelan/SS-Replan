@@ -37,7 +37,7 @@ from src.interface import Interface
 from src.command import execute_commands, iterate_commands
 from src.parse_brain import task_from_trial_manager, create_trial_args, TRIAL_MANAGER_TASKS
 from src.utils import JOINT_TEMPLATE, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, \
-    INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER
+    INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER, get_difference_fn
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, dump_dict, update_objects, RIGHT, SIDES, LEFT
@@ -119,20 +119,38 @@ def planning_loop(interface):
 
 ################################################################################
 
+def seed_dart_with_carter(interface):
+    robot_entity = interface.domain.get_robot()
+    robot_entity.unfix_bases() # suppressor.deactivate() => unfix
+    start_time = time.time()
+    timeout = 5
+    while elapsed_time(start_time) < timeout:
+        interface.carter.pub_disable_deadman_switch.publish(True) # must send repeatedly
+        rospy.sleep(0.01)
+    interface.carter.pub_disable_deadman_switch.publish(False)
+    robot_entity.fix_bases() # suppressor.activate() => fix
+
+HOME_BASE_POSE = [31.797, 9.118, -0.12]
+INDIGO_BASE_POSE = [33.1, 7.789, 0.0]
+
 def test_carter(interface):
     carter = interface.carter
     # /isaac_navigation2D_status
     # /isaac_navigation2D_request
 
     assert carter is not None
-    carter_pose = carter.current_pose
-    print('Carter pose:', carter_pose)
-    x, y, theta = carter_pose  # current_velocity
+    initial_pose = carter.current_pose
+    print('Carter pose:', initial_pose)
+    x, y, theta = initial_pose  # current_velocity
     pos = np.array([x, y])
     goal_pos = pos - 1.0 * unit_from_theta(theta)
     goal_pose = np.append(goal_pos, [theta])
     #goal_pose = np.append(pos, [0.])
-    goal_pose = np.array([33.1, 7.789, 0.0])
+    #goal_pose = np.array(INDIGO_BASE_POSE)
+    goal_pose = np.array(HOME_BASE_POSE)
+
+    world = interface.world
+    base_difference_fn = get_difference_fn(world.robot, world.base_joints)
 
     #pose_deadman_topic = '/isaac/disable_deadman_switch'
     #velocity_deadman_topic = '/isaac/enable_ros_segway_cmd'
@@ -141,10 +159,26 @@ def test_carter(interface):
     robot_entity.unfix_bases() # suppressor.deactivate() => unfix
     start_time = time.time()
     timeout = 100
+    reached_goal = False
+    pos_error = 0.05
+    ori_error = math.radians(10)
     while elapsed_time(start_time) < timeout:
+        current_pose = carter.current_pose
+        if reached_goal:
+            print('At goal configuration!')
+        else:
+            error = base_difference_fn(current_pose, goal_pose)
+            print('Error:', np.array(error).round(3))
+            if np.less_equal(np.abs(error), [pos_error, pos_error, ori_error]).all():
+                reached_goal = True
+                goal_pose = current_pose
+                start_time = time.time()
+                timeout = 1.
+                #break
         carter.pub_disable_deadman_switch.publish(True) # must send repeatedly
         carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
         rospy.sleep(0.01)
+
     carter.pub_disable_deadman_switch.publish(False)
     robot_entity.fix_bases() # suppressor.activate() => fix
     # Towards the kitchen is +x (yaw=0)
@@ -217,7 +251,7 @@ def simulation_setup(domain, world, args):
         goal_drawer = TOP_DRAWER  # TOP_DRAWER | BOTTOM_DRAWER
         task = Task(world, prior=prior, teleport_base=True,
                     # goal_detected=[SPAM],
-                    goal_holding=SPAM,
+                    #goal_holding=SPAM,
                     #goal_on={SPAM: goal_drawer},
                     # goal_closed=[],
                     # goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
@@ -241,8 +275,8 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
-        #SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
+        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
@@ -250,24 +284,25 @@ def real_setup(domain, world, args):
     task = Task(world, prior=prior, teleport_base=True,
                 #goal_detected=[SPAM],
                 #goal_holding=SPAM,
-                goal_on={SPAM: goal_drawer},
+                #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
+                #goal_cooked=[SPAM],
                 #return_init_aq=True,
                 return_init_bq=True)
 
-    if not args.fixed:
-        carter = Carter(goal_threshold_tra=0.10,
-                        goal_threshold_rot=math.radians(15.),
-                        vel_threshold_lin=0.01,
-                        vel_threshold_ang=math.radians(1.0))
-        robot_entity = domain.get_robot()
-        robot_entity.carter_interface = carter
-        #robot_entity.fix_bases()
+    #if not args.fixed:
+    carter = Carter(goal_threshold_tra=0.10,
+                    goal_threshold_rot=math.radians(15.),
+                    vel_threshold_lin=0.01,
+                    vel_threshold_ang=math.radians(1.0))
+    robot_entity = domain.get_robot()
+    robot_entity.carter_interface = carter
+    #robot_entity.fix_bases()
     return Interface(args, task, observer, deepim=perception)
 
 
@@ -290,11 +325,7 @@ def main():
     args = parser.parse_args()
     np.set_printoptions(precision=3, suppress=True)
     #args.watch |= args.execute
-    # TODO: samples from the belief distribution likely don't have the init flag
-
-    # TODO: populate with initial objects even if not observed
     # TODO: reobserve thee same scene until receive good observation
-    # TODO: integrate with deepim
 
     # srl_system/packages/isaac_bridge/configs/ycb_table_config.json
     # srl_system/packages/isaac_bridge/configs/ycb_table_graph.json
@@ -310,7 +341,7 @@ def main():
         #domain = DemoKitchenDomain(sim=not args.execute, use_carter=True) # TODO: broken
     robot_entity = domain.get_robot()
     #robot_entity.get_motion_interface().remove_obstacle() # TODO: doesn't remove
-    robot_entity.fix_bases()
+    #robot_entity.fix_bases()
     #robot_entity.unfix_bases()
     #print(dump_dict(robot_entity))
     #test_deepim(domain)
@@ -328,11 +359,12 @@ def main():
         interface = real_setup(domain, world, args)
     else:
         interface = simulation_setup(domain, world, args)
+    #seed_dart_with_carter(interface)
     franka_open_gripper(interface)
     #interface.localize_all()
     #interface.update_state()
-    #test_carter(interface)
-    #return
+    test_carter(interface)
+    return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -399,7 +431,7 @@ if __name__ == '__main__':
 # Running on the real robot w/o LULA
 # cpaxton@lokeefe:~$ roscore
 # 1) srl@vgilligan:~$ roslaunch franka_controllers start_control.launch
-# 2) srl@vgilligan:~/srl_system/packages/panda_moveit_config/launch$ roslaunch panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
+# 2) srl@vgilligan:~/catkin_ws/src/panda_moveit_config/launch$ roslaunch panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
 # 3) srl@vgilligan:~$ ~/srl_system/workspace/src/brain/relay.sh
 # 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz (REQUIRED!!!)
 # 4) killall move_group franka_control_node local_controller

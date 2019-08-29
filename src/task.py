@@ -239,15 +239,15 @@ def fixed_stow(world, **kwargs):
     world.set_base_conf(BASE_POSE2D)
 
     drawers = ['indigo_drawer_top', 'indigo_drawer_bottom']
-    #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
+    initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
-    initial_surface, goal_surface = drawers
+    #initial_surface, goal_surface = drawers
     #initial_surface, goal_surface = reversed(drawers)
     #initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
     if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)
     #joint_name = JOINT_TEMPLATE.format(goal_surface)
-    world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(goal_surface)))
+    #world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(goal_surface)))
 
     # TODO: declare success if already believe it's in the drawer or require detection?
     prior = {
@@ -258,7 +258,8 @@ def fixed_stow(world, **kwargs):
     return Task(world, prior=prior, movable_base=False,
                 #goal_detected=[entity_name],
                 #goal_holding=entity_name,
-                goal_on={entity_name: goal_surface},
+                goal_cooked=[entity_name],
+                #goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
                 #goal_closed=ALL_JOINTS,

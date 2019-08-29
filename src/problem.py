@@ -189,9 +189,10 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     for action_name, cost in ACTION_COSTS.items():
         function_name = '{}Cost'.format(title_from_snake(action_name))
         function = (function_name,)
-        init.append(Equal(function, cost))
+        init.append(Equal(function, cost)) # TODO: stove state
     init += [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Stackable', name, stove) for name, stove in product(task.goal_cooked, STOVES)] + \
+            [('Cold', name) for name in STOVES] + \
             [('Cooked', name) for name in belief.cooked] + \
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
@@ -222,6 +223,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                      [door_closed_formula(joint_name) for joint_name in task.goal_closed] + \
                      [door_open_formula(joint_name) for joint_name in task.goal_open] + \
                      list(task.goal)
+    # [('Cold', name) for name in STOVES] + \
 
     if not task.movable_base or task.return_init_bq: # fixed_base?
         goal_bq = world.goal_bq if task.movable_base else init_bq

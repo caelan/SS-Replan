@@ -324,7 +324,7 @@ def get_test_near_joint(world, **kwargs):
 
     def test(joint_name, base_conf):
         if joint_name in KNOBS:
-            return False # TODO: address this
+            return True # TODO: address this
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
             vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_INVERSE_BASE)
@@ -519,6 +519,7 @@ def is_approach_safe(world, obj_name, pose, grasp, obstacles):
         #wait_for_user()
         if any(pairwise_collision(world.gripper, obst) # or pairwise_collision(obj_body, obst)
                for obst in obstacles):
+            print('Unsafe approach!')
             return False
     return True
 
@@ -542,14 +543,14 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
     full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
     if full_grasp_conf is None:
-        # if PRINT_FAILURES: print('Grasp kinematic failure')
+        if PRINT_FAILURES: print('Grasp kinematic failure')
         return
     moving_links = get_moving_links(world.robot, world.arm_joints)
     robot_obstacle = (world.robot, frozenset(moving_links))
     #robot_obstacle = get_descendant_obstacles(world.robot, child_link_from_joint(world.arm_joints[0]))
     #robot_obstacle = world.robot
     if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-        #if PRINT_FAILURES: print('Grasp collision failure')
+        if PRINT_FAILURES: print('Grasp collision failure')
         #set_renderer(enable=True)
         #wait_for_user()
         #set_renderer(enable=False)
@@ -558,6 +559,7 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
                                   obstacles=obstacles, **kwargs)
     if approach_path is None:
+        if PRINT_FAILURES: print('Approach plan failure')
         return
     if MOVE_ARM:
         aq = FConf(world.robot, world.arm_joints, approach_path[0])
@@ -919,7 +921,9 @@ def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=Tr
     finger_cmd, = gripper_motion_fn(world.open_gq, world.closed_gq)
     cmd = Sequence(State(world, savers=[robot_saver]), commands=[
         finger_cmd.commands[0],
-        ApproachTrajectory(world, world.robot, world.arm_joints, approach_path + approach_path[::-1]),
+        ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
+        ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
+
         finger_cmd.commands[0].reverse(),
     ], name='press')
     yield (aq, cmd,)
@@ -983,8 +987,8 @@ def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=Fal
                 ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, world.static_obstacles,
                                              randomize=randomize, **kwargs), None)
                 if ik_outputs is not None:
-                    yield (base_conf,) + ik_outputs
-                    break
+                    yield ik_outputs
+                    break  # return
             else:
                 if PRINT_FAILURES: print('Fixed pull failure')
                 yield None

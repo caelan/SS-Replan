@@ -20,6 +20,8 @@
     (StoveKnob ?s ?k)
     (Above ?j1 ?j2)
     (Adjacent ?j1 ?j2)
+    (Cold ?s)
+    (Hot ?s)
 
     (CheckNearby ?o)
     (NearPose ?o2 ?wp2 ?bq)
@@ -266,6 +268,8 @@
                        (not (UnsafeATraj ?at))
                        (not (Unsafe)))
     :effect (and (CanMoveBase) (CanMoveArm)
+                 ;(when (Cold ?s) (and (Hot ?s) (not (Cold ?s))))
+                 ;(when (Hot ?s) (and (Cold ?s) (not (Hot ?s))))
                  (Cooked ?o)
                  ;(forall (?o) (when (and (Cookable ?o) (On ?o ?s))
                  ;                   (Cooked ?o)))
