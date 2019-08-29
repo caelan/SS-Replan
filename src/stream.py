@@ -645,12 +645,11 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
 HandleGrasp = namedtuple('HandleGrasp', ['link', 'handle_grasp', 'handle_pregrasp'])
 DoorPath = namedtuple('DoorPath', ['link_path', 'handle_path', 'handle_grasp', 'tool_path'])
 
-def get_handle_grasps(world, joint, pre_distance=APPROACH_DISTANCE):
+def get_handle_grasps(world, joint, pull=True, pre_distance=APPROACH_DISTANCE):
     pre_direction = pre_distance * get_unit_vector([0, 0, 1])
     #half_extent = 1.0*FINGER_EXTENT[2] # Collides
-    half_extent = 1.1*FINGER_EXTENT[2]
+    half_extent = 1.05*FINGER_EXTENT[2]
 
-    # TODO: move closer if performing a push rather than a pull
     grasps = []
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
@@ -658,6 +657,14 @@ def get_handle_grasps(world, joint, pre_distance=APPROACH_DISTANCE):
             # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/kitchen_poses.py
             for yaw in [0, np.pi]: # yaw=0 DOESN'T WORK WITH LULA
                 handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=yaw)))
+                #if not pull:
+                #    handle_pose = get_link_pose(world.kitchen, link)
+                #    for distance in np.arange(0., 0.05, step=0.001):
+                #        pregrasp = multiply(([0, 0, -distance], unit_quat()), handle_grasp)
+                #        tool_pose = multiply(handle_pose, invert(pregrasp))
+                #        set_tool_pose(world, tool_pose)
+                #        # TODO: check collisions
+                #        wait_for_user()
                 handle_pregrasp = multiply((pre_direction, unit_quat()), handle_grasp)
                 grasps.append(HandleGrasp(link, handle_grasp, handle_pregrasp))
     return grasps
@@ -675,8 +682,9 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles=set(
         door_path = [door_conf1.values, door_conf2.values]
     # TODO: open until collision for the drawers
 
+    pull = (door_path[0][0] < door_path[-1][0])
     # door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
-    for handle_grasp in get_handle_grasps(world, door_joint):
+    for handle_grasp in get_handle_grasps(world, door_joint, pull=pull):
         link, grasp, pregrasp = handle_grasp
         handle_path = []
         for door_conf in door_path:
