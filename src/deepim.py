@@ -158,7 +158,7 @@ class DeepIM(Perception):
         administrator = entity.administrator
 
         duration = 5.0
-        min_fraction = 0.5
+        min_fraction = 0.25
         expected_detections = duration * DETECTIONS_PER_SEC
         observations = self.get_recent_observations(RIGHT, obj_type, duration)
         print('{}) observations={}, duration={}, rate={}'.format(

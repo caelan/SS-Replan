@@ -23,7 +23,7 @@ from brain_ros.kitchen_domain import KitchenDomain
 #from grasps import *
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
-from src.carter import test_carter
+from src.carter import test_carter, command_carter, HOME_BASE_POSE, INDIGO_BASE_POSE
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, elapsed_time, \
     point_from_pose, set_camera_pose, \
@@ -119,6 +119,9 @@ def planning_loop(interface):
 
 ################################################################################
 
+#TARGET_DISTANCE = 0.25 # match up with Isaac Sight
+TARGET_DISTANCE = 0.05
+
 def real_setup(domain, world, args):
     # TODO: detect if lula is active via rosparam
     observer = RosObserver(domain)
@@ -129,31 +132,38 @@ def real_setup(domain, world, args):
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
-    goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
+    goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
     task = Task(world, prior=prior, teleport_base=True,
                 #goal_detected=[SPAM],
                 #goal_holding=SPAM,
                 #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
-                goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
-                #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
+                #goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
+                goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
                 #goal_cooked=[SPAM],
                 #return_init_aq=True,
                 return_init_bq=True)
 
-    #if not args.fixed:
-    # TODO: these thresholds not used by Isaac
-    carter = Carter(goal_threshold_tra=0.10,
-                    goal_threshold_rot=math.radians(15.),
-                    vel_threshold_lin=0.01,
-                    vel_threshold_ang=math.radians(1.0))
-    robot_entity = domain.get_robot()
-    robot_entity.carter_interface = carter
+    if not args.fixed:
+        # TODO: these thresholds not used by Isaac
+        carter = Carter(goal_threshold_tra=TARGET_DISTANCE,
+                        goal_threshold_rot=math.radians(15.),
+                        vel_threshold_lin=0.01,
+                        vel_threshold_ang=math.radians(1.0))
+        robot_entity = domain.get_robot()
+        robot_entity.carter_interface = carter
+    interface = Interface(args, task, observer, deepim=perception)
+    if interface.carter is not None:
+        #initial_pose = interface.carter.current_pose
+        initial_pose = INDIGO_BASE_POSE # INDIGO_BASE_POSE | HOME_BASE_POSE
+        command_carter(interface, initial_pose)
+        # Carter more likely to creep forward when not near cabinet
+
     #robot_entity.fix_bases()
-    return Interface(args, task, observer, deepim=perception)
+    return interface
 
 
 ################################################################################
@@ -217,7 +227,7 @@ def main():
     #interface.localize_all()
     #interface.update_state()
     #test_carter(interface)
-    #return
+    return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints
@@ -242,8 +252,8 @@ def main():
         add_markers(interface.task, inverse_place=False)
     #wait_for_user()
 
-    test_carter(interface)
-    return
+    #test_carter(interface)
+    #return
 
     #base_control(world, [2.0, 0, -3*np.pi / 4], domain.get_robot().get_motion_interface(), observer)
     #return
@@ -279,8 +289,11 @@ if __name__ == '__main__':
 # Running the carter
 # cpaxton@lokeefe:~$ ssh srl@carter
 # srl@carter:~$ cd ~/deploy/srl/carter-pkg
-# srl@carter:~/deploy/srl/carter-pkg$ ./apps/carter/carter -r 2 -m seattle_map_res02_181214
+# srl@carter:~/deploy/srl/carter-pkg$ ./apps/carter/carter -r srl -m seattle_map_res02_181214
 # cpaxton@lokeefe:~/alice$ bazel run apps/samples/navigation_rosbridge
+
+# commander.robot_remote
+# navigation.control.lqr
 
 # Running DART
 # cpaxton@lokeefe:~$ franka world franka_center_right_kitchen.yaml
@@ -290,8 +303,9 @@ if __name__ == '__main__':
 # Running on the real robot w/o LULA
 # cpaxton@lokeefe:~$ roscore
 # 1) srl@vgilligan:~$ roslaunch franka_controllers start_control.launch
+# 2) srl@vgilligan:~$ cd ~/catkin_ws/src/panda_moveit_config/launch
 # 2) srl@vgilligan:~/catkin_ws/src/panda_moveit_config/launch$ roslaunch panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
-# 3) srl@vgilligan:~$ ~/srl_system/workspace/src/brain/relay.sh
+# 3) srl@vgilligan:~$ ./srl_system/workspace/src/brain/relay.sh
 # 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz (REQUIRED!!!)
 # 4) killall move_group franka_control_node local_controller
 

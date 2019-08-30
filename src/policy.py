@@ -12,6 +12,7 @@ def run_policy(task, args, observation_fn, transition_fn):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     world = task.world
     if args.observable:
+        # TODO: problematic if not observable
         belief = create_observable_belief(world)  # Fast
     else:
         belief = task.create_belief()

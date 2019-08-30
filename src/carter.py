@@ -1,9 +1,12 @@
+from __future__ import print_function
+
 import numpy as np
 import time
+import math
 
 import rospy
-from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, multiply, invert, \
-    unit_from_theta, get_nonholonomic_distance_fn
+from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, \
+    multiply, invert, unit_from_theta, pose_from_pose2d
 
 
 
@@ -28,6 +31,14 @@ def seed_dart_with_carter(interface):
     interface.carter.pub_disable_deadman_switch.publish(False)
     robot_entity.fix_bases() # suppressor.activate() => fix
 
+# navigation.control.lqr
+ISAAC_SIGHT = {
+    "gain_speed": 10.0,
+    "min_distance": 0.0,
+    "num_controls_to_check": 25,
+    "speed_gradient_min_distance": 0.1,
+    "target_distance": 0.0, # 0.01
+}
 
 def command_carter(interface, goal_pose, timeout=30):
     # pose_deadman_topic = '/isaac/disable_deadman_switch'
@@ -38,24 +49,47 @@ def command_carter(interface, goal_pose, timeout=30):
     start_time = time.time()
     reached_goal = False
     carter = interface.carter
+    carter.current_goal = goal_pose
+
+    history = []
+    print('Initial pose:', np.array(carter.current_pose).round(3))
+    print('Goal pose:', np.array(goal_pose).round(3))
     while elapsed_time(start_time) < timeout:
+        carter.update_current_error()
         print('Error:', np.array(carter.pose_error).round(3))
+        history.append(np.array(carter.current_pose))
         if carter.at_goal():
-            print('At goal configuration!')
-            reached_goal = True
-            break
+            print('Within goal region!')
+            # TODO: wrap angle
+            if np.std([pose[2] for pose in history[-10:]]) < math.radians(2):
+                break
+        #else:
+        #    history = []
         carter.pub_disable_deadman_switch.publish(True)  # must send repeatedly
         carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
         rospy.sleep(0.01)
+    else:
+        reached_goal = False
 
     start_time = time.time()
-    while elapsed_time(start_time) < 1.0:
-        carter.move_to_async(carter.current_pose)  # move_to_async | move_to_safe
-        carter.pub_disable_deadman_switch.publish(False)
+    rest_pose = np.array(carter.current_pose)
+    print('Stopping carter')
+    total = np.zeros(rest_pose.shape)
+    num = 0
+    while elapsed_time(start_time) < 10.0:
+        total += carter.current_pose
+        num += 1
+        average = total / num
+        print('Running average:', average.round(3))
+        rest_pose = average
+        #rest_pose = carter.current_pose
+        carter.move_to_async(rest_pose)  # move_to_async | move_to_safe
+        carter.pub_disable_deadman_switch.publish(True)
         rospy.sleep(0.01)
     # TODO: wait until it doesn't move for a certain amount of time
+    # TODO: wait for dart to stabilize as well
 
-    carter.pub_disable_deadman_switch.publish(False)
+    #carter.pub_disable_deadman_switch.publish(False)
     robot_entity.fix_bases()  # suppressor.activate() => fix
     # Towards the kitchen is +x (yaw=0)
     # fix base of Panda with DART is overwritten by the published message
@@ -64,10 +98,10 @@ def command_carter(interface, goal_pose, timeout=30):
 
 def command_carter_to_pybullet_goal(interface, goal_pose2d, **kwargs):
     world = interface.world
-    pybullet_from_current = pose2d_from_pose(get_joint_positions(world.robot, world.base_joints))
-    isaac_from_current = pose2d_from_pose(interface.carter.current_pose)
+    pybullet_from_current = pose_from_pose2d(get_joint_positions(world.robot, world.base_joints))
+    isaac_from_current = pose_from_pose2d(interface.carter.current_pose)
     isaac_from_pybullet = multiply(isaac_from_current, invert(pybullet_from_current))
-    pybullet_from_goal = pose2d_from_pose(goal_pose2d)
+    pybullet_from_goal = pose_from_pose2d(goal_pose2d)
     isaac_from_goal = multiply(isaac_from_pybullet, pybullet_from_goal)
     isaac_from_goal2d = pose2d_from_pose(isaac_from_goal)
     #distance_fn = get_nonholonomic_distance_fn(world.robot, world.base_joints,
@@ -97,8 +131,8 @@ def test_carter(interface):
     x, y, theta = initial_pose  # current_velocity
     #goal_pose = np.array([x, y, 0])
     #goal_pose = heading_stuff(carter, -1.0)
-    goal_pose = np.array(INDIGO_BASE_POSE)
-    #goal_pose = np.array(HOME_BASE_POSE)
+    #goal_pose = np.array(INDIGO_BASE_POSE)
+    goal_pose = np.array(HOME_BASE_POSE)
     command_carter(interface, goal_pose, timeout=120)
 
     #while True:
