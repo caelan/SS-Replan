@@ -84,7 +84,7 @@ def add_block(world, idx=0, **kwargs):
     #world.add_body(name)
     #print(get_aabb_extent(get_aabb(world.get_body(name))))
     side = 0.065
-    body = create_box(w=side, l=side, h=side, color=COLOR_FROM_NAME['red'])
+    body = create_box(w=side, l=side, h=side, color=COLOR_FROM_NAME['green'])
     world.add(name, body)
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
@@ -301,7 +301,7 @@ def stow_block(world, num=1, **kwargs):
     #    wait_for_user()
 
     return Task(world, prior=prior, movable_base=True,
-                #goal_holding=list(prior)[0],
+                goal_holding=list(prior)[0],
                 #goal_on=goal_on,
                 goal_cooked=list(prior),
                 return_init_bq=True, return_init_aq=True,

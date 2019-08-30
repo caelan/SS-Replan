@@ -2,7 +2,8 @@ import numpy as np
 import time
 
 import rospy
-from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, multiply, invert, unit_from_theta
+from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, multiply, invert, \
+    unit_from_theta, get_nonholonomic_distance_fn
 
 
 
@@ -69,6 +70,10 @@ def command_carter_to_pybullet_goal(interface, goal_pose2d, **kwargs):
     pybullet_from_goal = pose2d_from_pose(goal_pose2d)
     isaac_from_goal = multiply(isaac_from_pybullet, pybullet_from_goal)
     isaac_from_goal2d = pose2d_from_pose(isaac_from_goal)
+    #distance_fn = get_nonholonomic_distance_fn(world.robot, world.base_joints,
+    #                                           linear_velocity=0.25, angular_velocity=np.pi/2)
+    #duration = distance_fn(pybullet_from_current, pybullet_from_goal)
+    #timeout = 2*duration
     return command_carter(interface, isaac_from_goal2d, **kwargs) # TODO: customize based on the straight-line distance
 
 

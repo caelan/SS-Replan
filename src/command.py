@@ -6,7 +6,8 @@ import time
 
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, user_input, flatten_links, remove_handles, \
-    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, get_link_pose
+    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, get_link_pose, \
+    waypoints_from_path, get_difference_fn, get_max_velocity
 from src.utils import create_surface_attachment
 
 DEFAULT_TIME_STEP = 0.02
@@ -127,25 +128,95 @@ class Trajectory(Command):
             yield
     def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
         from src.retime import slow_trajectory, ensure_increasing
-        from scipy.interpolate import CubicSpline
-        path = list(self.path)
-        time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
-        ensure_increasing(path, time_from_starts)
+        from scipy.interpolate import CubicSpline, interp1d
+        velocity_fraction = 0.75
+        acceleration_fraction = 0.5 # fraction of max_velocity per second
+        max_velocities = velocity_fraction*np.array([get_max_velocity(self.robot, joint) for joint in self.joints])
+        accelerations = max_velocities*acceleration_fraction
+
+        path = waypoints_from_path(self.path)
+        difference_fn = get_difference_fn(self.robot, self.joints)
+        spline_step = 0.1
+
+        # Assuming instant changes in accelerations
+        waypoints = [path[0]]
+        time_from_starts = [0.]
+        for q1, q2 in zip(path[:-1], path[1:]):
+            differences = difference_fn(q2, q1)
+            distances = np.abs(differences)
+            directions = np.sign(differences)
+            max_duration = 0
+            for idx in range(len(self.joints)):
+                distance = distances[idx]
+                max_velocity = max_velocities[idx]
+                acceleration = accelerations[idx]
+                max_ramp_time = max_velocity / acceleration
+                ramp_distance = 0.5*acceleration*math.pow(max_ramp_time, 2)
+                remaining_distance = distance - 2 * ramp_distance
+                if 0 <= remaining_distance: # zero acceleration
+                    remaining_time = remaining_distance / max_velocity
+                    total_time = 2 * max_ramp_time + remaining_time
+                else:
+                    half_time = np.sqrt(distance  / acceleration)
+                    total_time = 2*half_time
+                max_duration = max(max_duration, total_time)
+
+            ramp_times = []
+            for idx in range(len(self.joints)):
+                distance = distances[idx]
+                acceleration = accelerations[idx]
+                discriminant = max(0, math.pow(max_duration*acceleration, 2) - 4*distance*acceleration)
+                velocity = 0.5*(max_duration*acceleration - math.sqrt(discriminant)) # +/-
+                assert velocity <= max_velocities[idx]
+                ramp_time = velocity / acceleration
+                ramp_times.append(ramp_time)
+                predicted_distance = velocity*(max_duration-2*ramp_time) + acceleration*math.pow(ramp_time, 2)
+                assert abs(distance - predicted_distance) < 1e-6
+
+            time_from_start = time_from_starts[-1]
+            #waypoints.append(q2)
+            #time_from_starts.append(time_from_start + max_duration)
+            #continue
+
+            positions = np.array(q1)
+            velocities = np.zeros(positions.shape)
+            for t in np.arange(spline_step, max_duration, spline_step):
+                for idx in range(len(self.joints)):
+                    positions[idx] += velocities[idx] * spline_step
+                    acceleration = accelerations[idx]
+                    if t <= ramp_times[idx]:
+                        positions[idx] += 0.5*directions[idx]*acceleration*math.pow(spline_step, 2)
+                        velocities[idx] += directions[idx]* acceleration * spline_step
+                    elif (max_duration - ramp_times[idx]) <= t:
+                        positions[idx] -= 0.5*directions[idx]*acceleration*math.pow(spline_step, 2)
+                        velocities[idx] -= directions[idx]* acceleration * spline_step
+                waypoints.append(np.array(positions))
+                time_from_starts.append(time_from_start + t)
+            print(q2, positions, velocities)
+            waypoints.append(q2)
+            time_from_starts.append(time_from_start + max_duration)
+        path = waypoints
+
+        positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0)
+
+        #path = list(self.path)
+        #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
+        #ensure_increasing(path, time_from_starts)
         #positions_curve = interp1d(time_from_starts, path, kind='linear')
-        positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
-                                      extrapolate=False)  # bc_type=((1, 0), (1, 0))
-        velocities_curve = positions_curve.derivative(nu=1)
-        accelerations_curve = velocities_curve.derivative(nu=1)
+        #positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
+        #                              extrapolate=False)  # bc_type=((1, 0), (1, 0))
+        #velocities_curve = positions_curve.derivative(nu=1)
+        #accelerations_curve = velocities_curve.derivative(nu=1)
 
         # https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html
-        # Waypoints are followed perfectly
-        # twice continuously differentiable
-        # TODO: iteratively increase spacing until velocity / acceleration is good
-        for i, t in enumerate(time_from_starts):
-            print('{}), t={:.3f}'.format(i, t), np.array(positions_curve(t)).round(5),
-                  #(np.array(path[i]) - positions_curve(t)).round(5),
-                  np.array(velocities_curve(t)).round(5), np.array(accelerations_curve(t)).round(5))
-        wait_for_user('Continue?')
+        # Waypoints are followed perfectly, twice continuously differentiable
+        # TODO: iteratively increase spacing until velocity / accelerations is good
+        #for i, t in enumerate(time_from_starts):
+        #    print('{}), t={:.3f}'.format(i, t), np.array(positions_curve(t)).round(5),
+        #          #(np.array(path[i]) - positions_curve(t)).round(5),
+        #          np.array(velocities_curve(t)).round(5), np.array(accelerations_curve(t)).round(5))
+        #if len(self.joints) == 7 and len(path) != 2:
+        #    wait_for_user('Continue?')
 
         print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(len(path), len(self.joints), time_from_starts[-1]))
         for t in np.arange(time_from_starts[0], time_from_starts[-1], step=time_step):
