@@ -12,11 +12,11 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, \
     get_random_seed, get_numpy_seed, VideoSaver
-from src.command import create_state
+from src.command import create_state, iterate_commands, simulate_commands
 from src.visualization import add_markers
 from src.observe import observe_pybullet
 #from src.debug import test_observation
-from src.planner import VIDEO_TEMPLATE, iterate_commands
+from src.planner import VIDEO_TEMPLATE
 from src.world import World
 from src.task import TASKS
 from src.policy import run_policy
@@ -100,6 +100,7 @@ def main():
         # wait_for_user()
         # simulate_plan(real_state, commands, args)
         return iterate_commands(real_state, commands)
+        #return simulate_commands(real_state, commands)
 
     run_policy(task, args, observation_fn, transition_fn)
 

@@ -9,15 +9,9 @@ from pybullet_tools.utils import get_moving_links, set_joint_positions, create_a
     get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, get_link_pose
 from src.utils import create_surface_attachment
 
+DEFAULT_TIME_STEP = 0.02
 DEFAULT_SLEEP = 0.5
 FORCE = 50 # 20 | 50 | 100
-# TODO: force per object
-
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/isaac_bridge/launch/carter_localization_priors.launch#L6
-# /isaac/odometry is zero
-# /isaac/pose_status is 33.1
-CARTER_X = 33.1
-CARTER_Y = 7.789
 
 EFFORT_FROM_OBJECT = {
     'potted_meat_can': 60,
@@ -25,6 +19,12 @@ EFFORT_FROM_OBJECT = {
     'sugar_box': 40,
     'cracker_box': 40,
 }
+
+# https://gitlab-master.nvidia.com/SRL/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/isaac_bridge/launch/carter_localization_priors.launch#L6
+# /isaac/odometry is zero
+# /isaac/pose_status is 33.1
+#CARTER_X = 33.1
+#CARTER_Y = 7.789
 
 class State(object):
     # TODO: rename to be world state?
@@ -80,6 +80,11 @@ class Command(object):
         raise NotImplementedError()
     def iterate(self, state):
         raise NotImplementedError()
+    def simulate(self, state, time_per_step=DEFAULT_TIME_STEP, **kwargs):
+        for j, _ in enumerate(self.iterate(state)):
+            state.derive()
+            if j != 0:
+                wait_for_duration(time_per_step)
     def execute(self, interface):
         raise NotImplementedError()
 
@@ -120,6 +125,36 @@ class Trajectory(Command):
         for positions in self.path:
             set_joint_positions(self.robot, self.joints, positions)
             yield
+    def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
+        from src.retime import slow_trajectory, ensure_increasing
+        from scipy.interpolate import CubicSpline
+        path = list(self.path)
+        time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
+        ensure_increasing(path, time_from_starts)
+        #positions_curve = interp1d(time_from_starts, path, kind='linear')
+        positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
+                                      extrapolate=False)  # bc_type=((1, 0), (1, 0))
+        velocities_curve = positions_curve.derivative(nu=1)
+        accelerations_curve = velocities_curve.derivative(nu=1)
+
+        # https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html
+        # Waypoints are followed perfectly
+        # twice continuously differentiable
+        # TODO: iteratively increase spacing until velocity / acceleration is good
+        for i, t in enumerate(time_from_starts):
+            print('{}), t={:.3f}'.format(i, t), np.array(positions_curve(t)).round(5),
+                  #(np.array(path[i]) - positions_curve(t)).round(5),
+                  np.array(velocities_curve(t)).round(5), np.array(accelerations_curve(t)).round(5))
+        wait_for_user('Continue?')
+
+        print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(len(path), len(self.joints), time_from_starts[-1]))
+        for t in np.arange(time_from_starts[0], time_from_starts[-1], step=time_step):
+            positions = positions_curve(t)
+            set_joint_positions(self.robot, self.joints, positions)
+            state.derive()
+            wait_for_duration(real_per_sim*time_step)
+        return True
+
     def execute_base(self, interface):
         assert self.joints == self.world.base_joints
         # assert not moveit.use_lula
@@ -403,12 +438,9 @@ class Wait(Command):
 
 ################################################################################s
 
-DEFAULT_TIME_STEP = 0.02
-
 def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
     if commands is None:
         return False
-    # TODO: spline interpolation for visualization
     for i, command in enumerate(commands):
         print('\nCommand {:2}/{:2}: {}'.format(i + 1, len(commands), command))
         # TODO: skip to end
@@ -424,6 +456,13 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
                 wait_for_duration(time_step)
     return True
 
+def simulate_commands(state, commands, **kwargs):
+    if commands is None:
+        return False
+    for i, command in enumerate(commands):
+        print('\nCommand {:2}/{:2}: {}'.format(i + 1, len(commands), command))
+        command.simulate(state, **kwargs)
+    return True
 
 def execute_commands(interface, commands):
     if commands is None:

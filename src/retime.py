@@ -2,9 +2,6 @@ import numpy as np
 import rospy
 
 from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn, INF
-from src.issac import ISSAC_FRANKA_FRAME
-
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
@@ -63,6 +60,17 @@ def slow_trajectory(robot, joints, path, **kwargs):
     # time_from_starts = new_time_from_starts
     return new_time_from_starts
 
+#def acceleration_limits(robot, joints, path, speed=ARM_SPEED, **kwargs):
+#    # TODO: multiple bodies (such as drawer)
+#    # The drawers do actually have velocity limits
+#    fraction = 0.25
+#    duration_fn = get_duration_fn(robot, joints)
+#    max_velocities = speed * np.array([get_max_velocity(robot, joint) for joint in joints])
+#    max_accelerations = 2*fraction*max_velocities # TODO: fraction
+#    difference_fn = get_difference_fn(robot, joints)
+#    differences1 = [difference_fn(q2, q1) for q1, q2 in zip(path[:-1], path[1:])]
+#    differences2 = [np.array(d2) - np.array(d1) for d1, d2 in zip(differences1[:-1], differences1[1:])] # TODO: circular case
+
 ################################################################################
 
 def ensure_increasing(path, time_from_starts):
@@ -73,6 +81,9 @@ def ensure_increasing(path, time_from_starts):
             time_from_starts.pop(i)
 
 def spline_parameterization(robot, joints, path, **kwargs):
+    from src.issac import ISSAC_FRANKA_FRAME
+    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
     # TODO: could interpolate each DOF independently
     # Univariate interpolation just means that the input is one dimensional (aka time)
     # The output can be arbitrary dimension
@@ -99,6 +110,7 @@ def spline_parameterization(robot, joints, path, **kwargs):
     velocities = positions.derivative(nu=1)
     accelerations = velocities.derivative(nu=1)
     # Could resample at this point
+    # TODO: could pass incorrect accelerations (bounded)
 
     #for i, t in enumerate(time_from_starts):
     #    print(i, t, path[i], positions(t), velocities(t), accelerations(t))
@@ -123,6 +135,9 @@ def spline_parameterization(robot, joints, path, **kwargs):
 ################################################################################
 
 def linear_parameterization(robot, joints, path, speed=ARM_SPEED):
+    from src.issac import ISSAC_FRANKA_FRAME
+    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
     distance_fn = get_distance_fn(robot, joints)
     distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
     time_from_starts = np.cumsum(distances) / speed
