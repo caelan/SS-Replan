@@ -5,9 +5,8 @@ import numpy as np
 import time
 
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
-    wait_for_duration, user_input, flatten_links, remove_handles, \
-    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, get_link_pose, \
-    waypoints_from_path, get_difference_fn, get_max_velocity, clip
+    wait_for_duration, flatten_links, remove_handles, \
+    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver
 from src.utils import create_surface_attachment
 
 DEFAULT_TIME_STEP = 0.02
@@ -20,6 +19,7 @@ EFFORT_FROM_OBJECT = {
     'sugar_box': 40,
     'cracker_box': 40,
 }
+# TODO: grasps per object
 
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/isaac_bridge/launch/carter_localization_priors.launch#L6
 # /isaac/odometry is zero
@@ -108,78 +108,6 @@ class Sequence(object):
 
 ################################################################################
 
-def compute_min_duration(distance, max_velocity, acceleration):
-    max_ramp_duration = max_velocity / acceleration
-    ramp_distance = 0.5 * acceleration * math.pow(max_ramp_duration, 2)
-    remaining_distance = distance - 2 * ramp_distance
-    if 0 <= remaining_distance:  # zero acceleration
-        remaining_time = remaining_distance / max_velocity
-        total_time = 2 * max_ramp_duration + remaining_time
-    else:
-        half_time = np.sqrt(distance / acceleration)
-        total_time = 2 * half_time
-    return total_time
-
-def compute_ramp_duration(distance, max_velocity, acceleration, duration):
-    discriminant = max(0, math.pow(duration * acceleration, 2) - 4 * distance * acceleration)
-    velocity = 0.5 * (duration * acceleration - math.sqrt(discriminant))  # +/-
-    #assert velocity <= max_velocity
-    ramp_time = velocity / acceleration
-    predicted_distance = velocity * (duration - 2 * ramp_time) + acceleration * math.pow(ramp_time, 2)
-    assert abs(distance - predicted_distance) < 1e-6
-    return ramp_time
-
-def compute_position(ramp_time, max_duration, acceleration, t):
-    velocity = acceleration * ramp_time
-    max_time = max_duration - 2 * ramp_time
-    t1 = clip(t, 0, ramp_time)
-    t2 = clip(t - ramp_time, 0, max_time)
-    t3 = clip(t - ramp_time - max_time, 0, ramp_time)
-    #assert t1 + t2 + t3 == t
-    return 0.5 * acceleration * math.pow(t1, 2) + velocity * t2 + \
-           (velocity * t3 - 0.5 * acceleration * math.pow(t3, 2))
-
-def retime_trajectory(robot, joints, path, velocity_fraction=0.75, acceleration_fraction=1.0, sample_step=0.0001):
-    """
-    :param robot:
-    :param joints:
-    :param path:
-    :param velocity_fraction: fraction of max_velocity
-    :param acceleration_fraction: fraction of velocity_fraction*max_velocity per second
-    :param sample_step:
-    :return:
-    """
-    max_velocities = velocity_fraction * np.array([get_max_velocity(robot, joint) for joint in joints])
-    accelerations = max_velocities * acceleration_fraction
-    path = waypoints_from_path(path)
-    difference_fn = get_difference_fn(robot, joints)
-
-    # Assuming instant changes in accelerations
-    waypoints = [path[0]]
-    time_from_starts = [0.]
-    for q1, q2 in zip(path[:-1], path[1:]):
-        differences = difference_fn(q2, q1)
-        distances = np.abs(differences)
-        duration = 0
-        for idx in range(len(joints)):
-            total_time = compute_min_duration(distances[idx], max_velocities[idx], accelerations[idx])
-            duration = max(duration, total_time)
-        ramp_durations = [compute_ramp_duration(distances[idx], max_velocities[idx], accelerations[idx], duration)
-                      for idx in range(len(joints))]
-        time_from_start = time_from_starts[-1]
-        if sample_step is not None:
-            directions = np.sign(differences)
-            for t in np.arange(sample_step, duration, sample_step):
-                positions = []
-                for idx in range(len(joints)):
-                    distance = compute_position(ramp_durations[idx], duration, accelerations[idx], t)
-                    positions.append(q1[idx] + directions[idx] * distance)
-                waypoints.append(positions)
-                time_from_starts.append(time_from_start + t)
-        waypoints.append(q2)
-        time_from_starts.append(time_from_start + duration)
-    return waypoints, time_from_starts
-
 class Trajectory(Command):
     def __init__(self, world, robot, joints, path, speed=1.0):
         super(Trajectory, self).__init__(world)
@@ -199,13 +127,13 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
     def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
-        #from src.retime import slow_trajectory, ensure_increasing
+        from src.retime import slow_trajectory, ensure_increasing, retime_trajectory
         from scipy.interpolate import interp1d, CubicSpline
         path, time_from_starts = retime_trajectory(self.robot, self.joints, self.path, sample_step=None)
         #path = list(self.path)
         #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
         #ensure_increasing(path, time_from_starts)
-        positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
+        #positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
         positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
                                       extrapolate=False)  # bc_type=((1, 0), (1, 0))
 
