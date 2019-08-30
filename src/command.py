@@ -158,13 +158,12 @@ class Trajectory(Command):
     def execute_base(self, interface):
         assert self.joints == self.world.base_joints
         # assert not moveit.use_lula
-        domain = interface.domain
-        carter = domain.carter
+        carter = interface.carter
         #from src.base import follow_base_trajectory
         # from src.update_isaac import update_isaac_robot
         # from isaac_bridge.manager import SimulationManager
         if carter is None:
-            pass
+            raise NotImplementedError()
             #follow_base_trajectory(self.world, self.path, interface.moveit, interface.observer)
         #elif isinstance(carter, SimulationManager):
         #    sim_manager = carter
@@ -175,6 +174,9 @@ class Trajectory(Command):
         #    interface.resume_simulation()
         #    # TODO: teleport attached
         else:
+            from src.carter import command_carter_to_pybullet_goal
+            return command_carter_to_pybullet_goal(interface, self.path[-1])
+
             world_state = domain.root
             # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/carter_sim.py
             # https://gitlab-master.nvidia.com/SRL/srl_system/blob/2cb8df9ac14b56a5955251cf4325369172c2ba72/packages/isaac_bridge/src/isaac_bridge/carter.py
