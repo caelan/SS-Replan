@@ -1,11 +1,19 @@
 from __future__ import print_function
 
+from brain_ros.sim_test_tools import TrialManager
+
+import numpy as np
+
 from pddlstream.language.constants import Not
 from pddlstream.utils import Verbose
-from src.task import Task
+from src.deepim import FullObserver, Segmentator
+from src.interface import Interface
+from src.task import Task, sample_placement
 from src.problem import door_closed_formula, door_open_formula
-from examples.discrete_belief.dist import DeltaDist
-from src.utils import SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, ECHO_COUNTER, INDIGO_COUNTER
+from examples.discrete_belief.dist import DeltaDist, UniformDist
+from src.update_isaac import update_isaac_sim
+from src.utils import SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER, \
+    BOTTOM_DRAWER
 
 TRIAL_MANAGER_TASKS = [
     'open_bottom', 'open_top', 'pick_spam',
@@ -101,3 +109,67 @@ def create_trial_args(**kwargs):
     args.babble = False
     # TODO: use setattr
     return args
+
+################################################################################
+
+def set_isaac_sim(interface):
+    assert interface.simulation
+    task = interface.task
+    world = task.world
+    #close_all_doors(world)
+    if task.movable_base:
+        world.set_base_conf([2.0, 0, -np.pi / 2])
+        # world.set_initial_conf()
+    else:
+        for name, dist in task.prior.items():
+            if name in task.prior:
+                surface = task.prior[name].sample()
+                sample_placement(world, name, surface, learned=True)
+            else:
+                sample_placement(world, name, ECHO_COUNTER, learned=False)
+        # pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
+        # pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
+    update_isaac_sim(interface, world)
+    # wait_for_user()
+
+################################################################################
+
+def simulation_setup(domain, world, args):
+    # TODO: forcibly reset robot arm configuration
+    # trial_args = parse.parse_kitchen_args()
+    trial_args = create_trial_args()
+    with Verbose(False):
+        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
+    observer = trial_manager.observer
+    #set_isaac_camera(trial_manager.sim_manager)
+    trial_manager.set_camera(randomize=False)
+
+    task_name = args.problem.replace('_', ' ')
+    if task_name in TRIAL_MANAGER_TASKS:
+        task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
+    else:
+        prior = {
+            SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]),
+            #SPAM: UniformDist([INDIGO_COUNTER]),
+            SUGAR: UniformDist([INDIGO_COUNTER]),
+            CHEEZIT: UniformDist([INDIGO_COUNTER]),
+        }
+        goal_drawer = TOP_DRAWER  # TOP_DRAWER | BOTTOM_DRAWER
+        task = Task(world, prior=prior, teleport_base=True,
+                    # goal_detected=[SPAM],
+                    #goal_holding=SPAM,
+                    #goal_on={SPAM: goal_drawer},
+                    # goal_closed=[],
+                    # goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
+                    # goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
+                    movable_base=not args.fixed,
+                    goal_aq=world.carry_conf,  # .values,
+                    # return_init_aq=True,
+                    return_init_bq=True)
+
+    perception = FullObserver(domain) if args.observable else Segmentator(domain)
+    interface = Interface(args, task, observer, trial_manager=trial_manager, deepim=perception)
+    if args.jump:
+        robot_entity = domain.get_robot()
+        robot_entity.carter_interface = interface.sim_manager
+    return interface

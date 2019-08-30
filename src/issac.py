@@ -198,15 +198,8 @@ def update_robot_base(interface, entity=None):
     set_pose(world.robot, world_from_origin)
     world.set_base_conf(base_values)
     print('Initial base:', np.array(base_values).round(3))
-
     # draw_pose(get_pose(world.robot), length=3)
     # draw_pose(get_link_pose(world.robot, world.base_link), length=1)
-
-    # map_from_carter = pose_from_pose2d(carter_values)
-    # world_from_carter = pose_from_pose2d(base_values)
-    # map_from_world = multiply(map_from_carter, invert(world_from_carter))
-    # print(multiply(map_from_world,  pose_from_pose2d(np.zeros(3))))
-    # print()
 
 
 def update_robot(interface):

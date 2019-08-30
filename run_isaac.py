@@ -21,33 +21,32 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 from brain_ros.kitchen_domain import KitchenDomain
 #from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain
 #from grasps import *
-from brain_ros.sim_test_tools import TrialManager
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
+from src.carter import test_carter
 
-from pybullet_tools.utils import LockRenderer, wait_for_user, unit_from_theta, elapsed_time, \
-    get_distance, quat_angle_between, quat_from_pose, point_from_pose, set_camera_pose, \
-    link_from_name, get_link_pose, get_joint_positions, pose2d_from_pose, pose_from_pose2d
+from pybullet_tools.utils import LockRenderer, wait_for_user, elapsed_time, \
+    point_from_pose, set_camera_pose, \
+    link_from_name, get_link_pose, get_joint_positions
 from pddlstream.utils import Verbose
 
-from src.deepim import DeepIM, mean_pose_deviation, Segmentator, FullObserver
+from src.deepim import DeepIM, mean_pose_deviation
 #from retired.perception import test_deepim
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
-from src.parse_brain import task_from_trial_manager, create_trial_args, TRIAL_MANAGER_TASKS
-from src.utils import JOINT_TEMPLATE, SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, YCB_OBJECTS, ECHO_COUNTER, \
-    INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER, get_difference_fn
+from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
+    simulation_setup
+from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
-    load_objects, display_kinect, dump_dict, update_objects, RIGHT, SIDES, LEFT
-from src.update_isaac import update_isaac_sim, set_isaac_camera
+    load_objects, display_kinect, update_objects, RIGHT, LEFT
 from src.world import World
-from src.task import Task, SPAM_POSE2D, pose2d_on_surface, sample_placement, close_all_doors
+from src.task import Task
 from src.execution import franka_open_gripper
 from run_pybullet import create_parser
 
-from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
+from examples.discrete_belief.dist import UniformDist
 
 
 # TODO: prevent grasp if open
@@ -55,6 +54,7 @@ from examples.discrete_belief.dist import DDist, UniformDist, DeltaDist
 # TODO: avoid redetects on hard surfaces
 
 def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0):
+    # TODO: move to a dart class
     start_time = time.time()
     history = defaultdict(list)
     num_updates = 0
@@ -119,170 +119,6 @@ def planning_loop(interface):
 
 ################################################################################
 
-def seed_dart_with_carter(interface):
-    robot_entity = interface.domain.get_robot()
-    robot_entity.unfix_bases() # suppressor.deactivate() => unfix
-    start_time = time.time()
-    timeout = 5
-    while elapsed_time(start_time) < timeout:
-        interface.carter.pub_disable_deadman_switch.publish(True) # must send repeatedly
-        rospy.sleep(0.01)
-    interface.carter.pub_disable_deadman_switch.publish(False)
-    robot_entity.fix_bases() # suppressor.activate() => fix
-
-HOME_BASE_POSE = [31.797, 9.118, -0.12]
-#INDIGO_BASE_POSE = [33.1, 7.789, 0.0]
-INDIGO_BASE_POSE = [33.05, 7.789, 0.0]
-
-# Middle
-#Carter pose: [ 25.928  11.541   2.4  ]
-# BB8
-# Carter pose: [ 17.039  13.291  -2.721]
-
-def command_carter(interface, goal_pose, timeout=30):
-    # pose_deadman_topic = '/isaac/disable_deadman_switch'
-    # velocity_deadman_topic = '/isaac/enable_ros_segway_cmd'
-    # carter.move_to(goal_pose) # recursion bug
-    robot_entity = interface.domain.get_robot()
-    robot_entity.unfix_bases()  # suppressor.deactivate() => unfix
-    start_time = time.time()
-    reached_goal = False
-    carter = interface.carter
-    while elapsed_time(start_time) < timeout:
-        print('Error:', np.array(carter.pose_error).round(3))
-        if carter.at_goal():
-            print('At goal configuration!')
-            reached_goal = True
-            break
-        carter.pub_disable_deadman_switch.publish(True)  # must send repeatedly
-        carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
-        rospy.sleep(0.01)
-
-    start_time = time.time()
-    while elapsed_time(start_time) < 1.:
-        carter.move_to_async(carter.current_pose)  # move_to_async | move_to_safe
-        carter.pub_disable_deadman_switch.publish(False)
-        rospy.sleep(0.01)
-    # TODO: wait until it doesn't move for a certain amount of time
-
-    carter.pub_disable_deadman_switch.publish(False)
-    robot_entity.fix_bases()  # suppressor.activate() => fix
-    # Towards the kitchen is +x (yaw=0)
-    # fix base of Panda with DART is overwritten by the published message
-    return reached_goal
-
-def heading_stuff(carter, distance):
-    x, y, theta = carter.current_pose # current_velocity
-    pos = np.array([x, y])
-    goal_pos = pos + distance * unit_from_theta(theta)
-    goal_pose = np.append(goal_pos, [theta])
-    return goal_pose
-
-def test_carter(interface):
-    carter = interface.carter
-    # /isaac_navigation2D_status
-    # /isaac_navigation2D_request
-
-    assert carter is not None
-    initial_pose = carter.current_pose
-    print('Carter pose:', initial_pose)
-    x, y, theta = initial_pose  # current_velocity
-    #goal_pose = np.array([x, y, 0])
-    #goal_pose = heading_stuff(carter, -1.0)
-    goal_pose = np.array(INDIGO_BASE_POSE)
-    #goal_pose = np.array(HOME_BASE_POSE)
-    command_carter(interface, goal_pose, timeout=120)
-
-    #while True:
-    #    print('Carter pose:', carter.current_pose)
-    #    rospy.sleep(0.1)
-
-    #carter.move_to_openloop(goal_pose)
-    # move_to_open_loop | move_to_safe_followed_by_openloop
-
-    #carter.simple_move(-0.1) # simple_move | simple_stop
-    # rospy.sleep(2.0)
-    # carter.simple_stop()
-    #domain.get_robot().carter_interface = interface.carter
-    # domain.get_robot().unsuppress_fixed_bases()
-
-    # /sim/tf to get all objects
-    # https://gitlab-master.nvidia.com/srl/srl_system/blob/722d127a016c9105ec68a33902a73480c36b31ac/packages/isaac_bridge/scripts/sim_tf_relay.py
-    # sim_tf_relay.py
-
-    # roslaunch isaac_bridge sim_franka.launch cooked_sim:=true config:=panda_full lula:=false world:=franka_leftright_kitchen_ycb_world.yaml
-    # https://gitlab-master.nvidia.com/srl/srl_system/blob/fb94253c60b1bd1308a37c1aeb9dc4a4c453c512/packages/isaac_bridge/launch/sim_franka.launch
-    # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.sim.yaml
-    # packages/external/lula_franka/config/worlds/franka_center_right_kitchen.yaml
-
-#   File "/home/cpaxton/srl_system/workspace/src/brain/src/brain_ros/ros_world_state.py", line 397, in update_msg
-#     self.gripper = msg.get_positions([self.gripper_joint])[0]
-# TypeError: 'NoneType' object has no attribute '__getitem__'
-
-def set_isaac_sim(interface):
-    assert interface.simulation
-    task = interface.task
-    world = task.world
-    #close_all_doors(world)
-    if task.movable_base:
-        world.set_base_conf([2.0, 0, -np.pi / 2])
-        # world.set_initial_conf()
-    else:
-        for name, dist in task.prior.items():
-            if name in task.prior:
-                surface = task.prior[name].sample()
-                sample_placement(world, name, surface, learned=True)
-            else:
-                sample_placement(world, name, ECHO_COUNTER, learned=False)
-        # pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
-        # pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
-    update_isaac_sim(interface, world)
-    # wait_for_user()
-
-################################################################################
-
-def simulation_setup(domain, world, args):
-    # TODO: forcibly reset robot arm configuration
-    # trial_args = parse.parse_kitchen_args()
-    trial_args = create_trial_args()
-    with Verbose(False):
-        trial_manager = TrialManager(trial_args, domain, lula=args.lula)
-    observer = trial_manager.observer
-    #set_isaac_camera(trial_manager.sim_manager)
-    trial_manager.set_camera(randomize=False)
-
-    task_name = args.problem.replace('_', ' ')
-    if task_name in TRIAL_MANAGER_TASKS:
-        task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
-    else:
-        prior = {
-            SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]),
-            #SPAM: UniformDist([INDIGO_COUNTER]),
-            SUGAR: UniformDist([INDIGO_COUNTER]),
-            CHEEZIT: UniformDist([INDIGO_COUNTER]),
-        }
-        goal_drawer = TOP_DRAWER  # TOP_DRAWER | BOTTOM_DRAWER
-        task = Task(world, prior=prior, teleport_base=True,
-                    # goal_detected=[SPAM],
-                    #goal_holding=SPAM,
-                    #goal_on={SPAM: goal_drawer},
-                    # goal_closed=[],
-                    # goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
-                    # goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
-                    movable_base=not args.fixed,
-                    goal_aq=world.carry_conf,  # .values,
-                    # return_init_aq=True,
-                    return_init_bq=True)
-
-    perception = FullObserver(domain) if args.observable else Segmentator(domain)
-    interface = Interface(args, task, observer, trial_manager=trial_manager, deepim=perception)
-    if args.jump:
-        robot_entity = domain.get_robot()
-        robot_entity.carter_interface = interface.sim_manager
-    return interface
-
-################################################################################
-
 def real_setup(domain, world, args):
     # TODO: detect if lula is active via rosparam
     observer = RosObserver(domain)
@@ -309,6 +145,7 @@ def real_setup(domain, world, args):
                 return_init_bq=True)
 
     #if not args.fixed:
+    # TODO: these thresholds not used by Isaac
     carter = Carter(goal_threshold_tra=0.10,
                     goal_threshold_rot=math.radians(15.),
                     vel_threshold_lin=0.01,
@@ -321,8 +158,9 @@ def real_setup(domain, world, args):
 
 ################################################################################
 
-CARRY_CONF = [0.020760029206411876, -1.0611899273529857, -0.052402929133539944, -2.567198461037754,
-              -0.06013280179334339, 1.5917587080266737, -2.3553707114303295]
+#   File "/home/cpaxton/srl_system/workspace/src/brain/src/brain_ros/ros_world_state.py", line 397, in update_msg
+#     self.gripper = msg.get_positions([self.gripper_joint])[0]
+# TypeError: 'NoneType' object has no attribute '__getitem__'
 
 def main():
     parser = create_parser()
