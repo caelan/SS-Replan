@@ -192,7 +192,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         init.append(Equal(function, cost)) # TODO: stove state
     init += [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Stackable', name, stove) for name, stove in product(task.goal_cooked, STOVES)] + \
-            [('Cold', name) for name in STOVES] + \
+            [('Pressed', name) for name in belief.pressed] + \
             [('Cooked', name) for name in belief.cooked] + \
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
@@ -218,12 +218,12 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     if task.goal_holding is not None:
         goal_literals.append(('Holding', task.goal_holding))
     goal_literals += [('On', name, surface) for name, surface in task.goal_on.items()] + \
+                     [Not(('Pressed', name)) for name in KNOBS] + \
                      [('Cooked', name) for name in task.goal_cooked] + \
                      [('Localized', name) for name in task.goal_detected] + \
                      [door_closed_formula(joint_name) for joint_name in task.goal_closed] + \
                      [door_open_formula(joint_name) for joint_name in task.goal_open] + \
                      list(task.goal)
-    # [('Cold', name) for name in STOVES] + \
 
     if not task.movable_base or task.return_init_bq: # fixed_base?
         goal_bq = world.goal_bq if task.movable_base else init_bq

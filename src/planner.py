@@ -144,6 +144,8 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
     planner = 'ff-astar' if args.anytime else 'ff-wastar2'
     search_sample_ratio = 0.5 # 0.5
     max_planner_time = 10
+    # TODO: max number of samples per iteration flag
+    # TODO: don't greedily expand samples with too high of a complexity if out of time
 
     pr = cProfile.Profile()
     pr.enable()
@@ -208,7 +210,7 @@ def commands_from_plan(world, plan):
     commands = []
     for action, params in plan:
         # TODO: break if the action is a StreamAction
-        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'press']:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'press-on', 'press-off']:
             commands.extend(params[-1].commands)
         elif action == 'detect':
             commands.append(params[-1])

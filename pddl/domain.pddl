@@ -20,8 +20,7 @@
     (StoveKnob ?s ?k)
     (Above ?j1 ?j2)
     (Adjacent ?j1 ?j2)
-    (Cold ?s)
-    (Hot ?s)
+    (Pressed ?k)
 
     (CheckNearby ?o)
     (NearPose ?o2 ?wp2 ?bq)
@@ -259,20 +258,32 @@
                                       (not (AtWorldPose ?o1 ?wp3))))
                  (increase (total-cost) (DetectCost ?o1 ?rp1 ?obs ?rp2))))
 
-
-  (:action press
+  ; TODO: avoid double open
+  (:action press-on
     :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
     :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o) (OpenGConf ?gq) ; TODO: @closed_gq
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
-                       (HandEmpty) (Calibrated) (On ?o ?s)
+                       (HandEmpty) (Calibrated) (On ?o ?s) (not (Pressed ?k))
                        (not (UnsafeATraj ?at))
                        (not (Unsafe)))
     :effect (and (CanMoveBase) (CanMoveArm)
+                 (Pressed ?k)
                  ;(when (Cold ?s) (and (Hot ?s) (not (Cold ?s))))
                  ;(when (Hot ?s) (and (Cold ?s) (not (Hot ?s))))
                  (Cooked ?o)
                  ;(forall (?o) (when (and (Cookable ?o) (On ?o ?s))
                  ;                   (Cooked ?o)))
+                 (increase (total-cost) (PressCost))))
+
+  (:action press-off
+    :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
+    :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o) (OpenGConf ?gq)
+                       (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
+                       (HandEmpty) (Calibrated) (On ?o ?s) (Pressed ?k)
+                       (not (UnsafeATraj ?at))
+                       (not (Unsafe)))
+    :effect (and (CanMoveBase) (CanMoveArm)
+                 (not (Pressed ?k))
                  (increase (total-cost) (PressCost))))
 
   ;(:derived (OpenGripper)
