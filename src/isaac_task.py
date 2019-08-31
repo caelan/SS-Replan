@@ -12,6 +12,7 @@ from src.task import Task, sample_placement
 from src.problem import door_closed_formula, door_open_formula
 from examples.discrete_belief.dist import DeltaDist, UniformDist
 from src.update_isaac import update_isaac_sim
+from src.issac import NULL_POSE, set_pose
 from src.utils import SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER, \
     BOTTOM_DRAWER
 
@@ -29,6 +30,7 @@ TRIAL_MANAGER_TASKS = [
 def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwargs):
     assert task_name in TRIAL_MANAGER_TASKS
     with Verbose(False):
+        task_name = task_name.replace('_', ' ')
         objects, goal, plan = trial_manager.get_task(task=task_name, reset=True)
     trial_goals = [(h.format(o), v) for h, v in goal for o in objects]
     print('Objects:', objects)
@@ -75,9 +77,9 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
     prior = {
         SPAM: DeltaDist(INDIGO_COUNTER),
         CHEEZIT: DeltaDist(INDIGO_COUNTER),
-        MUSTARD: DeltaDist(ECHO_COUNTER),
-        TOMATO_SOUP: DeltaDist(ECHO_COUNTER),
-        SUGAR: DeltaDist(ECHO_COUNTER),
+        #MUSTARD: DeltaDist(ECHO_COUNTER),
+        #TOMATO_SOUP: DeltaDist(ECHO_COUNTER),
+        #SUGAR: DeltaDist(ECHO_COUNTER),
     }
     return Task(world, prior=prior, movable_base=not fixed, init=init, goal=goal_literals,
                 return_init_bq=True, return_init_aq=True, **kwargs)
@@ -126,7 +128,8 @@ def set_isaac_sim(interface):
                 surface = task.prior[name].sample()
                 sample_placement(world, name, surface, learned=True)
             else:
-                sample_placement(world, name, ECHO_COUNTER, learned=False)
+                set_pose(world.get_body(name), NULL_POSE)
+                #sample_placement(world, name, ECHO_COUNTER, learned=False)
         # pose2d_on_surface(world, SPAM, INDIGO_COUNTER, pose2d=SPAM_POSE2D)
         # pose2d_on_surface(world, CHEEZIT, INDIGO_COUNTER, pose2d=CRACKER_POSE2D)
     update_isaac_sim(interface, world)
@@ -144,7 +147,7 @@ def simulation_setup(domain, world, args):
     #set_isaac_camera(trial_manager.sim_manager)
     trial_manager.set_camera(randomize=False)
 
-    task_name = args.problem.replace('_', ' ')
+    task_name = args.problem
     if task_name in TRIAL_MANAGER_TASKS:
         task = task_from_trial_manager(world, trial_manager, task_name, fixed=args.fixed)
     else:

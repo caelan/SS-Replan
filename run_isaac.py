@@ -23,24 +23,24 @@ from brain_ros.kitchen_domain import KitchenDomain
 #from grasps import *
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
-from src.carter import test_carter, command_carter, HOME_BASE_POSE, INDIGO_BASE_POSE
+from src.carter import command_carter, INDIGO_BASE_POSE
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, elapsed_time, \
     point_from_pose, set_camera_pose, \
     link_from_name, get_link_pose, get_joint_positions
 from pddlstream.utils import Verbose
 
-from src.deepim import DeepIM, mean_pose_deviation
+from src.deepim import DeepIM, mean_pose_deviation, get_pose_distance
 #from retired.perception import test_deepim
 from src.policy import run_policy
 from src.interface import Interface
 from src.command import execute_commands, iterate_commands
 from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
     simulation_setup
-from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, TOP_DRAWER, BOTTOM_DRAWER
+from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, TOP_DRAWER
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
-    load_objects, display_kinect, update_objects, RIGHT, LEFT
+    load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
 from src.world import World
 from src.task import Task
 from src.execution import franka_open_gripper
@@ -63,6 +63,7 @@ def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0)
         print('Update: {} | Time: {}'.format(num_updates, elapsed_time(start_time)))
         world_state = interface.update_state()
         observation = update_objects(interface, world_state, detected)
+        # TODO: could include robot pose here
         # print(observation)
         for name, pose in observation.items():
             history[name].extend(pose)
@@ -82,6 +83,7 @@ def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0)
 
 def planning_loop(interface):
     args = interface.args
+    initial_base_pose = get_base_pose(interface.observer)
 
     def observation_fn(belief):
         # TODO: test if visibility is good enough
@@ -93,6 +95,8 @@ def planning_loop(interface):
         start_time = time.time()
         converged = wait_for_dart_convergence(interface, detected)
         print('Stabilized: {} | Time: {:.3f}'.format(converged, elapsed_time(start_time)))
+        global initial_base_pose
+        initial_base_pose = get_base_pose(interface.observer)
         #rospy.sleep(5.0)
         # Wait until convergence
         #interface.localize_all()
@@ -109,6 +113,13 @@ def planning_loop(interface):
         if args.teleport or args.cfree:
             print('Some constraints were ignored. Skipping execution!')
             return False
+        current_base_pose = get_base_pose(interface.observer)
+        global initial_base_pose
+        translation, rotation = get_pose_distance(initial_base_pose, current_base_pose)
+        #if (0.01 < translation) or ():
+        #    return False
+
+
         # TODO: could calibrate closed-loop relative to the object
         # Terminate if failed to pick up
         success = execute_commands(interface, commands)
@@ -228,7 +239,7 @@ def main():
     #interface.localize_all()
     #interface.update_state()
     #test_carter(interface)
-    return
+    #return
 
     # Can disable lula world objects to improve speed
     # Adjust DART to get a better estimate for the drawer joints

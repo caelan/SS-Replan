@@ -123,12 +123,20 @@ def load_calibrate_conf(side='left'):
 #    _, reference_frame = entity.base_frame.split('/')  # 'measured/right_gripper'
 #    return reference_frame
 
+def get_base_pose(observer, entity=None):
+    if entity is None:
+        domain = observer.domain
+        entity = domain.get_robot() #  domain.root.entities[domain.robot]
+    base_frame = entity.current_root
+    # world_from_base = unit_pose()
+    world_from_base = lookup_pose(observer.tf_listener, source_frame=base_frame) # view_root
+    # entity.view_root # 00_base_link
+    return world_from_base
+
 def get_world_from_model(observer, entity, body, model_link=BASE_LINK):
     # TODO: be careful with how base joints are handled
+    world_from_reference = get_base_pose(observer, entity)
     reference_frame = entity.current_root  # Likely ISSAC_REFERENCE_FRAME
-    # world_from_reference = unit_pose()
-    world_from_reference = lookup_pose(observer.tf_listener, source_frame=reference_frame)
-
     entity_frame = entity.base_frame.split('/')[-1]
     reference_from_entity = pose_from_tform(entity.pose)
     world_from_entity = multiply(world_from_reference, reference_from_entity)
@@ -205,7 +213,7 @@ def update_robot_base(interface, entity=None):
 def update_robot(interface):
     world_state = interface.observer.current_state
     entity = world_state.entities[interface.domain.robot]
-    update_robot_conf(interface, entity)
+    update_robot_conf(interface, entity) # Must come before the base
     update_robot_base(interface, entity)
 
 def check_limits(world, entity):

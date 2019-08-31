@@ -1,5 +1,8 @@
 from __future__ import print_function
 
+import math
+import time
+
 from collections import defaultdict
 from itertools import product, combinations
 
@@ -12,9 +15,9 @@ from geometry_msgs.msg import PoseStamped
 from brain_ros.ros_world_state import make_pose_from_pose_msg
 
 from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_distance, quat_from_pose, \
-    quat_angle_between, read_json
+    quat_angle_between, read_json, elapsed_time
 from sensor_msgs.msg import Image
-from src.issac import ISSAC_WORLD_FRAME, DEPTH_PREFIX, PANDA_FULL_CONFIG_PATH, PREFIX_FROM_SIDE, RIGHT
+from src.issac import ISSAC_WORLD_FRAME, DEPTH_PREFIX, PANDA_FULL_CONFIG_PATH, PREFIX_FROM_SIDE, RIGHT, lookup_pose
 
 #DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
 DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']
@@ -30,12 +33,41 @@ DETECTIONS_PER_SEC = 0.6 # /deepim/raw/objects/prior_pose
 
 # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
 
+def get_pose_distance(pose1, pose2):
+    translation = get_distance(point_from_pose(pose1), point_from_pose(pose2))
+    rotation = quat_angle_between(quat_from_pose(pose1), quat_from_pose(pose2))
+    return translation, rotation
+
 def mean_pose_deviation(poses):
     points = [point_from_pose(pose) for pose in poses]
     pos_deviation = np.mean([get_distance(*pair) for pair in combinations(points, r=2)])
     quats = [quat_from_pose(pose) for pose in poses]
     ori_deviation = np.mean([quat_angle_between(*pair) for pair in combinations(quats, r=2)])
     return pos_deviation, ori_deviation
+
+def wait_until_frames_stabilize(interface, frames, min_updates=10, timeout=10.0,
+                                pos_threshold=0.005, ori_threshold=math.radians(1)):
+    start_time = time.time()
+    history = defaultdict(list)
+    num_updates = 0
+    while elapsed_time(start_time) < timeout:
+        num_updates += 1
+        print('Update: {} | Frames: {} | Time: {}'.format(num_updates, frames, elapsed_time(start_time)))
+        success = True
+        for frame in frames:
+            history[frame].append(lookup_pose(interface.observer.tf_listerner, frame))
+            if min_updates <= len(history[frame]):
+                pos_deviation, ori_deviation = mean_pose_deviation(history[frame][-min_updates:])
+                print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(
+                    frame, pos_deviation, math.degrees(ori_deviation)))
+                success &= (pos_deviation <= pos_threshold) and (ori_deviation <= math.radians(ori_threshold))
+            else:
+                success = False
+        if success:
+            return True
+        rospy.sleep(0.001) # TODO: multiply with min_updates
+    # TODO: return last observation?
+    return False
 
 ################################################################################
 
