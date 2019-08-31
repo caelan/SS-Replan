@@ -43,10 +43,10 @@ class Interface(object):
         if self.trial_manager is None:
             return None
         return self.trial_manager.sim
-    def optimize_base(self):
-        return self.robot_entity.suppress_fixed_bases()
-    def fix_base(self):
-        return self.robot_entity.unsuppress_fixed_bases()
+    #def optimize_base(self):
+    #    return self.robot_entity.suppress_fixed_bases()
+    #def fix_base(self):
+    #    return self.robot_entity.unsuppress_fixed_bases()
     def disable_collisions(self):
         self.trial_manager.disable()
     def pause_simulation(self):

@@ -147,13 +147,13 @@ def real_setup(domain, world, args):
                 #return_init_aq=True,
                 return_init_bq=True)
 
+    robot_entity = domain.get_robot()
     if not args.fixed:
         # TODO: these thresholds not used by Isaac
         carter = Carter(goal_threshold_tra=TARGET_DISTANCE,
                         goal_threshold_rot=math.radians(15.),
                         vel_threshold_lin=0.01,
                         vel_threshold_ang=math.radians(1.0))
-        robot_entity = domain.get_robot()
         robot_entity.carter_interface = carter
     interface = Interface(args, task, observer, deepim=perception)
     if interface.carter is not None:
@@ -163,6 +163,7 @@ def real_setup(domain, world, args):
         # Carter more likely to creep forward when not near cabinet
 
     #robot_entity.fix_bases()
+    robot_entity.unfix_bases()
     return interface
 
 

@@ -13,7 +13,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
     set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, \
-    get_aabb, draw_aabb, remove_handles
+    get_aabb, draw_aabb, remove_handles, add_line
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
@@ -421,23 +421,39 @@ def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport
 
 ################################################################################
 
+def is_robot_visible(world, links):
+    for link in links:
+        link_point = point_from_pose(get_link_pose(world.robot, link))
+        visible = False
+        for camera_body, camera_matrix, camera_depth in world.cameras.values():
+            camera_pose = get_pose(camera_body)
+            #camera_point = point_from_pose(camera_pose)
+            #add_line(link_point, camera_point)
+            if is_visible_point(camera_matrix, camera_depth, link_point, camera_pose):
+                visible = True
+                break
+        if not visible:
+            return False
+    #wait_for_user()
+    return True
+
 def inverse_reachability(world, base_generator, obstacles=set(),
-                         max_attempts=50, min_distance=0.01, **kwargs):
+                         max_attempts=50, min_distance=0.02, **kwargs):
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
+    ensure_visible = world.task.teleport_base
+    robot_links = [world.franka_link, world.gripper_link] if ensure_visible else []
     while True:
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
             if not all_between(lower_limits, base_conf, upper_limits):
                 continue
-            # TODO: account for doors and placed-object collisions here
-            #pose.assign()
             bq = FConf(world.robot, world.base_joints, base_conf)
             bq.assign()
             for conf in world.special_confs:
-                # TODO: ensure the base and/or end-effector is visible at the calibrate_conf
                 # Could even sample a special visible conf for this base_conf
                 conf.assign()
-                if any(pairwise_collision(world.robot, b, max_distance=min_distance) for b in obstacles):
+                if not is_robot_visible(world, robot_links) or any(pairwise_collision(
+                        world.robot, b, max_distance=min_distance) for b in obstacles):
                     break
             else:
                 # print('IR attempts:', i)

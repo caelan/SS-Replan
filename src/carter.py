@@ -22,14 +22,14 @@ CARRY_CONF = [0.020760029206411876, -1.0611899273529857, -0.052402929133539944, 
 
 def seed_dart_with_carter(interface):
     robot_entity = interface.domain.get_robot()
-    robot_entity.unfix_bases() # suppressor.deactivate() => unfix
+    #robot_entity.unfix_bases() # suppressor.deactivate() => unfix
     start_time = time.time()
     timeout = 5
     while elapsed_time(start_time) < timeout:
         interface.carter.pub_disable_deadman_switch.publish(True) # must send repeatedly
         rospy.sleep(0.01)
     interface.carter.pub_disable_deadman_switch.publish(False)
-    robot_entity.fix_bases() # suppressor.activate() => fix
+    #robot_entity.fix_bases() # suppressor.activate() => fix
 
 # navigation.control.lqr
 ISAAC_SIGHT = {
@@ -45,7 +45,7 @@ def command_carter(interface, goal_pose, timeout=30):
     # velocity_deadman_topic = '/isaac/enable_ros_segway_cmd'
     # carter.move_to(goal_pose) # recursion bug
     robot_entity = interface.domain.get_robot()
-    robot_entity.unfix_bases()  # suppressor.deactivate() => unfix
+    #robot_entity.unfix_bases()  # suppressor.deactivate() => unfix
     start_time = time.time()
     reached_goal = False
     carter = interface.carter
@@ -90,7 +90,7 @@ def command_carter(interface, goal_pose, timeout=30):
     # TODO: wait for dart to stabilize as well
 
     #carter.pub_disable_deadman_switch.publish(False)
-    robot_entity.fix_bases()  # suppressor.activate() => fix
+    #robot_entity.fix_bases()  # suppressor.activate() => fix
     # Towards the kitchen is +x (yaw=0)
     # fix base of Panda with DART is overwritten by the published message
     return reached_goal

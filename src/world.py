@@ -121,7 +121,7 @@ class World(object):
         self.carry_conf = FConf(self.robot, self.arm_joints, self.default_conf)
         #self.calibrate_conf = Conf(self.robot, self.arm_joints, load_calibrate_conf(side='left'))
         self.calibrate_conf = FConf(self.robot, self.arm_joints, self.default_conf) # Must differ from carry_conf
-        self.special_confs = [self.carry_conf, self.calibrate_conf]
+        self.special_confs = [self.carry_conf] #, self.calibrate_conf]
         self.open_gq = FConf(self.robot, self.gripper_joints,
                             get_max_limits(self.robot, self.gripper_joints))
         self.closed_gq = FConf(self.robot, self.gripper_joints,
@@ -239,6 +239,12 @@ class World(object):
     @property
     def base_link(self):
         return child_link_from_joint(self.base_joints[-1])
+    @property
+    def franka_link(self):
+        return parent_link_from_joint(self.robot, self.arm_joints[0])
+    @property
+    def gripper_link(self):
+        return parent_link_from_joint(self.robot, self.gripper_joints[0])
     @property
     def tool_link(self):
         return link_from_name(self.robot, get_tool_link(self.robot))

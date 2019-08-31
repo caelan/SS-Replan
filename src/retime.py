@@ -225,10 +225,11 @@ def retime_trajectory(robot, joints, path, velocity_fraction=0.75, acceleration_
         for idx in range(len(joints)):
             total_time = compute_min_duration(distances[idx], max_velocities[idx], accelerations[idx])
             duration = max(duration, total_time)
-        ramp_durations = [compute_ramp_duration(distances[idx], max_velocities[idx], accelerations[idx], duration)
-                      for idx in range(len(joints))]
+
         time_from_start = time_from_starts[-1]
         if sample_step is not None:
+            ramp_durations = [compute_ramp_duration(distances[idx], max_velocities[idx], accelerations[idx], duration)
+                              for idx in range(len(joints))]
             directions = np.sign(differences)
             for t in np.arange(sample_step, duration, sample_step):
                 positions = []
