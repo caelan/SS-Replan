@@ -6,7 +6,10 @@ import math
 
 import rospy
 from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, \
-    multiply, invert, unit_from_theta, pose_from_pose2d
+    multiply, invert, unit_from_theta, pose_from_pose2d, quat_angle_between
+
+from src.issac import get_base_pose
+from src.deepim import mean_pose_deviation, wait_until_frames_stabilize
 
 
 
@@ -86,8 +89,8 @@ def command_carter(interface, goal_pose, timeout=30):
         carter.move_to_async(rest_pose)  # move_to_async | move_to_safe
         carter.pub_disable_deadman_switch.publish(True)
         rospy.sleep(0.01)
-    # TODO: wait until it doesn't move for a certain amount of time
-    # TODO: wait for dart to stabilize as well
+
+    success = wait_until_frames_stabilize(interface, frames=[robot_entity.current_root])
 
     #carter.pub_disable_deadman_switch.publish(False)
     #robot_entity.fix_bases()  # suppressor.activate() => fix
