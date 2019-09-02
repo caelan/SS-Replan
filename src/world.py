@@ -15,11 +15,12 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, draw_aabb, \
-    disable_gravity, set_all_static, get_movable_joints, get_joint_names
+    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, FConf, are_confs_close
+    get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, IKEA_PATH, \
+    FConf, are_confs_close
 
 USE_TRACK_IK = True
 try:
@@ -295,6 +296,10 @@ class World(object):
         return get_joint_positions(self.robot, self.base_joints)
     def set_base_conf(self, conf):
         set_joint_positions(self.robot, self.base_joints, conf)
+    def get_base_aabb(self):
+        franka_links = get_link_subtree(self.robot, self.franka_link)
+        base_links = get_link_subtree(self.robot, self.base_link)
+        return aabb_union(get_aabb(self.robot, link) for link in set(base_links) - set(franka_links))
     def get_world_aabb(self):
         return aabb_union(get_aabb(body) for body in self.fixed) # self.all_bodies
 

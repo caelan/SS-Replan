@@ -16,9 +16,9 @@ from brain_ros.ros_world_state import make_pose
 
 from pybullet_tools.utils import set_joint_positions, joints_from_names, pose_from_tform, link_from_name, get_link_pose, \
     multiply, invert, set_pose, joint_from_name, set_joint_position, get_links, \
-    BASE_LINK, base_values_from_pose, unit_pose, \
+    BASE_LINK, base_values_from_pose, point_from_pose, unit_pose, \
     pose_from_base_values, INF, wait_for_user, get_joint_limits, violates_limit, \
-    set_renderer, draw_pose, Pose, Point, set_all_static, elapsed_time
+    set_renderer, draw_pose, Pose, Point, set_all_static, elapsed_time, get_aabb, aabb_contains_point
 from src.utils import get_srl_path, CAMERA_TEMPLATE
 
 SRL_PATH = get_srl_path()
@@ -40,7 +40,7 @@ KINECT_FROM_SIDE = {
     LEFT: KINECT_TEMPLATE.format(2),
 }
 
-DEPTH_PREFIX = 'depth_camera'
+DEPTH_PREFIX = 'depth_camera' # Was changed to now be kinect1_depth_optical_frame
 DEPTH_FROM_SIDE = {
     RIGHT: DEPTH_PREFIX, # indexes from 1
     LEFT: '{}_2'.format(DEPTH_PREFIX),
@@ -315,6 +315,7 @@ def load_objects(task):
     set_all_static()
 
 def update_objects(interface, world_state, visible): #=set()):
+    base_aabb = interface.world.get_base_aabb()
     observation = {}
     for name, entity in world_state.entities.items():
         # entity.obj_type, entity.semantic_frames
@@ -331,10 +332,11 @@ def update_objects(interface, world_state, visible): #=set()):
                 pose = lookup_pose(interface.observer.tf_listener, frame_name)
                 # pose = get_world_from_model(observer, entity, body)
                 # pose = pose_from_tform(entity.pose)
-            else:
-                #pose = NULL_POSE  # TODO: modify world_state directly?
-                continue
-            observation.setdefault(name, []).append(pose)
+                point = point_from_pose(pose)
+                if not aabb_contains_point(point, base_aabb):
+                    observation.setdefault(name, []).append(pose)
+            #else:
+            #    pose = NULL_POSE  # TODO: modify world_state directly?
         elif isinstance(entity, Drawer):
             continue
         elif isinstance(entity, RigidBody):

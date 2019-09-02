@@ -116,7 +116,21 @@ def franka_control(robot, joints, path, interface, **kwargs):
         #return joint_state_control(robot, joints, path, interface)
         return moveit_control(robot, joints, path, interface)
 
+    # /franka_control
+    # https://github.com/frankaemika/franka_ros
     # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
+    # https://erdalpekel.de/?p=55
+    # http://wiki.ros.org/joint_trajectory_controller
+    # https://frankaemika.github.io/docs/franka_ros.html
+    # http://docs.ros.org/indigo/api/moveit_tutorials/html/doc/pr2_tutorials/planning/src/doc/controller_configuration.html
+
+    # rosservice call /controller_manager/list_controller_types
+    # rosservice call /controller_manager/list_controllers
+    # controller_manager_tests/VelEffController, effort_controllers/JointTrajectoryController,
+    #   joint_state_controller/JointStateController, pos_vel_acc_controllers/JointTrajectoryController,
+    #   pos_vel_controllers/JointTrajectoryController, position_controllers/JointTrajectoryController,
+    #   velocity_controllers/JointTrajectoryController]
+
     action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
     # /move_base_simple/goal
     # /execute_trajectory/goal
@@ -144,8 +158,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #path = [start_conf] + list(path)
     trajectory = spline_parameterization(robot, joints, path, **kwargs)
     total_duration = trajectory.points[-1].time_from_start.to_sec()
-    print('Following {} waypoints in {:.3f} seconds'.format(
-        len(trajectory.points), total_duration))
+    print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(
+        len(trajectory.points), len(trajectory.joint_names), total_duration))
     # path_tolerance, goal_tolerance, goal_time_tolerance
     # http://docs.ros.org/diamondback/api/control_msgs/html/msg/FollowJointTrajectoryGoal.html
     publish_display_trajectory(interface.moveit, trajectory)

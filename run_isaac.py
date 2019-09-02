@@ -16,7 +16,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 #import brain_ros.moveit
-#brain_ros.moveit.USE_MOVEIT = True
+#brain_ros.moveit.USE_MOVEIT = False
 
 from brain_ros.kitchen_domain import KitchenDomain
 #from brain_ros.demo_kitchen_domain import KitchenDomain as DemoKitchenDomain
@@ -24,6 +24,9 @@ from brain_ros.kitchen_domain import KitchenDomain
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
 from src.carter import command_carter, INDIGO_BASE_POSE
+
+#import kitchen_poses
+#kitchen_poses.supported_ycb_objects[:] = []
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, elapsed_time, \
     point_from_pose, set_camera_pose, \
@@ -37,7 +40,7 @@ from src.interface import Interface
 from src.command import execute_commands, iterate_commands
 from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
     simulation_setup
-from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, TOP_DRAWER
+from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, TOP_DRAWER, TOP_GRASP
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
@@ -59,6 +62,8 @@ def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0)
     history = defaultdict(list)
     num_updates = 0
     while elapsed_time(start_time) < timeout:
+
+        #rospy.sleep(1e-2)
         num_updates += 1
         print('Update: {} | Time: {}'.format(num_updates, elapsed_time(start_time)))
         world_state = interface.update_state()
@@ -141,20 +146,20 @@ def real_setup(domain, world, args):
         #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
         SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
-        CHEEZIT: UniformDist([INDIGO_COUNTER]),
+        #CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
     goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
-    task = Task(world, prior=prior, teleport_base=True,
+    task = Task(world, prior=prior, teleport_base=True, grasp_types=[TOP_GRASP],
                 #goal_detected=[SPAM],
-                #goal_holding=SPAM,
+                goal_holding=SPAM,
                 #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
-                goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
+                #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
-                #goal_cooked=[SPAM],
+                goal_cooked=[SPAM],
                 #return_init_aq=True,
                 return_init_bq=True)
 
@@ -310,7 +315,7 @@ if __name__ == '__main__':
 # Running DART
 # cpaxton@lokeefe:~$ franka world franka_center_right_kitchen.yaml
 # cpaxton@lokeefe:~$ roslaunch lula_dart kitchen_dart_kinect1_kinect2.launch
-# cpaxton@lokeefe:~/srl_system/workspace/src/brain/src/brain_ros$ rosrun lula_dart object_administrator --detect --j=00_potted_meat_can
+# cpaxton@lokeefe:~/srl_system/workspace/src/brain/src/brain_ros$ rosrun lula_dart object_administrator --detect --obj=00_potted_meat_can
 
 # Running on the real robot w/o LULA
 # cpaxton@lokeefe:~$ roscore

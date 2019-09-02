@@ -10,7 +10,7 @@ from pybullet_tools.utils import get_moving_links, set_joint_positions, create_a
 from src.utils import create_surface_attachment
 
 DEFAULT_TIME_STEP = 0.02
-DEFAULT_SLEEP = 0.5
+DEFAULT_SLEEP = 0.0
 FORCE = 50 # 20 | 50 | 100
 
 EFFORT_FROM_OBJECT = {

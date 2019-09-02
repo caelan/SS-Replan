@@ -11,8 +11,6 @@ from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInter
 #ARM_SPEED = 0.15*np.pi # radians / sec
 ARM_SPEED = 0.2 # percent
 
-# TODO: acceleration limits
-
 
 def get_joint_names(body, joints):
     return [get_joint_name(body, joint).encode('ascii')  # ,'ignore')
@@ -105,6 +103,7 @@ def spline_parameterization(robot, joints, path, **kwargs):
     #time_from_starts = retime_path(robot, joints, path, **kwargs)
     #time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
     #ensure_increasing(path, time_from_starts)
+    # TODO: interpolate through the waypoints
     path, time_from_starts = retime_trajectory(robot, joints, path)
     #positions = interp1d(time_from_starts, path, kind='linear')
     positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
@@ -126,9 +125,9 @@ def spline_parameterization(robot, joints, path, **kwargs):
     trajectory.joint_names = get_joint_names(robot, joints)
     for t in time_from_starts:
         point = JointTrajectoryPoint()
-        point.positions = positions(t)
+        point.positions = positions(t) # positions alone is insufficient
         point.velocities = velocities(t)
-        point.accelerations = accelerations(t)
+        point.accelerations = accelerations(t) # accelerations aren't strictly needed
         #point.effort = list(np.ones(len(joints)))
         point.time_from_start = rospy.Duration(t)
         trajectory.points.append(point)
@@ -199,7 +198,7 @@ def compute_position(ramp_time, max_duration, acceleration, t):
            (velocity * t3 - 0.5 * acceleration * math.pow(t3, 2))
 
 
-def retime_trajectory(robot, joints, path, velocity_fraction=0.75, acceleration_fraction=1.0, sample_step=0.0001):
+def retime_trajectory(robot, joints, path, velocity_fraction=0.5, acceleration_fraction=1.0, sample_step=None):
     """
     :param robot:
     :param joints:

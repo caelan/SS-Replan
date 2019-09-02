@@ -147,8 +147,8 @@ class DeepIM(Perception):
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py#L4
     def callback(self, pose_stamped, side, obj_type):
         #print('Received {} camera detection of {}'.format(side, obj_type))
-        if not pose_stamped.header.frame_id.startswith(DEPTH_PREFIX):
-            return
+        #if not pose_stamped.header.frame_id.startswith(DEPTH_PREFIX):
+        #    return
         self.observations[side, obj_type].append(pose_stamped)
     def last_detected(self, side, obj_type):
         if not self.observations[side, obj_type]:
