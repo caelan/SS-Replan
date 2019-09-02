@@ -296,7 +296,8 @@ def update_kitchen(world, world_state):
             #entity.open_dist
         elif isinstance(entity, RigidBody):
             # TODO: indigo_countertop does not exist
-            print("Warning! {} was not processed".format(name))
+            #print("Warning! {} was not processed".format(name))
+            pass
         else:
             raise NotImplementedError(entity.__class__)
     return position_from_joint
@@ -341,7 +342,8 @@ def update_objects(interface, world_state, visible): #=set()):
             continue
         elif isinstance(entity, RigidBody):
             # TODO: indigo_countertop does not exist
-            print("Warning! {} was not processed".format(name))
+            #print("Warning! {} was not processed".format(name))
+            pass
         else:
             raise NotImplementedError(entity.__class__)
     return observation

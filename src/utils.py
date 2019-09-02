@@ -103,6 +103,7 @@ ECHO_COUNTER = 'echo'
 INDIGO_COUNTER = 'indigo_tmp'
 TOP_DRAWER = 'indigo_drawer_top'
 BOTTOM_DRAWER = 'indigo_drawer_bottom'
+LEFT_DOOR = 'dagger_door_left'
 
 ################################################################################
 
@@ -167,7 +168,7 @@ SURFACE_FROM_NAME = {
 }
 
 ZED_LEFT_SURFACES = [
-    #'dagger_door_left',
+    'dagger_door_left',
     'indigo_tmp',
     'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',

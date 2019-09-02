@@ -102,9 +102,9 @@ def spline_parameterization(robot, joints, path, **kwargs):
     #path = list(path)
     #time_from_starts = retime_path(robot, joints, path, **kwargs)
     #time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
-    #ensure_increasing(path, time_from_starts)
     # TODO: interpolate through the waypoints
     path, time_from_starts = retime_trajectory(robot, joints, path)
+    ensure_increasing(path, time_from_starts)
     #positions = interp1d(time_from_starts, path, kind='linear')
     positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
                             extrapolate=False) # bc_type=((1, 0), (1, 0))

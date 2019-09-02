@@ -11,6 +11,7 @@ import rospy
 import tf
 from cv_bridge import CvBridge
 
+#from posecnn_pytorch_msgs.msg import DetectionList
 from geometry_msgs.msg import PoseStamped
 from brain_ros.ros_world_state import make_pose_from_pose_msg
 
@@ -22,7 +23,6 @@ from src.issac import ISSAC_WORLD_FRAME, DEPTH_PREFIX, PANDA_FULL_CONFIG_PATH, P
 #DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
 DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']
 
-# TODO: use the confidences that Chris added
 POSECNN_POSE_TEMPLATE = '/posecnn/{}/info' # /posecnn/00/info # posecnn_pytorch/DetectionList
 #POSECNN_POSE_TEMPLATE = '/objects/prior_pose/{}_{}/decayable_weight'
 
@@ -126,16 +126,23 @@ class Segmentator(Perception):
 
 ################################################################################
 
-# TODO: it looks like DeepIM publishes each pose individually
-
 class DeepIM(Perception):
     def __init__(self, domain, sides=[], obj_types=[]):
         super(DeepIM, self).__init__(domain)
         self.sides = tuple(sides)
         self.obj_types = tuple(obj_types)
         self.tf_listener = tf.TransformListener()
-        self.subscribers = {}
         self.observations = defaultdict(list)
+        self.tracked = set()
+        # TODO: finish using the confidences that Chris added
+        self.posecnn_subscriber = {}
+        #for side in self.sides:
+        #    prefix = PREFIX_FROM_SIDE[side]
+        #    topic = POSECNN_POSE_TEMPLATE.format(prefix)
+        #    cb = lambda data, s=side: self.posecnn_callback(data, s)
+        #    self.posecnn_subscriber[side] = rospy.Subscriber(
+        #        topic, DetectionList, cb, queue_size=1)
+        self.subscribers = {}
         for side, obj_type in product(self.sides, self.obj_types):
             prefix = PREFIX_FROM_SIDE[side]
             topic = DEEPIM_POSE_TEMPLATE.format(prefix, obj_type)
@@ -145,6 +152,8 @@ class DeepIM(Perception):
                 topic, PoseStamped, cb, queue_size=1)
         # TODO: use the pose_fixer topic to send DART a prior
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/b38a70fda63f5556bcba2ccb94eca54124e40b65/packages/lula_dart/lula_dartpy/pose_fixer.py#L4
+    def posecnn_callback(self, data, side):
+        print(data)
     def callback(self, pose_stamped, side, obj_type):
         #print('Received {} camera detection of {}'.format(side, obj_type))
         #if not pose_stamped.header.frame_id.startswith(DEPTH_PREFIX):
@@ -175,11 +184,14 @@ class DeepIM(Perception):
         return pose_from_tform(make_pose_from_pose_msg(tf_pose))
     def stop_tracking(self, obj_type):
         # Nothing happens if already not tracked
+        self.tracked.discard(obj_type)
         entity = self.domain.root.entities[obj_type]
         entity.stop_localizing()
         #administrator = entity.administrator
         #administrator.deactivate()
     def detect(self, obj_type):
+        if obj_type in self.tracked:
+            return True
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/lula_dart/lula_dartpy/object_administrator.py
         # https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/brain/src/brain_ros/ros_world_state.py
         #self.domain.entities
@@ -211,6 +223,7 @@ class DeepIM(Perception):
         # TODO: prune if incorrect orientation
         # TODO: small sleep after each detection to ensure time to converge
 
+        self.tracked.add(obj_type)
         administrator.activate() # entity.localize()
         #entity.set_tracked() # entity.is_tracked = True # Doesn't do anything
         #administrator.detect_and_wait(wait_time=2.0)

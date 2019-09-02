@@ -700,7 +700,8 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles=set(
         door_path = [door_conf1.values, door_conf2.values]
     # TODO: open until collision for the drawers
 
-    pull = (door_path[0][0] < door_path[-1][0])
+    sign = world.get_door_sign(door_joint)
+    pull = (sign*door_path[0][0] < sign*door_path[-1][0])
     # door_obstacles = get_descendant_obstacles(world.kitchen, door_joint)
     for handle_grasp in get_handle_grasps(world, door_joint, pull=pull):
         link, grasp, pregrasp = handle_grasp
@@ -821,7 +822,8 @@ def plan_pull(world, door_joint, door_plan, base_conf,
         ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ]
     door_path, _, _, _ = door_plan
-    pull = (door_path[0][0] < door_path[-1][0])
+    sign = world.get_door_sign(door_joint)
+    pull = (sign*door_path[0][0] < sign*door_path[-1][0])
     if pull:
         commands.insert(1, finger_cmd.commands[0])
         commands.insert(3, finger_cmd.commands[0].reverse())

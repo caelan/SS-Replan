@@ -40,7 +40,8 @@ from src.interface import Interface
 from src.command import execute_commands, iterate_commands
 from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
     simulation_setup
-from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, TOP_DRAWER, TOP_GRASP
+from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, \
+    TOP_DRAWER, TOP_GRASP, LEFT_DOOR, BOTTOM_DRAWER, SIDE_GRASP
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
@@ -62,7 +63,6 @@ def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0)
     history = defaultdict(list)
     num_updates = 0
     while elapsed_time(start_time) < timeout:
-
         #rospy.sleep(1e-2)
         num_updates += 1
         print('Update: {} | Time: {}'.format(num_updates, elapsed_time(start_time)))
@@ -89,6 +89,7 @@ def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0)
 def planning_loop(interface):
     args = interface.args
     initial_base_pose = get_base_pose(interface.observer)
+    # TODO: wait until the robot's base orientation is correct
 
     def observation_fn(belief):
         # TODO: test if visibility is good enough
@@ -148,10 +149,10 @@ def real_setup(domain, world, args):
         SUGAR: UniformDist([INDIGO_COUNTER]),
         #CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
-    goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER
-    task = Task(world, prior=prior, teleport_base=True, grasp_types=[TOP_GRASP],
+    goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
+    task = Task(world, prior=prior, teleport_base=True, grasp_types=[TOP_GRASP], #, SIDE_GRASP],
                 #goal_detected=[SPAM],
-                goal_holding=SPAM,
+                #goal_holding=SPAM,
                 #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
