@@ -11,6 +11,7 @@ from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, \
     get_joint_positions, get_min_limits, get_max_limits, get_length
 from pddlstream.utils import Verbose
 
+from trajectory_msgs.msg import JointTrajectory
 from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
 from actionlib import SimpleActionClient, GoalStatus
 #from actionlib_msgs.msg import GoalStatus, GoalState, SimpleClientGoalState
@@ -27,6 +28,8 @@ from lula_franka.franka_gripper_commander import FrankaGripperCommander
 # franka_gripper/MoveAction
 # moveit_msgs/ExecuteTrajectoryAction
 # moveit_msgs/MoveGroupAction
+
+CSPACE_TRAJECTORY = Falseq
 
 def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAME):
     display_trajectory_pub = rospy.Publisher('/display_planned_path', DisplayTrajectory, queue_size=1)
@@ -108,6 +111,56 @@ def joint_state_control(robot, joints, path, interface,
 
 ################################################################################
 
+def lula_joint_trajectory(trajectory):
+    action_topic = '/robot/right/cspace_trajectory/msg'
+    print('Starting', action_topic)
+    pub = rospy.Publisher(action_topic, JointTrajectory, queue_size=1)
+    pub.publish(trajectory)
+    rospy.sleep(trajectory.points[-1].time_from_start)
+    return True
+
+def follow_joint_trajectory(trajectory):
+    action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
+    # /move_base_simple/goal
+    # /execute_trajectory/goal
+    # /position_joint_trajectory_controller/command
+    client = SimpleActionClient(action_topic, FollowJointTrajectoryAction)
+    print('Starting', action_topic)
+    client.wait_for_server()
+    client.cancel_all_goals()
+    # time.sleep(0.1)
+    print('Finished', action_topic)
+    # TODO: create this action client once
+
+    #error_threshold = 1e-3
+    #threshold_template = '/position_joint_trajectory_controller/constraints/{}/goal'
+    #for name in get_joint_names(robot, joints):
+    #    param = threshold_template.format(name)
+    #    rospy.set_param(param, error_threshold)
+    #    #print(name, rospy.get_param(param))
+
+    goal = FollowJointTrajectoryGoal(trajectory=trajectory)
+    goal.goal_time_tolerance = rospy.Duration.from_sec(2.0)
+    for joint in trajectory.joint_names:
+        # goal.path_tolerance.append(JointTolerance(name=joint, position=1e-2)) # position | velocity | acceleration
+        goal.goal_tolerance.append(JointTolerance(name=joint, position=1e-3))  # position | velocity | acceleration
+
+    # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
+    while True:
+        state = client.send_goal_and_wait(goal)  # send_goal_and_wait
+        # state = client.get_state() # get_comm_state, get_terminal_state
+        print('State:', state)
+        # result = client.get_result()
+        # print('Result:', result)
+        # text = client.get_goal_status_text()
+        text = GoalStatus.to_string(state)
+        print('Goal status:', text)
+        if state != GoalStatus.PREEMPTED:
+            break
+        # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
+        # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
+    return True
+
 def franka_control(robot, joints, path, interface, **kwargs):
 
     #joint_command_control(robot, joints, path, **kwargs)
@@ -131,12 +184,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #   pos_vel_controllers/JointTrajectoryController, position_controllers/JointTrajectoryController,
     #   velocity_controllers/JointTrajectoryController]
 
-    #error_threshold = 1e-3
-    #threshold_template = '/position_joint_trajectory_controller/constraints/{}/goal'
-    #for name in get_joint_names(robot, joints):
-    #    param = threshold_template.format(name)
-    #    rospy.set_param(param, error_threshold)
-    #    #print(name, rospy.get_param(param))
+
 
     update_robot_conf(interface)
     start_conf = get_joint_positions(robot, joints)
@@ -155,47 +203,10 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # TODO: adjust to the actual current configuration
 
     start_time = time.time()
-    stuff = True
-    if stuff:
-        from trajectory_msgs.msg import JointTrajectory
-        action_topic = '/robot/right/cspace_trajectory/msg'
-        print('Starting', action_topic)
-        pub = rospy.Publisher(action_topic, JointTrajectory, queue_size=1)
-        pub.publish(trajectory)
-        rospy.sleep(trajectory.points[-1].time_from_start)
+    if CSPACE_TRAJECTORY:
+        lula_joint_trajectory(trajectory)
     else:
-        action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
-        # /move_base_simple/goal
-        # /execute_trajectory/goal
-        # /position_joint_trajectory_controller/command
-        client = SimpleActionClient(action_topic, FollowJointTrajectoryAction)
-        print('Starting', action_topic)
-        client.wait_for_server()
-        client.cancel_all_goals()
-        # time.sleep(0.1)
-        print('Finished', action_topic)
-        # TODO: create this action client once
-
-        goal = FollowJointTrajectoryGoal(trajectory=trajectory)
-        goal.goal_time_tolerance = rospy.Duration.from_sec(2.0)
-        for joint in trajectory.joint_names:
-            #goal.path_tolerance.append(JointTolerance(name=joint, position=1e-2)) # position | velocity | acceleration
-            goal.goal_tolerance.append(JointTolerance(name=joint, position=1e-3)) # position | velocity | acceleration
-
-        # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/ros_controller.py
-        while True:
-            state = client.send_goal_and_wait(goal)  # send_goal_and_wait
-            #state = client.get_state() # get_comm_state, get_terminal_state
-            print('State:', state)
-            #result = client.get_result()
-            #print('Result:', result)
-            #text = client.get_goal_status_text()
-            text = GoalStatus.to_string(state)
-            print('Goal status:', text)
-            if state != GoalStatus.PREEMPTED:
-                break
-            # http://docs.ros.org/diamondback/api/actionlib/html/action__client_8py_source.html
-            # https://docs.ros.org/diamondback/api/actionlib/html/simple__action__client_8py_source.html
+        follow_joint_trajectory(trajectory)
 
     # TODO: different joint distance metric. The last joint seems to move slowly
     # TODO: extra effort to get to the final conf
@@ -246,8 +257,8 @@ def moveit_control(robot, joints, path, interface, **kwargs):
     moveit = interface.moveit
     # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/interpolator.py
     # Only position, time_from_start, and velocity are used
-    # trajectory = linear_parameterization(robot, joints, path, speed=0.025*np.pi)
-    trajectory = spline_parameterization(robot, joints, path, speed=0.05 * np.pi, **kwargs)
+    # trajectory = linear_parameterization(robot, joints, path, speed=0.025*np.pi) # speed=0.05 * np.pi
+    trajectory = spline_parameterization(robot, joints, path, **kwargs)
     print('Following {} waypoints in {:.3f} seconds'.format(
         len(path), trajectory.points[-1].time_from_start.to_sec()))
     publish_display_trajectory(interface.moveit, trajectory)
@@ -267,7 +278,7 @@ def moveit_control(robot, joints, path, interface, **kwargs):
 
     moveit.verbose = False
     moveit.last_ik = plan.joint_trajectory.points[-1].positions
-    moveit.dilation = 5.0
+    moveit.dilation = 5.0 # TODO: fix trajectory timing
     start_time = time.time()
     # /move_group/display_planned_path
     # TODO: display base motions?

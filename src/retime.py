@@ -84,7 +84,7 @@ def spline_parameterization(robot, joints, path, **kwargs):
     from src.issac import ISSAC_FRANKA_FRAME
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-    # TODO: could interpolate each DOF independently
+    # Can always interpolate each DOF independently
     # Univariate interpolation just means that the input is one dimensional (aka time)
     # The output can be arbitrary dimension
     # Bivariate interpolation has a 2D input space
@@ -92,7 +92,6 @@ def spline_parameterization(robot, joints, path, **kwargs):
     # Was initially using scipy 0.17.0
     # https://docs.scipy.org/doc/scipy-0.17.0/reference/interpolate.html
     # https://docs.scipy.org/doc/scipy-0.17.0/reference/tutorial/interpolate.html
-
     # Upgraded to scipy 0.18.0 to use the CubicSpline method
     # sudo pip2 install scipy==0.18.0
     # https://docs.scipy.org/doc/scipy-0.18.0/reference/interpolate.html
@@ -103,7 +102,7 @@ def spline_parameterization(robot, joints, path, **kwargs):
     #time_from_starts = retime_path(robot, joints, path, **kwargs)
     #time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
     # TODO: interpolate through the waypoints
-    path, time_from_starts = retime_trajectory(robot, joints, path)
+    path, time_from_starts = retime_trajectory(robot, joints, path, **kwargs)
     ensure_increasing(path, time_from_starts)
     #positions = interp1d(time_from_starts, path, kind='linear')
     positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
