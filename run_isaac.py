@@ -197,8 +197,6 @@ def main():
     parser = create_parser()
     parser.add_argument('-execute', action='store_true',
                         help="When enabled, uses the real robot_entity")
-    parser.add_argument('-fixed', action='store_true',
-                        help="When enabled, fixes the robot_entity's base")
     parser.add_argument('-jump', action='store_true',
                         help="When enabled, skips base control")
     parser.add_argument('-lula', action='store_true',

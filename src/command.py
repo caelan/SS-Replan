@@ -132,7 +132,9 @@ class Trajectory(Command):
         path, time_from_starts = retime_trajectory(self.robot, self.joints, self.path, sample_step=None)
         #path = list(self.path)
         #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
-        #ensure_increasing(path, time_from_starts)
+        ensure_increasing(path, time_from_starts)
+        if len(path) <= 1:
+            return True
         #positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
         positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
                                       extrapolate=False)  # bc_type=((1, 0), (1, 0))

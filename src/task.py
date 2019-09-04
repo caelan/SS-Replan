@@ -6,7 +6,7 @@ import time
 
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
     create_box, set_all_static, COLOR_FROM_NAME, \
-    stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb
+    stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb, create_cylinder
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
@@ -66,16 +66,6 @@ BOX_POSE2D = (0.1, 1.15, 0.)
 SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
 CRACKER_POSE2D = (0.2, 1.2, np.pi/4)
 
-def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
-    x, y, yaw = pose2d
-    body = world.get_body(entity_name)
-    surface_aabb = compute_surface_aabb(world, surface_name)
-    z = stable_z_on_aabb(body, surface_aabb)
-    pose = Pose(Point(x, y, z), Euler(yaw=yaw))
-    set_pose(body, pose)
-    return pose
-
-
 def add_block(world, idx=0, **kwargs):
     # TODO: automatically produce a unique name
     block_type = BLOCK_TEMPLATE.format(BLOCK_SIZES[-1], BLOCK_COLORS[0])
@@ -89,22 +79,25 @@ def add_block(world, idx=0, **kwargs):
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
-
-def add_cracker_box(world, idx=0, **kwargs):
-    ycb_type = 'cracker_box'
+def add_sugar_box(world, idx=0, **kwargs):
+    #ycb_type = 'cracker_box'
+    ycb_type = 'sugar_box'
     name = name_from_type(ycb_type, idx)
     world.add_body(name, color=np.ones(4))
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
-
-def add_cylinder(world, color_name, idx=0, **kwargs):
-    height = 0.14
-    width = 0.07
+def add_box(world, color_name, idx=0, **kwargs):
     name = name_from_type(color_name, idx)
     # TODO: geometry type
-    body = create_box(w=width, l=width, h=height, color=COLOR_FROM_NAME[color_name])
-    # body = create_cylinder(radius=width/2, height=height, color=COLOR_FROM_NAME[color_name])
+    body = create_box(w=0.07, l=0.07, h=0.14, color=COLOR_FROM_NAME[color_name])
+    world.add(name, body)
+    # pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
+    return name
+
+def add_cylinder(world, color_name, idx=0, **kwargs):
+    name = name_from_type(color_name, idx)
+    body = create_cylinder(radius=0.07/2, height=0.14, color=COLOR_FROM_NAME[color_name])
     world.add(name, body)
     # pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
@@ -115,6 +108,21 @@ def add_kinect(world, camera_name=LEFT_CAMERA):
     world.add_camera(camera_name, world_from_camera, CAMERA_MATRIX)
 
 ################################################################################
+
+BASE_POSE2D = (0.74, 0.80, -np.pi)
+
+def set_fixed_base(world):
+    # set_base_values(world.robot, BASE_POSE2D)
+    world.set_base_conf(BASE_POSE2D)
+
+def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
+    x, y, yaw = pose2d
+    body = world.get_body(entity_name)
+    surface_aabb = compute_surface_aabb(world, surface_name)
+    z = stable_z_on_aabb(body, surface_aabb)
+    pose = Pose(Point(x, y, z), Euler(yaw=yaw))
+    set_pose(body, pose)
+    return pose
 
 def sample_placement(world, entity_name, surface_name, **kwargs):
     entity_body = world.get_body(entity_name)
@@ -136,13 +144,16 @@ def open_all_doors(world):
 
 ################################################################################
 
-def detect_block(world, **kwargs):
+def detect_block(world, fixed=False, **kwargs):
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    obstruction_name = add_cracker_box(world, idx=0, pose2d=CRACKER_POSE2D)
+    obstruction_name = add_sugar_box(world, idx=0, pose2d=CRACKER_POSE2D)
     #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:
         add_kinect(world, side)
+    if fixed:
+        set_fixed_base(world)
+
     goal_surface = 'indigo_drawer_top'
     initial_distribution = UniformDist([goal_surface]) # indigo_tmp
     initial_surface = initial_distribution.sample()
@@ -156,17 +167,17 @@ def detect_block(world, **kwargs):
         entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
         obstruction_name: DeltaDist('indigo_tmp'),
     }
-    return Task(world, prior=prior, movable_base=True,
+    return Task(world, prior=prior, movable_base=not fixed,
                 return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
                 goal_holding=entity_name,
                 #goal_on={entity_name: goal_surface},
                 goal_closed=ALL_JOINTS,
-                **kwargs)
+            )
 
 ################################################################################
 
-def hold_block(world, num=5, **kwargs):
+def hold_block(world, num=5, fixed=False, **kwargs):
     # TODO: compare with the NN grasp prediction in clutter
     # TODO: consider a task where most directions are blocked except for one
     initial_surface = 'indigo_tmp'
@@ -177,29 +188,31 @@ def hold_block(world, num=5, **kwargs):
 
     prior = {}
     # green_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    green_name = add_cylinder(world, 'green', idx=0)
+    green_name = add_box(world, 'green', idx=0)
     prior[green_name] = DeltaDist(initial_surface)
     sample_placement(world, green_name, initial_surface, learned=True)
     for idx in range(num):
-        red_name = add_cylinder(world, 'red', idx=idx)
+        red_name = add_box(world, 'red', idx=idx)
         prior[red_name] = DeltaDist(initial_surface)
         sample_placement(world, red_name, initial_surface, learned=True)
 
     set_all_static()
     add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
 
-    return Task(world, prior=prior, movable_base=True,
+    return Task(world, prior=prior, movable_base=not fixed,
                 # grasp_types=GRASP_TYPES,
                 grasp_types=[SIDE_GRASP],
                 return_init_bq=True, return_init_aq=True,
                 goal_holding=green_name,
                 #goal_closed=ALL_JOINTS,
-                **kwargs)
+            )
 
 
 ################################################################################
 
-def cracker_drawer(world, **kwargs):
+def sugar_drawer(world, fixed=False, **kwargs):
     initial_surface = 'indigo_drawer_top' # indigo_drawer_top | indigo_drawer_bottom
     #initial_surface = 'indigo_tmp'
     joint_name = JOINT_TEMPLATE.format(initial_surface)
@@ -210,42 +223,66 @@ def cracker_drawer(world, **kwargs):
     block_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     prior[block_name] = DeltaDist('indigo_tmp')
 
-    cracker_name = add_cracker_box(world, idx=0)
+    cracker_name = add_sugar_box(world, idx=0)
     prior[cracker_name] = DeltaDist(initial_surface)
     sample_placement(world, cracker_name, initial_surface, learned=True)
 
     set_all_static()
     add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
 
-    return Task(world, prior=prior, movable_base=True,
+    return Task(world, prior=prior, movable_base=not fixed,
                 goal_on={block_name: initial_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[JOINT_TEMPLATE.format('indigo_drawer_top')],
                 goal_closed=ALL_JOINTS,
-                **kwargs)
+            )
 
 ################################################################################
 
-BASE_POSE2D = (0.74, 0.80, -np.pi)
+def cook_block(world, fixed=True, **kwargs):
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    set_all_static()
+    add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
 
+    initial_surface = 'indigo_tmp'
+    sample_placement(world, entity_name, initial_surface, learned=True)
 
-def fixed_stow(world, **kwargs):
+    prior = {
+        entity_name: UniformDist([initial_surface]),
+    }
+    return Task(world, prior=prior, movable_base=not fixed,
+                #goal_detected=[entity_name],
+                goal_holding=entity_name,
+                goal_cooked=[entity_name],
+                #goal_on={entity_name: goal_surface},
+                return_init_bq=True, return_init_aq=True,
+                #goal_open=[joint_name],
+                #goal_closed=ALL_JOINTS,
+            )
+
+################################################################################
+
+def detect_drawers(world, fixed=True, **kwargs):
     # set_base_values
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     set_all_static()
     add_kinect(world)
-
-    # set_base_values(world.robot, BASE_POSE2D)
-    world.set_base_conf(BASE_POSE2D)
+    if fixed:
+        set_fixed_base(world)
 
     drawers = ['indigo_drawer_top', 'indigo_drawer_bottom']
-    initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
+    #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
-    #initial_surface, goal_surface = drawers
-    #initial_surface, goal_surface = reversed(drawers)
     #initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
+    initial_surface, goal_surface = drawers
+    #initial_surface, goal_surface = reversed(drawers)
     if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)
+
     #joint_name = JOINT_TEMPLATE.format(goal_surface)
     #world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(goal_surface)))
 
@@ -255,28 +292,23 @@ def fixed_stow(world, **kwargs):
         entity_name: UniformDist(drawers),
         #entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top', 'indigo_drawer_bottom']),
     }
-    return Task(world, prior=prior, movable_base=False,
+    return Task(world, prior=prior, movable_base=not fixed,
                 #goal_detected=[entity_name],
                 #goal_holding=entity_name,
-                goal_cooked=[entity_name],
-                #goal_on={entity_name: goal_surface},
+                #goal_cooked=[entity_name],
+                goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
-                #goal_closed=ALL_JOINTS,
-                **kwargs)
+                goal_closed=ALL_JOINTS,
+            )
 
 ################################################################################
 
-def stow_block(world, num=1, **kwargs):
-    #world.open_gq.assign()
-    # dump_link_cross_sections(world, link_name='indigo_drawer_top')
-    # wait_for_user()
-
+def stow_block(world, num=1, fixed=False, **kwargs):
     # initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
     initial_surface = 'indigo_tmp'  # hitman_tmp | indigo_tmp | range | front_right_stove
     # initial_surface = 'indigo_drawer_top'
     goal_surface = 'indigo_drawer_top'  # baker | hitman_drawer_top | indigo_drawer_top | hitman_tmp | indigo_tmp
-    joint_name = 'indigo_drawer_top_joint'
     print('Initial surface: | Goal surface: ', initial_surface, initial_surface)
 
     prior = {}
@@ -286,35 +318,33 @@ def stow_block(world, num=1, **kwargs):
         prior[entity_name] = DeltaDist(initial_surface)
         goal_on[entity_name] = goal_surface
         sample_placement(world, entity_name, initial_surface, learned=True)
+
     #obstruction_name = add_box(world, idx=0)
     #sample_placement(world, obstruction_name, 'hitman_tmp')
     set_all_static()
     add_kinect(world)  # TODO: this needs to be after set_all_static
+    if fixed:
+        set_fixed_base(world)
 
+    #joint_name = 'indigo_drawer_top_joint'
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
-    #initial_surface = 'golf' # range | table | golf
-    #surface_body = world.environment_bodies[initial_surface]
-    #draw_aabb(get_aabb(surface_body))
-    #while True:
-    #    sample_placement(world, entity_name, surface_name=initial_surface, learned=False)
-    #    wait_for_user()
-
-    return Task(world, prior=prior, movable_base=True,
-                goal_holding=list(prior)[0],
-                #goal_on=goal_on,
-                goal_cooked=list(prior),
+    return Task(world, prior=prior, movable_base=not fixed,
+                #goal_holding=list(prior)[0],
+                goal_on=goal_on,
+                #goal_cooked=list(prior),
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
-                goal_closed=ALL_JOINTS,
-                **kwargs)
+                goal_closed=ALL_JOINTS
+            )
 
 ################################################################################
 
 TASKS = [
     detect_block,
     hold_block,
-    fixed_stow,
-    cracker_drawer,
+    detect_drawers,
+    sugar_drawer,
+    cook_block,
     stow_block,
 ]

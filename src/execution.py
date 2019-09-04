@@ -29,7 +29,7 @@ from lula_franka.franka_gripper_commander import FrankaGripperCommander
 # moveit_msgs/ExecuteTrajectoryAction
 # moveit_msgs/MoveGroupAction
 
-CSPACE_TRAJECTORY = Falseq
+CSPACE_TRAJECTORY = False
 
 def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAME):
     display_trajectory_pub = rospy.Publisher('/display_planned_path', DisplayTrajectory, queue_size=1)

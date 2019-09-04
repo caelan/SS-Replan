@@ -32,15 +32,21 @@ def create_parser():
     #                    help='When enabled, defers evaluation of motion planning streams.')
     parser.add_argument('-deterministic', action='store_true',
                         help='Treats actions as fully deterministic')
-    parser.add_argument('-observable', action='store_true',
-                        help='Treats the state as fully observable')
+    parser.add_argument('-fixed', action='store_true',
+                        help="When enabled, fixes the robot_entity's base")
     parser.add_argument('-max_time', default=5*60, type=int,
                         help='The max computation time')
+    parser.add_argument('-num', default=1, type=int,
+                        help='The number of objects')
+    parser.add_argument('-observable', action='store_true',
+                        help='Treats the state as fully observable')
     parser.add_argument('-record', action='store_true',
                         help='When enabled, records and saves a video at {}'.format(
                             VIDEO_TEMPLATE.format('<problem>')))
     #parser.add_argument('-seed', default=None,
     #                    help='The random seed to use.')
+    parser.add_argument('-simulate', action='store_true',
+                        help='When enabled, trajectories are simulated')
     parser.add_argument('-teleport', action='store_true',
                         help='When enabled, motion planning is skipped')
     parser.add_argument('-unit', action='store_true',
@@ -72,7 +78,7 @@ def main():
     task_fn_from_name = {fn.__name__: fn for fn in TASKS}
     task_fn = task_fn_from_name[args.problem]
 
-    task = task_fn(world)
+    task = task_fn(world, num=args.num, fixed=args.fixed)
     world._update_initial()
     if not args.record:
         with LockRenderer():
@@ -94,13 +100,13 @@ def main():
         return observe_pybullet(world)
 
     def transition_fn(belief, commands):
-        # TODO: fixed-base planning and execution
-        # Multiple rays for detecting
         # restore real_state just in case?
         # wait_for_user()
         # simulate_plan(real_state, commands, args)
-        return iterate_commands(real_state, commands)
-        #return simulate_commands(real_state, commands)
+        if args.fixed: # args.simulate
+            return simulate_commands(real_state, commands)
+        else:
+            return iterate_commands(real_state, commands)
 
     run_policy(task, args, observation_fn, transition_fn)
 
