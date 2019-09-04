@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import time
 import math
+import copy
 
 from pddlstream.utils import str_from_object
 from examples.discrete_belief.dist import UniformDist, DeltaDist
@@ -39,7 +40,7 @@ from src.utils import create_relative_pose, RelPose, FConf, are_confs_close
 # https://github.com/caelan/pddlstream/blob/stable/examples/pybullet/pr2_belief/run.py
 
 MIN_GRASP_WIDTH = 0.005
-REPAIR_DETECTIONS = False
+REPAIR_DETECTIONS = True
 
 ################################################################################
 
@@ -117,8 +118,9 @@ class Belief(object):
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/master/control_tools/pr2_controller.py#L93
         # https://github.mit.edu/caelan/mudfish/blob/master/scripts/planner.py#L346
         if (self.grasped is not None) and self.is_gripper_closed():
-            # TODO: need to add the grasp object back into the dist
+            # TODO: need to add the grasped object back into the dist
             self.grasped = None
+            print('Inconsistent belief!')
             return False
         return True
     def update(self, detections, n_samples=25):
@@ -229,6 +231,11 @@ def create_surface_belief(world, surface_dists, **kwargs):
 
 ################################################################################
 
+def delocalize_belief(belief, o, rp):
+    dist = UniformDist([rp, copy.copy(rp)])
+    belief.pose_dists[o] = PoseDist(belief.world, o, dist)
+    return dist
+
 def transition_belief_update(belief, plan):
     if plan is None:
         return False
@@ -258,15 +265,19 @@ def transition_belief_update(belief, plan):
             if not belief.is_gripper_closed():
                 del belief.pose_dists[o]
                 belief.grasped = g
+                # TODO: open gripper afterwards to ensure not in hand
             else:
+                print('Failed to grasp! Delocalizing belief')
+                delocalize_belief(belief, o, rp)
                 success = False
-                #break
+                break
         elif action == 'place':
             o, p, g, rp = params[:4]
             belief.grasped = None
-            dist = DeltaDist(rp)
-            #dist = UniformDist([rp]) # TODO: add a copy of rp to allow uncertainty
-            belief.pose_dists[o] = PoseDist(belief.world, o, dist)
+            delocalize_belief(belief, o, rp)
+            #dist = DeltaDist(rp)
+            #dist = UniformDist([rp, copy.copy(rp)])
+            #belief.pose_dists[o] = PoseDist(belief.world, o, dist)
         elif action == 'cook':
             pass
         else:

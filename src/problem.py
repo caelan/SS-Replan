@@ -150,6 +150,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         '@world': 'world',
         '@gripper': 'gripper',
         '@stove': 'stove',
+        '@none': None,
 
         '@rest_aq': carry_aq,
         #'@calibrate_aq': calibrate_aq,
@@ -350,7 +351,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     # TODO: track poses over time to produce estimates
     for obj_name, pose_dist in belief.pose_dists.items():
         dist_support = pose_dist.dist.support()
-        localized = (len(dist_support) == 1)
+        localized = pose_dist.is_localized()
         if localized:
             init.append(('Localized', obj_name))
             [rel_pose] = dist_support

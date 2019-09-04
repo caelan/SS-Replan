@@ -10,6 +10,7 @@ from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInter
 
 #ARM_SPEED = 0.15*np.pi # radians / sec
 ARM_SPEED = 0.2 # percent
+DEFAULT_SPEED_FRACTION = 0.5
 
 
 def get_joint_names(body, joints):
@@ -197,7 +198,8 @@ def compute_position(ramp_time, max_duration, acceleration, t):
            (velocity * t3 - 0.5 * acceleration * math.pow(t3, 2))
 
 
-def retime_trajectory(robot, joints, path, velocity_fraction=0.5, acceleration_fraction=1.0, sample_step=None):
+def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACTION,
+                      acceleration_fraction=1.5, sample_step=None):
     """
     :param robot:
     :param joints:

@@ -170,7 +170,7 @@ SURFACE_FROM_NAME = {
 ZED_LEFT_SURFACES = [
     'dagger_door_left',
     'indigo_tmp',
-    'range',
+    #'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',
 ] + STOVES
 

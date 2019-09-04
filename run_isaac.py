@@ -59,6 +59,8 @@ from examples.discrete_belief.dist import UniformDist
 
 def wait_for_dart_convergence(interface, detected, min_updates=10, timeout=10.0):
     # TODO: move to a dart class
+    if not detected:
+        return True
     start_time = time.time()
     history = defaultdict(list)
     num_updates = 0
@@ -92,6 +94,7 @@ def planning_loop(interface):
     # TODO: wait until the robot's base orientation is correct
 
     def observation_fn(belief):
+        #wait_for_user()
         # TODO: test if visibility is good enough
         # TODO: sort by distance from camera
         assert interface.deepim is not None # TODO: IsaacSim analog
@@ -110,7 +113,7 @@ def planning_loop(interface):
 
     def transition_fn(belief, commands):
         sim_state = belief.sample_state()
-        if args.watch or args.record:
+        if args.watch: # or args.record:
             wait_for_user()
             # simulate_plan(sim_state.copy(), commands, args)
             iterate_commands(sim_state.copy(), commands)
@@ -125,7 +128,6 @@ def planning_loop(interface):
         #if (0.01 < translation) or ():
         #    return False
 
-
         # TODO: could calibrate closed-loop relative to the object
         # Terminate if failed to pick up
         success = execute_commands(interface, commands)
@@ -139,21 +141,28 @@ def planning_loop(interface):
 #TARGET_DISTANCE = 0.25 # match up with Isaac Sight
 TARGET_DISTANCE = 0.05
 
+def reset_task(world, args):
+    return Task(world, prior={}, teleport_base=True,
+                movable_base=not args.fixed,
+                goal_aq=world.carry_conf, #.values,
+                #return_init_aq=True,
+                return_init_bq=True)
+
 def real_setup(domain, world, args):
     # TODO: detect if lula is active via rosparam
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
-        #SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
+        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
-        #CHEEZIT: UniformDist([INDIGO_COUNTER]),
+        CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
     goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
     task = Task(world, prior=prior, teleport_base=True,
-                grasp_types=[TOP_GRASP, SIDE_GRASP],
+                grasp_types=[TOP_GRASP], #, SIDE_GRASP],
                 #goal_detected=[SPAM],
-                goal_holding=SPAM,
+                #goal_holding=SPAM,
                 #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
@@ -161,12 +170,16 @@ def real_setup(domain, world, args):
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
-                #goal_cooked=[SPAM],
+                goal_cooked=[SPAM],
                 #return_init_aq=True,
                 return_init_bq=True)
+    if args.reset:
+        task = reset_task(world, args)
 
     robot_entity = domain.get_robot()
-    if not args.fixed:
+    if args.fixed:
+        robot_entity.fix_bases()
+    else:
         # TODO: these thresholds not used by Isaac
         carter = Carter(goal_threshold_tra=TARGET_DISTANCE,
                         goal_threshold_rot=math.radians(15.),
@@ -183,7 +196,7 @@ def real_setup(domain, world, args):
         # Carter more likely to creep forward when not near cabinet
 
     #robot_entity.fix_bases()
-    robot_entity.unfix_bases()
+    #robot_entity.unfix_bases()
     return interface
 
 
@@ -203,6 +216,8 @@ def main():
                         help='When enabled, uses LULA instead of JointState control')
     parser.add_argument('-problem', default=TRIAL_MANAGER_TASKS[2], #choices=TRIAL_MANAGER_TASKS,
                         help='The name of the task')
+    parser.add_argument('-reset', action='store_true',
+                        help='When enabled, resets robot conf')
     parser.add_argument('-watch', action='store_true',
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
@@ -269,7 +284,9 @@ def main():
             set_isaac_sim(interface)
         world._update_initial()
         add_markers(interface.task, inverse_place=False)
-    #wait_for_user()
+
+    if args.watch:
+        wait_for_user()
 
     #test_carter(interface)
     #return

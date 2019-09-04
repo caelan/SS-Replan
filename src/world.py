@@ -449,7 +449,7 @@ class World(object):
             return None
         [surface_name] = supporting
         return surface_name
-    def fix_pose(self, name, pose=None):
+    def fix_pose(self, name, pose=None, height=False):
         body = self.get_body(name)
         if pose is None:
             pose = get_pose(body)
@@ -463,6 +463,9 @@ class World(object):
         surface_name = self.get_supporting(name)
         if surface_name is None:
             return None, None
+        if not height:
+            new_pose = (Point(x, y, z), quat)
+            return new_pose, surface_name
         surface_aabb = compute_surface_aabb(self, surface_name)
         new_z = stable_z_on_aabb(body, surface_aabb)
         point = Point(x, y, new_z)

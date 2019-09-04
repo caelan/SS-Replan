@@ -36,14 +36,16 @@
     :inputs (?o ?r)
     :domain (and (MovableBase) (Stackable ?o ?r))
     :outputs (?rp)
-    :certified (and (RelPose ?o ?rp ?r) (Value ?rp) (Sample ?rp)))
+    :certified (and (RelPose ?o ?rp ?r)
+                    (Value ?rp) (Sample ?rp) (BeliefUpdate ?o ?rp @none ?rp)
+                ))
   (:stream sample-nearby-pose
     :inputs (?o1 ?o2 ?wp2 ?bq)
     :domain (and (NearPose ?o2 ?wp2 ?bq) (Stackable ?o1 ?o2)) ; TODO: ensure door is open?
     :outputs (?wp1 ?rp)
     :certified (and (RelPose ?o1 ?rp ?o2) (NearPose ?o1 ?wp1 ?bq)
                     (Value ?wp1) (Sample ?wp1)
-                    (Value ?rp) (Sample ?rp)
+                    (Value ?rp) (Sample ?rp) (BeliefUpdate ?o1 ?rp @none ?rp)
                     (WorldPose ?o1 ?wp1) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2)))
 
   ; Movable base

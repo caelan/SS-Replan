@@ -242,8 +242,13 @@ class ApproachTrajectory(Trajectory):
     def __init__(self, *args, **kwargs):
         super(ApproachTrajectory, self).__init__(*args, **kwargs)
         assert self.joints == self.world.arm_joints
+        self.speed = 0.25
     def execute(self, interface):
-        return super(ApproachTrajectory, self).execute(interface)
+        from src.execution import franka_control
+        from src.retime import DEFAULT_SPEED_FRACTION
+        return franka_control(self.robot, self.joints, self.path, interface,
+                              velocity_fraction=self.speed*DEFAULT_SPEED_FRACTION)
+        #return super(ApproachTrajectory, self).execute(interface)
         # TODO: finish if error is still large
 
         #from src.issac import update_robot

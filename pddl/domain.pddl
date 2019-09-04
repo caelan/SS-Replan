@@ -1,7 +1,7 @@
 (define (domain nvidia-tamp)
   (:requirements :strips :equality)
   (:constants
-    @world @gripper @stove
+    @world @gripper @stove @none
     @open @closed
     @rest_aq ; @calibrate_aq
     @open_gq @closed_gq)
@@ -187,6 +187,7 @@
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?wp1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (Calibrated) ; TODO: detect precondition?
+                       (Localized ?o1)
                        (Accessible ?o2 ?wp2) (AdmitsGrasp ?o1 ?g ?o2)
                        (not (UnsafeApproach ?o1 ?wp1 ?g))
                        (not (UnsafeATraj ?at))
@@ -198,7 +199,6 @@
                  (Holding ?o1) (not (On ?o1 ?o2))
                  (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?wp1))
                  (not (HandEmpty))
-                 ; (not (Localized ?o1))
                  (increase (total-cost) (PickCost))))
   (:action place
     :parameters (?o1 ?wp1 ?g ?rp ?o2 ?wp2 ?bq ?aq ?at) ; ?gq
@@ -215,7 +215,7 @@
                  (AtGConf @open_gq) ; (not (AtGConf ?gq))
                  (CanMoveBase) (CanMoveArm)
                  (not (AtGrasp ?o1 ?g))
-                 ;(not (Localized ?o1))
+                 (not (Localized ?o1))
                  (increase (total-cost) (PlaceCost))))
   (:action pull
     :parameters (?j ?a1 ?a2 ?o ?wp1 ?wp2 ?bq ?aq1 ?aq2 ?gq ?at)

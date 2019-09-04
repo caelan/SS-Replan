@@ -40,9 +40,6 @@ def create_parser():
                         help='The number of objects')
     parser.add_argument('-observable', action='store_true',
                         help='Treats the state as fully observable')
-    parser.add_argument('-record', action='store_true',
-                        help='When enabled, records and saves a video at {}'.format(
-                            VIDEO_TEMPLATE.format('<problem>')))
     #parser.add_argument('-seed', default=None,
     #                    help='The random seed to use.')
     parser.add_argument('-simulate', action='store_true',
@@ -65,6 +62,9 @@ def main():
     parser = create_parser()
     parser.add_argument('-problem', default=task_names[-1], choices=task_names,
                         help='The name of the problem to solve.')
+    parser.add_argument('-record', action='store_true',
+                        help='When enabled, records and saves a video at {}'.format(
+                            VIDEO_TEMPLATE.format('<problem>')))
     args = parser.parse_args()
     #if args.seed is not None:
     #    set_seed(args.seed)

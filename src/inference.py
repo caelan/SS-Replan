@@ -47,7 +47,8 @@ class PoseDist(object):
         self.weight = weight
         self.bandwidth = bandwidth
         self.handles = []
-
+    def is_localized(self):
+        return len(self.dist.support()) == 1
     def surface_prob(self, surface):
         return self.weight * self.surface_dist.prob(surface)
     def discrete_prob(self, pose):

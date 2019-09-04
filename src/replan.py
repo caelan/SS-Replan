@@ -11,7 +11,7 @@ from src.problem import ACTION_COSTS
 
 
 OBSERVATION_ACTIONS = {'detect'}
-NOISY_ACTIONS = {'pull', 'place'} # 'calibrate', 'pick'])
+NOISY_ACTIONS = {'place'} #, 'pull'} # 'calibrate', 'pick'])
 STOCHASTIC_ACTIONS = OBSERVATION_ACTIONS | {'move_base'} # | NOISY_ACTIONS
 INTERNAL_ACTIONS = {'detect', 'calibrate'} # Fake, skippable, etc...
 

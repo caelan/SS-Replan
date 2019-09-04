@@ -201,13 +201,16 @@ class DeepIM(Perception):
         entity = self.domain.root.entities[obj_type]
         administrator = entity.administrator
 
-        duration = 5.0
-        min_fraction = 0.25
-        expected_detections = duration * DETECTIONS_PER_SEC
+        duration = 2.0
+        #duration = 5.0
         observations = self.get_recent_observations(RIGHT, obj_type, duration)
         print('{}) observations={}, duration={}, rate={}'.format(
             obj_type, len(observations), duration, len(observations) / duration))
-        if len(observations) < min_fraction*expected_detections:
+        #expected_detections = duration * DETECTIONS_PER_SEC
+        #min_fraction = 0.25
+        #if len(observations) < min_fraction*expected_detections:
+        #    return False
+        if len(observations) <= 1:
             return False
         detections_from_frame = {}
         for pose_stamped in observations:

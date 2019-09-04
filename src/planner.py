@@ -31,7 +31,7 @@ COST_BOUND = 1000.0
 
 def opt_detect_cost_fn(obj_name, rp_dist, obs, rp_sample):
     # TODO: prune these surfaces if the cost is already too high
-    if isinstance(rp_sample, RelPose):
+    if isinstance(rp_sample, RelPose) or (rp_dist == rp_sample):
         # This shouldn't be needed if eager=True
         return detect_cost_fn(obj_name, rp_dist, obs, rp_sample)
     prob = rp_dist.surface_prob(rp_dist.surface_name)

@@ -7,7 +7,7 @@ from src.database import load_pull_base_poses, get_surface_reference_pose, load_
 from src.utils import ALL_JOINTS, ALL_SURFACES, get_grasps, surface_from_name, STOVES
 
 GROW_PLACEMENT = 0.05
-GROW_INVERSE_BASE = 0.05
+GROW_INVERSE_BASE = 0.05 # 0.05 | 0.1
 GROW_FORWARD_RADIUS = 0.25 # Done for block. Incorrect for other object types
 
 def get_floor_z(world, floor_z=0.005):

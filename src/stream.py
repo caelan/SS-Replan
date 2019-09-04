@@ -40,7 +40,7 @@ BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 
 PAUSE_MOTION_FAILURES = True
-PRINT_FAILURES = False
+PRINT_FAILURES = True
 MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
@@ -87,7 +87,7 @@ def compute_detect_cost(prob):
 def detect_cost_fn(obj_name, rp_dist, obs, rp_sample):
     # TODO: extend to continuous rp_sample controls using densities
     # TODO: count samples in a nearby vicinity to be invariant to number of samples
-    prob = rp_dist.discrete_prob(rp_sample)
+    prob = 1. if rp_dist == rp_sample else rp_dist.discrete_prob(rp_sample)
     cost = clip_cost(compute_detect_cost(prob), max_cost=MAX_COST)
     #print('{}) Detect Prob: {:.3f} | Detect Cost: {:.3f}'.format(
     #    rp_dist.surface_name, prob, cost))
@@ -133,7 +133,7 @@ def get_compute_angle_kin(world):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
-    scale = 0.05 # 0.5
+    scale = 1.0 # 0.05 | 0.5
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass
@@ -241,6 +241,9 @@ def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relativ
     detect_fn = get_compute_detect(world, ray_trace=False, **kwargs)
     def gen(obj_name, pose_dist, surface_name):
         # TODO: apply these checks to the whole surfaces
+        if isinstance(pose_dist, RelPose):
+            yield (pose_dist,)
+            return
         valid_samples = {}
         for rp in pose_dist.dist.support():
             prob = pose_dist.discrete_prob(rp)
@@ -353,14 +356,17 @@ def get_stable_gen(world, max_attempts=100,
             surface_body = world.environment_bodies[surface_name]
         surface_aabb = compute_surface_aabb(world, surface_name)
         learned_poses = load_placements(world, surface_name) if learned else [] # TODO: GROW_PLACEMENT
+        center = -np.pi/4
+        half_extent = np.pi / 16
+        yaw_range = (center-half_extent, center+half_extent)
         while True:
             for _ in range(max_attempts):
                 if surface_name in STOVES:
                     surface_link = link_from_name(world.kitchen, surface_name)
                     world_from_surface = get_link_pose(world.kitchen, surface_link)
                     z = stable_z_on_aabb(obj_body, surface_aabb) - point_from_pose(world_from_surface)[2]
-                    theta = random.uniform(-np.pi, +np.pi)
-                    body_pose_surface = Pose(Point(z=z + z_offset), Euler(yaw=theta))
+                    yaw = random.uniform(*yaw_range)
+                    body_pose_surface = Pose(Point(z=z + z_offset), Euler(yaw=yaw))
                     body_pose_world = multiply(world_from_surface, body_pose_surface)
                 elif learned:
                     if not learned_poses:
@@ -372,9 +378,9 @@ def get_stable_gen(world, max_attempts=100,
                     dx, dy = np.random.normal(scale=pos_scale, size=2)
                     # TODO: avoid reloading
                     z = stable_z_on_aabb(obj_body, surface_aabb)
-                    theta = wrap_angle(yaw + np.random.normal(scale=rot_scale))
-                    #yaw = np.random.uniform(*CIRCULAR_LIMITS)
-                    quat = quat_from_euler(Euler(yaw=theta))
+                    yaw = random.uniform(*yaw_range)
+                    #yaw = wrap_angle(yaw + np.random.normal(scale=rot_scale))
+                    quat = quat_from_euler(Euler(yaw=yaw))
                     body_pose_world = ([x+dx, y+dy, z+z_offset], quat)
                     # TODO: project onto the surface
                 else:
