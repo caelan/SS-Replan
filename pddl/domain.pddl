@@ -182,7 +182,8 @@
   ;)
   (:action pick
     :parameters (?o1 ?wp1 ?g ?rp ?o2 ?wp2 ?bq ?aq ?gq ?at)
-    :precondition (and (Pick ?o1 ?wp1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (OpenGConf ?gq)
+    :precondition (and (Pick ?o1 ?wp1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2)
+                       (= ?gq @open_gq) ; (OpenGConf ?gq))
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?wp1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (Calibrated) ; TODO: detect precondition?
@@ -261,7 +262,8 @@
   ; TODO: avoid double open
   (:action press-on
     :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
-    :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o) (OpenGConf ?gq) ; TODO: @closed_gq
+    :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o)
+                       (= ?gq  @closed_gq) ; (OpenGConf ?gq)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (HandEmpty) (Calibrated) (On ?o ?s) (not (Pressed ?k))
                        (not (UnsafeATraj ?at))
@@ -277,7 +279,8 @@
 
   (:action press-off
     :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
-    :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o) (OpenGConf ?gq)
+    :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o)
+                       (= ?gq  @closed_gq) ; (OpenGConf ?gq)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (HandEmpty) (Calibrated) (On ?o ?s) (Pressed ?k)
                        (not (UnsafeATraj ?at))

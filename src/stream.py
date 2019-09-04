@@ -17,7 +17,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
-    Detect, AttachGripper
+    Detect, AttachGripper, Wait
 from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
     load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
@@ -935,14 +935,14 @@ def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=Tr
         return
     aq = FConf(world.robot, world.arm_joints, approach_path[0]) if MOVE_ARM else world.carry_conf
 
-    gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
-    finger_cmd, = gripper_motion_fn(world.open_gq, world.closed_gq)
+    #gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
+    #finger_cmd, = gripper_motion_fn(world.open_gq, world.closed_gq)
     cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-        finger_cmd.commands[0],
+        #finger_cmd.commands[0],
         ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
         ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
-
-        finger_cmd.commands[0].reverse(),
+        #finger_cmd.commands[0].reverse(),
+        Wait(world, duration=1.0),
     ], name='press')
     yield (aq, cmd,)
 

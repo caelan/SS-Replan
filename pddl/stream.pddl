@@ -204,10 +204,10 @@
     :certified (OFreeRayGrasp ?r ?bq ?aq ?o ?g))
 
   ; TODO: these could also just be populated in the initial state
-  (:stream test-gripper
-    :inputs (?gq)
-    :domain (GConf ?gq)
-    :certified (OpenGConf ?gq))
+  ;(:stream test-gripper
+  ;  :inputs (?gq)
+  ;  :domain (GConf ?gq)
+  ;  :certified (OpenGConf ?gq))
   (:stream test-door
     :inputs (?j ?a ?s)
     :domain (and (Angle ?j ?a) (Status ?s))

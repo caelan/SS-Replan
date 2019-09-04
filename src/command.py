@@ -424,18 +424,21 @@ class Detect(Command):
             self.__class__.__name__, self.camera, self.name, self.surface_name)
 
 class Wait(Command):
-    def __init__(self, world, steps):
+    def __init__(self, world, steps=1, duration=1.0):
         super(Wait, self).__init__(world)
         self.steps = steps
+        self.duration = duration
     @property
     def bodies(self):
         return set()
     def reverse(self):
         return self
     def iterate(self, state):
-        for _ in range(self.steps):
+        for _ in range(self.steps+1):
             yield
     def execute(self, interface):
+        import rospy
+        rospy.sleep(self.duration)
         return True
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.steps)
