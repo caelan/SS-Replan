@@ -33,8 +33,11 @@ DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
 }
 
+#CARRY_CONF = [0.020760029206411876, -1.0611899273529857, -0.052402929133539944, -2.567198461037754,
+#              -0.06013280179334339, 1.5917587080266737, -2.3553707114303295] # Exceeds joint7 limits!!!
 DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476e-05,
                     -2.8105969429016113, -0.00025768374325707555, 3.0363450050354004, 0.7410701513290405]
+#DEFAULT_ARM_CONF = CARRY_CONF
 
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py#L59
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L52
@@ -192,7 +195,6 @@ class World(object):
         lower, upper = lower + buffer, upper - buffer
         lower[6] = -MAX_FRANKA_JOINT7
         upper[6] = +MAX_FRANKA_JOINT7
-        #buffer[-1] *= 2
         self.ik_solver.set_joint_limits(lower, upper)
 
     def _update_initial(self):

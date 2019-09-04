@@ -55,7 +55,7 @@ def wait_until_frames_stabilize(interface, frames, min_updates=10, timeout=10.0,
         print('Update: {} | Frames: {} | Time: {}'.format(num_updates, frames, elapsed_time(start_time)))
         success = True
         for frame in frames:
-            history[frame].append(lookup_pose(interface.observer.tf_listerner, frame))
+            history[frame].append(lookup_pose(interface.observer.tf_listener, frame))
             if min_updates <= len(history[frame]):
                 pos_deviation, ori_deviation = mean_pose_deviation(history[frame][-min_updates:])
                 print('{}) position deviation: {:.3f} meters | orientation deviation: {:.3f} degrees'.format(

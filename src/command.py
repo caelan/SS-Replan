@@ -10,7 +10,7 @@ from pybullet_tools.utils import get_moving_links, set_joint_positions, create_a
 from src.utils import create_surface_attachment
 
 DEFAULT_TIME_STEP = 0.02
-DEFAULT_SLEEP = 0.0
+DEFAULT_SLEEP = 0.5
 FORCE = 50 # 20 | 50 | 100
 
 EFFORT_FROM_OBJECT = {
@@ -222,7 +222,7 @@ class Trajectory(Command):
             from src.execution import franka_control
             success = franka_control(self.robot, self.joints, self.path, interface)
         #status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
-        time.sleep(DEFAULT_SLEEP)
+        #time.sleep(DEFAULT_SLEEP)
         return success
 
         # if self.joints == self.world.arm_joints:
@@ -295,7 +295,7 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         #    time.sleep(DEFAULT_SLEEP)
         from src.execution import franka_control
         success = franka_control(self.robot, self.joints, self.path, interface)
-        time.sleep(DEFAULT_SLEEP)
+        #time.sleep(DEFAULT_SLEEP)
         return success
         #if self.do_pull:
         #    franka_open_gripper(interface)

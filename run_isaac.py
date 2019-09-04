@@ -23,7 +23,7 @@ from brain_ros.kitchen_domain import KitchenDomain
 #from grasps import *
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
-from src.carter import command_carter, INDIGO_BASE_POSE
+from src.carter import command_carter, HOME_BASE_POSE, test_carter
 
 #import kitchen_poses
 #kitchen_poses.supported_ycb_objects[:] = []
@@ -144,15 +144,16 @@ def real_setup(domain, world, args):
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
-        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
+        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        #SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
         #CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
     goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
-    task = Task(world, prior=prior, teleport_base=True, grasp_types=[TOP_GRASP], #, SIDE_GRASP],
+    task = Task(world, prior=prior, teleport_base=True,
+                grasp_types=[TOP_GRASP, SIDE_GRASP],
                 #goal_detected=[SPAM],
-                #goal_holding=SPAM,
+                goal_holding=SPAM,
                 #goal_on={SPAM: goal_drawer},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
@@ -160,7 +161,7 @@ def real_setup(domain, world, args):
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
-                goal_cooked=[SPAM],
+                #goal_cooked=[SPAM],
                 #return_init_aq=True,
                 return_init_bq=True)
 
@@ -175,8 +176,10 @@ def real_setup(domain, world, args):
     interface = Interface(args, task, observer, deepim=perception)
     if interface.carter is not None:
         #initial_pose = interface.carter.current_pose
-        initial_pose = INDIGO_BASE_POSE # INDIGO_BASE_POSE | HOME_BASE_POSE
-        command_carter(interface, initial_pose)
+        initial_pose = HOME_BASE_POSE # INDIGO_BASE_POSE | HOME_BASE_POSE
+        goal_distance = np.linalg.norm(np.array(HOME_BASE_POSE)[:2] - np.array(interface.carter.current_pose)[:2])
+        if 0.5 < goal_distance:
+            command_carter(interface, initial_pose)
         # Carter more likely to creep forward when not near cabinet
 
     #robot_entity.fix_bases()

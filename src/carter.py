@@ -16,12 +16,13 @@ from src.deepim import mean_pose_deviation, wait_until_frames_stabilize
 # Middle carter pose: [ 25.928  11.541   2.4  ]
 # BB8 carter pose: [ 17.039  13.291  -2.721]
 
+# navigation.localization.scan_localization
+# isaac.navigation.ParticleFilterLocalization
+# reseed_particles
+
 HOME_BASE_POSE = [31.797, 9.118, -0.12]
 #INDIGO_BASE_POSE = [33.1, 7.789, 0.0]
 INDIGO_BASE_POSE = [33.05, 7.789, 0.0]
-
-CARRY_CONF = [0.020760029206411876, -1.0611899273529857, -0.052402929133539944, -2.567198461037754,
-              -0.06013280179334339, 1.5917587080266737, -2.3553707114303295]
 
 def seed_dart_with_carter(interface):
     robot_entity = interface.domain.get_robot()
@@ -68,8 +69,8 @@ def command_carter(interface, goal_pose, timeout=30):
                 break
         #else:
         #    history = []
-        carter.pub_disable_deadman_switch.publish(True)  # must send repeatedly
         carter.move_to_async(goal_pose)  # move_to_async | move_to_safe
+        carter.pub_disable_deadman_switch.publish(True)  # must send repeatedly
         rospy.sleep(0.01)
     else:
         reached_goal = False
@@ -90,13 +91,16 @@ def command_carter(interface, goal_pose, timeout=30):
         carter.pub_disable_deadman_switch.publish(True)
         rospy.sleep(0.01)
 
+    while elapsed_time(start_time) < 1.0:
+        carter.pub_disable_deadman_switch.publish(False)
+        rospy.sleep(0.01)
     success = wait_until_frames_stabilize(interface, frames=[robot_entity.current_root])
 
-    #carter.pub_disable_deadman_switch.publish(False)
     #robot_entity.fix_bases()  # suppressor.activate() => fix
     # Towards the kitchen is +x (yaw=0)
     # fix base of Panda with DART is overwritten by the published message
-    return reached_goal
+    #return reached_goal
+    return True
 
 
 def command_carter_to_pybullet_goal(interface, goal_pose2d, **kwargs):

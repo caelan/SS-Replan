@@ -438,7 +438,7 @@ def is_robot_visible(world, links):
     return True
 
 def inverse_reachability(world, base_generator, obstacles=set(),
-                         max_attempts=50, min_distance=0.02, **kwargs):
+                         max_attempts=50, min_distance=0.04, **kwargs):
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
     ensure_visible = world.task.teleport_base
