@@ -133,7 +133,8 @@ def get_compute_angle_kin(world):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
-    scale = 1.0 # 0.05 | 0.5
+    scale = 0.05 # 0.05 | 0.5 | 1.0
+    #scale = 1.25 # 0.05 | 0.5 | 1.0
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass

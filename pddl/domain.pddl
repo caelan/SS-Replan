@@ -160,7 +160,7 @@
                        ;(CanMoveGripper)
                        (not (Unsafe)))
     :effect (and (AtGConf ?gq2)
-                 (not (AtGConf ?gq1)) (not (CanMoveGripper))
+                 (not (AtGConf ?gq1)) ; (not (CanMoveGripper))
                  (increase (total-cost) (MoveGripperCost))))
   ;(:action replan
   ;  :parameters ()
@@ -183,7 +183,7 @@
   (:action pick
     :parameters (?o1 ?wp1 ?g ?rp ?o2 ?wp2 ?bq ?aq ?gq ?at)
     :precondition (and (Pick ?o1 ?wp1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2)
-                       (= ?gq @open_gq) ; (OpenGConf ?gq))
+                       (GConf ?gq) (= ?gq @open_gq) ; (OpenGConf ?gq))
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?wp1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (Calibrated) ; TODO: detect precondition?
@@ -219,7 +219,8 @@
                  (increase (total-cost) (PlaceCost))))
   (:action pull
     :parameters (?j ?a1 ?a2 ?o ?wp1 ?wp2 ?bq ?aq1 ?aq2 ?gq ?at)
-    :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at) (OpenGConf ?gq)
+    :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)
+                       (GConf ?gq) (= ?gq @open_gq) ; (OpenGConf ?gq) ; (OpenGripper)
                        (AngleKin ?o ?wp1 ?j ?a1) (AngleKin ?o ?wp2 ?j ?a2)
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?wp1)
                        (AtBConf ?bq) (AtAConf ?aq1) (AtGConf ?gq)
@@ -228,7 +229,8 @@
                        ; (not (UnsafeAngle ?j ?a1)) (not (UnsafeAngle ?j ?a2))
                        (not (UnsafeAngleTraj ?j ?a1 ?a2))
                        (not (UnsafeATraj ?at)) ; TODO: approach pull trajectories
-                       (not (Unsafe)))
+                       (not (Unsafe))
+                   )
     ; TODO: use the full pull trajectory
     :effect (and (AtAngle ?j ?a2) (AtWorldPose ?o ?wp2) (AtAConf ?aq2)
                  ; (AtGConf @open_gq) (not (AtGConf ?gq))
@@ -259,11 +261,10 @@
                                       (not (AtWorldPose ?o1 ?wp3))))
                  (increase (total-cost) (DetectCost ?o1 ?rp1 ?obs ?rp2))))
 
-  ; TODO: avoid double open
   (:action press-on
     :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
     :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o)
-                       (= ?gq  @closed_gq) ; (OpenGConf ?gq)
+                       (GConf ?gq) (= ?gq  @closed_gq) ; (OpenGConf ?gq)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (HandEmpty) (Calibrated) (On ?o ?s) (not (Pressed ?k))
                        (not (UnsafeATraj ?at))
@@ -280,7 +281,7 @@
   (:action press-off
     :parameters (?s ?k ?o ?bq ?aq ?gq ?at)
     :precondition (and (Press ?k ?bq ?aq ?at) (StoveKnob ?s ?k) (Cookable ?o)
-                       (= ?gq  @closed_gq) ; (OpenGConf ?gq)
+                       (GConf ?gq) (= ?gq  @closed_gq) ; (OpenGConf ?gq)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
                        (HandEmpty) (Calibrated) (On ?o ?s) (Pressed ?k)
                        (not (UnsafeATraj ?at))
@@ -290,9 +291,9 @@
                  (increase (total-cost) (PressCost))))
 
   ;(:derived (OpenGripper)
-  ;  ;(AtGConf @open_gq)
-  ;  (exists (?gq) (and (OpenGConf ?gq)
-  ;                     (AtGConf ?gq)))
+  ;  (AtGConf @open_gq)
+  ;  ;(exists (?gq) (and (OpenGConf ?gq)
+  ;  ;                   (AtGConf ?gq)))
   ;)
 
   (:derived (Accessible ?o ?wp) (or

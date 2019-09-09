@@ -47,7 +47,7 @@ from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
 from src.world import World
 from src.task import Task
-from src.execution import franka_open_gripper
+from src.execution import franka_open_gripper, franka_close_gripper
 from run_pybullet import create_parser
 
 from examples.discrete_belief.dist import UniformDist
@@ -142,37 +142,42 @@ def planning_loop(interface):
 TARGET_DISTANCE = 0.05
 
 def reset_task(world, args):
-    return Task(world, prior={}, teleport_base=True,
-                movable_base=not args.fixed,
-                goal_aq=world.carry_conf, #.values,
-                #return_init_aq=True,
-                return_init_bq=True)
+    return Task(world, prior={
+            # TODO: no idea why but instantiation is super slow without this
+            SPAM: UniformDist([INDIGO_COUNTER]),
+        }, teleport_base=True,
+        movable_base=not args.fixed,
+        goal_aq=world.carry_conf, #.values,
+        #return_init_aq=True,
+        return_init_bq=True)
 
 def real_setup(domain, world, args):
     # TODO: detect if lula is active via rosparam
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
-        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
+        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        #SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
         SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
     }
-    goal_drawer = TOP_DRAWER # TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
+    goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
     task = Task(world, prior=prior, teleport_base=True,
                 grasp_types=[TOP_GRASP], #, SIDE_GRASP],
                 #goal_detected=[SPAM],
                 #goal_holding=SPAM,
-                #goal_on={SPAM: goal_drawer},
+                goal_on={SPAM: goal_drawer},
+                #goal_on={SUGAR: TOP_DRAWER},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf, #.values,
-                goal_cooked=[SPAM],
+                #goal_cooked=[SPAM],
                 #return_init_aq=True,
-                return_init_bq=True)
+                return_init_bq=True
+                )
     if args.reset:
         task = reset_task(world, args)
 
@@ -222,8 +227,9 @@ def main():
                         help='When enabled, plans are visualized in PyBullet before executing in IsaacSim')
     args = parser.parse_args()
     np.set_printoptions(precision=3, suppress=True)
+    args.observable |= args.reset
     #args.watch |= args.execute
-    # TODO: reobserve thee same scene until receive good observation
+    # TODO: reobserve the same scene until receive good observation
 
     # srl_system/packages/isaac_bridge/configs/ycb_table_config.json
     # srl_system/packages/isaac_bridge/configs/ycb_table_graph.json
@@ -258,6 +264,8 @@ def main():
         interface = simulation_setup(domain, world, args)
     #seed_dart_with_carter(interface)
     franka_open_gripper(interface)
+    #franka_close_gripper(interface)
+    #wait_for_user()
     #interface.localize_all()
     #interface.update_state()
     #test_carter(interface)
@@ -340,6 +348,7 @@ if __name__ == '__main__':
 # cpaxton@lokeefe:~$ roscore
 # 1) srl@vgilligan:~$ roslaunch franka_controllers start_control.launch
 # 2) srl@vgilligan:~$ cd ~/catkin_ws/src/panda_moveit_config/launch
+# srl@vgilligan:~/catkin_ws/src/panda_moveit_config/launch$ source ~/catkin_ws/devel/setup.bash
 # 2) srl@vgilligan:~/catkin_ws/src/panda_moveit_config/launch$ roslaunch panda_control_moveit_rviz.launch load_gripper:=True robot_ip:=172.16.0.2
 # 3) srl@vgilligan:~$ ./srl_system/workspace/src/brain/relay.sh
 # 3) cpaxton@lokeefe:~/srl_system/workspace/src/external/lula_franka$ franka viz (REQUIRED!!!)
