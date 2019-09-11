@@ -46,7 +46,7 @@ class Task(object):
         self.max_cost = max_cost # TODO: use instead of the default
     @property
     def objects(self):
-        return set(self.prior.keys())
+        return sorted(set(self.prior.keys()))
     def create_belief(self):
         t0 = time.time()
         print('Creating initial belief')
@@ -62,30 +62,35 @@ class Task(object):
 
 # (x, y, yaw)
 UNIT_POSE2D = (0., 0., 0.)
-BOX_POSE2D = (0.1, 1.15, 0.)
+BOX_POSE2D = (0.1, 1.05, 0.)
 SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
+#CRACKER_POSE2D = (0.2, 1.1, np.pi/4)
 CRACKER_POSE2D = (0.2, 1.2, np.pi/4)
+BIG_BLOCK_SIDE = 0.065
 
 def add_block(world, idx=0, **kwargs):
     # TODO: automatically produce a unique name
-    block_type = BLOCK_TEMPLATE.format(BLOCK_SIZES[-1], BLOCK_COLORS[0])
+    color = 'green'
+    block_type = '{}_block'.format(color)
+    #block_type = BLOCK_TEMPLATE.format(BLOCK_SIZES[-1], BLOCK_COLORS[0])
     #block_type = 'potted_meat_can'
     name = name_from_type(block_type, idx)
     #world.add_body(name)
     #print(get_aabb_extent(get_aabb(world.get_body(name))))
-    side = 0.065
-    body = create_box(w=side, l=side, h=side, color=COLOR_FROM_NAME['green'])
+    side = BIG_BLOCK_SIDE
+    body = create_box(w=side, l=side, h=side, color=COLOR_FROM_NAME[color])
     world.add(name, body)
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
-def add_sugar_box(world, idx=0, **kwargs):
-    #ycb_type = 'cracker_box'
-    ycb_type = 'sugar_box'
+def add_ycb(world, ycb_type, idx, **kwargs):
     name = name_from_type(ycb_type, idx)
     world.add_body(name, color=np.ones(4))
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
+
+add_sugar_box = lambda world, **kwargs: add_ycb(world, 'sugar_box', **kwargs)
+add_cracker_box = lambda world, **kwargs: add_ycb(world, 'cracker_box', **kwargs)
 
 def add_box(world, color_name, idx=0, **kwargs):
     name = name_from_type(color_name, idx)
@@ -146,7 +151,9 @@ def open_all_doors(world):
 
 def detect_block(world, fixed=False, **kwargs):
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    obstruction_name = add_sugar_box(world, idx=0, pose2d=CRACKER_POSE2D)
+    x, y, yaw = CRACKER_POSE2D
+    sugar_name = add_sugar_box(world, idx=0, pose2d=CRACKER_POSE2D)
+    #cracker_name = add_cracker_box(world, idx=0, pose2d=(x, 1.4, yaw))
     #other_name = add_box(world, idx=1)
     set_all_static()
     for side in CAMERAS[:1]:
@@ -165,7 +172,8 @@ def detect_block(world, fixed=False, **kwargs):
 
     prior = {
         entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
-        obstruction_name: DeltaDist('indigo_tmp'),
+        sugar_name: DeltaDist('indigo_tmp'),
+        #cracker_name: DeltaDist('indigo_tmp'),
     }
     return Task(world, prior=prior, movable_base=not fixed,
                 return_init_bq=True, return_init_aq=True,

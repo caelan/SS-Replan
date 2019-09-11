@@ -13,7 +13,7 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.discrete_belief.run import geometric_cost
 from pybullet_tools.utils import BodySaver, joint_from_name, LockRenderer, spaced_colors, WorldSaver, \
     pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user, \
-    get_joint_positions, get_joint_name, get_joint_position
+    get_joint_positions, get_joint_name, get_joint_position, GREEN
 from src.command import State
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, relative_detections, ELSEWHERE
@@ -53,7 +53,9 @@ class Belief(object):
         self.world = world
         self.pose_dists = pose_dists
         self.grasped = grasped # grasped or holding?
-        self.color_from_name = dict(zip(self.objects, spaced_colors(len(self.objects))))
+        #colors = spaced_colors(len(self.objects))
+        colors = [GREEN]*len(self.objects)
+        self.color_from_name = dict(zip(self.objects, colors))
         self.observations = []
         self.handles = []
 

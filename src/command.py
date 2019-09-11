@@ -452,7 +452,7 @@ class Wait(Command):
 
 ################################################################################s
 
-def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
+def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP, pause=False):
     if commands is None:
         return False
     for i, command in enumerate(commands):
@@ -468,6 +468,8 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP):
                 wait_for_user('Command {:2}/{:2} | step {:2} | Next?'.format(i + 1, len(commands), j))
             else:
                 wait_for_duration(time_step)
+        if pause:
+            wait_for_user('Continue?')
     return True
 
 def simulate_commands(state, commands, **kwargs):

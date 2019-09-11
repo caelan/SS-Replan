@@ -11,7 +11,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, \
-    get_random_seed, get_numpy_seed, VideoSaver
+    get_random_seed, get_numpy_seed, VideoSaver, set_camera, set_camera_pose, get_point
 from src.command import create_state, iterate_commands, simulate_commands
 from src.visualization import add_markers
 from src.observe import observe_pybullet
@@ -80,9 +80,13 @@ def main():
 
     task = task_fn(world, num=args.num, fixed=args.fixed)
     world._update_initial()
-    if not args.record:
-        with LockRenderer():
-            add_markers(task, inverse_place=False)
+    print('Objects:', task.objects)
+    #target_point = get_point(world.get_body(task.objects[0]))
+    #set_camera_pose(camera_point=target_point+np.array([-1, 0, 1]), target_point=target_point)
+
+    #if not args.record:
+    #    with LockRenderer():
+    #        add_markers(task, inverse_place=False)
     #wait_for_user()
     # TODO: FD instantiation is slightly slow to a deepcopy
     # 4650801/25658    2.695    0.000    8.169    0.000 /home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/skeleton.py:114(do_evaluate_helper)
@@ -105,8 +109,7 @@ def main():
         # simulate_plan(real_state, commands, args)
         if args.fixed: # args.simulate
             return simulate_commands(real_state, commands)
-        else:
-            return iterate_commands(real_state, commands)
+        return iterate_commands(real_state, commands)
 
     run_policy(task, args, observation_fn, transition_fn)
 

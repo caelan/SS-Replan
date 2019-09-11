@@ -12,7 +12,7 @@ from examples.discrete_belief.dist import UniformDist, DDist, DeltaDist, mixDDis
 from pybullet_tools.pr2_utils import is_visible_point
 from pybullet_tools.utils import base_values_from_pose, CIRCULAR_LIMITS, stable_z_on_aabb, point_from_pose, Point, Pose, \
     Euler, set_pose, multiply, draw_circle, LockRenderer, BodySaver, Ray, batch_ray_collision, draw_ray, wrap_angle, \
-    circular_difference, remove_handles, get_pose, pairwise_collision
+    circular_difference, remove_handles, get_pose, pairwise_collision, GREEN
 from src.database import get_surface_reference_pose
 from src.utils import compute_surface_aabb, create_relative_pose, CAMERA_MATRIX, KINECT_DEPTH, Z_EPSILON, test_supported
 
@@ -251,7 +251,7 @@ class PoseDist(object):
 
     def dump(self):
         print(self.name, self.dist)
-    def draw(self, color=(1, 0, 0), **kwargs):
+    def draw(self, color=GREEN, **kwargs):
         #if self.handles:
         #    return
         poses = list(self.dist.support())
