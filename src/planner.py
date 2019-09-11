@@ -24,6 +24,7 @@ from src.replan import INTERNAL_ACTIONS
 # TODO: use the same objects for poses and configs
 from src.utils import RelPose
 
+VIDEO_TEMPLATE = '{}.mp4'
 COST_BOUND = 1000.0
 # TODO: multiple cost bounds
 
@@ -159,8 +160,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
         effort_weight = 1e-3 if args.anytime else 1
         #effort_weight = 0
         solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
-                                 replan_actions=replan_actions,
-                                 initial_complexity=5,
+                                 replan_actions=replan_actions, initial_complexity=5,
                                  planner=planner, max_planner_time=max_planner_time,
                                  unit_costs=args.unit, success_cost=success_cost,
                                  max_time=max_time, verbose=True, debug=False,
@@ -225,20 +225,3 @@ def commands_from_plan(world, plan):
             raise NotImplementedError(action)
     return commands
     #return combine_commands(commands)
-
-################################################################################
-
-VIDEO_TEMPLATE = '{}.mp4'
-
-def simulate_plan(state, commands, args, time_step=DEFAULT_TIME_STEP):
-    wait_for_user()
-    if commands is None:
-        return
-    time_step = None if args.teleport else time_step
-    if args.record:
-        video_path = VIDEO_TEMPLATE.format(args.problem)
-        with VideoSaver(video_path):
-            iterate_commands(state, commands, time_step=time_step)
-        print('Saved', video_path)
-    else:
-        iterate_commands(state, commands, time_step=time_step)

@@ -62,10 +62,9 @@ class Task(object):
 
 # (x, y, yaw)
 UNIT_POSE2D = (0., 0., 0.)
-BOX_POSE2D = (0.1, 1.05, 0.)
+BOX_POSE2D = (0.1, 1.05, 0.) # 1.15
 SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
-#CRACKER_POSE2D = (0.2, 1.1, np.pi/4)
-CRACKER_POSE2D = (0.2, 1.2, np.pi/4)
+CRACKER_POSE2D = (0.2, 1.1, np.pi/4) # 1.2
 BIG_BLOCK_SIDE = 0.065
 
 def add_block(world, idx=0, **kwargs):

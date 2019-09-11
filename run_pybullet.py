@@ -12,7 +12,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, \
     get_random_seed, get_numpy_seed, VideoSaver, set_camera, set_camera_pose, get_point
-from src.command import create_state, iterate_commands, simulate_commands
+from src.command import create_state, iterate_commands, simulate_commands, DEFAULT_TIME_STEP
 from src.visualization import add_markers
 from src.observe import observe_pybullet
 #from src.debug import test_observation
@@ -98,22 +98,26 @@ def main():
     video = None
     if args.record:
         wait_for_user('Start?')
-        video = VideoSaver(VIDEO_TEMPLATE.format(args.problem))
+        video_path = VIDEO_TEMPLATE.format(args.problem)
+        video = VideoSaver(video_path)
+    time_step = None if args.teleport else DEFAULT_TIME_STEP
 
     def observation_fn(belief):
         return observe_pybullet(world)
 
     def transition_fn(belief, commands):
+        # if not args.record:  # Video doesn't include planning time
+        #    wait_for_user()
         # restore real_state just in case?
         # wait_for_user()
-        # simulate_plan(real_state, commands, args)
         if args.fixed: # args.simulate
             return simulate_commands(real_state, commands)
-        return iterate_commands(real_state, commands)
+        return iterate_commands(real_state, commands, time_step=time_step)
 
     run_policy(task, args, observation_fn, transition_fn)
 
     if video:
+        print('Saved', video_path)
         video.restore()
     world.destroy()
     # TODO: make the sink extrude from the mesh
