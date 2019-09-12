@@ -1,12 +1,12 @@
 import numpy as np
 import random
 
-from pybullet_tools.utils import approximate_as_cylinder, approximate_as_prism
-from pybullet_tools.utils import multiply, invert, BodySaver, Euler, set_pose, wait_for_user, \
+from pybullet_tools.utils import approximate_as_cylinder, approximate_as_prism, \
+    multiply, invert, BodySaver, Euler, set_pose, wait_for_user, \
     Point, Pose
 from src.command import Sequence, ApproachTrajectory, State, Wait
 from src.stream import MOVE_ARM, plan_workspace
-from src.utils import FConf
+from src.utils import FConf, type_from_name, MUSTARD
 
 
 def pour_path_from_parameter(world, bowl_name, cup_name):
@@ -17,7 +17,15 @@ def pour_path_from_parameter(world, bowl_name, cup_name):
 
     #####
 
-    cup_pour_pitch = -3 * np.pi / 4
+    obj_type = type_from_name(cup_name)
+    if obj_type in [MUSTARD]:
+        initial_pitch = final_pitch = -np.pi
+        radius = 0
+    else:
+        initial_pitch = 0 # different if mustard
+        final_pitch = -3 * np.pi / 4
+        radius = bowl_d / 2
+
     #axis_in_cup_center_x = -0.05
     axis_in_cup_center_x = 0 # meters
     #axis_in_cup_center_z = -cup_h/2.
@@ -28,20 +36,18 @@ def pour_path_from_parameter(world, bowl_name, cup_name):
     cup_tl_in_center = np.array([-cup_d/2, 0, cup_h/2])
     cup_tl_in_axis = cup_tl_in_center - Point(z=axis_in_cup_center_z)
     cup_tl_angle = np.math.atan2(cup_tl_in_axis[2], cup_tl_in_axis[0])
-    cup_tl_pour_pitch = cup_pour_pitch - cup_tl_angle
+    cup_tl_pour_pitch = final_pitch - cup_tl_angle
 
     cup_radius2d = np.linalg.norm([cup_tl_in_axis])
     pivot_in_bowl_tr = Point(
         x=-(cup_radius2d * np.math.cos(cup_tl_pour_pitch) + 0.01),
-        z=(cup_radius2d * np.math.sin(cup_tl_pour_pitch) + 0.01))
+        z=(cup_radius2d * np.math.sin(cup_tl_pour_pitch) + 0.03))
 
-    pivot_in_bowl_center = Point(x=bowl_d / 2, z=bowl_h / 2) + pivot_in_bowl_tr
+    pivot_in_bowl_center = Point(x=radius, z=bowl_h / 2) + pivot_in_bowl_tr
     base_from_pivot = Pose(Point(x=axis_in_cup_center_x, z=axis_in_cup_center_z))
 
     #####
 
-    initial_pitch = 0 # different if mustard
-    final_pitch = cup_pour_pitch
     assert -np.pi <= final_pitch <= initial_pitch
     cup_path_in_bowl = []
     for pitch in list(np.arange(final_pitch, initial_pitch, np.pi/16)) + [initial_pitch]:

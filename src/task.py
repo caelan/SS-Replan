@@ -334,7 +334,7 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     goal_on = {}
     for idx in range(num):
         #entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
-        entity_name = add_ycb(world, 'tomato_soup_can', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
+        entity_name = add_ycb(world, 'mustard_bottle', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
         prior[entity_name] = DeltaDist(initial_surface)
         goal_on[entity_name] = goal_surface
         if not fixed:
