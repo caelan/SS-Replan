@@ -284,6 +284,8 @@
                  (Cooked ?o)
                  ;(forall (?o) (when (and (Cookable ?o) (On ?o ?s))
                  ;                   (Cooked ?o)))
+                 (forall (?l) (when (and (Liquid ?l) (HasLiquid ?o ?l))
+                                    (Cooked ?l)))
                  (increase (total-cost) (PressCost))))
 
   (:action press-off

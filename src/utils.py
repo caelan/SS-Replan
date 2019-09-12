@@ -110,6 +110,7 @@ LEFT_DOOR = 'dagger_door_left'
 
 BOWLS = [BOWL]
 POURABLE = [TOMATO_SOUP, MUSTARD] # SUGAR
+FOOD = [TOMATO_SOUP, SPAM, BOWL]
 
 ################################################################################
 
@@ -547,13 +548,14 @@ class Grasp(object):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
-def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTANCE, fraction=0.5, **kwargs):
+def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTANCE, fraction=1.25, **kwargs):
     use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
     #fraction = 0.25
     obj_type = type_from_name(name)
     body_pose = REFERENCE_POSE.get(obj_type, unit_pose())
     center, extent = approximate_as_prism(body, body_pose)
+    grasp_length = fraction*FINGER_EXTENT[2]  # fraction = 0.5
     # TODO: CYLINDERS
 
     for grasp_type in grasp_types:
@@ -564,7 +566,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
             generator = get_top_grasps(body, under=True, tool_pose=TOOL_POSE, body_pose=body_pose,
-                                       grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf, **kwargs)
+                                       grasp_length=grasp_length, max_width=np.inf, **kwargs)
         elif grasp_type == SIDE_GRASP:
             x, z = pre_distance * get_unit_vector([3, -1])
             pre_direction = [0, 0, x]
@@ -572,8 +574,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
             top_offset = extent[2] / 2 if obj_type in MID_SIDE_GRASPS else fraction*FINGER_EXTENT[0]
             # Under grasps are actually easier for this robot
             generator = get_side_grasps(body, under=False, tool_pose=TOOL_POSE, body_pose=body_pose,
-                                        grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf,
-                                        top_offset=top_offset, **kwargs)
+                                        grasp_length=grasp_length, top_offset=top_offset, max_width=np.inf, **kwargs)
             #generator = grasps[4:]
             #rotate_z = Pose(euler=[0, 0, np.pi]) if world.robot_name == FRANKA_CARTER else unit_pose()
             rotate_z = Pose(euler=[0, 0, 0])

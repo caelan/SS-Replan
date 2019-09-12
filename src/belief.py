@@ -66,6 +66,7 @@ class Belief(object):
         self.door_confs = {}
         self.pressed = set()
         self.cooked = set()
+        self.liquid = set()
     def update_state(self):
         # TODO: apply this directly from observations
         # No use applying this to base confs
@@ -263,7 +264,9 @@ def transition_belief_update(belief, plan):
             belief.door_confs[j] = a2
             belief.arm_conf = aq2
         elif action == 'pour':
-            pass # TODO: update liquid belief
+            bowl, wp, cup, g, liquid, bq, aq, at = params
+            belief.liquid.discard((cup, liquid))
+            belief.liquid.add((bowl, liquid))
         elif action == 'pick':
             o, p, g, rp = params[:4]
             if not belief.is_gripper_closed():

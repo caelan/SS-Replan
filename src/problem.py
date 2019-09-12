@@ -15,7 +15,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
     get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name
 
 from src.inference import PoseDist
-from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, COUNTERS, \
+from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, FOOD, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
     KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
@@ -205,7 +205,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             [('Knob', knob) for knob in KNOBS] + \
             [('Joint', knob) for knob in KNOBS] + \
             [('Liquid', liquid) for _, liquid in task.init_liquid + task.goal_liquid] + \
-            [('HasLiquid', cup, liquid) for cup, liquid in task.init_liquid] + \
+            [('HasLiquid', cup, liquid) for cup, liquid in belief.liquid] + \
             [('StoveKnob', STOVE_TEMPLATE.format(loc), KNOB_TEMPLATE.format(loc)) for loc in STOVE_LOCATIONS] + \
             [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object
             #[('Type', obj_name, 'stove') for obj_name in STOVES] + \
@@ -355,12 +355,14 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         obj_type = type_from_name(obj_name)
         if obj_type in BOWLS:
             init.append(('Bowl', obj_name))
+        else:
+            init.append(('Obstacle', obj_name)) # TODO: hack to place within bowls
+        if obj_type in FOOD:
+            init.append(('Cookable', obj_name))
         if obj_type in POURABLE:
             init.append(('Pourable', obj_name))
         init += [
             ('Entity', obj_name),
-            ('Cookable', obj_name), # TODO: only things that are cookable
-            ('Obstacle', obj_name),
             ('CheckNearby', obj_name),
         ] + [('Stackable', obj_name, counter) for counter in set(ALL_SURFACES) & set(COUNTERS)]
 

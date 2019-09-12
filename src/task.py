@@ -319,6 +319,44 @@ def detect_drawers(world, fixed=True, **kwargs):
 
 ################################################################################
 
+def cook_meal(world, fixed=False, **kwargs):
+    add_kinect(world) # previously needed to be after set_all_static?
+    if fixed:
+        set_fixed_base(world)
+
+    prior = {}
+    soup_name = add_ycb(world, 'tomato_soup_can', pose2d=[0.1, 0.9, +np.pi / 8])
+    prior[soup_name] = DeltaDist('indigo_tmp')
+    if not fixed:
+        sample_placement(world, soup_name, 'indigo_tmp', learned=True)
+
+    mustard_name = add_ycb(world, 'mustard_bottle', pose2d=[0.25, 1.2, -np.pi / 8])
+    prior[mustard_name] = DeltaDist('indigo_tmp')
+    if not fixed:
+        sample_placement(world, mustard_name, 'indigo_tmp', learned=True)
+
+
+    stove = STOVES[-1]
+    bowl_name = add_ycb(world, 'bowl')
+    prior[bowl_name] = DeltaDist(stove)
+    sample_placement(world, bowl_name, stove, learned=True)
+
+    set_all_static()
+
+    return Task(world, prior=prior, movable_base=not fixed,
+                init_liquid=[(soup_name, 'tomato'), (mustard_name, 'mustard')],
+                #goal_liquid=[(bowl_name, 'tomato'), (bowl_name, 'mustard')],
+                #goal_holding=list(prior)[0],
+                goal_hand_empty=True,
+                #goal_cooked=[bowl_name],
+                goal_cooked=['tomato', 'mustard'],
+                return_init_bq=True, return_init_aq=True,
+                #goal_open=[joint_name],
+                goal_closed=ALL_JOINTS
+            )
+
+################################################################################
+
 def stow_block(world, num=1, fixed=False, **kwargs):
     add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
@@ -334,7 +372,7 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     goal_on = {}
     for idx in range(num):
         #entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
-        entity_name = add_ycb(world, 'mustard_bottle', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
+        entity_name = add_ycb(world, 'tomato_soup_can', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
         prior[entity_name] = DeltaDist(initial_surface)
         goal_on[entity_name] = goal_surface
         if not fixed:
@@ -355,7 +393,8 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     return Task(world, prior=prior, movable_base=not fixed,
                 init_liquid=[(entity_name, 'food')],
                 goal_liquid=[(bowl_name, 'food')],
-                goal_holding=list(prior)[0],
+                #goal_holding=list(prior)[0],
+                goal_hand_empty=True,
                 #goal_on=goal_on,
                 #goal_cooked=list(prior),
                 return_init_bq=True, return_init_aq=True,
@@ -371,5 +410,6 @@ TASKS = [
     detect_drawers,
     sugar_drawer,
     cook_block,
+    cook_meal,
     stow_block,
 ]

@@ -20,6 +20,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         belief = create_observable_belief(world)  # Fast
     else:
         belief = task.create_belief()
+    belief.liquid.update(task.init_liquid)
     print('Prior:', belief)
 
     previous_facts = []

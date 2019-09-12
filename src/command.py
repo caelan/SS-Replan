@@ -441,6 +441,8 @@ class Wait(Command):
     def iterate(self, state):
         for _ in range(self.steps+1):
             yield
+    def simulate(self, state, **kwargs):
+        wait_for_duration(self.duration)
     def execute(self, interface):
         import rospy
         rospy.sleep(self.duration)
