@@ -4,6 +4,7 @@ import os
 import numpy as np
 import yaml
 import string
+import math
 
 from collections import namedtuple
 
@@ -16,7 +17,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
     child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input, \
-    get_difference_fn
+    get_difference_fn, Euler, approximate_as_prism, wait_for_user
 
 ################################################################################
 
@@ -508,6 +509,12 @@ INVALID_GRASPS = {
 
 MID_SIDE_GRASPS = [MUSTARD, SUGAR, CHEEZIT]
 
+REFERENCE_POSE = {
+    MUSTARD: Pose(euler=Euler(yaw=math.radians(24))),
+}
+
+CYLINDERS = [TOMATO_SOUP]
+
 def is_valid_grasp_type(obj_name, grasp_type):
     obj_type = type_from_name(obj_name)
     return obj_type not in INVALID_GRASPS.get(grasp_type, [])
@@ -538,6 +545,10 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
     use_width = world.robot_name == FRANKA_CARTER
     body = world.get_body(name)
     #fraction = 0.25
+    obj_type = type_from_name(name)
+    body_pose = REFERENCE_POSE.get(obj_type, unit_pose())
+    center, extent = approximate_as_prism(body, body_pose)
+    # TODO: CYLINDERS
 
     for grasp_type in grasp_types:
         if not is_valid_grasp_type(name, grasp_type):
@@ -546,16 +557,17 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
         if grasp_type == TOP_GRASP:
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
-            generator = get_top_grasps(body, under=True, tool_pose=TOOL_POSE,
+            generator = get_top_grasps(body, under=True, tool_pose=TOOL_POSE, body_pose=body_pose,
                                        grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf, **kwargs)
         elif grasp_type == SIDE_GRASP:
             x, z = pre_distance * get_unit_vector([3, -1])
             pre_direction = [0, 0, x]
             post_direction = [0, 0, z]
+            top_offset = extent[2] / 2 if obj_type in MID_SIDE_GRASPS else fraction*FINGER_EXTENT[0]
             # Under grasps are actually easier for this robot
-            generator = get_side_grasps(body, under=False, tool_pose=TOOL_POSE,
+            generator = get_side_grasps(body, under=False, tool_pose=TOOL_POSE, body_pose=body_pose,
                                         grasp_length=fraction*FINGER_EXTENT[2], max_width=np.inf,
-                                        top_offset=fraction*FINGER_EXTENT[0], **kwargs)
+                                        top_offset=top_offset, **kwargs)
             #generator = grasps[4:]
             #rotate_z = Pose(euler=[0, 0, np.pi]) if world.robot_name == FRANKA_CARTER else unit_pose()
             rotate_z = Pose(euler=[0, 0, 0])
