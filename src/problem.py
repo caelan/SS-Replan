@@ -17,7 +17,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
-    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type
+    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -27,6 +27,8 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
     get_sample_belief_gen, detect_cost_fn, get_fixed_press_gen_fn, get_cfree_bconf_pose_test, \
     get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, get_cfree_angle_angle_test, get_press_gen_fn
+
+from src.streams.pour import get_fixed_pour_gen_fn
 from src.database import has_place_database
 
 MAX_ERROR = np.pi / 6
@@ -88,6 +90,7 @@ def get_streams(world, debug=False, teleport_base=False, **kwargs):
         'fixed-plan-pick': from_gen_fn(get_fixed_pick_gen_fn(world, **kwargs)),
         'fixed-plan-pull': from_gen_fn(get_fixed_pull_gen_fn(world, **kwargs)),
         'fixed-plan-press': from_gen_fn(get_fixed_press_gen_fn(world, **kwargs)),
+        'fixed-plan-pour': from_gen_fn(get_fixed_pour_gen_fn(world, **kwargs)),
 
         'compute-pose-kin': from_fn(get_compute_pose_kin(world)),
         # 'compute-angle-kin': from_fn(compute_angle_kin),
@@ -198,6 +201,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
             [('Joint', knob) for knob in KNOBS] + \
+            [('Liquid', liquid) for _, liquid in task.init_liquid + task.goal_liquid] + \
+            [('HasLiquid', cup, liquid) for cup, liquid in task.init_liquid] + \
             [('StoveKnob', STOVE_TEMPLATE.format(loc), KNOB_TEMPLATE.format(loc)) for loc in STOVE_LOCATIONS] + \
             [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object
             #[('Type', obj_name, 'stove') for obj_name in STOVES] + \
@@ -220,6 +225,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         goal_literals.append(('Holding', task.goal_holding))
     goal_literals += [('On', name, surface) for name, surface in task.goal_on.items()] + \
                      [Not(('Pressed', name)) for name in KNOBS] + \
+                     [('HasLiquid', cup, liquid) for cup, liquid in task.goal_liquid] + \
                      [('Cooked', name) for name in task.goal_cooked] + \
                      [('Localized', name) for name in task.goal_detected] + \
                      [door_closed_formula(joint_name) for joint_name in task.goal_closed] + \
@@ -343,6 +349,11 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
                     if is_valid_grasp_type(obj_name, grasp_type))
 
     for obj_name in world.movable:
+        obj_type = type_from_name(obj_name)
+        if obj_type in BOWLS:
+            init.append(('Bowl', obj_name))
+        if obj_type in POURABLE:
+            init.append(('Pourable', obj_name))
         init += [
             ('Entity', obj_name),
             ('Cookable', obj_name), # TODO: only things that are cookable

@@ -108,6 +108,9 @@ TOP_DRAWER = 'indigo_drawer_top'
 BOTTOM_DRAWER = 'indigo_drawer_bottom'
 LEFT_DOOR = 'dagger_door_left'
 
+BOWLS = [BOWL]
+POURABLE = [TOMATO_SOUP, MUSTARD] # SUGAR
+
 ################################################################################
 
 #KITCHEN_PATH = '/home/caelan/Programs/robot_kitchen/model/robot_kitchen.sdf'
@@ -504,7 +507,8 @@ def compute_surface_aabb(world, surface_name):
 ################################################################################
 
 INVALID_GRASPS = {
-    TOP_GRASP: [MUSTARD, CHEEZIT],
+    TOP_GRASP: [MUSTARD, CHEEZIT, BOWL],
+    SIDE_GRASP: [BOWL],
 }
 
 MID_SIDE_GRASPS = [MUSTARD, SUGAR, CHEEZIT]

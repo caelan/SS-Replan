@@ -80,10 +80,18 @@
                     (Press ?k ?bq ?aq ?at)))
   (:stream fixed-plan-press
     :inputs (?k ?bq)
-    :domain (NearJoint ?k ?bq)
+    :domain (NearJoint ?k ?bq) ; TODO: use pose instead?
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
                     (Press ?k ?bq ?aq ?at)))
+
+	(:stream fixed-plan-pour
+		:inputs (?bowl ?wp ?cup ?g ?bq) ; TODO: can pour ?bowl & ?cup
+		:domain (and (Bowl ?bowl) (WorldPose ?bowl ?wp) (Sample ?wp) (NearPose ?bowl ?wp ?bq)
+                 (Pourable ?cup) (Grasp ?cup ?g))
+		:outputs (?aq ?at)
+		:certified (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at)
+						        (AConf ?bq ?aq) (ATraj ?at)))
 
   ; Fixed base
   (:stream test-near-pose

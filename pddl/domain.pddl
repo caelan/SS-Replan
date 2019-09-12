@@ -80,6 +80,12 @@
     (OpenGripper)
     (OpenGConf ?gq)
 
+    (Bowl ?bowl)
+    (Pourable ?cup)
+    (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at)
+    (Liquid ?liquid)
+    (HasLiquid ?cup ?liquid)
+
     (Status ?s)
     (DoorStatus ?j ?s)
     (AngleWithin ?j ?a ?s)
@@ -290,6 +296,17 @@
     :effect (and (CanMoveBase) (CanMoveArm)
                  (not (Pressed ?k))
                  (increase (total-cost) (PressCost))))
+
+  (:action pour
+        :parameters (?bowl ?wp ?cup ?g ?liquid ?bq ?aq ?at)
+        :precondition (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at) (Liquid ?liquid)
+                           (HasLiquid ?cup ?liquid)
+                           (AtWorldPose ?bowl ?wp) (AtGrasp ?cup ?g)
+                           (AtBConf ?bq) (AtAConf ?aq)
+                           (not (= ?bowl ?cup)) (not (UnsafeATraj ?at)))
+        :effect (and (CanMoveBase) (CanMoveArm) (HasLiquid ?bowl ?liquid) ; TODO: forall
+                     (not (HasLiquid ?cup ?liquid)))
+  )
 
   ;(:derived (OpenGripper)
   ;  (AtGConf @open_gq)

@@ -19,6 +19,7 @@ class Task(object):
     def __init__(self, world, prior={}, skeletons=[], grasp_types=GRASP_TYPES,
                  movable_base=True, noisy_base=True, teleport_base=False,
                  return_init_bq=False, return_init_aq=False, goal_aq=None,
+                 init_liquid=[], goal_liquid=[],
                  goal_hand_empty=False, goal_holding=None, goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
                  init=[], goal=[], max_cost=MAX_COST):
@@ -34,6 +35,8 @@ class Task(object):
         self.goal_aq = goal_aq
         self.return_init_bq = return_init_bq
         self.return_init_aq = return_init_aq
+        self.init_liquid = init_liquid
+        self.goal_liquid = goal_liquid
         self.goal_hand_empty = goal_hand_empty
         self.goal_holding = goal_holding
         self.goal_on = dict(goal_on)
@@ -331,10 +334,11 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     goal_on = {}
     for idx in range(num):
         #entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
-        entity_name = add_ycb(world, 'mustard_bottle', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
+        entity_name = add_ycb(world, 'tomato_soup_can', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
         prior[entity_name] = DeltaDist(initial_surface)
         goal_on[entity_name] = goal_surface
-        sample_placement(world, entity_name, initial_surface, learned=True)
+        if not fixed:
+            sample_placement(world, entity_name, initial_surface, learned=True)
 
     stove = STOVES[-1]
     bowl_name = add_ycb(world, 'bowl')
@@ -349,6 +353,8 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     return Task(world, prior=prior, movable_base=not fixed,
+                init_liquid=[(entity_name, 'food')],
+                goal_liquid=[(bowl_name, 'food')],
                 goal_holding=list(prior)[0],
                 #goal_on=goal_on,
                 #goal_cooked=list(prior),
