@@ -10,7 +10,7 @@ from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pos
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name
+    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, STOVES
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -82,7 +82,7 @@ def add_block(world, idx=0, **kwargs):
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
     return name
 
-def add_ycb(world, ycb_type, idx, **kwargs):
+def add_ycb(world, ycb_type, idx=0, **kwargs):
     name = name_from_type(ycb_type, idx)
     world.add_body(name, color=np.ones(4))
     pose2d_on_surface(world, name, COUNTERS[0], **kwargs)
@@ -149,16 +149,17 @@ def open_all_doors(world):
 ################################################################################
 
 def detect_block(world, fixed=False, **kwargs):
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    x, y, yaw = CRACKER_POSE2D
-    sugar_name = add_sugar_box(world, idx=0, pose2d=CRACKER_POSE2D)
-    #cracker_name = add_cracker_box(world, idx=0, pose2d=(x, 1.4, yaw))
-    #other_name = add_box(world, idx=1)
-    set_all_static()
     for side in CAMERAS[:1]:
         add_kinect(world, side)
     if fixed:
         set_fixed_base(world)
+
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    #x, y, yaw = CRACKER_POSE2D
+    sugar_name = add_sugar_box(world, idx=0, pose2d=CRACKER_POSE2D)
+    #cracker_name = add_cracker_box(world, idx=0, pose2d=(x, 1.4, yaw))
+    #other_name = add_box(world, idx=1)
+    set_all_static()
 
     goal_surface = 'indigo_drawer_top'
     initial_distribution = UniformDist([goal_surface]) # indigo_tmp
@@ -185,6 +186,10 @@ def detect_block(world, fixed=False, **kwargs):
 ################################################################################
 
 def hold_block(world, num=5, fixed=False, **kwargs):
+    add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
+
     # TODO: compare with the NN grasp prediction in clutter
     # TODO: consider a task where most directions are blocked except for one
     initial_surface = 'indigo_tmp'
@@ -204,9 +209,6 @@ def hold_block(world, num=5, fixed=False, **kwargs):
         sample_placement(world, red_name, initial_surface, learned=True)
 
     set_all_static()
-    add_kinect(world)
-    if fixed:
-        set_fixed_base(world)
 
     return Task(world, prior=prior, movable_base=not fixed,
                 # grasp_types=GRASP_TYPES,
@@ -220,6 +222,10 @@ def hold_block(world, num=5, fixed=False, **kwargs):
 ################################################################################
 
 def sugar_drawer(world, fixed=False, **kwargs):
+    add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
+
     initial_surface = 'indigo_drawer_top' # indigo_drawer_top | indigo_drawer_bottom
     #initial_surface = 'indigo_tmp'
     joint_name = JOINT_TEMPLATE.format(initial_surface)
@@ -235,9 +241,6 @@ def sugar_drawer(world, fixed=False, **kwargs):
     sample_placement(world, cracker_name, initial_surface, learned=True)
 
     set_all_static()
-    add_kinect(world)
-    if fixed:
-        set_fixed_base(world)
 
     return Task(world, prior=prior, movable_base=not fixed,
                 goal_on={block_name: initial_surface},
@@ -249,11 +252,12 @@ def sugar_drawer(world, fixed=False, **kwargs):
 ################################################################################
 
 def cook_block(world, fixed=True, **kwargs):
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    set_all_static()
-    add_kinect(world)
+    add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
         set_fixed_base(world)
+
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    set_all_static()
 
     initial_surface = 'indigo_tmp'
     sample_placement(world, entity_name, initial_surface, learned=True)
@@ -274,12 +278,13 @@ def cook_block(world, fixed=True, **kwargs):
 ################################################################################
 
 def detect_drawers(world, fixed=True, **kwargs):
+    add_kinect(world) # previously needed to be after set_all_static?
+    if fixed:
+        set_fixed_base(world)
+
     # set_base_values
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     set_all_static()
-    add_kinect(world)
-    if fixed:
-        set_fixed_base(world)
 
     drawers = ['indigo_drawer_top', 'indigo_drawer_bottom']
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
@@ -312,6 +317,10 @@ def detect_drawers(world, fixed=True, **kwargs):
 ################################################################################
 
 def stow_block(world, num=1, fixed=False, **kwargs):
+    add_kinect(world) # previously needed to be after set_all_static?
+    if fixed:
+        set_fixed_base(world)
+
     # initial_surface = random.choice(DRAWERS) # COUNTERS | DRAWERS | SURFACES | CABINETS
     initial_surface = 'indigo_tmp'  # hitman_tmp | indigo_tmp | range | front_right_stove
     # initial_surface = 'indigo_drawer_top'
@@ -321,24 +330,27 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     prior = {}
     goal_on = {}
     for idx in range(num):
-        entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
+        #entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
+        entity_name = add_ycb(world, 'mustard_bottle', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
         prior[entity_name] = DeltaDist(initial_surface)
         goal_on[entity_name] = goal_surface
         sample_placement(world, entity_name, initial_surface, learned=True)
 
+    stove = STOVES[-1]
+    bowl_name = add_ycb(world, 'bowl')
+    prior[bowl_name] = DeltaDist(stove)
+    sample_placement(world, bowl_name, stove, learned=True)
+
     #obstruction_name = add_box(world, idx=0)
     #sample_placement(world, obstruction_name, 'hitman_tmp')
     set_all_static()
-    add_kinect(world)  # TODO: this needs to be after set_all_static
-    if fixed:
-        set_fixed_base(world)
 
     #joint_name = 'indigo_drawer_top_joint'
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     return Task(world, prior=prior, movable_base=not fixed,
-                #goal_holding=list(prior)[0],
-                goal_on=goal_on,
+                goal_holding=list(prior)[0],
+                #goal_on=goal_on,
                 #goal_cooked=list(prior),
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],

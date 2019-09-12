@@ -105,6 +105,7 @@
     (AngleKin ?o ?wp ?j ?a)
 
     (AdmitsGrasp ?o1 ?g ?o2)
+    (ValidGraspType ?o ?gty)
     (IsGraspType ?o ?g ?gty)
     (AdmitsGraspType ?o2 ?gty))
 

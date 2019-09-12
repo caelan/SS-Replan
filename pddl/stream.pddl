@@ -27,7 +27,7 @@
 
   (:stream sample-grasp
     :inputs (?o ?gty)
-    :domain (and (Graspable ?o) (GraspType ?gty))
+    :domain (ValidGraspType ?o ?gty)
     :outputs (?g)
     :certified (and (Grasp ?o ?g) (IsGraspType ?o ?g ?gty))) ; TODO: produce carry conf for ?o
 

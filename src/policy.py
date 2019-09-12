@@ -10,7 +10,7 @@ from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSER
     STOCHASTIC_ACTIONS
 
 
-def run_policy(task, args, observation_fn, transition_fn, constrain=False, defer=True,
+def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True,
                max_time=5*60, max_planning_time=30):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     defer_actions = replan_actions if defer else set()

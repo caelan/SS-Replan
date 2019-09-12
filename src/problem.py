@@ -17,7 +17,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
-    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS
+    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
@@ -331,7 +331,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         grasp = belief.grasped
         init += [
             # Static
-            ('Graspable', obj_name),
+            #('Graspable', obj_name),
             ('Grasp', obj_name, grasp),
             ('IsGraspType', obj_name, grasp, grasp.grasp_type),
             # Fluent
@@ -339,6 +339,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             ('Holding', obj_name),
             ('Localized', obj_name),
         ]
+        init.extend(('ValidGraspType', obj_name, grasp_type) for grasp_type in task.grasp_types
+                    if is_valid_grasp_type(obj_name, grasp_type))
 
     for obj_name in world.movable:
         init += [
@@ -352,16 +354,18 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     for obj_name, pose_dist in belief.pose_dists.items():
         dist_support = pose_dist.dist.support()
         localized = pose_dist.is_localized()
+        graspable = True
         if localized:
             init.append(('Localized', obj_name))
             [rel_pose] = dist_support
             roll, pitch, yaw = euler_from_quat(quat_from_pose(rel_pose.get_reference_from_body()))
-            if (abs(roll) <= MAX_ERROR) and (abs(pitch) <= MAX_ERROR):
-                init.append(('Graspable', obj_name))
-            else:
+            if (MAX_ERROR < abs(roll)) or (MAX_ERROR < abs(pitch)):
+                graspable = False
                 print('{} has an invalid orientation: roll={:.3f}, pitch={:.3f}'.format(obj_name, roll, pitch))
-        else:
-            init.append(('Graspable', obj_name))
+        if graspable:
+            #init.append(('Graspable', obj_name))
+            init.extend(('ValidGraspType', obj_name, grasp_type) for grasp_type in task.grasp_types
+                        if is_valid_grasp_type(obj_name, grasp_type))
 
         # Could also fully decompose into points (but many samples)
         # Could immediately add likely points for collision checking

@@ -39,8 +39,8 @@ BASE_CONSTANT = 1.0 # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 
-PAUSE_MOTION_FAILURES = True
-PRINT_FAILURES = True
+PAUSE_MOTION_FAILURES = False
+PRINT_FAILURES = False
 MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
@@ -130,6 +130,15 @@ def get_compute_angle_kin(world):
     return fn
 
 ################################################################################
+
+def is_visible_by_camera(world, point):
+    for camera_name in world.cameras:
+        camera_body, camera_matrix, camera_depth = world.cameras[camera_name]
+        camera_pose = get_pose(camera_body)
+        #camera_point = point_from_pose(camera_pose)
+        if is_visible_point(camera_matrix, camera_depth, point, camera_pose):
+            return True
+    return False
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
@@ -390,6 +399,8 @@ def get_stable_gen(world, max_attempts=100,
                     body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
                     if body_pose_world is None:
                         continue # return?
+                if not is_visible_by_camera(world, point_from_pose(body_pose_world)):
+                    continue
                 set_pose(obj_body, body_pose_world)
                 # TODO: make sure the surface is open when doing this
                 if test_supported(world, obj_body, surface_name, collisions=collisions):

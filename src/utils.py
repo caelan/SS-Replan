@@ -96,8 +96,10 @@ MUSTARD = 'mustard_bottle'
 TOMATO_SOUP = 'tomato_soup_can'
 SUGAR = 'sugar_box'
 CHEEZIT = 'cracker_box'
-YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT]
-# pudding_box banana bowl
+BOWL = 'bowl'
+PUDDING = 'pudding_box'
+BANANA = 'banana'
+YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT] # + [BOWL, PUDDING, BANANA]
 
 ECHO_COUNTER = 'echo'
 INDIGO_COUNTER = 'indigo_tmp'
@@ -500,6 +502,16 @@ def compute_surface_aabb(world, surface_name):
 
 ################################################################################
 
+INVALID_GRASPS = {
+    TOP_GRASP: [MUSTARD, CHEEZIT],
+}
+
+MID_SIDE_GRASPS = [MUSTARD, SUGAR, CHEEZIT]
+
+def is_valid_grasp_type(obj_name, grasp_type):
+    obj_type = type_from_name(obj_name)
+    return obj_type not in INVALID_GRASPS.get(grasp_type, [])
+
 class Grasp(object):
     def __init__(self, world, body_name, grasp_type, index, grasp_pose, pregrasp_pose,
                  grasp_width=None):
@@ -528,6 +540,9 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
     #fraction = 0.25
 
     for grasp_type in grasp_types:
+        if not is_valid_grasp_type(name, grasp_type):
+            continue
+        #assert is_valid_grasp_type(name, grasp_type)
         if grasp_type == TOP_GRASP:
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
