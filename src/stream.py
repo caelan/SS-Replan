@@ -763,22 +763,7 @@ def is_pull_safe(world, door_joint, door_plan):
             return False
     return True
 
-def plan_pull(world, door_joint, door_plan, base_conf,
-              randomize=True, collisions=True, teleport=False, **kwargs):
-    door_path, handle_path, handle_plan, tool_path = door_plan
-    handle_link, handle_grasp, handle_pregrasp = handle_plan
-    # TODO: could push if the goal is to be fully closed
-
-    door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) # if collisions else set()
-    obstacles = (world.static_obstacles | door_obstacles) # if collisions else set()
-
-    base_conf.assign()
-    world.open_gripper()
-    world.carry_conf.assign()
-    robot_saver = BodySaver(world.robot) # TODO: door_saver?
-    if not is_pull_safe(world, door_joint, door_plan):
-        return
-
+def plan_workspace(world, tool_path, obstacles, randomize=True, teleport=False):
     # Assuming that pairs of fixed things aren't in collision at this point
     moving_links = get_moving_links(world.robot, world.arm_joints)
     robot_obstacle = (world.robot, frozenset(moving_links))
@@ -790,24 +775,44 @@ def plan_pull(world, door_joint, door_plan, base_conf,
         world.carry_conf.assign()
     arm_path = []
     for i, tool_pose in enumerate(tool_path):
-        set_joint_positions(world.kitchen, [door_joint], door_path[i])
+        #set_joint_positions(world.kitchen, [door_joint], door_path[i])
         tolerance = INF if i == 0 else NEARBY_PULL
         full_arm_conf = world.solve_inverse_kinematics(tool_pose, nearby_tolerance=tolerance)
         if full_arm_conf is None:
-            if PRINT_FAILURES: print('Door kinematic failure')
-            return
+            if PRINT_FAILURES: print('Workspace kinematic failure')
+            return None
         if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-            if PRINT_FAILURES: print('Door collision failure')
-            return
+            if PRINT_FAILURES: print('Workspace collision failure')
+            return None
         arm_conf = get_joint_positions(world.robot, world.arm_joints)
         if arm_path and not teleport:
             distance = distance_fn(arm_path[-1], arm_conf)
             if MAX_CONF_DISTANCE < distance:
-                if PRINT_FAILURES: print('Door proximity failure (distance={:.5f})'.format(distance))
-                return
+                if PRINT_FAILURES: print('Workspace proximity failure (distance={:.5f})'.format(distance))
+                return None
         arm_path.append(arm_conf)
         # wait_for_user()
+    return arm_path
 
+def plan_pull(world, door_joint, door_plan, base_conf,
+              randomize=True, collisions=True, teleport=False, **kwargs):
+    door_path, handle_path, handle_plan, tool_path = door_plan
+    handle_link, handle_grasp, handle_pregrasp = handle_plan
+
+    door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) # if collisions else set()
+    obstacles = (world.static_obstacles | door_obstacles) # if collisions else set()
+
+    base_conf.assign()
+    world.open_gripper()
+    world.carry_conf.assign()
+    robot_saver = BodySaver(world.robot) # TODO: door_saver?
+    if not is_pull_safe(world, door_joint, door_plan):
+        return
+
+    arm_path = plan_workspace(world, tool_path, world.static_obstacles,
+                              randomize=randomize, teleport=collisions)
+    if arm_path is None:
+        return
     approach_paths = []
     for index in [0, -1]:
         set_joint_positions(world.kitchen, [door_joint], door_path[index])

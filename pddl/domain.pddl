@@ -4,6 +4,7 @@
     @world @gripper @stove @none
     @open @closed
     @rest_aq ; @calibrate_aq
+    @top @side
     @open_gq @closed_gq)
   (:predicates
     (Type ?t ?b)
@@ -299,7 +300,7 @@
 
   (:action pour
         :parameters (?bowl ?wp ?cup ?g ?liquid ?bq ?aq ?at)
-        :precondition (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at) (Liquid ?liquid)
+        :precondition (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at) (Liquid ?liquid) (IsGraspType ?cup ?g @side)
                            (HasLiquid ?cup ?liquid)
                            (AtWorldPose ?bowl ?wp) (AtGrasp ?cup ?g)
                            (AtBConf ?bq) (AtAConf ?aq)

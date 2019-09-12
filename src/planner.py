@@ -202,7 +202,7 @@ def commands_from_plan(world, plan):
     commands = []
     for action, params in plan:
         # TODO: break if the action is a StreamAction
-        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'press-on', 'press-off']:
+        if action in ['move_base', 'move_arm', 'move_gripper', 'pick', 'pull', 'pour', 'press-on', 'press-off']:
             commands.extend(params[-1].commands)
         elif action == 'detect':
             commands.append(params[-1])

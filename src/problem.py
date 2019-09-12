@@ -15,7 +15,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
     get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name
 
 from src.inference import PoseDist
-from src.utils import ALL_SURFACES, surface_from_name, COUNTERS, \
+from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
     KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
@@ -26,7 +26,8 @@ from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
     get_sample_belief_gen, detect_cost_fn, get_fixed_press_gen_fn, get_cfree_bconf_pose_test, \
-    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, get_cfree_angle_angle_test, get_press_gen_fn
+    get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, \
+    get_cfree_angle_angle_test, get_press_gen_fn
 
 from src.streams.pour import get_fixed_pour_gen_fn
 from src.database import has_place_database
@@ -161,6 +162,8 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         '@closed_gq': closed_gq,
         '@open': OPEN,
         '@closed': CLOSED,
+        '@top': TOP_GRASP,
+        '@side': SIDE_GRASP,
     }
     top_joint = JOINT_TEMPLATE.format(TOP_DRAWER)
     bottom_joint = JOINT_TEMPLATE.format(BOTTOM_DRAWER)

@@ -262,6 +262,8 @@ def transition_belief_update(belief, plan):
             j, a1, a2, o, wp1, wp2, bq, aq1, aq2, gq, at = params
             belief.door_confs[j] = a2
             belief.arm_conf = aq2
+        elif action == 'pour':
+            pass # TODO: update liquid belief
         elif action == 'pick':
             o, p, g, rp = params[:4]
             if not belief.is_gripper_closed():

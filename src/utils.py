@@ -542,6 +542,8 @@ class Grasp(object):
     def get_gripper_conf(self):
         conf = [self.grasp_width] * len(self.world.gripper_joints)
         return FConf(self.world.robot, self.world.gripper_joints, conf)
+    def set_gripper(self):
+        return self.get_gripper_conf().assign()
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.grasp_type, self.index)
 
