@@ -12,6 +12,7 @@ class Interface(object):
         self.trial_manager = trial_manager
         self.deepim = deepim
         self.paused = False
+        self.world.interface = self
     @property
     def perception(self):
         return self.deepim

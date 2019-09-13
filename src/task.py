@@ -22,7 +22,7 @@ class Task(object):
                  init_liquid=[], goal_liquid=[],
                  goal_hand_empty=False, goal_holding=None, goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
-                 init=[], goal=[], max_cost=MAX_COST):
+                 init=[], goal=[], real=False, max_cost=MAX_COST):
         self.world = world
         world.task = self
         self.prior = dict(prior) # DiscreteDist over
@@ -46,6 +46,7 @@ class Task(object):
         self.goal_cooked = set(goal_cooked)
         self.init = init
         self.goal = goal
+        self.real = real
         self.max_cost = max_cost # TODO: use instead of the default
     @property
     def objects(self):
@@ -131,12 +132,12 @@ def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
     set_pose(body, pose)
     return pose
 
-def sample_placement(world, entity_name, surface_name, **kwargs):
+def sample_placement(world, entity_name, surface_name, min_distance=0.02, **kwargs):
     entity_body = world.get_body(entity_name)
-    placement_gen = get_stable_gen(world, pos_scale=1e-3, rot_scale=1e-2, **kwargs)
+    placement_gen = get_stable_gen(world, pos_scale=0, rot_scale=0, **kwargs)
     for pose, in placement_gen(entity_name, surface_name):
         pose.assign()
-        if not any(pairwise_collision(entity_body, obst_body) for obst_body in
+        if not any(pairwise_collision(entity_body, obst_body, max_distance=min_distance) for obst_body in
                    world.body_from_name.values() if entity_body != obst_body):
             return pose
     raise RuntimeError('Unable to find a pose for object {} on surface {}'.format(entity_name, surface_name))

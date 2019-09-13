@@ -31,7 +31,7 @@ MAX_COST = MAX_FD_COST / COST_SCALE
 # TODO: move this to FD
 
 # TODO: top part of object is visible
-DETECT_SCALE = 0.5 # 0.05 | 0.5 | 1.0 | 1.25
+DETECT_SCALE = 1.25 # 0.05 | 0.5 | 1.0 | 1.25
 
 DETECT_COST = 1.0
 BASE_CONSTANT = 1.0 # 1 | 10
@@ -359,7 +359,7 @@ def get_stable_gen(world, max_attempts=100,
         learned_poses = load_placements(world, surface_name) if learned else [] # TODO: GROW_PLACEMENT
         center = -np.pi/4
         half_extent = np.pi / 16
-        yaw_range = (center-half_extent, center+half_extent)
+        yaw_range = (center-half_extent, center+half_extent) if world.task.real else (-np.pi, np.pi)
         while True:
             for _ in range(max_attempts):
                 if surface_name in STOVES:
@@ -447,7 +447,10 @@ def is_robot_visible(world, links):
     return True
 
 def inverse_reachability(world, base_generator, obstacles=set(),
-                         max_attempts=50, min_distance=0.04, **kwargs):
+                         max_attempts=50, **kwargs):
+
+    min_distance = 0.04 if world.task.real else 0.0
+    special_confs = world.special_confs if world.task.real else []
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
     ensure_visible = world.task.teleport_base
@@ -458,7 +461,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
                 continue
             bq = FConf(world.robot, world.base_joints, base_conf)
             bq.assign()
-            for conf in world.special_confs:
+            for conf in special_confs:
                 # Could even sample a special visible conf for this base_conf
                 conf.assign()
                 if not is_robot_visible(world, robot_links) or any(pairwise_collision(

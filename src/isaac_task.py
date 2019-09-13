@@ -82,7 +82,7 @@ def task_from_trial_manager(world, trial_manager, task_name, fixed=False, **kwar
         #SUGAR: DeltaDist(ECHO_COUNTER),
     }
     return Task(world, prior=prior, movable_base=not fixed, init=init, goal=goal_literals,
-                return_init_bq=True, return_init_aq=True, **kwargs)
+                return_init_bq=True, return_init_aq=True, real=True, **kwargs)
 
 ################################################################################
 

@@ -150,7 +150,7 @@ def reset_task(world, args):
         movable_base=not args.fixed,
         goal_aq=world.carry_conf, #.values,
         #return_init_aq=True,
-        return_init_bq=True)
+        return_init_bq=True, real=True)
 
 BOWL_POSE = ((0.065, 0.625, -0.5255), (0.0, 0.0, 0.0, 1))
 
@@ -187,8 +187,7 @@ def real_setup(domain, world, args):
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf,  #.values,
                 #return_init_aq=True,
-                return_init_bq=True
-                )
+                return_init_bq=True, real=True)
     if args.reset:
         task = reset_task(world, args)
 

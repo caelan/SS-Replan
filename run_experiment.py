@@ -69,6 +69,9 @@ TASK_NAMES = [
     'stow_block',
 ]
 
+# TODO: parallel might be possible due to TracIK
+# TODO: CPU usage at 300%?
+
 ################################################################################
 
 def map_parallel(fn, inputs, num_cores=None, timeout=None):
@@ -130,6 +133,7 @@ def run_experiment(experiment):
     state1 = random.getstate()
     state2 = numpy.random.get_state()
     for policy in POLICIES:
+        # TODO: memory error will kill all of these at once...
         random.setstate(state1)
         numpy.random.set_state(state2)
         saver.restore()
