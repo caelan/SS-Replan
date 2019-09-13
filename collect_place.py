@@ -20,7 +20,8 @@ from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TO
     SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS, \
     OPEN_SURFACES, ENV_SURFACES, CABINETS
 from src.world import World
-from src.stream import get_pick_gen_fn, get_stable_gen, get_grasp_gen, Z_EPSILON
+from src.stream import get_stable_gen, get_grasp_gen, Z_EPSILON
+from src.streams.pick import get_pick_gen_fn
 from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
 
 

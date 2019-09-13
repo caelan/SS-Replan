@@ -16,7 +16,8 @@ from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     get_joint_name, joint_from_name, get_date, SEPARATOR, safe_remove, link_from_name
 from src.utils import CABINET_JOINTS, DRAWER_JOINTS, KNOBS
 from src.world import World
-from src.stream import get_pull_gen_fn, get_press_gen_fn
+from src.streams.press import get_press_gen_fn
+from src.streams.pull import get_pull_gen_fn
 from src.database import DATABASE_DIRECTORY, get_joint_reference_pose, PULL_IR_FILENAME, PRESS_IR_FILENAME
 
 

@@ -1,32 +1,28 @@
 import numpy as np
 import random
-from itertools import islice, cycle
+from itertools import islice
 from collections import namedtuple
 
-from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb, get_top_presses
+from pybullet_tools.pr2_utils import is_visible_point, get_view_aabb, support_from_aabb
 from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint_positions, BodySaver, get_distance, \
     set_joint_positions, plan_direct_joint_motion, plan_joint_motion, \
-    get_custom_limits, all_between, uniform_pose_generator, plan_nonholonomic_motion, link_from_name, get_extend_fn, \
-    joint_from_name, get_link_subtree, get_link_name, get_link_pose, \
+    get_custom_limits, all_between, link_from_name, get_link_pose, \
     Euler, quat_from_euler, set_pose, point_from_pose, sample_placement_on_aabb, get_sample_fn, get_pose, \
-    stable_z_on_aabb, euler_from_quat, quat_from_pose, wrap_angle, wait_for_user, \
-    Ray, get_distance_fn, get_unit_vector, unit_quat, Point, set_configuration, \
+    stable_z_on_aabb, euler_from_quat, quat_from_pose, Ray, get_distance_fn, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
-    set_renderer, get_movable_joints, INF, apply_affine, get_joint_name, unit_point, \
-    get_aabb, draw_aabb, remove_handles, add_line
+    INF, apply_affine, get_joint_name, get_unit_vector, get_link_subtree, get_link_name, unit_quat, joint_from_name, \
+    get_extend_fn
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
-from src.command import Sequence, Trajectory, ApproachTrajectory, Attach, Detach, State, DoorTrajectory, \
-    Detect, AttachGripper, Wait
-from src.database import load_placements, get_surface_reference_pose, load_place_base_poses, \
-    load_pull_base_poses, load_forward_placements, load_inverse_placements
-from src.utils import get_grasps, iterate_approach_path, APPROACH_DISTANCE, ALL_SURFACES, \
-    set_tool_pose, close_until_collision, get_descendant_obstacles, surface_from_name, RelPose, FINGER_EXTENT, create_surface_attachment, \
-    compute_surface_aabb, create_relative_pose, Z_EPSILON, get_surface_obstacles, test_supported, \
-    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVE_LOCATIONS, STOVES, \
-    TOOL_POSE, Grasp, TOP_GRASP, KNOBS, JOINT_TEMPLATE
+from src.command import Sequence, State, Detect
+from src.database import load_placements, get_surface_reference_pose, load_pull_base_poses, load_forward_placements, load_inverse_placements
+from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
+    get_descendant_obstacles, surface_from_name, RelPose, compute_surface_aabb, create_relative_pose, Z_EPSILON, \
+    get_surface_obstacles, test_supported, \
+    get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVES, \
+    TOP_GRASP, KNOBS, APPROACH_DISTANCE, FINGER_EXTENT, set_tool_pose
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
-from src.inference import SurfaceDist, NUM_PARTICLES
+from src.inference import SurfaceDist
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
 
 COST_SCALE = 1e3 # 3 decimal places
@@ -540,143 +536,36 @@ def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
         return None
     return approach_path + grasp_path
 
-################################################################################
-
-def is_approach_safe(world, obj_name, pose, grasp, obstacles):
-    assert pose.support is not None
-    obj_body = world.get_body(obj_name)
-    pose.assign()  # May set the drawer confs as well
-    set_joint_positions(world.gripper, get_movable_joints(world.gripper), world.open_gq.values)
-    #set_renderer(enable=True)
-    for _ in iterate_approach_path(world, pose, grasp, body=obj_body):
-        #for link in get_all_links(world.gripper):
-        #    set_color(world.gripper, apply_alpha(np.zeros(3)), link)
-        #wait_for_user()
-        if any(pairwise_collision(world.gripper, obst) # or pairwise_collision(obj_body, obst)
-               for obst in obstacles):
-            print('Unsafe approach!')
-            return False
-    return True
-
-def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True, **kwargs):
-    # TODO: check if within database convex hull
-    # TODO: flag to check if initially in collision
-
-    obj_body = world.get_body(obj_name)
-    pose.assign()
-    base_conf.assign()
-    world.open_gripper()
-    robot_saver = BodySaver(world.robot)
-    obj_saver = BodySaver(obj_body)
-
+def plan_workspace(world, tool_path, obstacles, randomize=True, teleport=False):
+    # Assuming that pairs of fixed things aren't in collision at this point
+    moving_links = get_moving_links(world.robot, world.arm_joints)
+    robot_obstacle = (world.robot, frozenset(moving_links))
+    distance_fn = get_distance_fn(world.robot, world.arm_joints)
     if randomize:
         sample_fn = get_sample_fn(world.robot, world.arm_joints)
         set_joint_positions(world.robot, world.arm_joints, sample_fn())
     else:
         world.carry_conf.assign()
-    world_from_body = pose.get_world_from_body()
-    gripper_pose = multiply(world_from_body, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
-    full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
-    if full_grasp_conf is None:
-        if PRINT_FAILURES: print('Grasp kinematic failure')
-        return
-    moving_links = get_moving_links(world.robot, world.arm_joints)
-    robot_obstacle = (world.robot, frozenset(moving_links))
-    #robot_obstacle = get_descendant_obstacles(world.robot, child_link_from_joint(world.arm_joints[0]))
-    #robot_obstacle = world.robot
-    if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-        if PRINT_FAILURES: print('Grasp collision failure')
-        #set_renderer(enable=True)
-        #wait_for_user()
-        #set_renderer(enable=False)
-        return
-    approach_pose = multiply(world_from_body, invert(grasp.pregrasp_pose))
-    approach_path = plan_approach(world, approach_pose,  # attachments=[grasp.get_attachment()],
-                                  obstacles=obstacles, **kwargs)
-    if approach_path is None:
-        if PRINT_FAILURES: print('Approach plan failure')
-        return
-    if MOVE_ARM:
-        aq = FConf(world.robot, world.arm_joints, approach_path[0])
-    else:
-        aq = world.carry_conf
-
-    gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
-    finger_cmd, = gripper_motion_fn(world.open_gq, grasp.get_gripper_conf())
-    attachment = create_surface_attachment(world, obj_name, pose.support)
-    objects = [obj_name]
-    cmd = Sequence(State(world, savers=[robot_saver, obj_saver],
-                         attachments=[attachment]), commands=[
-        ApproachTrajectory(objects, world, world.robot, world.arm_joints, approach_path),
-        finger_cmd.commands[0],
-        Detach(world, attachment.parent, attachment.parent_link, attachment.child),
-        AttachGripper(world, obj_body, grasp=grasp),
-        ApproachTrajectory(objects, world, world.robot, world.arm_joints, reversed(approach_path)),
-    ], name='pick')
-    yield (aq, cmd,)
-
-################################################################################
-
-def get_fixed_pick_gen_fn(world, max_attempts=25, collisions=True, **kwargs):
-
-    def gen(obj_name, pose, grasp, base_conf):
-        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)  # | {obj_body}
-        #if not collisions:
-        #    obstacles = set()
-        if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
-            return
-        # TODO: increase timeouts if a previously successful value
-        # TODO: seed IK using the previous solution
-        while True:
-            for i in range(max_attempts):
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
-                                            randomize=randomize, **kwargs), None)
-                if ik_outputs is not None:
-                    yield ik_outputs
-                    break  # return
-            else:
-                if PRINT_FAILURES: print('Fixed pick failure')
-                if not pose.init:
-                    break
-                yield None
-    return gen
-
-def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwargs):
-    # TODO: sample in the neighborhood of the base conf to ensure robust
-
-    def gen(obj_name, pose, grasp, *args):
-        obstacles = world.static_obstacles | get_surface_obstacles(world, pose.support)
-        #if not collisions:
-        #    obstacles = set()
-        if not is_approach_safe(world, obj_name, pose, grasp, obstacles):
-            return
-
-        # TODO: check collisions with obj at pose
-        gripper_pose = multiply(pose.get_world_from_body(), invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        if learned:
-            base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
-        else:
-            base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
-        while True:
-            for i in range(max_attempts):
-                try:
-                    base_conf, = next(safe_base_generator)
-                except StopIteration:
-                    return
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
-                                            randomize=randomize, **kwargs), None)
-                if ik_outputs is not None:
-                    yield (base_conf,) + ik_outputs
-                    break
-            else:
-                if PRINT_FAILURES: print('Pick failure')
-                if not pose.init:
-                    break
-                yield None
-    return gen
+    arm_path = []
+    for i, tool_pose in enumerate(tool_path):
+        #set_joint_positions(world.kitchen, [door_joint], door_path[i])
+        tolerance = INF if i == 0 else NEARBY_PULL
+        full_arm_conf = world.solve_inverse_kinematics(tool_pose, nearby_tolerance=tolerance)
+        if full_arm_conf is None:
+            if PRINT_FAILURES: print('Workspace kinematic failure')
+            return None
+        if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
+            if PRINT_FAILURES: print('Workspace collision failure')
+            return None
+        arm_conf = get_joint_positions(world.robot, world.arm_joints)
+        if arm_path and not teleport:
+            distance = distance_fn(arm_path[-1], arm_conf)
+            if MAX_CONF_DISTANCE < distance:
+                if PRINT_FAILURES: print('Workspace proximity failure (distance={:.5f})'.format(distance))
+                return None
+        arm_path.append(arm_conf)
+        # wait_for_user()
+    return arm_path
 
 ################################################################################
 
@@ -752,429 +641,6 @@ def compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles=set(
         else:
             door_paths.append(DoorPath(door_path, handle_path, handle_grasp, tool_path))
     return door_paths
-
-def is_pull_safe(world, door_joint, door_plan):
-    obstacles = get_descendant_obstacles(world.kitchen, door_joint)
-    door_path, handle_path, handle_plan, tool_path = door_plan
-    for door_conf in [door_path[0], door_path[-1]]:
-        # TODO: check the whole door trajectory
-        set_joint_positions(world.kitchen, [door_joint], door_conf)
-        # TODO: just check collisions with the base of the robot
-        if any(pairwise_collision(world.robot, b) for b in obstacles):
-            if PRINT_FAILURES: print('Door start/end failure')
-            return False
-    return True
-
-def plan_workspace(world, tool_path, obstacles, randomize=True, teleport=False):
-    # Assuming that pairs of fixed things aren't in collision at this point
-    moving_links = get_moving_links(world.robot, world.arm_joints)
-    robot_obstacle = (world.robot, frozenset(moving_links))
-    distance_fn = get_distance_fn(world.robot, world.arm_joints)
-    if randomize:
-        sample_fn = get_sample_fn(world.robot, world.arm_joints)
-        set_joint_positions(world.robot, world.arm_joints, sample_fn())
-    else:
-        world.carry_conf.assign()
-    arm_path = []
-    for i, tool_pose in enumerate(tool_path):
-        #set_joint_positions(world.kitchen, [door_joint], door_path[i])
-        tolerance = INF if i == 0 else NEARBY_PULL
-        full_arm_conf = world.solve_inverse_kinematics(tool_pose, nearby_tolerance=tolerance)
-        if full_arm_conf is None:
-            if PRINT_FAILURES: print('Workspace kinematic failure')
-            return None
-        if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-            if PRINT_FAILURES: print('Workspace collision failure')
-            return None
-        arm_conf = get_joint_positions(world.robot, world.arm_joints)
-        if arm_path and not teleport:
-            distance = distance_fn(arm_path[-1], arm_conf)
-            if MAX_CONF_DISTANCE < distance:
-                if PRINT_FAILURES: print('Workspace proximity failure (distance={:.5f})'.format(distance))
-                return None
-        arm_path.append(arm_conf)
-        # wait_for_user()
-    return arm_path
-
-def plan_pull(world, door_joint, door_plan, base_conf,
-              randomize=True, collisions=True, teleport=False, **kwargs):
-    door_path, handle_path, handle_plan, tool_path = door_plan
-    handle_link, handle_grasp, handle_pregrasp = handle_plan
-
-    door_obstacles = get_descendant_obstacles(world.kitchen, door_joint) # if collisions else set()
-    obstacles = (world.static_obstacles | door_obstacles) # if collisions else set()
-
-    base_conf.assign()
-    world.open_gripper()
-    world.carry_conf.assign()
-    robot_saver = BodySaver(world.robot) # TODO: door_saver?
-    if not is_pull_safe(world, door_joint, door_plan):
-        return
-
-    arm_path = plan_workspace(world, tool_path, world.static_obstacles,
-                              randomize=randomize, teleport=collisions)
-    if arm_path is None:
-        return
-    approach_paths = []
-    for index in [0, -1]:
-        set_joint_positions(world.kitchen, [door_joint], door_path[index])
-        set_joint_positions(world.robot, world.arm_joints, arm_path[index])
-        tool_pose = multiply(handle_path[index], invert(handle_pregrasp))
-        approach_path = plan_approach(world, tool_pose, obstacles=obstacles, teleport=teleport, **kwargs)
-        if approach_path is None:
-            return
-        approach_paths.append(approach_path)
-
-    if MOVE_ARM:
-        aq1 = FConf(world.robot, world.arm_joints, approach_paths[0][0])
-        aq2 = FConf(world.robot, world.arm_joints, approach_paths[-1][0])
-    else:
-        aq1 = world.carry_conf
-        aq2 = aq1
-
-    set_joint_positions(world.kitchen, [door_joint], door_path[0])
-    set_joint_positions(world.robot, world.arm_joints, arm_path[0])
-    grasp_width = close_until_collision(world.robot, world.gripper_joints,
-                                        bodies=[(world.kitchen, [handle_link])])
-    gripper_motion_fn = get_gripper_motion_gen(world, teleport=teleport, collisions=collisions, **kwargs)
-    gripper_conf = FConf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
-    finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
-
-    objects = []
-    commands = [
-        ApproachTrajectory(objects, world, world.robot, world.arm_joints, approach_paths[0]),
-        DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
-                       world.kitchen, [door_joint], door_path),
-        ApproachTrajectory(objects, world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
-    ]
-    door_path, _, _, _ = door_plan
-    sign = world.get_door_sign(door_joint)
-    pull = (sign*door_path[0][0] < sign*door_path[-1][0])
-    if pull:
-        commands.insert(1, finger_cmd.commands[0])
-        commands.insert(3, finger_cmd.commands[0].reverse())
-    cmd = Sequence(State(world, savers=[robot_saver]), commands, name='pull')
-    yield (aq1, aq2, cmd,)
-
-################################################################################
-
-def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=False, **kwargs):
-
-    def gen(joint_name, door_conf1, door_conf2, base_conf):
-        #if door_conf1 == door_conf2:
-        #    return
-        # TODO: check if within database convex hull
-        door_joint = joint_from_name(world.kitchen, joint_name)
-        obstacles = (world.static_obstacles | get_descendant_obstacles(
-            world.kitchen, door_joint)) # if collisions else set()
-
-        base_conf.assign()
-        world.carry_conf.assign()
-        door_plans = [door_plan for door_plan in compute_door_paths(
-            world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
-                      if is_pull_safe(world, door_joint, door_plan)]
-        if not door_plans:
-            print('Unable to open door {} at fixed config'.format(joint_name))
-            return
-        while True:
-            for i in range(max_attempts):
-                door_path = random.choice(door_plans)
-                # TracIK is itself stochastic
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,
-                                            randomize=randomize, collisions=collisions, teleport=teleport, **kwargs),
-                                  None)
-                if ik_outputs is not None:
-                    yield ik_outputs
-                    break  # return
-            else:
-                if PRINT_FAILURES: print('Fixed pull failure')
-                yield None
-    return gen
-
-def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):
-    # TODO: could condition pick/place into cabinet on the joint angle
-    obstacles = world.static_obstacles
-    #if not collisions:
-    #    obstacles = set()
-
-    def gen(joint_name, door_conf1, door_conf2, *args):
-        if door_conf1 == door_conf2:
-            return
-        door_joint = joint_from_name(world.kitchen, joint_name)
-        door_paths = compute_door_paths(world, joint_name, door_conf1, door_conf2, obstacles, teleport=teleport)
-        if not door_paths:
-            return
-        if learned:
-            base_generator = cycle(load_pull_base_poses(world, joint_name))
-        else:
-            _, _, _, tool_path = door_paths[0]
-            index = int(len(tool_path) / 2)  # index = 0
-            target_pose = tool_path[index]
-            base_generator = uniform_pose_generator(world.robot, target_pose)
-        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
-        while True:
-            for i in range(max_attempts):
-                try:
-                    base_conf, = next(safe_base_generator)
-                except StopIteration:
-                    return
-                door_path = random.choice(door_paths)
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,
-                                            randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
-                if ik_outputs is not None:
-                    yield (base_conf,) + ik_outputs
-                    break
-            else:
-                if PRINT_FAILURES: print('Pull failure')
-                yield None
-    return gen
-
-################################################################################
-
-def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=True, **kwargs):
-    base_conf.assign()
-    world.close_gripper()
-    robot_saver = BodySaver(world.robot)
-
-    if randomize:
-        sample_fn = get_sample_fn(world.robot, world.arm_joints)
-        set_joint_positions(world.robot, world.arm_joints, sample_fn())
-    else:
-        world.carry_conf.assign()
-    gripper_pose = multiply(pose, invert(grasp.grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
-    #set_joint_positions(world.gripper, get_movable_joints(world.gripper), world.closed_gq.values)
-    #set_tool_pose(world, gripper_pose)
-    full_grasp_conf = world.solve_inverse_kinematics(gripper_pose)
-    #wait_for_user()
-    if full_grasp_conf is None:
-        # if PRINT_FAILURES: print('Grasp kinematic failure')
-        return
-    robot_obstacle = (world.robot, frozenset(get_moving_links(world.robot, world.arm_joints)))
-    if any(pairwise_collision(robot_obstacle, b) for b in obstacles):
-        #if PRINT_FAILURES: print('Grasp collision failure')
-        return
-    approach_pose = multiply(pose, invert(grasp.pregrasp_pose))
-    approach_path = plan_approach(world, approach_pose, obstacles=obstacles, **kwargs)
-    if approach_path is None:
-        return
-    aq = FConf(world.robot, world.arm_joints, approach_path[0]) if MOVE_ARM else world.carry_conf
-
-    #gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
-    #finger_cmd, = gripper_motion_fn(world.open_gq, world.closed_gq)
-    objects = []
-    cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-        #finger_cmd.commands[0],
-        ApproachTrajectory(objects, world, world.robot, world.arm_joints, approach_path),
-        ApproachTrajectory(objects, world, world.robot, world.arm_joints, reversed(approach_path)),
-        #finger_cmd.commands[0].reverse(),
-        Wait(world, duration=1.0),
-    ], name='press')
-    yield (aq, cmd,)
-
-def get_grasp_presses(world, knob, pre_distance=APPROACH_DISTANCE):
-    knob_link = link_from_name(world.kitchen, knob)
-    pre_direction = pre_distance * get_unit_vector([0, 0, 1])
-    post_direction = unit_point()
-    for i, grasp_pose in enumerate(get_top_presses(world.kitchen, link=knob_link,
-                                                   tool_pose=TOOL_POSE, top_offset=FINGER_EXTENT[0]/2 + 5e-3)):
-        pregrasp_pose = multiply(Pose(point=pre_direction), grasp_pose,
-                                 Pose(point=post_direction))
-        grasp = Grasp(world, knob, TOP_GRASP, i, grasp_pose, pregrasp_pose)
-        yield grasp
-
-def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=False, **kwargs):
-    def gen(knob_name):
-        obstacles = world.static_obstacles
-        knob_link = link_from_name(world.kitchen, knob_name)
-        pose = get_link_pose(world.kitchen, knob_link)
-        #pose = RelPose(world.kitchen, knob_link, init=True)
-        presses = cycle(get_grasp_presses(world, knob_name))
-        grasp = next(presses)
-        gripper_pose = multiply(pose, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        if learned:
-            #base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
-            raise NotImplementedError()
-        else:
-            base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
-        while True:
-            for i in range(max_attempts):
-                try:
-                    base_conf, = next(safe_base_generator)
-                except StopIteration:
-                    return
-                grasp = next(presses)
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, obstacles,
-                                             randomize=randomize, **kwargs), None)
-                if ik_outputs is not None:
-                    yield (base_conf,) + ik_outputs
-                    break
-            else:
-                if PRINT_FAILURES: print('Pick failure')
-                if not pose.init:
-                    break
-                yield None
-    return gen
-
-def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=False, **kwargs):
-
-    def gen(knob_name, base_conf):
-        knob_link = link_from_name(world.kitchen, knob_name)
-        pose = get_link_pose(world.kitchen, knob_link)
-        presses = cycle(get_grasp_presses(world, knob_name))
-        while True:
-            for i in range(max_attempts):
-                grasp = next(presses)
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, world.static_obstacles,
-                                             randomize=randomize, **kwargs), None)
-                if ik_outputs is not None:
-                    yield ik_outputs
-                    break  # return
-            else:
-                if PRINT_FAILURES: print('Fixed pull failure')
-                yield None
-    return gen
-
-################################################################################
-
-def parse_fluents(world, fluents):
-    attachments = []
-    obstacles = set()
-    for fluent in fluents:
-        predicate, args = fluent[0], fluent[1:]
-        if predicate in {p.lower() for p in ['AtBConf', 'AtAConf', 'AtGConf']}:
-            q, = args
-            q.assign()
-        elif predicate == 'AtAngle'.lower():
-            raise RuntimeError()
-            # j, a = args
-            # a.assign()
-            # obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
-        elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
-            b, p = args
-            if isinstance(p, SurfaceDist):
-                continue
-            p.assign()
-            obstacles.update(get_link_obstacles(world, b))
-        elif predicate == 'AtGrasp'.lower():
-            b, g = args
-            if b is not None:
-                attachments.append(g.get_attachment())
-                attachments[-1].assign()
-        else:
-            raise NotImplementedError(predicate)
-    return attachments, obstacles
-
-def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=False,
-                       restarts=4, iterations=75, smooth=100):
-    # TODO: lazy planning on a common base roadmap
-
-    def fn(bq1, bq2, aq, fluents=[]):
-        #if bq1 == bq2:
-        #    return None
-        bq1.assign()
-        aq.assign()
-        attachments, obstacles = parse_fluents(world, fluents)
-        if not collisions:
-            obstacles = set()
-        obstacles.update(world.static_obstacles)
-        robot_saver = BodySaver(world.robot)
-        if (bq1 == bq2) or teleport_base or teleport:
-            path = [bq1.values, bq2.values]
-        else:
-            # It's important that the extend function is reversible to avoid getting trapped
-            path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=attachments,
-                                            obstacles=obstacles, custom_limits=world.custom_limits,
-                                            reversible=True, self_collisions=False,
-                                            restarts=restarts, iterations=iterations, smooth=smooth)
-            if path is None:
-                print('Failed to find a base motion plan!')
-                if PAUSE_MOTION_FAILURES:
-                    set_renderer(enable=True)
-                    #print(fluents)
-                    for bq in [bq1, bq2]:
-                        bq.assign()
-                        wait_for_user()
-                    set_renderer(enable=False)
-                return None
-        # TODO: could actually plan with all joints as long as we return to the same config
-        cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-            Trajectory(world, world.robot, world.base_joints, path),
-        ], name='base')
-        return (cmd,)
-    return fn
-
-def get_reachability_test(world, **kwargs):
-    base_motion_fn = get_base_motion_fn(world, restarts=2, iterations=50, smooth=0, **kwargs)
-    bq0 = FConf(world.robot, world.base_joints)
-    # TODO: can check for arm motions as well
-
-    def test(bq):
-        aq = world.carry_conf
-        outputs = base_motion_fn(aq, bq0, bq, fluents=[])
-        return outputs is not None
-    return test
-
-################################################################################
-
-def get_arm_motion_gen(world, collisions=True, teleport=False):
-    resolutions = ARM_RESOLUTION * np.ones(len(world.arm_joints))
-
-    def fn(bq, aq1, aq2, fluents=[]):
-        #if aq1 == aq2:
-        #    return None
-        bq.assign()
-        aq1.assign()
-        attachments, obstacles = parse_fluents(world, fluents)
-        if not collisions:
-            obstacles = set()
-        obstacles.update(world.static_obstacles)
-        robot_saver = BodySaver(world.robot)
-        if teleport:
-            path = [aq1.values, aq2.values]
-        else:
-            path = plan_joint_motion(world.robot, aq2.joints, aq2.values,
-                                     attachments=attachments, obstacles=obstacles,
-                                     self_collisions=SELF_COLLISIONS,
-                                     disabled_collisions=world.disabled_collisions,
-                                     custom_limits=world.custom_limits, resolutions=resolutions,
-                                     restarts=2, iterations=50, smooth=50)
-            if path is None:
-                print('Failed to find an arm motion plan!')
-                if PAUSE_MOTION_FAILURES:
-                    set_renderer(enable=True)
-                    #print(fluents)
-                    for bq in [aq1, aq2]:
-                        bq.assign()
-                        wait_for_user()
-                    set_renderer(enable=False)
-                return None
-        cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-            Trajectory(world, world.robot, world.arm_joints, path),
-        ], name='arm')
-        return (cmd,)
-    return fn
-
-def get_gripper_motion_gen(world, teleport=False, **kwargs):
-    resolutions = GRIPPER_RESOLUTION * np.ones(len(world.gripper_joints))
-
-    def fn(gq1, gq2):
-        #if gq1 == gq2:
-        #    return None
-        if teleport:
-            path = [gq1.values, gq2.values]
-        else:
-            extend_fn = get_extend_fn(gq2.body, gq2.joints, resolutions=resolutions)
-            path = [gq1.values] + list(extend_fn(gq1.values, gq2.values))
-        cmd = Sequence(State(world), commands=[
-            Trajectory(world, gq2.body, gq2.joints, path),
-        ], name='gripper')
-        return (cmd,)
-    return fn
 
 ################################################################################
 

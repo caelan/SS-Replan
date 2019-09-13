@@ -18,16 +18,19 @@ from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, COOKABLE, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
     KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
-from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
-    get_base_motion_fn, get_pull_gen_fn, get_door_test, CLOSED, DOOR_STATUSES, \
+from src.stream import get_stable_gen, get_grasp_gen, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
-    get_calibrate_gen, get_fixed_pick_gen_fn, get_fixed_pull_gen_fn, get_compute_angle_kin, \
-    get_compute_pose_kin, get_arm_motion_gen, get_gripper_motion_gen, get_test_near_pose, \
+    get_calibrate_gen, get_compute_angle_kin, \
+    get_compute_pose_kin, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
     get_compute_detect, get_ofree_ray_pose_test, get_ofree_ray_grasp_test, \
-    get_sample_belief_gen, detect_cost_fn, get_fixed_press_gen_fn, get_cfree_bconf_pose_test, \
+    get_sample_belief_gen, detect_cost_fn, get_cfree_bconf_pose_test, \
     get_cfree_worldpose_worldpose_test, get_cfree_worldpose_test, update_belief_fn, \
-    get_cfree_angle_angle_test, get_press_gen_fn
+    get_cfree_angle_angle_test
+from src.streams.move import get_base_motion_fn, get_arm_motion_gen, get_gripper_motion_gen
+from src.streams.press import get_press_gen_fn, get_fixed_press_gen_fn
+from src.streams.pull import get_fixed_pull_gen_fn, get_pull_gen_fn
+from src.streams.pick import get_fixed_pick_gen_fn, get_pick_gen_fn
 
 from src.streams.pour import get_fixed_pour_gen_fn
 from src.database import has_place_database
