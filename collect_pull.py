@@ -18,7 +18,7 @@ from src.utils import CABINET_JOINTS, DRAWER_JOINTS, KNOBS
 from src.world import World
 from src.streams.press import get_press_gen_fn
 from src.streams.pull import get_pull_gen_fn
-from src.database import get_joint_reference_pose, get_pull_path
+from src.database import get_joint_reference_pose, get_pull_path, is_press
 
 
 def collect_pull(world, joint_name, args):
@@ -26,8 +26,7 @@ def collect_pull(world, joint_name, args):
     #set_seed(args.seed)
 
     robot_name = get_body_name(world.robot)
-    press = (joint_name in KNOBS)
-    if press:
+    if is_press(joint_name):
         press_gen = get_press_gen_fn(world, collisions=not args.cfree, teleport=args.teleport, learned=False)
     else:
         joint = joint_from_name(world.kitchen, joint_name)
@@ -54,11 +53,9 @@ def collect_pull(world, joint_name, args):
                 len(entries), args.num_samples, elapsed_time(start_time)))
             failures += 1
             continue
-        if press:
-            joint_pose = get_link_pose(world.kitchen, link_from_name(world.kitchen, joint_name))
-        else:
+        if not is_press(joint_name):
             open_conf.assign()
-            joint_pose = get_joint_reference_pose(world.kitchen, joint_name)
+        joint_pose = get_joint_reference_pose(world.kitchen, joint_name)
         bq, aq1 = result[:2]
         bq.assign()
         aq1.assign()

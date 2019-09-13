@@ -7,6 +7,7 @@ from pybullet_tools.utils import BodySaver, get_sample_fn, set_joint_positions, 
 from src.command import Sequence, State, ApproachTrajectory, Wait
 from src.stream import plan_approach, MOVE_ARM, inverse_reachability, P_RANDOMIZE_IK, PRINT_FAILURES
 from src.utils import FConf, APPROACH_DISTANCE, TOOL_POSE, FINGER_EXTENT, Grasp, TOP_GRASP
+from src.database import load_pull_base_poses
 
 def get_grasp_presses(world, knob, pre_distance=APPROACH_DISTANCE):
     knob_link = link_from_name(world.kitchen, knob)
@@ -61,7 +62,7 @@ def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=Tr
 
 ################################################################################
 
-def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=False, **kwargs):
+def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):
     def gen(knob_name):
         obstacles = world.static_obstacles
         knob_link = link_from_name(world.kitchen, knob_name)
@@ -71,8 +72,7 @@ def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, le
         grasp = next(presses)
         gripper_pose = multiply(pose, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
         if learned:
-            #base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
-            raise NotImplementedError()
+            base_generator = cycle(load_pull_base_poses(world, knob_name))
         else:
             base_generator = uniform_pose_generator(world.robot, gripper_pose)
         safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)

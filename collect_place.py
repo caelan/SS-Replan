@@ -22,8 +22,9 @@ from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TO
 from src.world import World
 from src.stream import get_stable_gen, get_grasp_gen, Z_EPSILON
 from src.streams.pick import get_pick_gen_fn
-from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose
+from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose, get_place_path
 
+# TODO: generalize to any manipulation with a fixed entity
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()
@@ -41,12 +42,10 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     grasps = list(grasp_gen_fn(object_name, grasp_type))
 
     robot_name = get_body_name(world.robot)
-    filename = PLACE_IR_FILENAME.format(robot_name=robot_name, surface_name=surface_name,
-                                        grasp_type=grasp_type)
-    path = os.path.join(DATABASE_DIRECTORY, filename)
+    path = get_place_path(robot_name, surface_name, grasp_type)
     print(SEPARATOR)
     print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {} | Filename: {}'.format(
-        robot_name, object_name, surface_name, grasp_type, filename))
+        robot_name, object_name, surface_name, grasp_type, path))
 
     # TODO: ensure pose is in view of cameras
     entries = []
@@ -100,7 +99,6 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
         'entries': entries,
         'failures': failures,
         'successes': len(entries),
-        'filename': filename,
     }
 
     write_json(path, data)

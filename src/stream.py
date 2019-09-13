@@ -64,8 +64,6 @@ NEARBY_PULL = 0.25
 
 # ik_solver.set_joint_limits([0.0]* ik_solver.number_of_joints, upper_bound)
 
-# TODO: need to wrap trajectory when executing in simulation or running on the robot
-
 ################################################################################
 
 def base_cost_fn(q1, q2):
@@ -194,9 +192,7 @@ def move_occluding(world):
 def get_ofree_ray_pose_test(world, **kwargs):
     # TODO: detect the configuration of joints
     def test(detect, obj_name, pose):
-        if detect.name == obj_name:
-            return True
-        if isinstance(pose, SurfaceDist):
+        if (detect.name == obj_name) or (detect.surface_name == obj_name) or isinstance(pose, SurfaceDist):
             return True
         move_occluding(world)
         detect.pose.assign()
@@ -217,6 +213,7 @@ def get_ofree_ray_grasp_test(world, **kwargs):
     def test(detect, bconf, aconf, obj_name, grasp):
         if detect.name == obj_name:
             return True
+        assert obj_name is None # shouldn't happen anymore
         move_occluding(world)
         bconf.assign()
         aconf.assign()
@@ -332,8 +329,6 @@ def get_test_near_joint(world, **kwargs):
     vertices_from_joint = {}
 
     def test(joint_name, base_conf):
-        if joint_name in KNOBS:
-            return True # TODO: address this
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
             vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_INVERSE_BASE)

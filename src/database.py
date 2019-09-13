@@ -8,9 +8,10 @@ from src.utils import GRASP_TYPES, surface_from_name, BASE_JOINTS, joint_from_na
 
 DATABASE_DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
-PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
-PRESS_IR_FILENAME = '{robot_name}-{knob_name}-press.json'
-
+#PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
+#PRESS_IR_FILENAME = '{robot_name}-{knob_name}-press.json'
+PULL_IR_FILENAME = '{}-{}-pull.json'
+PRESS_IR_FILENAME = '{}-{}-press.json'
 
 def get_surface_reference_pose(kitchen, surface_name):
     surface = surface_from_name(surface_name)
@@ -88,15 +89,16 @@ def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
 def is_press(joint_name):
     return joint_name in KNOBS
 
-def get_joint_reference_pose(kitchen, surface_name):
-    joint = joint_from_name(kitchen, surface_name)
+def get_joint_reference_pose(kitchen, joint_name):
+    if is_press(joint_name):
+        return get_link_pose(kitchen, link_from_name(kitchen, joint_name))
+    joint = joint_from_name(kitchen, joint_name)
     link = parent_link_from_joint(kitchen, joint)
     return get_link_pose(kitchen, link)
 
 def get_pull_path(robot_name, joint_name):
     ir_filename = PRESS_IR_FILENAME if is_press(joint_name) else PULL_IR_FILENAME
-    return os.path.join(DATABASE_DIRECTORY, ir_filename.format(
-        robot_name=robot_name, joint_name=joint_name))
+    return os.path.join(DATABASE_DIRECTORY, ir_filename.format(robot_name, joint_name))
 
 def load_pull_database(robot_name, joint_name):
     data = {}
