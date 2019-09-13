@@ -39,10 +39,12 @@ from run_pybullet import create_parser
 
 from multiprocessing import Pool, TimeoutError, cpu_count
 
-DATA_DIRECTORY = 'data/'
+DATA_DIRECTORY = 'data/' # TODO: rename to experiments
 TEMP_DIRECTORY = 'temp_parallel/'
 MAX_TIME = 5*60
 VERBOSE = False
+
+TIME_PER_TRIAL = (60*60*0.912) / 126 # ~26 sec
 
 N = 100
 
@@ -164,12 +166,12 @@ def main():
 
     # https://stackoverflow.com/questions/15314189/python-multiprocessing-pool-hangs-at-join
     # https://stackoverflow.com/questions/39884898/large-amount-of-multiprocessing-process-causing-deadlock
-    num_cores = cpu_count()
+    # TODO: alternatively don't destroy the world
+    num_cores = cpu_count() / 2 # -2
     directory = os.path.realpath(DATA_DIRECTORY)
     date_name = datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
-    json_path = os.path.join(directory, date_name)
-    experiments = [{'task': task, 'trial': trial} for task in TASK_NAMES for trial in range(N)]
-
+    json_path = os.path.join(directory, '{}.json'.format(date_name))
+    experiments = [{'task': task, 'trial': trial} for trial in range(N) for task in TASK_NAMES]
 
     print('Results:', json_path)
     print('Num Cores:', num_cores)
@@ -189,7 +191,7 @@ def main():
     start_time = time.time()
     results = []
     try:
-        for result in map_parallel(run_experiment, experiments, timeout=2*MAX_TIME):
+        for result in map_parallel(run_experiment, experiments, num_cores=num_cores, timeout=2*MAX_TIME):
             results.append(result)
             print('{}\nExperiments: {} / {} | Time: {:.3f}'.format(
                 SEPARATOR, len(results), len(experiments), elapsed_time(start_time)))
@@ -203,6 +205,7 @@ def main():
         if results:
             write_json(json_path, results)
         print(SEPARATOR)
+        print('Saved:', json_path)
         print('Results:', len(results))
         print('Hours: {:.3f}'.format(elapsed_time(start_time) / (60*60)))
     return results

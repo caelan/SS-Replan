@@ -250,7 +250,7 @@
                  (forall (?o4 ?wp4 ?rp4) (when (and (PoseKin ?o4 ?wp4 ?rp4 ?o ?wp2) (AtRelPose ?o4 ?rp4 ?o))
                                                (AtWorldPose ?o4 ?wp4)))
                  (increase (total-cost) (PullCost))))
-  (:action detect ; TODO: only allow detect in carry conf
+  (:action detect ; TODO: or in carry conf
     :parameters (?o1 ?wp1 ?rp1 ?obs ?wp2 ?rp2 ?o0 ?wp0 ?r)
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)
                        (Detect ?o1 ?wp2 ?r) (BeliefUpdate ?o1 ?rp1 ?obs ?rp2)

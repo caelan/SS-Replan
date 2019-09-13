@@ -211,10 +211,10 @@ def get_ofree_ray_pose_test(world, **kwargs):
         if any(pairwise_collision(body, obst) for obst in obstacles):
             return False
         visible = not obstacles & detect.compute_occluding()
-        if not visible:
-            handles = detect.draw()
-            wait_for_user()
-            remove_handles(handles)
+        #if not visible:
+        #    handles = detect.draw()
+        #    wait_for_user()
+        #    remove_handles(handles)
         return visible
     return test
 
