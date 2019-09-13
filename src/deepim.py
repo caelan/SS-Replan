@@ -18,6 +18,7 @@ from brain_ros.ros_world_state import make_pose_from_pose_msg
 from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_distance, quat_from_pose, \
     quat_angle_between, read_json, elapsed_time
 from sensor_msgs.msg import Image
+from src.utils import BOWL
 from src.issac import ISSAC_WORLD_FRAME, DEPTH_PREFIX, PANDA_FULL_CONFIG_PATH, PREFIX_FROM_SIDE, RIGHT, lookup_pose
 
 #DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
@@ -198,6 +199,8 @@ class DeepIM(Perception):
         #dump_dict(self.domain)
         #dump_dict(self.domain.root)
         #dump_dict(entity)
+        if obj_type == BOWL:
+            return False
         entity = self.domain.root.entities[obj_type]
         administrator = entity.administrator
 

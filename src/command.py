@@ -13,11 +13,16 @@ DEFAULT_TIME_STEP = 0.02
 DEFAULT_SLEEP = 0.5
 FORCE = 50 # 20 | 50 | 100
 
+TIN_EFFORT = 60
+PLASTIC_EFFORT = 50
+CARDBOARD_EFFORT = 60
+
 EFFORT_FROM_OBJECT = {
-    'potted_meat_can': 60,
-    'tomato_soup_can': 60,
-    'sugar_box': 40,
-    'cracker_box': 40,
+    'potted_meat_can': TIN_EFFORT,
+    'tomato_soup_can': TIN_EFFORT,
+    'mustard_bottle': PLASTIC_EFFORT,
+    'sugar_box': CARDBOARD_EFFORT,
+    'cracker_box': CARDBOARD_EFFORT,
 }
 # TODO: grasps per object
 
@@ -239,13 +244,24 @@ class Trajectory(Command):
 
 
 class ApproachTrajectory(Trajectory):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, objects=[], *args, **kwargs):
         super(ApproachTrajectory, self).__init__(*args, **kwargs)
         assert self.joints == self.world.arm_joints
         self.speed = 0.25
+        self.objects = set(objects)
+    @property
+    def bodies(self):
+        bodies = set(super(ApproachTrajectory, self).bodies) # TODO: rename to bodies
+        for name in self.objects:
+            bodies.update(flatten_links(self.world.get_body(name)))
+        return bodies
+    def reverse(self):
+        return self.__class__(self.objects, self.world, self.robot, self.joints, self.path[::-1])
     def execute(self, interface):
         from src.execution import franka_control
         from src.retime import DEFAULT_SPEED_FRACTION
+        if len(self.path) == 1:
+            return True
         return franka_control(self.robot, self.joints, self.path, interface,
                               velocity_fraction=self.speed*DEFAULT_SPEED_FRACTION)
         #return super(ApproachTrajectory, self).execute(interface)

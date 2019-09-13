@@ -250,6 +250,9 @@ def transition_belief_update(belief, plan):
             s, k, o, bq, aq, gq, at = params
             belief.pressed.add(k)
             belief.cooked.add(o)
+            for bowl, liquid in belief.liquid:
+                if bowl == o:
+                    belief.cooked.add(liquid)
         elif action == 'press-off':
             s, k, o, bq, aq, gq, at = params
             belief.pressed.remove(k)

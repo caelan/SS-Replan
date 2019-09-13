@@ -335,11 +335,11 @@ def cook_meal(world, fixed=False, **kwargs):
     if not fixed:
         sample_placement(world, mustard_name, 'indigo_tmp', learned=True)
 
-
     stove = STOVES[-1]
     bowl_name = add_ycb(world, 'bowl')
     prior[bowl_name] = DeltaDist(stove)
     sample_placement(world, bowl_name, stove, learned=True)
+    #print(get_pose(world.get_body(bowl_name)))
 
     set_all_static()
 

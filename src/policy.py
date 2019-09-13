@@ -3,11 +3,12 @@ from __future__ import print_function
 import time
 
 from pybullet_tools.utils import wait_for_duration, wait_for_user, print_separator, INF, elapsed_time
-from src.belief import create_observable_belief, transition_belief_update
+from src.belief import create_observable_belief, transition_belief_update, create_observable_pose_dist
 from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
     STOCHASTIC_ACTIONS
+from src.utils import BOWL
 
 
 def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True,
@@ -20,6 +21,8 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         belief = create_observable_belief(world)  # Fast
     else:
         belief = task.create_belief()
+    if BOWL in task.objects: # TODO: hack for bowl
+        belief.pose_dists[BOWL] = create_observable_pose_dist(world, BOWL)
     belief.liquid.update(task.init_liquid)
     print('Prior:', belief)
 

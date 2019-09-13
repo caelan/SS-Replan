@@ -75,7 +75,7 @@ def observe_pybullet(world):
 
 ################################################################################
 
-def fix_detections(belief, detections):
+def fix_detections(belief, detections, **kwargs):
     # TODO: move directly to belief?
     world = belief.world
     fixed_detections = {}
@@ -83,7 +83,7 @@ def fix_detections(belief, detections):
         if name == belief.holding:
             continue
         for observed_pose in detections[name]:
-            fixed_pose, support = world.fix_pose(name, observed_pose)
+            fixed_pose, support = world.fix_pose(name, observed_pose, **kwargs)
             if fixed_pose is not None:
                 fixed_detections.setdefault(name, []).append(fixed_pose)
     return fixed_detections

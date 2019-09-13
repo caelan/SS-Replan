@@ -49,8 +49,11 @@ def pour_path_from_parameter(world, bowl_name, cup_name):
     #####
 
     assert -np.pi <= final_pitch <= initial_pitch
+    pitches = [initial_pitch]
+    if final_pitch != initial_pitch:
+        pitches = list(np.arange(final_pitch, initial_pitch, np.pi/16)) + pitches
     cup_path_in_bowl = []
-    for pitch in list(np.arange(final_pitch, initial_pitch, np.pi/16)) + [initial_pitch]:
+    for pitch in pitches:
         rotate_pivot = Pose(euler=Euler(pitch=pitch)) # Can also interpolate directly between start and end quat
         cup_path_in_bowl.append(multiply(Pose(point=bowl_center), Pose(pivot_in_bowl_center),
                                          rotate_pivot, invert(base_from_pivot),
@@ -103,10 +106,13 @@ def get_fixed_pour_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
             aq = FConf(world.robot, world.arm_joints, arm_path[-1])
             robot_saver = BodySaver(world.robot)
 
+            obj_type = type_from_name(cup_name)
+            duration = 5.0 if obj_type in [MUSTARD] else 1.0
+            objects = [bowl_name, cup_name]
             cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-                ApproachTrajectory(world, world.robot, world.arm_joints, arm_path[::-1]),
-                Wait(world),
-                ApproachTrajectory(world, world.robot, world.arm_joints, arm_path),
+                ApproachTrajectory(objects, world, world.robot, world.arm_joints, arm_path[::-1]),
+                Wait(world, duration=duration),
+                ApproachTrajectory(objects, world, world.robot, world.arm_joints, arm_path),
             ], name='pour')
             yield (aq, cmd,)
     return gen

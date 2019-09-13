@@ -34,13 +34,16 @@ MAX_COST = MAX_FD_COST / COST_SCALE
 #MAX_COST = MAX_FD_COST / get_cost_scale()
 # TODO: move this to FD
 
+# TODO: top part of object is visible
+DETECT_SCALE = 0.5 # 0.05 | 0.5 | 1.0 | 1.25
+
 DETECT_COST = 1.0
 BASE_CONSTANT = 1.0 # 1 | 10
 BASE_VELOCITY = 0.25
 SELF_COLLISIONS = True
 
 PAUSE_MOTION_FAILURES = False
-PRINT_FAILURES = False
+PRINT_FAILURES = True
 MOVE_ARM = True
 ARM_RESOLUTION = 0.05
 GRIPPER_RESOLUTION = 0.01
@@ -142,8 +145,6 @@ def is_visible_by_camera(world, point):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
-    scale = 0.05 # 0.05 | 0.5 | 1.0
-    #scale = 1.25 # 0.05 | 0.5 | 1.0
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass
@@ -158,7 +159,7 @@ def get_compute_detect(world, ray_trace=True, **kwargs):
 
             aabb = get_view_aabb(body, camera_pose)
             center = get_aabb_center(aabb)
-            extent = np.multiply([scale, scale, 1], get_aabb_extent(aabb))
+            extent = np.multiply([DETECT_SCALE, DETECT_SCALE, 1], get_aabb_extent(aabb))
             view_aabb = (center - extent / 2, center + extent / 2)
             # print(is_visible_aabb(view_aabb, camera_matrix=camera_matrix))
             obj_points = apply_affine(camera_pose, support_from_aabb(view_aabb)) + [obj_point]
@@ -210,10 +211,10 @@ def get_ofree_ray_pose_test(world, **kwargs):
         if any(pairwise_collision(body, obst) for obst in obstacles):
             return False
         visible = not obstacles & detect.compute_occluding()
-        #if not visible:
-        #    handles = detect.draw()
-        #    wait_for_user()
-        #    remove_handles(handles)
+        if not visible:
+            handles = detect.draw()
+            wait_for_user()
+            remove_handles(handles)
         return visible
     return test
 
@@ -603,13 +604,14 @@ def plan_pick(world, obj_name, pose, grasp, base_conf, obstacles, randomize=True
     gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
     finger_cmd, = gripper_motion_fn(world.open_gq, grasp.get_gripper_conf())
     attachment = create_surface_attachment(world, obj_name, pose.support)
+    objects = [obj_name]
     cmd = Sequence(State(world, savers=[robot_saver, obj_saver],
                          attachments=[attachment]), commands=[
-        ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
+        ApproachTrajectory(objects, world, world.robot, world.arm_joints, approach_path),
         finger_cmd.commands[0],
         Detach(world, attachment.parent, attachment.parent_link, attachment.child),
         AttachGripper(world, obj_body, grasp=grasp),
-        ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
+        ApproachTrajectory(objects, world, world.robot, world.arm_joints, reversed(approach_path)),
     ], name='pick')
     yield (aq, cmd,)
 
@@ -838,11 +840,12 @@ def plan_pull(world, door_joint, door_plan, base_conf,
     gripper_conf = FConf(world.robot, world.gripper_joints, [grasp_width] * len(world.gripper_joints))
     finger_cmd, = gripper_motion_fn(world.open_gq, gripper_conf)
 
+    objects = []
     commands = [
-        ApproachTrajectory(world, world.robot, world.arm_joints, approach_paths[0]),
+        ApproachTrajectory(objects, world, world.robot, world.arm_joints, approach_paths[0]),
         DoorTrajectory(world, world.robot, world.arm_joints, arm_path,
                        world.kitchen, [door_joint], door_path),
-        ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
+        ApproachTrajectory(objects, world, world.robot, world.arm_joints, reversed(approach_paths[-1])),
     ]
     door_path, _, _, _ = door_plan
     sign = world.get_door_sign(door_joint)
@@ -960,10 +963,11 @@ def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=Tr
 
     #gripper_motion_fn = get_gripper_motion_gen(world, **kwargs)
     #finger_cmd, = gripper_motion_fn(world.open_gq, world.closed_gq)
+    objects = []
     cmd = Sequence(State(world, savers=[robot_saver]), commands=[
         #finger_cmd.commands[0],
-        ApproachTrajectory(world, world.robot, world.arm_joints, approach_path),
-        ApproachTrajectory(world, world.robot, world.arm_joints, reversed(approach_path)),
+        ApproachTrajectory(objects, world, world.robot, world.arm_joints, approach_path),
+        ApproachTrajectory(objects, world, world.robot, world.arm_joints, reversed(approach_path)),
         #finger_cmd.commands[0].reverse(),
         Wait(world, duration=1.0),
     ], name='press')
