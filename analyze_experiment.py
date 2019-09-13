@@ -42,6 +42,7 @@ ERROR_OUTCOME = {
 
 
 def main():
+    # TODO: why are the memory errors happening? Is it because of FD overflow?
     parser = argparse.ArgumentParser()
     parser.add_argument('experiment', help='Name of the experiment')
     args = parser.parse_args()

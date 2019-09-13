@@ -122,16 +122,15 @@ def get_fixed_pour_gen_fn(world, max_attempts=50, collisions=True, teleport=Fals
 def get_pour_gen_fn(world, max_attempts=50, learned=False, **kwargs):
     ik_gen = get_fixed_pour_gen_fn(world, max_attempts=1, **kwargs)
 
-    def gen(bowl_name, wp, cup_name, grasp):
+    def gen(bowl_name, pose, cup_name, grasp):
         if bowl_name == cup_name:
             return
         obstacles = world.static_obstacles
-        pose = wp.get_world_from_body()
         if learned:
             #base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
             raise NotImplementedError()
         else:
-            base_generator = uniform_pose_generator(world.robot, pose)
+            base_generator = uniform_pose_generator(world.robot, pose.get_world_from_body())
         safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
         while True:
             for i in range(max_attempts):
@@ -140,7 +139,7 @@ def get_pour_gen_fn(world, max_attempts=50, learned=False, **kwargs):
                 except StopIteration:
                     return
                 #randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(ik_gen(bowl_name, wp, cup_name, grasp, base_conf), None)
+                ik_outputs = next(ik_gen(bowl_name, pose, cup_name, grasp, base_conf), None)
                 if ik_outputs is not None:
                     yield (base_conf,) + ik_outputs
                     break

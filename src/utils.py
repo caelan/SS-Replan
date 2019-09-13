@@ -649,7 +649,7 @@ def get_surface_obstacles(world, surface_name):
     obstacles = set()
     for joint_name in surface.joints:
         link = child_link_from_joint(joint_from_name(world.kitchen, joint_name))
-        obstacles.update(get_descendant_obstacles(world.kitchen, link)) # subtree?
+        obstacles.update(get_descendant_obstacles(world.kitchen, link))
     # Be careful to call this before each check
     open_surface_joints(world, surface_name, joint_names=CABINET_JOINTS)
     return obstacles

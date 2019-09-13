@@ -18,7 +18,7 @@ from src.utils import CABINET_JOINTS, DRAWER_JOINTS, KNOBS
 from src.world import World
 from src.streams.press import get_press_gen_fn
 from src.streams.pull import get_pull_gen_fn
-from src.database import DATABASE_DIRECTORY, get_joint_reference_pose, PULL_IR_FILENAME, PRESS_IR_FILENAME
+from src.database import get_joint_reference_pose, get_pull_path
 
 
 def collect_pull(world, joint_name, args):
@@ -29,18 +29,16 @@ def collect_pull(world, joint_name, args):
     press = (joint_name in KNOBS)
     if press:
         press_gen = get_press_gen_fn(world, collisions=not args.cfree, teleport=args.teleport, learned=False)
-        filename = PRESS_IR_FILENAME.format(robot_name=robot_name, knob_name=joint_name)
     else:
         joint = joint_from_name(world.kitchen, joint_name)
         open_conf = Conf(world.kitchen, [joint], [world.open_conf(joint)])
         closed_conf = Conf(world.kitchen, [joint], [world.closed_conf(joint)])
         pull_gen = get_pull_gen_fn(world, collisions=not args.cfree, teleport=args.teleport, learned=False)
         #handle_link, handle_grasp, _ = get_handle_grasp(world, joint)
-        filename = PULL_IR_FILENAME.format(robot_name=robot_name, joint_name=joint_name)
 
-    path = os.path.join(DATABASE_DIRECTORY, filename)
+    path = get_pull_path(robot_name, joint_name)
     print(SEPARATOR)
-    print('Robot name {} | Joint name: {} | Filename: {}'.format(robot_name, joint_name, filename))
+    print('Robot name {} | Joint name: {} | Filename: {}'.format(robot_name, joint_name, path))
 
     entries = []
     failures = 0
@@ -50,8 +48,7 @@ def collect_pull(world, joint_name, args):
         if press:
             result = next(press_gen(joint_name), None)
         else:
-            # Open to closed
-            result = next(pull_gen(joint_name, open_conf, closed_conf), None)
+            result = next(pull_gen(joint_name, open_conf, closed_conf), None) # Open to closed
         if result is None:
             print('Failure! | {} / {} [{:.3f}]'.format(
                 len(entries), args.num_samples, elapsed_time(start_time)))
@@ -92,7 +89,6 @@ def collect_pull(world, joint_name, args):
         'entries': entries,
         'failures': failures,
         'successes': len(entries),
-        'filename': filename,
     }
     if not press:
         data.update({

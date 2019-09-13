@@ -4,7 +4,7 @@ import random
 from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multiply, \
     euler_from_quat, draw_point, wait_for_user, set_joint_positions, joints_from_names, parent_link_from_joint, has_gui, \
     point_from_pose, RED, child_link_from_joint, get_pose, get_point, invert, base_values_from_pose
-from src.utils import GRASP_TYPES, surface_from_name, BASE_JOINTS, joint_from_name, unit_pose, ALL_SURFACES
+from src.utils import GRASP_TYPES, surface_from_name, BASE_JOINTS, joint_from_name, unit_pose, ALL_SURFACES, KNOBS
 
 DATABASE_DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
@@ -85,13 +85,17 @@ def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
 
 ################################################################################
 
+def is_press(joint_name):
+    return joint_name in KNOBS
+
 def get_joint_reference_pose(kitchen, surface_name):
     joint = joint_from_name(kitchen, surface_name)
     link = parent_link_from_joint(kitchen, joint)
     return get_link_pose(kitchen, link)
 
 def get_pull_path(robot_name, joint_name):
-    return os.path.join(DATABASE_DIRECTORY, PULL_IR_FILENAME.format(
+    ir_filename = PRESS_IR_FILENAME if is_press(joint_name) else PULL_IR_FILENAME
+    return os.path.join(DATABASE_DIRECTORY, ir_filename.format(
         robot_name=robot_name, joint_name=joint_name))
 
 def load_pull_database(robot_name, joint_name):

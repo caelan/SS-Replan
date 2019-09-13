@@ -123,13 +123,15 @@
 						        (BConf ?bq) (AConf ?bq @rest_aq) (AConf ?bq ?aq) (ATraj ?at)))
 
   (:stream plan-base-motion
-    :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
+    ;:fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf
+    :fluents (AtGConf AtAngle AtRelPose AtGrasp) ; AtBConf, AtAConf
     :inputs (?bq1 ?bq2 ?aq) ; TODO: just rest_aq?
     :domain (and (MovableBase) (AConf ?bq1 ?aq) (AConf ?bq2 ?aq))
     :outputs (?bt)
     :certified (BaseMotion ?bq1 ?bq2 ?aq ?bt))
   (:stream plan-arm-motion
-    :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle
+    ;:fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf
+    :fluents (AtGConf AtAngle AtRelPose AtGrasp) ; AtBConf, AtAConf
     ; TODO: disjunctive stream conditions
     :inputs (?bq ?aq1 ?aq2)
     :domain (and (AConf ?bq ?aq1) (AConf ?bq ?aq2))

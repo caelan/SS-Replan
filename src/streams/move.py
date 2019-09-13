@@ -1,15 +1,15 @@
 import numpy as np
 
 from pybullet_tools.utils import BodySaver, plan_nonholonomic_motion, set_renderer, wait_for_user, plan_joint_motion, \
-    get_extend_fn
+    get_extend_fn, child_link_from_joint
 from src.command import Sequence, State, Trajectory
 from src.inference import SurfaceDist
-from src.stream import PAUSE_MOTION_FAILURES, ARM_RESOLUTION, SELF_COLLISIONS, GRIPPER_RESOLUTION
-from src.utils import get_link_obstacles, FConf
+from src.stream import ARM_RESOLUTION, SELF_COLLISIONS, GRIPPER_RESOLUTION
+from src.utils import get_link_obstacles, FConf, get_descendant_obstacles
 
+PAUSE_MOTION_FAILURES = False
 
 def parse_fluents(world, fluents):
-    attachments = []
     obstacles = set()
     for fluent in fluents:
         predicate, args = fluent[0], fluent[1:]
@@ -17,19 +17,43 @@ def parse_fluents(world, fluents):
             q, = args
             q.assign()
         elif predicate == 'AtAngle'.lower():
+            j, a = args
+            a.assign()
+            link = child_link_from_joint(a.joints[0])
+            obstacles.update(get_descendant_obstacles(a.body, link))
+        elif predicate in 'AtWorldPose'.lower():
+            # TODO: conditional effects are not being correctly updated in pddlstream
+            #b, p = args
+            #if isinstance(p, SurfaceDist):
+            #    continue
+            #p.assign()
+            #obstacles.update(get_link_obstacles(world, b))
             raise RuntimeError()
-            # j, a = args
-            # a.assign()
-            # obstacles.update(get_descendant_obstacles(a.body, a.joints[0]))
-        elif predicate in {p.lower() for p in ['AtPose', 'AtWorldPose']}:
-            b, p = args
-            if isinstance(p, SurfaceDist):
-                continue
-            p.assign()
-            obstacles.update(get_link_obstacles(world, b))
+        elif predicate in 'AtRelPose'.lower():
+            pass
         elif predicate == 'AtGrasp'.lower():
-            b, g = args
-            if b is not None:
+            pass
+        else:
+            raise NotImplementedError(predicate)
+
+    attachments = []
+    for fluent in fluents:
+        predicate, args = fluent[0], fluent[1:]
+        if predicate in {p.lower() for p in ['AtBConf', 'AtAConf', 'AtGConf']}:
+            pass
+        elif predicate == 'AtAngle'.lower():
+            pass
+        elif predicate in 'AtWorldPose'.lower():
+            raise RuntimeError()
+        elif predicate in 'AtRelPose'.lower():
+            o1, rp, o2 = args
+            if isinstance(rp, SurfaceDist):
+                continue
+            rp.assign()
+            obstacles.update(get_link_obstacles(world, o1))
+        elif predicate == 'AtGrasp'.lower():
+            o, g = args
+            if o is not None:
                 attachments.append(g.get_attachment())
                 attachments[-1].assign()
         else:
@@ -61,10 +85,10 @@ def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=Fal
                                             reversible=True, self_collisions=False,
                                             restarts=restarts, iterations=iterations, smooth=smooth)
             if path is None:
-                print('Failed to find a base motion plan!')
+                print('Failed to find an arm motion plan for {}->{}'.format(bq1, bq2))
                 if PAUSE_MOTION_FAILURES:
                     set_renderer(enable=True)
-                    #print(fluents)
+                    print(fluents)
                     for bq in [bq1, bq2]:
                         bq.assign()
                         wait_for_user()
@@ -113,10 +137,10 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
                                      custom_limits=world.custom_limits, resolutions=resolutions,
                                      restarts=2, iterations=50, smooth=50)
             if path is None:
-                print('Failed to find an arm motion plan!')
+                print('Failed to find an arm motion plan for {}->{}'.format(aq1, aq2))
                 if PAUSE_MOTION_FAILURES:
                     set_renderer(enable=True)
-                    #print(fluents)
+                    print(fluents)
                     for bq in [aq1, aq2]:
                         bq.assign()
                         wait_for_user()
