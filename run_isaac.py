@@ -30,8 +30,9 @@ from src.carter import command_carter, HOME_BASE_POSE, test_carter
 
 from pybullet_tools.utils import LockRenderer, wait_for_user, elapsed_time, \
     point_from_pose, set_camera_pose, \
-    link_from_name, get_link_pose, get_joint_positions
+    link_from_name, get_link_pose, set_pose, get_joint_positions
 from pddlstream.utils import Verbose
+from src.belief import create_observable_pose_dist
 
 from src.deepim import DeepIM, mean_pose_deviation, get_pose_distance
 #from retired.perception import test_deepim
@@ -41,7 +42,7 @@ from src.command import execute_commands, iterate_commands
 from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
     simulation_setup
 from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, \
-    TOP_DRAWER, TOP_GRASP, LEFT_DOOR, BOTTOM_DRAWER, SIDE_GRASP
+    TOP_DRAWER, TOP_GRASP, LEFT_DOOR, BOTTOM_DRAWER, SIDE_GRASP, TOMATO_SOUP, MUSTARD, BOWL, STOVES
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
@@ -151,30 +152,40 @@ def reset_task(world, args):
         #return_init_aq=True,
         return_init_bq=True)
 
+BOWL_POSE = ((0.065, 0.625, -0.5255), (0.0, 0.0, 0.0, 1))
+
 def real_setup(domain, world, args):
     # TODO: detect if lula is active via rosparam
     observer = RosObserver(domain)
     perception = DeepIM(domain, sides=[RIGHT], obj_types=YCB_OBJECTS)
     prior = {
-        SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
-        #SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
-        SUGAR: UniformDist([INDIGO_COUNTER]),
+        #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
+        SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
+        #SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
+        #MUSTARD: UniformDist([INDIGO_COUNTER]),
+        #TOMATO_SOUP: UniformDist([INDIGO_COUNTER]),
+        # Need to extend the TaskManager class
+        #BOWL: UniformDist([STOVES[-1]]),
     }
-    goal_drawer = BOTTOM_DRAWER # TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
+    goal_drawer = TOP_DRAWER # INDIGO_COUNTER | TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
     task = Task(world, prior=prior, teleport_base=True,
-                grasp_types=[TOP_GRASP], #, SIDE_GRASP],
+                #grasp_types=[TOP_GRASP],  #, SIDE_GRASP],
+                #grasp_types=[SIDE_GRASP],  # , SIDE_GRASP],
+                #init_liquid=[(TOMATO_SOUP, 'tomato'), (MUSTARD, 'mustard')],
                 #goal_detected=[SPAM],
-                #goal_holding=SPAM,
-                goal_on={SPAM: goal_drawer},
-                #goal_on={SUGAR: TOP_DRAWER},
+                goal_holding=SPAM,
+                #goal_hand_empty=True,
+                #goal_on={SPAM: goal_drawer},
+                #goal_on={CHEEZIT: STOVES[-1]},
                 #goal_closed=[],
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
+                # goal_cooked=[SPAM],
+                #goal_cooked=['tomato', 'mustard'],
                 movable_base=not args.fixed,
-                goal_aq=world.carry_conf, #.values,
-                #goal_cooked=[SPAM],
+                goal_aq=world.carry_conf,  #.values,
                 #return_init_aq=True,
                 return_init_bq=True
                 )
@@ -280,6 +291,8 @@ def main():
         # Used to need to do expensive computation before localize_all
         # due to the LULA overhead (e.g. loading complex meshes)
         load_objects(interface.task)
+        if BOWL in interface.task.objects:
+            set_pose(world.get_body(BOWL), BOWL_POSE)
         observe_world(interface, visible=set())
         print('Base conf:', get_joint_positions(world.robot, world.base_joints))
         print('Arm conf:', get_joint_positions(world.robot, world.arm_joints))
