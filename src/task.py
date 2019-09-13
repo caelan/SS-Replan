@@ -397,7 +397,7 @@ def stow_block(world, num=1, fixed=False, **kwargs):
 
 ################################################################################
 
-TASKS = [
+TASKS_FNS = [
     detect_block,
     hold_block,
     detect_drawers,

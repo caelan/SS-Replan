@@ -18,7 +18,7 @@ from src.observe import observe_pybullet
 #from src.debug import test_observation
 from src.planner import VIDEO_TEMPLATE
 from src.world import World
-from src.task import TASKS
+from src.task import TASKS_FNS
 from src.policy import run_policy
 #from src.debug import dump_link_cross_sections, test_rays
 
@@ -57,7 +57,7 @@ def create_parser():
 ################################################################################
 
 def main():
-    task_names = [fn.__name__ for fn in TASKS]
+    task_names = [fn.__name__ for fn in TASKS_FNS]
     print('Tasks:', task_names)
     parser = create_parser()
     parser.add_argument('-problem', default=task_names[-1], choices=task_names,
@@ -75,7 +75,7 @@ def main():
 
     np.set_printoptions(precision=3, suppress=True)
     world = World(use_gui=True)
-    task_fn_from_name = {fn.__name__: fn for fn in TASKS}
+    task_fn_from_name = {fn.__name__: fn for fn in TASKS_FNS}
     task_fn = task_fn_from_name[args.problem]
 
     task = task_fn(world, num=args.num, fixed=args.fixed)
