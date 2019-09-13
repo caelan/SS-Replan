@@ -165,6 +165,8 @@ def linear_parameterization(robot, joints, path, speed=ARM_SPEED):
 ################################################################################
 
 def compute_min_duration(distance, max_velocity, acceleration):
+    if distance == 0:
+        return 0
     max_ramp_duration = max_velocity / acceleration
     ramp_distance = 0.5 * acceleration * math.pow(max_ramp_duration, 2)
     remaining_distance = distance - 2 * ramp_distance
@@ -210,6 +212,7 @@ def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACT
     :return:
     """
     max_velocities = velocity_fraction * np.array([get_max_velocity(robot, joint) for joint in joints])
+    assert np.all(max_velocities)
     accelerations = max_velocities * acceleration_fraction
     path = waypoints_from_path(path)
     difference_fn = get_difference_fn(robot, joints)

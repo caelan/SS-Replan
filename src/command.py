@@ -6,7 +6,7 @@ import time
 
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, flatten_links, remove_handles, \
-    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver
+    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, adjust_path
 from src.utils import create_surface_attachment
 
 DEFAULT_TIME_STEP = 0.02
@@ -143,10 +143,11 @@ class Trajectory(Command):
     def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
         from src.retime import slow_trajectory, ensure_increasing, retime_trajectory
         from scipy.interpolate import interp1d, CubicSpline
-        path, time_from_starts = retime_trajectory(self.robot, self.joints, self.path, sample_step=None)
+        path = adjust_path(self.robot, self.joints, self.path) # TODO: account for error in the start configuration?
+        path, time_from_starts = retime_trajectory(self.robot, self.joints, path, sample_step=None)
         #path = list(self.path)
         #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
-        ensure_increasing(path, time_from_starts)
+        #ensure_increasing(path, time_from_starts)
         if len(path) <= 1:
             return True
         #positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
@@ -321,6 +322,9 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
             set_joint_positions(self.robot, self.robot_joints, robot_conf)
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
+    #def simulate(self, state, **kwargs):
+    #    # TODO: interpolate for drawer
+    #    raise NotImplementedError()
     def execute(self, interface):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
