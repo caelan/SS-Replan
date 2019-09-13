@@ -48,52 +48,7 @@
                     (Value ?rp) (Sample ?rp) (BeliefUpdate ?o1 ?rp @none ?rp)
                     (WorldPose ?o1 ?wp1) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2)))
 
-  ; Movable base
-  (:stream plan-pick
-    :inputs (?o ?wp ?g) ; ?aq0)
-    :domain (and (MovableBase) (WorldPose ?o ?wp) (Sample ?wp) (Grasp ?o ?g)) ; (RestAConf ?aq0))
-    :outputs (?bq ?aq ?at)
-    :certified (and (BConf ?bq) (ATraj ?at)
-                    ; (AConf ?bq ?aq0)
-                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
-                    (AConf ?bq ?aq)
-                    (Pick ?o ?wp ?g ?bq ?aq ?at)))
-  (:stream plan-pull
-    :inputs (?j ?a1 ?a2) ; ?aq0)
-    :domain (and (MovableBase) (Angle ?j ?a1) (Angle ?j ?a2)) ; (RestAConf ?aq0))
-    :outputs (?bq ?aq1 ?aq2 ?at)
-    :certified (and (BConf ?bq) (ATraj ?at)
-                    ; (AConf ?bq ?aq0)
-                    ; TODO: strange effect with plan constraints
-                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
-                    (AConf ?bq ?aq1) (AConf ?bq ?aq2)
-                    (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)))
 
-  (:stream plan-press
-    :inputs (?k)
-    :domain (and (MovableBase) (Knob ?k)) ; TODO: (WorldPose ?o ?wp)
-    :outputs (?bq ?aq ?at)
-    :certified (and (BConf ?bq) (ATraj ?at)
-                    ; (AConf ?bq ?aq0)
-                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
-                    (AConf ?bq ?aq)
-                    (Press ?k ?bq ?aq ?at)))
-  (:stream fixed-plan-press
-    :inputs (?k ?bq)
-    :domain (NearJoint ?k ?bq) ; TODO: use pose instead?
-    :outputs (?aq ?at)
-    :certified (and (ATraj ?at) (AConf ?bq ?aq)
-                    (Press ?k ?bq ?aq ?at)))
-
-	(:stream fixed-plan-pour
-		:inputs (?bowl ?wp ?cup ?g ?bq) ; TODO: can pour ?bowl & ?cup
-		:domain (and (Bowl ?bowl) (WorldPose ?bowl ?wp) (Sample ?wp) (NearPose ?bowl ?wp ?bq)
-                 (Pourable ?cup) (Grasp ?cup ?g))
-		:outputs (?aq ?at)
-		:certified (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at)
-						        (AConf ?bq ?aq) (ATraj ?at)))
-
-  ; Fixed base
   (:stream test-near-pose
     :inputs (?o ?wp ?bq)
     :domain (and (WorldPose ?o ?wp) (CheckNearby ?o) (Sample ?wp) (InitBConf ?bq))
@@ -104,6 +59,15 @@
                  (WorldPose ?o ?wp) (Sample ?wp) (Grasp ?o ?g))
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
+                    (Pick ?o ?wp ?g ?bq ?aq ?at)))
+  (:stream plan-pick
+    :inputs (?o ?wp ?g) ; ?aq0)
+    :domain (and (MovableBase) (WorldPose ?o ?wp) (Sample ?wp) (Grasp ?o ?g)) ; (RestAConf ?aq0))
+    :outputs (?bq ?aq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at)
+                    ; (AConf ?bq ?aq0)
+                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
+                    (AConf ?bq ?aq)
                     (Pick ?o ?wp ?g ?bq ?aq ?at)))
 
   (:stream test-near-joint
@@ -116,6 +80,47 @@
     :outputs (?aq1 ?aq2 ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq1) (AConf ?bq ?aq2)
                     (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)))
+  (:stream plan-pull
+    :inputs (?j ?a1 ?a2) ; ?aq0)
+    :domain (and (MovableBase) (Angle ?j ?a1) (Angle ?j ?a2)) ; (RestAConf ?aq0))
+    :outputs (?bq ?aq1 ?aq2 ?at)
+    :certified (and (BConf ?bq) (ATraj ?at)
+                    ; (AConf ?bq ?aq0)
+                    ; TODO: strange effect with plan constraints
+                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
+                    (AConf ?bq ?aq1) (AConf ?bq ?aq2)
+                    (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)))
+
+
+  (:stream fixed-plan-press
+    :inputs (?k ?bq)
+    :domain (NearJoint ?k ?bq) ; TODO: use pose instead?
+    :outputs (?aq ?at)
+    :certified (and (ATraj ?at) (AConf ?bq ?aq)
+                    (Press ?k ?bq ?aq ?at)))
+  (:stream plan-press
+    :inputs (?k)
+    :domain (and (MovableBase) (Knob ?k)) ; TODO: (WorldPose ?o ?wp)
+    :outputs (?bq ?aq ?at)
+    :certified (and (BConf ?bq) (ATraj ?at)
+                    ; (AConf ?bq ?aq0)
+                    (AConf ?bq @rest_aq) ; (AConf ?bq @calibrate_aq)
+                    (AConf ?bq ?aq)
+                    (Press ?k ?bq ?aq ?at)))
+
+	(:stream fixed-plan-pour
+		:inputs (?bowl ?wp ?cup ?g ?bq) ; TODO: can pour ?bowl & ?cup
+		:domain (and (Bowl ?bowl) (WorldPose ?bowl ?wp) (Sample ?wp) (NearPose ?bowl ?wp ?bq)
+                 (Pourable ?cup) (Grasp ?cup ?g))
+		:outputs (?aq ?at)
+		:certified (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at)
+						        (AConf ?bq ?aq) (ATraj ?at)))
+	(:stream plan-pour
+		:inputs (?bowl ?wp ?cup ?g)
+		:domain (and (Bowl ?bowl) (WorldPose ?bowl ?wp) (Sample ?wp) (Pourable ?cup) (Grasp ?cup ?g))
+		:outputs (?bq ?aq ?at)
+		:certified (and (Pour ?bowl ?wp ?cup ?g ?bq ?aq ?at)
+						        (BConf ?bq) (AConf ?bq @rest_aq) (AConf ?bq ?aq) (ATraj ?at)))
 
   (:stream plan-base-motion
     :fluents (AtGConf AtWorldPose AtGrasp) ; AtBConf, AtAConf, AtGConf, AtAngle

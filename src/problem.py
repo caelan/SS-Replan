@@ -31,8 +31,7 @@ from src.streams.move import get_base_motion_fn, get_arm_motion_gen, get_gripper
 from src.streams.press import get_press_gen_fn, get_fixed_press_gen_fn
 from src.streams.pull import get_fixed_pull_gen_fn, get_pull_gen_fn
 from src.streams.pick import get_fixed_pick_gen_fn, get_pick_gen_fn
-
-from src.streams.pour import get_fixed_pour_gen_fn
+from src.streams.pour import get_fixed_pour_gen_fn, get_pour_gen_fn
 from src.database import has_place_database
 
 MAX_ERROR = np.pi / 6
@@ -82,6 +81,7 @@ def get_streams(world, debug=False, teleport_base=False, **kwargs):
         'plan-pick': from_gen_fn(get_pick_gen_fn(world, **kwargs)),
         'plan-pull': from_gen_fn(get_pull_gen_fn(world, **kwargs)),
         'plan-press': from_gen_fn(get_press_gen_fn(world, **kwargs)),
+        'plan-pour': from_gen_fn(get_pour_gen_fn(world, **kwargs)),
 
         'plan-base-motion': from_fn(get_base_motion_fn(world, teleport_base=teleport_base, **kwargs)),
         'plan-arm-motion': from_fn(get_arm_motion_gen(world, **kwargs)),
@@ -208,7 +208,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
             [('Joint', knob) for knob in KNOBS] + \
-            [('Liquid', liquid) for _, liquid in task.init_liquid + task.goal_liquid] + \
+            [('Liquid', liquid) for _, liquid in task.init_liquid] + \
             [('HasLiquid', cup, liquid) for cup, liquid in belief.liquid] + \
             [('StoveKnob', STOVE_TEMPLATE.format(loc), KNOB_TEMPLATE.format(loc)) for loc in STOVE_LOCATIONS] + \
             [('GraspType', ty) for ty in task.grasp_types]  # TODO: grasp_type per object

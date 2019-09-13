@@ -11,7 +11,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import wait_for_user, LockRenderer, \
-    get_random_seed, get_numpy_seed, VideoSaver, set_camera, set_camera_pose, get_point
+    get_random_seed, get_numpy_seed, VideoSaver, set_camera, set_camera_pose, get_point, wait_for_duration
 from src.command import create_state, iterate_commands, simulate_commands, DEFAULT_TIME_STEP
 from src.visualization import add_markers
 from src.observe import observe_pybullet
@@ -79,6 +79,7 @@ def main():
     task_fn = task_fn_from_name[args.problem]
 
     task = task_fn(world, num=args.num, fixed=args.fixed)
+    wait_for_duration(0.1)
     world._update_initial()
     print('Objects:', task.objects)
     #target_point = get_point(world.get_body(task.objects[0]))

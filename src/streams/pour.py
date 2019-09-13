@@ -3,7 +3,8 @@ import random
 
 from pybullet_tools.utils import approximate_as_cylinder, approximate_as_prism, \
     multiply, invert, BodySaver, Euler, set_pose, wait_for_user, \
-    Point, Pose
+    Point, Pose, uniform_pose_generator
+from src.stream import plan_approach, MOVE_ARM, inverse_reachability, P_RANDOMIZE_IK, PRINT_FAILURES
 from src.command import Sequence, ApproachTrajectory, State, Wait
 from src.stream import MOVE_ARM, plan_workspace
 from src.utils import FConf, type_from_name, MUSTARD
@@ -72,7 +73,7 @@ def visualize_cartesian_path(body, pose_path):
     #for h in handles:
     #    remove_debug(h)
 
-def get_fixed_pour_gen_fn(world, max_attempts=25, collisions=True, teleport=False, **kwargs):
+def get_fixed_pour_gen_fn(world, max_attempts=50, collisions=True, teleport=False, **kwargs):
     def gen(bowl_name, wp, cup_name, grasp, bq):
         # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/d1e6024c5c13df7edeab3a271b745e656a794b02/plan_tools/samplers/pour.py
         if bowl_name == cup_name:
@@ -99,7 +100,7 @@ def get_fixed_pour_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
             bq.assign()
             grasp.set_gripper()
             world.carry_conf.assign()
-            arm_path = plan_workspace(world, tool_path, obstacles) # tilt to upright
+            arm_path = plan_workspace(world, tool_path, obstacles, randomize=True) # tilt to upright
             if arm_path is None:
                 continue
             assert MOVE_ARM
@@ -115,4 +116,37 @@ def get_fixed_pour_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
                 ApproachTrajectory(objects, world, world.robot, world.arm_joints, arm_path),
             ], name='pour')
             yield (aq, cmd,)
+    return gen
+
+
+def get_pour_gen_fn(world, max_attempts=50, learned=False, **kwargs):
+    ik_gen = get_fixed_pour_gen_fn(world, max_attempts=1, **kwargs)
+
+    def gen(bowl_name, wp, cup_name, grasp):
+        if bowl_name == cup_name:
+            return
+        obstacles = world.static_obstacles
+        pose = wp.get_world_from_body()
+        if learned:
+            #base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, grasp.grasp_type))
+            raise NotImplementedError()
+        else:
+            base_generator = uniform_pose_generator(world.robot, pose)
+        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+        while True:
+            for i in range(max_attempts):
+                try:
+                    base_conf, = next(safe_base_generator)
+                except StopIteration:
+                    return
+                #randomize = (random.random() < P_RANDOMIZE_IK)
+                ik_outputs = next(ik_gen(bowl_name, wp, cup_name, grasp, base_conf), None)
+                if ik_outputs is not None:
+                    yield (base_conf,) + ik_outputs
+                    break
+            else:
+                if PRINT_FAILURES: print('Pour failure')
+                if not pose.init:
+                    break
+                yield None
     return gen

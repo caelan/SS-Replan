@@ -79,13 +79,17 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
     # pool_result = pool.map_async(worker, args)
     #return generator
     while True:
+        # TODO: need to actually retrieve the info about which thread failed
         try:
             yield generator.next(timeout=timeout)
         except StopIteration:
             break
-        except TimeoutError:
-            print('Error! Timed out after {:.3f} seconds'.format(timeout))
-            break
+        except MemoryError: # as e:
+            traceback.print_exc()
+            continue
+        except TimeoutError: # as e:
+            traceback.print_exc()
+            continue
     if pool is not None:
         pool.close()
         pool.terminate()
@@ -103,7 +107,8 @@ def run_experiment(experiment):
     if not VERBOSE:
        sys.stdout = open(os.devnull, 'w')
     current_wd = os.getcwd()
-    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(pid))
+    #trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(pid))
+    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}/'.format(experiment['task'], experiment['trial']))
     safe_rm_dir(trial_wd)
     ensure_dir(trial_wd)
     os.chdir(trial_wd)
@@ -139,7 +144,6 @@ def run_experiment(experiment):
             data['error'] = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt()
-        #except MemoryError as err:
         except:
             traceback.print_exc()
             data = {'error': True}
@@ -160,6 +164,13 @@ def run_experiment(experiment):
 
 ################################################################################
 
+def set_soft_limit(name, limit):
+    # TODO: use FastDownward's memory strategy
+    # ulimit -a
+    soft, hard = resource.getrlimit(name) # resource.RLIM_INFINITY
+    soft = limit
+    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+
 def main():
     #parser = create_parser()
     #parser.add_argument('-problem', default=task_names[-1], choices=task_names,
@@ -172,21 +183,20 @@ def main():
     # https://stackoverflow.com/questions/15314189/python-multiprocessing-pool-hangs-at-join
     # https://stackoverflow.com/questions/39884898/large-amount-of-multiprocessing-process-causing-deadlock
     # TODO: alternatively don't destroy the world
-    num_cores = cpu_count() / 3 # -2
+    num_cores = cpu_count() - 2
     directory = os.path.realpath(DATA_DIRECTORY)
     date_name = datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
     json_path = os.path.join(directory, '{}.json'.format(date_name))
     experiments = [{'task': task, 'trial': trial} for trial in range(N) for task in TASK_NAMES]
 
-    # ulimit -a
-    soft, hard = resource.getrlimit(resource.RLIMIT_AS) # resource.RLIM_INFINITY
-    soft = int(BYTES_PER_GIGABYTE * MAX_RAM / num_cores)
-    resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # bytes
+    memory_per_core = float(MAX_RAM) / num_cores # gigabytes
+    set_soft_limit(resource.RLIMIT_AS, int(BYTES_PER_GIGABYTE * memory_per_core)) # bytes
+    #set_soft_limit(resource.RLIMIT_CPU, 2*MAX_TIME) # seconds
     # RLIMIT_MEMLOCK, RLIMIT_STACK, RLIMIT_DATA
 
     print('Results:', json_path)
     print('Num Cores:', num_cores)
-    print('Memory per Core: {:.2f}'.format(MAX_RAM / num_cores))
+    print('Memory per Core: {:.2f}'.format(memory_per_core))
     print('Tasks: {} | {}'.format(len(TASK_NAMES), TASK_NAMES))
     print('Policies: {} | {}'.format(len(POLICIES), POLICIES))
     print('Num Trials:', N)

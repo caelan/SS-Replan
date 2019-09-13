@@ -70,7 +70,7 @@ def main():
                 for attribute, value in outcome.items():
                     if (attribute not in ['policy']) and not isinstance(value, str):
                         value_per_attribute.setdefault(attribute, []).append(value)
-            statistics = {attribute: 'mean={:.3f}'.format(np.mean(values)) for attribute, values in value_per_attribute.items()}
+            statistics = {attribute: '{:.2f}'.format(np.mean(values)) for attribute, values in value_per_attribute.items()}
             statistics['trials'] = len(outcomes_per_task[task][policy])
             print('{}: {}'.format(name, str_from_object(statistics)))
 

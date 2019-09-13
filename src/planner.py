@@ -72,16 +72,18 @@ def get_stream_info():
 
         'compute-detect': StreamInfo(opt_gen_fn=opt_gen_fn, p_success=1e-4),
 
-        'plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         'fixed-plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'plan-pick': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+
+        'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
         # TODO: can't defer this because collision streams depend on it
         'plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False),
-        'fixed-plan-pull': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
 
-        'plan-press': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1, defer=False),
         'fixed-plan-press': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'plan-press': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
 
         'fixed-plan-pour': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
+        'plan-pour': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
 
         # 'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
         'plan-base-motion': StreamInfo(opt_gen_fn=PartialInputs(test=opt_move_base_test),
