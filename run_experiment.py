@@ -15,6 +15,7 @@ import random
 import os
 import sys
 import traceback
+import resource
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
@@ -47,6 +48,9 @@ VERBOSE = False
 TIME_PER_TRIAL = (60*60*0.912) / 126 # ~26 sec
 
 N = 100
+MAX_RAM = 28 # Max of 31.1 Gigabytes
+BYTES_PER_KILOBYTE = math.pow(2, 10)
+BYTES_PER_GIGABYTE = math.pow(2, 30)
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
@@ -135,6 +139,7 @@ def run_experiment(experiment):
             data['error'] = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt()
+        #except MemoryError as err:
         except:
             traceback.print_exc()
             data = {'error': True}
@@ -167,14 +172,21 @@ def main():
     # https://stackoverflow.com/questions/15314189/python-multiprocessing-pool-hangs-at-join
     # https://stackoverflow.com/questions/39884898/large-amount-of-multiprocessing-process-causing-deadlock
     # TODO: alternatively don't destroy the world
-    num_cores = cpu_count() / 2 # -2
+    num_cores = cpu_count() / 3 # -2
     directory = os.path.realpath(DATA_DIRECTORY)
     date_name = datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
     json_path = os.path.join(directory, '{}.json'.format(date_name))
     experiments = [{'task': task, 'trial': trial} for trial in range(N) for task in TASK_NAMES]
 
+    # ulimit -a
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS) # resource.RLIM_INFINITY
+    soft = int(BYTES_PER_GIGABYTE * MAX_RAM / num_cores)
+    resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # bytes
+    # RLIMIT_MEMLOCK, RLIMIT_STACK, RLIMIT_DATA
+
     print('Results:', json_path)
     print('Num Cores:', num_cores)
+    print('Memory per Core: {:.2f}'.format(MAX_RAM / num_cores))
     print('Tasks: {} | {}'.format(len(TASK_NAMES), TASK_NAMES))
     print('Policies: {} | {}'.format(len(POLICIES), POLICIES))
     print('Num Trials:', N)

@@ -14,7 +14,7 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
-    set_quat, quat_from_euler, INF, read_json, set_camera_pose, draw_aabb, \
+    set_quat, quat_from_euler, INF, read_json, set_camera_pose, set_real_time, set_caching, draw_aabb, \
     disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
@@ -72,6 +72,8 @@ class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.task = None
         self.client = connect(use_gui=use_gui)
+        set_real_time(False)
+        set_caching(False)
         disable_gravity()
         add_data_path()
         set_camera_pose(camera_point=[2, -1.5, 1])
