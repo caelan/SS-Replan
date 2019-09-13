@@ -511,7 +511,7 @@ def compute_surface_aabb(world, surface_name):
 ################################################################################
 
 INVALID_GRASPS = {
-    TOP_GRASP: [MUSTARD, CHEEZIT, BOWL, TOMATO_SOUP],
+    TOP_GRASP: [MUSTARD, CHEEZIT, BOWL], #, TOMATO_SOUP],
     SIDE_GRASP: [BOWL, SPAM],
 }
 
@@ -564,7 +564,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
             continue
         #assert is_valid_grasp_type(name, grasp_type)
         if grasp_type == TOP_GRASP:
-            grasp_length = 1.25 * FINGER_EXTENT[2]  # fraction = 0.5
+            grasp_length = 1.5 * FINGER_EXTENT[2]  # fraction = 0.5
             pre_direction = pre_distance * get_unit_vector([0, 0, 1])
             post_direction = unit_point()
             generator = get_top_grasps(body, under=True, tool_pose=TOOL_POSE, body_pose=body_pose,
@@ -587,7 +587,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
             raise ValueError(grasp_type)
         grasp_poses = randomize(list(generator))
         if obj_type in CYLINDERS:
-            # TODO: could apply to under as well
+            # TODO: filter first
             grasp_poses = (multiply(grasp_pose, Pose(euler=Euler(
                 yaw=random.uniform(-math.pi, math.pi)))) for grasp_pose in cycle(grasp_poses))
         for i, grasp_pose in enumerate(grasp_poses):

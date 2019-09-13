@@ -255,7 +255,7 @@
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)
                        (Detect ?o1 ?wp2 ?r) (BeliefUpdate ?o1 ?rp1 ?obs ?rp2)
                        (AtWorldPose ?o1 ?wp1) ; (AtRelPose ?o1 ?rp1 ?o0) (AtWorldPose ?o0 ?wp0)
-                       (Accessible ?o0 ?wp0)
+                       (Accessible ?o0 ?wp0) (HandEmpty)
                        ; (not (UnsafeRelPose ?o1 ?rp2 ?o0))
                        (not (OccludedRay ?r))
                        (not (Unsafe))

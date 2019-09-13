@@ -10,7 +10,7 @@ from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pos
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, STOVES
+    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, STOVES, TOP_GRASP
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -344,9 +344,10 @@ def cook_meal(world, fixed=False, **kwargs):
     set_all_static()
 
     return Task(world, prior=prior, movable_base=not fixed,
+                #grasp_types=[TOP_GRASP],
                 init_liquid=[(soup_name, 'tomato'), (mustard_name, 'mustard')],
                 #goal_liquid=[(bowl_name, 'tomato'), (bowl_name, 'mustard')],
-                #goal_holding=list(prior)[0],
+                #goal_holding=soup_name,
                 goal_hand_empty=True,
                 #goal_cooked=[bowl_name],
                 goal_cooked=['tomato', 'mustard'],
@@ -371,17 +372,11 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     prior = {}
     goal_on = {}
     for idx in range(num):
-        #entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
-        entity_name = add_ycb(world, 'tomato_soup_can', idx=idx, pose2d=SPAM_POSE2D) # mustard_bottle | tomato_soup_can
+        entity_name = add_block(world, idx=idx, pose2d=SPAM_POSE2D)
         prior[entity_name] = DeltaDist(initial_surface)
         goal_on[entity_name] = goal_surface
         if not fixed:
             sample_placement(world, entity_name, initial_surface, learned=True)
-
-    stove = STOVES[-1]
-    bowl_name = add_ycb(world, 'bowl')
-    prior[bowl_name] = DeltaDist(stove)
-    sample_placement(world, bowl_name, stove, learned=True)
 
     #obstruction_name = add_box(world, idx=0)
     #sample_placement(world, obstruction_name, 'hitman_tmp')
@@ -391,11 +386,9 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     return Task(world, prior=prior, movable_base=not fixed,
-                init_liquid=[(entity_name, 'food')],
-                goal_liquid=[(bowl_name, 'food')],
                 #goal_holding=list(prior)[0],
                 goal_hand_empty=True,
-                #goal_on=goal_on,
+                goal_on=goal_on,
                 #goal_cooked=list(prior),
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
