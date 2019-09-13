@@ -254,7 +254,7 @@ def sugar_drawer(world, fixed=False, **kwargs):
 
 ################################################################################
 
-def cook_block(world, fixed=True, **kwargs):
+def cook_block(world, fixed=False, **kwargs):
     add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
         set_fixed_base(world)
@@ -270,7 +270,7 @@ def cook_block(world, fixed=True, **kwargs):
     }
     return Task(world, prior=prior, movable_base=not fixed,
                 #goal_detected=[entity_name],
-                goal_holding=entity_name,
+                #goal_holding=entity_name,
                 goal_cooked=[entity_name],
                 #goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,

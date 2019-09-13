@@ -31,7 +31,7 @@ def get_srl_path():
         raise RuntimeError('Please install srl_system and set the {} environment variable'.format(SRL_VAR))
     return os.environ[SRL_VAR]
 
-MODELS_PATH = './models'
+MODELS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'models/')
 
 #YUMI_PATH = os.path.join(SRL_PATH, 'packages/external/abb_yumi_model/yumi_description/urdf/yumi_lula.urdf')
 #INTEL_PATH = os.path.join(SRL_PATH, 'packages/external/intel_robot_model/robots/intel_robot_model.urdf')
@@ -113,7 +113,7 @@ LEFT_DOOR = 'dagger_door_left'
 
 BOWLS = [BOWL]
 POURABLE = [TOMATO_SOUP, MUSTARD] # SUGAR
-FOOD = [TOMATO_SOUP, SPAM, BOWL]
+COOKABLE = [BOWL]
 
 ################################################################################
 

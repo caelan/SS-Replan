@@ -6,7 +6,7 @@ from pybullet_tools.utils import read_json, link_from_name, get_link_pose, multi
     point_from_pose, RED, child_link_from_joint, get_pose, get_point, invert, base_values_from_pose
 from src.utils import GRASP_TYPES, surface_from_name, BASE_JOINTS, joint_from_name, unit_pose, ALL_SURFACES
 
-DATABASE_DIRECTORY = os.path.join(os.getcwd(), 'databases/')
+DATABASE_DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'databases/')
 PLACE_IR_FILENAME = '{robot_name}-{surface_name}-{grasp_type}-place.json'
 PULL_IR_FILENAME = '{robot_name}-{joint_name}-pull.json'
 PRESS_IR_FILENAME = '{robot_name}-{knob_name}-press.json'

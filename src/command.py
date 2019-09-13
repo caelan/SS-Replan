@@ -82,6 +82,9 @@ class Command(object):
     @property
     def bodies(self):
         raise NotImplementedError()
+    @property
+    def cost(self):
+        raise NotImplementedError()
     def reverse(self):
         raise NotImplementedError()
     def iterate(self, state):
@@ -105,6 +108,9 @@ class Sequence(object):
         for command in self.commands:
             bodies.update(command.bodies)
         return bodies
+    @property
+    def cost(self):
+        return sum([0] + [command.cost for command in self.commands])
     def reverse(self):
         return Sequence(self.context, [command.reverse() for command in reversed(self.commands)], name=self.name)
     def __repr__(self):
@@ -124,6 +130,9 @@ class Trajectory(Command):
     def bodies(self):
         # TODO: decompose into dependents and moving?
         return flatten_links(self.robot, get_moving_links(self.robot, self.joints))
+    @property
+    def cost(self):
+        return len(self.path)
     def reverse(self):
         return self.__class__(self.world, self.robot, self.joints, self.path[::-1])
     def iterate(self, state):
@@ -301,6 +310,9 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
     def bodies(self):
         return flatten_links(self.robot, get_moving_links(self.robot, self.robot_joints)) | \
                flatten_links(self.world.kitchen, get_moving_links(self.world.kitchen, self.door_joints))
+    @property
+    def cost(self):
+        return len(self.path)
     def reverse(self):
         return self.__class__(self.world, self.robot, self.robot_joints, self.robot_path[::-1],
                               self.door, self.door_joints, self.door_path[::-1])
@@ -345,6 +357,9 @@ class Attach(Command):
     def bodies(self):
         return set()
         #return {self.robot, self.body}
+    @property
+    def cost(self):
+        return 0
     def reverse(self):
         return Detach(self.world, self.robot, self.link, self.body)
     def attach(self):
@@ -391,6 +406,9 @@ class Detach(Command):
     def bodies(self):
         return set()
         #return {self.robot, self.body}
+    @property
+    def cost(self):
+        return 0
     def reverse(self):
         return Attach(self.world, self.robot, self.link, self.body)
     def iterate(self, state):
@@ -418,6 +436,10 @@ class Detect(Command):
         self.pose = pose # Object pose
         self.rays = tuple(rays)
         # TODO: could instead use cones for full detection
+    # TODO: bodies?
+    @property
+    def cost(self):
+        return 0
     @property
     def surface_name(self):
         return self.pose.support
@@ -452,6 +474,9 @@ class Wait(Command):
     @property
     def bodies(self):
         return set()
+    @property
+    def cost(self):
+        return 0
     def reverse(self):
         return self
     def iterate(self, state):
@@ -484,6 +509,8 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP, pause=False):
             if time_step is None:
                 wait_for_duration(1e-2)
                 wait_for_user('Command {:2}/{:2} | step {:2} | Next?'.format(i + 1, len(commands), j))
+            elif time_step == 0:
+                pass
             else:
                 wait_for_duration(time_step)
         if pause:

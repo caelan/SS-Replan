@@ -15,7 +15,7 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
     get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name
 
 from src.inference import PoseDist
-from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, FOOD, COUNTERS, \
+from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, COOKABLE, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
     KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
 from src.stream import get_stable_gen, get_grasp_gen, get_pick_gen_fn, \
@@ -200,6 +200,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     init += [('Stackable', name, surface) for name, surface in task.goal_on.items()] + \
             [('Stackable', name, stove) for name, stove in product(task.goal_cooked, STOVES)] + \
             [('Pressed', name) for name in belief.pressed] + \
+            [('Cookable', name) for name in task.goal_cooked] + \
             [('Cooked', name) for name in belief.cooked] + \
             [('Status', status) for status in DOOR_STATUSES] + \
             [('Knob', knob) for knob in KNOBS] + \
@@ -357,7 +358,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             init.append(('Bowl', obj_name))
         else:
             init.append(('Obstacle', obj_name)) # TODO: hack to place within bowls
-        if obj_type in FOOD:
+        if obj_type in COOKABLE:
             init.append(('Cookable', obj_name))
         if obj_type in POURABLE:
             init.append(('Pourable', obj_name))
