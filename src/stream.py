@@ -447,20 +447,17 @@ def is_robot_visible(world, links):
 
 def inverse_reachability(world, base_generator, obstacles=set(),
                          max_attempts=50, **kwargs):
-
     min_distance = 0.04 if world.is_real() else 0.0
-    special_confs = world.special_confs if world.is_real() else []
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
-    ensure_visible = world.is_real() # world.task.teleport_base
-    robot_links = [world.franka_link, world.gripper_link] if ensure_visible else []
+    robot_links = [world.franka_link, world.gripper_link] if world.is_real() else []
     while True:
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
             if not all_between(lower_limits, base_conf, upper_limits):
                 continue
             bq = FConf(world.robot, world.base_joints, base_conf)
             bq.assign()
-            for conf in special_confs:
+            for conf in world.special_confs:
                 # Could even sample a special visible conf for this base_conf
                 conf.assign()
                 if not is_robot_visible(world, robot_links) or any(pairwise_collision(

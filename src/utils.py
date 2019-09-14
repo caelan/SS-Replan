@@ -371,7 +371,7 @@ def get_tool_link(robot):
         return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
-def create_gripper(robot, visual=False):
+def create_gripper(robot, visual=True):
     gripper_link = link_from_name(robot, get_gripper_link(robot))
     links = get_link_descendants(robot, gripper_link) # get_link_descendants | get_link_subtree
     with LockRenderer():

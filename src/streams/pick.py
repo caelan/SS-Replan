@@ -2,7 +2,7 @@ import random
 from itertools import cycle
 
 from pybullet_tools.utils import BodySaver, get_sample_fn, set_joint_positions, multiply, invert, get_moving_links, \
-    pairwise_collision, uniform_pose_generator, get_movable_joints
+    pairwise_collision, uniform_pose_generator, get_movable_joints, wait_for_user
 from src.command import Sequence, State, ApproachTrajectory, Detach, AttachGripper
 from src.database import load_place_base_poses
 from src.stream import PRINT_FAILURES, plan_approach, MOVE_ARM, P_RANDOMIZE_IK, inverse_reachability
@@ -22,6 +22,7 @@ def is_approach_safe(world, obj_name, pose, grasp, obstacles):
         if any(pairwise_collision(world.gripper, obst) # or pairwise_collision(obj_body, obst)
                for obst in obstacles):
             print('Unsafe approach!')
+            #wait_for_user()
             return False
     return True
 

@@ -281,7 +281,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         link_name = get_link_name(world.kitchen, child_link_from_joint(joint))
         #link_name = str(link_name.decode('UTF-8'))
         #link_name = str(link_name.encode('ascii','ignore'))
-        for conf in [init_conf, world.open_kitchen_confs[joint], world.closed_kitchen_confs[joint]]:
+        for conf in {init_conf, world.open_kitchen_confs[joint], world.closed_kitchen_confs[joint]}:
             # TODO: return to initial poses?
             world_pose, = compute_angle_kin(link_name, joint_name, conf)
             init.extend([

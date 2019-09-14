@@ -34,7 +34,8 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
     # TODO: this assumes the drawer is open
 
-    stable_gen_fn = get_stable_gen(world, z_offset=Z_EPSILON, visibility=False, learned=False, collisions=not args.cfree)
+    stable_gen_fn = get_stable_gen(world, z_offset=Z_EPSILON, visibility=False,
+                                   learned=False, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world)
     ik_ir_gen = get_pick_gen_fn(world, learned=False, collisions=not args.cfree, teleport=args.teleport)
 

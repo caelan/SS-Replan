@@ -6,7 +6,6 @@ from src.database import load_pull_base_poses, get_surface_reference_pose, load_
     load_place_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import ALL_JOINTS, ALL_SURFACES, get_grasps, surface_from_name, STOVES
 
-GROW_PLACEMENT = 0.05
 GROW_INVERSE_BASE = 0.05 # 0.05 | 0.1
 GROW_FORWARD_RADIUS = 0.25 # Done for block. Incorrect for other object types
 
@@ -47,7 +46,7 @@ def add_markers(task, placements=True, forward_place=True, pull_bases=True, inve
                     #for object_point in object_points:
                     #    handles.extend(draw_point(object_point, color=color))
                     _, _, z = np.average(object_points, axis=0)
-                    object_points = [Point(x, y, z) for x, y in grow_polygon(object_points, radius=GROW_PLACEMENT)]
+                    object_points = [Point(x, y, z) for x, y in grow_polygon(object_points, radius=0.0)]
                     handles.extend(add_segments(object_points, color=color, closed=True,
                                                 parent=world.kitchen, parent_link=surface_link))
                 base_points = list(map(point_from_pose, load_inverse_placements(world, surface_name,

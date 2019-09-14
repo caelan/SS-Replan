@@ -85,9 +85,9 @@ def main():
     #target_point = get_point(world.get_body(task.objects[0]))
     #set_camera_pose(camera_point=target_point+np.array([-1, 0, 1]), target_point=target_point)
 
-    #if not args.record:
-    #    with LockRenderer():
-    #        add_markers(task, inverse_place=False)
+    if not args.record:
+        with LockRenderer():
+            add_markers(task, inverse_place=False)
     #wait_for_user()
     # TODO: FD instantiation is slightly slow to a deepcopy
     # 4650801/25658    2.695    0.000    8.169    0.000 /home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/skeleton.py:114(do_evaluate_helper)
