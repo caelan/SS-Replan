@@ -55,7 +55,7 @@ BYTES_PER_GIGABYTE = math.pow(2, 30)
 POLICIES = [
     #{'constrain': False, 'defer': False},
     {'constrain': True, 'defer': False},
-    {'constrain': False, 'defer': True},
+    {'constrain': False, 'defer': True}, # Move actions grow immensely
     {'constrain': True, 'defer': True},
 ]
 
@@ -69,8 +69,8 @@ TASK_NAMES = [
     'stow_block',
 ]
 
-# TODO: parallel might be possible due to TracIK
-# TODO: CPU usage at 300%?
+# TODO: CPU usage at 300% due to TracIK?
+# TODO: could check collisions only with real (non-observed) values
 
 ################################################################################
 
@@ -144,7 +144,7 @@ def run_experiment(experiment):
             observation_fn = lambda belief: observe_pybullet(world)
             transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
             data = run_policy(task, args, observation_fn, transition_fn,
-                              max_time=MAX_TIME, max_planning_time=30, **policy)
+                              max_time=MAX_TIME, **policy)
             data['error'] = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt()

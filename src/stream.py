@@ -11,7 +11,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, Ray, get_distance_fn, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
     INF, apply_affine, get_joint_name, get_unit_vector, get_link_subtree, get_link_name, unit_quat, joint_from_name, \
-    get_extend_fn
+    get_extend_fn, wait_for_user
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, State, Detect
@@ -30,9 +30,7 @@ MAX_COST = MAX_FD_COST / COST_SCALE
 #MAX_COST = MAX_FD_COST / get_cost_scale()
 # TODO: move this to FD
 
-# TODO: top part of object is visible
-DETECT_SCALE = 1.25 # 0.05 | 0.5 | 1.0 | 1.25
-
+# TODO: ensure the top part of object is visible
 DETECT_COST = 1.0
 BASE_CONSTANT = 1.0 # 1 | 10
 BASE_VELOCITY = 0.25
@@ -138,6 +136,7 @@ def is_visible_by_camera(world, point):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
+    detect_scale = 1.25 if world.task.real else 0.5 # 0.05 | 0.5 | 1.0 | 1.25
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass
@@ -152,7 +151,7 @@ def get_compute_detect(world, ray_trace=True, **kwargs):
 
             aabb = get_view_aabb(body, camera_pose)
             center = get_aabb_center(aabb)
-            extent = np.multiply([DETECT_SCALE, DETECT_SCALE, 1], get_aabb_extent(aabb))
+            extent = np.multiply([detect_scale, detect_scale, 1], get_aabb_extent(aabb))
             view_aabb = (center - extent / 2, center + extent / 2)
             # print(is_visible_aabb(view_aabb, camera_matrix=camera_matrix))
             obj_points = apply_affine(camera_pose, support_from_aabb(view_aabb)) + [obj_point]
@@ -359,7 +358,8 @@ def get_stable_gen(world, max_attempts=100,
         learned_poses = load_placements(world, surface_name) if learned else [] # TODO: GROW_PLACEMENT
         center = -np.pi/4
         half_extent = np.pi / 16
-        yaw_range = (center-half_extent, center+half_extent) if world.task.real else (-np.pi, np.pi)
+        real = world.task and world.task.real
+        yaw_range = (center-half_extent, center+half_extent) if real else (-np.pi, np.pi)
         while True:
             for _ in range(max_attempts):
                 if surface_name in STOVES:
@@ -376,7 +376,7 @@ def get_stable_gen(world, max_attempts=100,
                     sampled_pose_surface = multiply(surface_pose_world, random.choice(learned_poses))
                     [x, y, _] = point_from_pose(sampled_pose_surface)
                     _, _, yaw = euler_from_quat(quat_from_pose(sampled_pose_surface))
-                    dx, dy = np.random.normal(scale=pos_scale, size=2)
+                    dx, dy = np.random.normal(scale=pos_scale, size=2) if pos_scale else np.zeros(2)
                     # TODO: avoid reloading
                     z = stable_z_on_aabb(obj_body, surface_aabb)
                     yaw = random.uniform(*yaw_range)

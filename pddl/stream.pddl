@@ -6,15 +6,15 @@
   (:rule
     :inputs (?o1 ?wp1 ?rp ?o2 ?wp2)
     :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Value ?rp))
-    :certified (Value ?wp1))
+    :certified (Value ?wp1)) ; Selected by planner
   (:rule
     :inputs (?o1 ?wp1 ?rp ?o2 ?wp2)
     :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Sample ?rp))
-    :certified (Sample ?wp1))
+    :certified (Sample ?wp1)) ; High confidence belief
   (:rule
     :inputs (?o1 ?wp1 ?rp ?o2 ?wp2)
     :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Dist ?rp))
-    :certified (Dist ?wp1))
+    :certified (Dist ?wp1)) ; Low confidence belief
   (:rule
     :inputs (?o1 ?wp1 ?rp ?o2 ?wp2 ?bq)
     :domain (and (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (NearPose ?o2 ?wp2 ?bq) (Posterior ?rp))

@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import cProfile
 import pstats
+import math
 
 #from examples.discrete_belief.run import MAX_COST
 from examples.discrete_belief.run import clip_cost
@@ -14,7 +15,7 @@ from pddlstream.language.constants import print_solution
 from pddlstream.language.stream import StreamInfo, PartialInputs
 from pddlstream.language.function import FunctionInfo
 from pddlstream.language.object import SharedOptValue
-from pddlstream.utils import INF
+from pddlstream.utils import INF, KILOBYTES_PER_GIGABYTE
 
 from pybullet_tools.utils import LockRenderer, WorldSaver, wait_for_user, VideoSaver, wait_for_duration
 from src.command import Wait, iterate_commands, Trajectory, DEFAULT_TIME_STEP
@@ -26,6 +27,7 @@ from src.utils import RelPose
 
 VIDEO_TEMPLATE = '{}.mp4'
 COST_BOUND = 1000.0
+MAX_MEMORY = 4.0 * KILOBYTES_PER_GIGABYTE
 # TODO: multiple cost bounds
 
 ################################################################################
@@ -125,7 +127,8 @@ def create_ordered_skeleton(skeleton):
             last_step = step
     return [OrderedSkeleton(skeleton, orders)]
 
-def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(), max_time=INF, max_cost=INF):
+def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
+                     max_time=INF, max_memory=MAX_MEMORY, max_cost=INF):
     set_cost_scale(COST_SCALE)
     reset_globals()
     stream_info = get_stream_info()
@@ -157,7 +160,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
                                  replan_actions=replan_actions, initial_complexity=5,
                                  planner=planner, max_planner_time=max_planner_time,
                                  unit_costs=args.unit, success_cost=success_cost,
-                                 max_time=max_time, verbose=True, debug=False,
+                                 max_time=max_time, max_memory=max_memory, verbose=True, debug=False,
                                  unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
                                  # bind=True, max_skeletons=None,
                                  search_sample_ratio=search_sample_ratio)

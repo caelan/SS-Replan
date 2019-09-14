@@ -71,6 +71,7 @@ MAX_FRANKA_JOINT7 = 1.89  # 1.8973
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
         self.task = None
+        self.interface = None
         self.client = connect(use_gui=use_gui)
         set_real_time(False)
         set_caching(False)

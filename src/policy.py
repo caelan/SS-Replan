@@ -12,7 +12,7 @@ from src.utils import BOWL
 
 
 def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True,
-               max_time=5*60, max_planning_time=30):
+               max_time=5*60, max_constrained_time=1*60, max_unconstrained_time=2*60):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     defer_actions = replan_actions if defer else set()
     world = task.world
@@ -36,38 +36,47 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
     while elapsed_time(total_start_time) < max_time:
         print_separator(n=50)
         num_iterations += 1
-        observation = observation_fn(belief) # TODO: could allow this to be an arbitrary belief transformation
+        # TODO: could allow this to be an arbitrary belief transformation
+        observation = observation_fn(belief)
         print('Observation:', observation)
         belief.update(observation)
         print('Belief:', belief)
         belief.draw()
-        plan_start_time = time.time()
+
         #wait_for_user('Plan?')
+        plan_start_time = time.time()
         plan, plan_cost = None, INF
-        # TODO: apply press check
-        problem = pdddlstream_from_problem(belief, fixed_base=True, additional_init=previous_facts,
-                                           collisions=not args.cfree, teleport=args.teleport)
-        if previous_skeleton is not None:
+        if constrain and (previous_skeleton is not None):
+            # TODO: could constrain by comparing to the previous plan cost
+            num_constrained += 1
             print_separator(n=25)
             print('Skeleton:', previous_skeleton)
             print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
-            # TODO: could compare to the previous plan cost
-            planning_time = min(max_time - elapsed_time(total_start_time), max_planning_time, args.max_time)
-            num_constrained += 1
+            problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
+                                               collisions=not args.cfree, teleport=args.teleport)
+            planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time, args.max_time)
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
                                                             skeleton=previous_skeleton, replan_actions=defer_actions)
             if plan is None:
                 print('Failed to adhere to plan')
                 #wait_for_user()
+        elif not constrain and not task.movable_base:
+            # TODO: process binding blows up for detect_drawer
+            num_unconstrained += 1
+            problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
+                                               collisions=not args.cfree, teleport=args.teleport)
+            print_separator(n=25)
+            planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time, args.max_time)
+            plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
+                                                            replan_actions=defer_actions)
 
-        # TODO: store history of stream evaluations
         if plan is None:
+            num_unconstrained += 1
             problem = pdddlstream_from_problem(belief, fixed_base=not task.movable_base or not constrain,
                                                additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
-            planning_time = min(max_time - elapsed_time(total_start_time), args.max_time)
-            num_unconstrained += 1
+            planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time, args.max_time)
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
                                                             max_cost=plan_cost, replan_actions=defer_actions)
 
@@ -100,6 +109,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             total_cost += sum(command.cost for command in commands)
         num_successes += success
 
+        # TODO: store history of stream evaluations
         if success and constrain:
             plan_postfix = get_plan_postfix(plan, plan_prefix)
             # TODO: exit if plan_postfix is empty?
