@@ -282,7 +282,7 @@ def cook_block(world, fixed=False, **kwargs):
 
 ################################################################################
 
-def detect_drawers(world, fixed=True, **kwargs):
+def detect_drawers(world, fixed=False, **kwargs):
     add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
         set_fixed_base(world)
@@ -290,6 +290,7 @@ def detect_drawers(world, fixed=True, **kwargs):
     # set_base_values
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     set_all_static()
+    #open_all_doors(world)
 
     drawers = ['indigo_drawer_top', 'indigo_drawer_bottom']
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
@@ -316,6 +317,8 @@ def detect_drawers(world, fixed=True, **kwargs):
                 goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
+                #goal_closed=[ALL_JOINTS[0]],
+                #goal_closed=[ALL_JOINTS[1]], # TODO: this causes the non-fixed base planning to fail sometimes?
                 goal_closed=ALL_JOINTS,
             )
 

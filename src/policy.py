@@ -4,14 +4,14 @@ import time
 
 from pybullet_tools.utils import wait_for_duration, wait_for_user, print_separator, INF, elapsed_time
 from src.belief import create_observable_belief, transition_belief_update, create_observable_pose_dist
-from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan, MAX_MEMORY
+from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
     STOCHASTIC_ACTIONS
 from src.utils import BOWL
 
 
-def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True,
+def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, serialize=True,
                max_time=5*60, max_constrained_time=1*60, max_unconstrained_time=2*60):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     defer_actions = replan_actions if defer else set()
@@ -68,7 +68,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             print_separator(n=25)
             planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time, args.max_time)
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-                                                            max_memory=MAX_MEMORY, replan_actions=defer_actions)
+                                                            replan_actions=defer_actions)
 
         if plan is None:
             num_unconstrained += 1 # additional_init=previous_facts,

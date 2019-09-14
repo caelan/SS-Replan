@@ -52,7 +52,7 @@ SERIALIZE_TASK = True
 TIME_PER_TRIAL = 150 # trial / sec
 HOURS_TO_SECS = 60 * 60
 
-N = 10
+N = 50
 #MAX_RAM = 28 # Max of 31.1 Gigabytes
 #BYTES_PER_KILOBYTE = math.pow(2, 10)
 #BYTES_PER_GIGABYTE = math.pow(2, 30)
@@ -64,14 +64,17 @@ POLICIES = [
     {'constrain': True, 'defer': True},
 ]
 
+# Is it because the objects are large files?
+# Switch to psutil
+
 TASK_NAMES = [
-    'detect_block',
-    'hold_block',
+    #'detect_block',
+    #'hold_block',
     'detect_drawers',
-    'sugar_drawer',
-    'cook_block',
-    'cook_meal',
-    'stow_block',
+    #'sugar_drawer',
+    #'cook_block',
+    #'cook_meal',
+    #'stow_block',
 ]
 
 # TODO: CPU usage at 300% due to TracIK?
@@ -128,11 +131,12 @@ def run_experiment(experiment):
        sys.stdout = open(os.devnull, 'w')
     current_wd = os.getcwd()
     #trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(os.getpid()))
-    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}_{}/'.format(
-        task_name, trial, name_from_policy(policy)))
-    safe_rm_dir(trial_wd)
-    ensure_dir(trial_wd)
-    os.chdir(trial_wd)
+    if not SERIAL:
+        trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}_{}/'.format(
+            task_name, trial, name_from_policy(policy)))
+        safe_rm_dir(trial_wd)
+        ensure_dir(trial_wd)
+        os.chdir(trial_wd)
 
     parser = create_parser()
     args = parser.parse_args()
@@ -141,12 +145,12 @@ def run_experiment(experiment):
     task_fn = task_fn_from_name[task_name]
     world = World(use_gui=SERIAL)
     if SERIALIZE_TASK:
-        task_fn(world)
+        task_fn(world, fixed=args.fixed)
         task = problem['task']
         task.world = world
     else:
         # TODO: assumes task_fn is deterministic wrt task
-        task = task_fn(world)
+        task_fn(world, fixed=args.fixed)
     problem['saver'].restore()
     world._update_initial()
     problem['task'] = task_name # for serialization
@@ -178,7 +182,8 @@ def run_experiment(experiment):
 
     world.destroy()
     os.chdir(current_wd)
-    safe_rm_dir(trial_wd)
+    if not SERIAL:
+        safe_rm_dir(trial_wd)
     if not VERBOSE:
         sys.stdout.close()
     sys.stdout = stdout
@@ -214,8 +219,8 @@ def create_problems(args):
             #print(world.body_from_name) # TODO: does not remain the same
             #wait_for_user()
             #world.reset()
-            if has_gui():
-                wait_for_user()
+            #if has_gui():
+            #    wait_for_user()
             world.destroy()
     return problems
 
@@ -262,8 +267,8 @@ def main():
     print('Estimated duration: {:.2f} hours'.format(TIME_PER_TRIAL*max_parallel / HOURS_TO_SECS))
     user_input('Begin?')
 
-    problem = create_problems(args) # copy.deepcopy(task)
-    experiments = [{'problem': task, 'policy': policy} #, 'args': args}
+    problem = create_problems(args)
+    experiments = [{'problem': copy.deepcopy(task), 'policy': policy} #, 'args': args}
                    for task in problem for policy in POLICIES]
 
     ensure_dir(directory)

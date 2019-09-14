@@ -10,7 +10,7 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
-from pybullet_tools.utils import wait_for_user, LockRenderer, \
+from pybullet_tools.utils import wait_for_user, set_random_seed, set_numpy_seed, LockRenderer, \
     get_random_seed, get_numpy_seed, VideoSaver, set_camera, set_camera_pose, get_point, wait_for_duration
 from src.command import create_state, iterate_commands, simulate_commands, DEFAULT_TIME_STEP
 from src.visualization import add_markers
@@ -68,8 +68,8 @@ def main():
     args = parser.parse_args()
     #if args.seed is not None:
     #    set_seed(args.seed)
-    #set_random_seed(None) # Doesn't ensure deterministic
-    #set_numpy_seed(None)
+    #set_random_seed(0) # Doesn't ensure deterministic
+    #set_numpy_seed(1)
     print('Random seed:', get_random_seed())
     print('Numpy seed:', get_numpy_seed())
 
