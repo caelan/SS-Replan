@@ -120,6 +120,8 @@ def get_streams(world, debug=False, teleport_base=False, **kwargs):
     }
     return stream_pddl, stream_map
 
+################################################################################
+
 def door_status_formula(joint_name, status):
     return Exists(['?a'], And(('AngleWithin', joint_name, '?a', status),
                               ('AtAngle', joint_name, '?a')))
@@ -129,6 +131,63 @@ def door_closed_formula(joint_name):
 
 def door_open_formula(joint_name):
     return door_status_formula(joint_name, OPEN)
+
+def get_goal(belief, init, base_threshold=(0.05, 0.05, math.radians(10)), arm_threshold=math.radians(10)):
+    # TODO: order goals for serialization
+    # TODO: make independent of belief and world
+    world = belief.world  # One world per state
+    task = world.task  # One task per world
+    init_bq = belief.base_conf
+    init_aq = belief.arm_conf
+
+    carry_aq = world.carry_conf
+    goal_literals = [Not(('Unsafe',))]
+    if task.goal_hand_empty:
+        goal_literals.append(('HandEmpty',))
+    if task.goal_holding is not None:
+        goal_literals.append(('Holding', task.goal_holding))
+    goal_literals += [('On', name, surface) for name, surface in task.goal_on.items()] + \
+                     [Not(('Pressed', name)) for name in KNOBS] + \
+                     [('HasLiquid', cup, liquid) for cup, liquid in task.goal_liquid] + \
+                     [('Cooked', name) for name in task.goal_cooked] + \
+                     [('Localized', name) for name in task.goal_detected] + \
+                     [door_closed_formula(joint_name) for joint_name in task.goal_closed] + \
+                     [door_open_formula(joint_name) for joint_name in task.goal_open] + \
+                     list(task.goal)
+
+    if not task.movable_base or task.return_init_bq:  # fixed_base?
+        goal_bq = world.goal_bq if task.movable_base else init_bq
+        init.extend([
+            ('BConf', goal_bq),
+            ('AConf', goal_bq, carry_aq),
+            ('CloseTo', goal_bq, goal_bq),
+        ])
+
+        base_difference_fn = get_difference_fn(world.robot, world.base_joints)
+        if np.less_equal(np.abs(base_difference_fn(init_bq.values, goal_bq.values)), base_threshold).all():
+            print('Close to goal base configuration')
+            init.append(('CloseTo', init_bq, goal_bq))
+        goal_literals.append(Exists(['?bq'], And(
+            ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
+
+        goal_aq = task.goal_aq
+        if task.return_init_aq:
+            goal_aq = init_aq if are_confs_close(init_aq, world.goal_aq) else world.goal_aq
+        if goal_aq is not None:
+            arm_difference_fn = get_difference_fn(world.robot, world.arm_joints)
+            if np.less_equal(np.abs(arm_difference_fn(init_aq.values, goal_aq.values)),
+                             arm_threshold * np.ones(len(world.arm_joints))).all():
+                print('Close to goal arm configuration')
+                init.append(('CloseTo', init_aq, goal_aq))
+            init.extend([
+                ('AConf', goal_bq, goal_aq),
+                ('CloseTo', goal_aq, goal_aq),
+            ])
+            goal_literals.append(Exists(['?aq'], And(
+                ('CloseTo', '?aq', goal_aq), ('AtAConf', '?aq'))))
+    return existential_quantification(goal_literals)
+
+################################################################################
 
 def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwargs):
     world = belief.world # One world per state
@@ -149,9 +208,11 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     #carry_aq = init_aq if are_confs_close(init_aq, world.carry_conf) else world.carry_conf
     #calibrate_aq = init_aq if are_confs_close(init_aq, world.calibrate_conf) else world.calibrate_conf
 
-    # TODO: likely don't need this now that returning to old confs
-    open_gq = init_gq if are_confs_close(init_gq, world.open_gq) else world.open_gq
-    closed_gq = init_gq if are_confs_close(init_gq, world.closed_gq) else world.closed_gq
+    # Don't need this now that returning to old confs
+    #open_gq = init_gq if are_confs_close(init_gq, world.open_gq) else world.open_gq
+    #closed_gq = init_gq if are_confs_close(init_gq, world.closed_gq) else world.closed_gq
+    open_gq = world.open_gq
+    closed_gq = world.closed_gq
 
     constant_map = {
         '@world': 'world',
@@ -223,53 +284,6 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
     compute_pose_kin = get_compute_pose_kin(world)
     compute_angle_kin = get_compute_angle_kin(world)
-
-    # TODO: order goals for serialization
-    goal_literals = [Not(('Unsafe',))]
-    if task.goal_hand_empty:
-        goal_literals.append(('HandEmpty',))
-    if task.goal_holding is not None:
-        goal_literals.append(('Holding', task.goal_holding))
-    goal_literals += [('On', name, surface) for name, surface in task.goal_on.items()] + \
-                     [Not(('Pressed', name)) for name in KNOBS] + \
-                     [('HasLiquid', cup, liquid) for cup, liquid in task.goal_liquid] + \
-                     [('Cooked', name) for name in task.goal_cooked] + \
-                     [('Localized', name) for name in task.goal_detected] + \
-                     [door_closed_formula(joint_name) for joint_name in task.goal_closed] + \
-                     [door_open_formula(joint_name) for joint_name in task.goal_open] + \
-                     list(task.goal)
-
-    if not task.movable_base or task.return_init_bq: # fixed_base?
-        goal_bq = world.goal_bq if task.movable_base else init_bq
-        init.extend([
-            ('BConf', goal_bq),
-            ('AConf', goal_bq, carry_aq),
-            ('CloseTo', goal_bq, goal_bq),
-        ])
-
-        base_difference_fn = get_difference_fn(world.robot, world.base_joints)
-        if np.less_equal(np.abs(base_difference_fn(init_bq.values, goal_bq.values)),
-                         [0.05, 0.05, math.radians(10)]).all():
-            print('Close to goal base configuration')
-            init.append(('CloseTo', init_bq, goal_bq))
-        goal_literals.append(Exists(['?bq'], And(
-            ('CloseTo', '?bq', goal_bq), ('AtBConf', '?bq'))))
-
-        goal_aq = task.goal_aq
-        if task.return_init_aq:
-            goal_aq = init_aq if are_confs_close(init_aq, world.goal_aq) else world.goal_aq
-        if goal_aq is not None:
-            arm_difference_fn = get_difference_fn(world.robot, world.arm_joints)
-            if np.less_equal(np.abs(arm_difference_fn(init_aq.values, goal_aq.values)),
-                             math.radians(10)*np.ones(len(world.arm_joints))).all():
-                print('Close to goal arm configuration')
-                init.append(('CloseTo', init_aq, goal_aq))
-            init.extend([
-                ('AConf', goal_bq, goal_aq),
-                ('CloseTo', goal_aq, goal_aq),
-            ])
-            goal_literals.append(Exists(['?aq'], And(
-                ('CloseTo', '?aq', goal_aq), ('AtAConf', '?aq'))))
 
     initial_poses = {}
     for joint_name, init_conf in belief.door_confs.items():
@@ -427,7 +441,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
     #bodies_from_type = get_bodies_from_type(problem)
     #bodies = bodies_from_type[get_parameter_name(ty)] if is_parameter(ty) else [ty]
 
-    goal_formula = existential_quantification(goal_literals)
+    goal_formula = get_goal(belief, init)
     stream_pddl, stream_map = get_streams(world, teleport_base=task.teleport_base, **kwargs)
 
     print('Constants:', constant_map)

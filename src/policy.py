@@ -125,7 +125,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
     return {
         'achieved_goal': achieved_goal,
         'total_time': elapsed_time(total_start_time),
-        'plan_start_time': plan_time,
+        'plan_time': plan_time,
         'num_iterations': num_iterations,
         'num_constrained': num_constrained,
         'num_unconstrained': num_unconstrained,

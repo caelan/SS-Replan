@@ -87,6 +87,8 @@ class Belief(object):
             name = get_joint_name(self.world.kitchen, joint)
             position = get_joint_position(self.world.kitchen, joint)
             self.update_door_conf(name, position)
+            self.update_door_conf(name, position)
+        #wait_for_user()
         return self.check_consistent()
     def update_door_conf(self, name, position):
         joint = joint_from_name(self.world.kitchen, name)
@@ -284,10 +286,10 @@ def transition_belief_update(belief, plan):
         elif action == 'place':
             o, p, g, rp = params[:4]
             belief.grasped = None
-            delocalize_belief(belief, o, rp)
-            #dist = DeltaDist(rp)
-            #dist = UniformDist([rp, copy.copy(rp)])
-            #belief.pose_dists[o] = PoseDist(belief.world, o, dist)
+            if belief.world.is_real():
+                delocalize_belief(belief, o, rp)
+            else:
+                belief.pose_dists[o] = PoseDist(belief.world, o, DeltaDist(rp))
         elif action == 'cook':
             pass
         else:

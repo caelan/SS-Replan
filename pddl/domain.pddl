@@ -208,6 +208,7 @@
                  (not (AtRelPose ?o1 ?rp ?o2)) (not (AtWorldPose ?o1 ?wp1))
                  (not (HandEmpty))
                  (increase (total-cost) (PickCost))))
+
   (:action place
     :parameters (?o1 ?wp1 ?g ?rp ?o2 ?wp2 ?bq ?aq ?at) ; ?gq
     :precondition (and (Pick ?o1 ?wp1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Value ?wp1) ; (GConf ?gq)
@@ -225,6 +226,7 @@
                  (not (AtGrasp ?o1 ?g))
                  (not (Localized ?o1))
                  (increase (total-cost) (PlaceCost))))
+
   (:action pull
     :parameters (?j ?a1 ?a2 ?o ?wp1 ?wp2 ?bq ?aq1 ?aq2 ?gq ?at)
     :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)
@@ -250,6 +252,7 @@
                  (forall (?o4 ?wp4 ?rp4) (when (and (PoseKin ?o4 ?wp4 ?rp4 ?o ?wp2) (AtRelPose ?o4 ?rp4 ?o))
                                                (AtWorldPose ?o4 ?wp4)))
                  (increase (total-cost) (PullCost))))
+
   (:action detect ; TODO: or in carry conf
     :parameters (?o1 ?wp1 ?rp1 ?obs ?wp2 ?rp2 ?o0 ?wp0 ?r)
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)

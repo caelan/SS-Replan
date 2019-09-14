@@ -28,8 +28,9 @@ pddlstream.language.statistics.LOAD_STATISTICS = False
 pddlstream.language.statistics.SAVE_STATISTICS = False
 
 from pybullet_tools.utils import has_gui, elapsed_time, user_input, ensure_dir, \
-    write_json, SEPARATOR, WorldSaver, get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user
-from pddlstream.utils import str_from_object, safe_rm_dir
+    write_json, SEPARATOR, WorldSaver, \
+    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user
+from pddlstream.utils import str_from_object, safe_rm_dir, Verbose
 from pddlstream.algorithms.algorithm import reset_globals
 
 from src.command import create_state, iterate_commands
@@ -48,7 +49,8 @@ VERBOSE = False
 SERIAL = False
 SERIALIZE_TASK = True
 
-TIME_PER_TRIAL = (60*60*0.912) / 126 # ~26 sec
+TIME_PER_TRIAL = 150 # trial / sec
+HOURS_TO_SECS = 60 * 60
 
 N = 10
 #MAX_RAM = 28 # Max of 31.1 Gigabytes
@@ -57,19 +59,19 @@ N = 10
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
-    #{'constrain': True, 'defer': False},
-    #{'constrain': False, 'defer': True}, # Move actions grow immensely
+    {'constrain': True, 'defer': False},
+    {'constrain': False, 'defer': True}, # Move actions grow immensely
     {'constrain': True, 'defer': True},
 ]
 
 TASK_NAMES = [
-    #'detect_block',
-    #'hold_block',
-    #'detect_drawers',
-    #'sugar_drawer',
+    'detect_block',
+    'hold_block',
+    'detect_drawers',
+    'sugar_drawer',
     'cook_block',
-    #'cook_meal',
-    #'stow_block',
+    'cook_meal',
+    'stow_block',
 ]
 
 # TODO: CPU usage at 300% due to TracIK?
@@ -112,16 +114,22 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
 
 ################################################################################
 
+def name_from_policy(policy):
+    return '_'.join('{}={:d}'.format(key, value) for key, value in sorted(policy.items()))
+
 def run_experiment(experiment):
     problem = experiment['problem']
     task_name = problem['task'].name if SERIALIZE_TASK else problem['task']
     trial = problem['trial']
+    policy = experiment['policy']
 
+    stdout = sys.stdout
     if not VERBOSE:
        sys.stdout = open(os.devnull, 'w')
     current_wd = os.getcwd()
     #trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(os.getpid()))
-    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}/'.format(task_name, trial))
+    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}_{}/'.format(
+        task_name, trial, name_from_policy(policy)))
     safe_rm_dir(trial_wd)
     ensure_dir(trial_wd)
     os.chdir(trial_wd)
@@ -160,7 +168,7 @@ def run_experiment(experiment):
         observation_fn = lambda belief: observe_pybullet(world)
         transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
         outcome = run_policy(task, args, observation_fn, transition_fn,
-                          max_time=MAX_TIME, **experiment['policy'])
+                          max_time=MAX_TIME, **policy)
         outcome['error'] = False
     except KeyboardInterrupt:
         raise KeyboardInterrupt()
@@ -173,6 +181,7 @@ def run_experiment(experiment):
     safe_rm_dir(trial_wd)
     if not VERBOSE:
         sys.stdout.close()
+    sys.stdout = stdout
 
     result = {
         'experiment': experiment,
@@ -247,12 +256,10 @@ def main():
     print('Tasks: {} | {}'.format(len(TASK_NAMES), TASK_NAMES))
     print('Policies: {} | {}'.format(len(POLICIES), POLICIES))
     print('Num Trials:', N)
-    print('Num Experiments:', len(TASK_NAMES)*len(POLICIES)*N)
-
-    #max_parallel = math.ceil(float(len(trials)) / num_cores)
-    #time_per_trial = (MAX_TIME * len(ALGORITHMS)) / HOURS_TO_SECS
-    #max_hours = max_parallel * time_per_trial
-    #print('Max hours:', max_hours)
+    num_experiments = len(TASK_NAMES)*len(POLICIES)*N
+    print('Num Experiments:', num_experiments)
+    max_parallel = math.ceil(float(num_experiments) / num_cores)
+    print('Estimated duration: {:.2f} hours'.format(TIME_PER_TRIAL*max_parallel / HOURS_TO_SECS))
     user_input('Begin?')
 
     problem = create_problems(args) # copy.deepcopy(task)
@@ -260,6 +267,7 @@ def main():
                    for task in problem for policy in POLICIES]
 
     ensure_dir(directory)
+    safe_rm_dir(TEMP_DIRECTORY)
     ensure_dir(TEMP_DIRECTORY)
     start_time = time.time()
     results = []
@@ -274,13 +282,14 @@ def main():
     #except BaseException as e:
     #    traceback.print_exc() # e
     finally:
-        safe_rm_dir(TEMP_DIRECTORY)
         if results:
             write_json(json_path, results)
         print(SEPARATOR)
         print('Saved:', json_path)
         print('Results:', len(results))
-        print('Hours: {:.3f}'.format(elapsed_time(start_time) / (60*60)))
+        print('Duration / experiment: {:.3f}'.format(num_cores*len(experiments) / elapsed_time(start_time)))
+        print('Duration: {:.2f} hours'.format(elapsed_time(start_time) / HOURS_TO_SECS))
+        safe_rm_dir(TEMP_DIRECTORY)
     return results
 
 

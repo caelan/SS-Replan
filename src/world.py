@@ -74,7 +74,7 @@ class World(object):
         self.interface = None
         self.client = connect(use_gui=use_gui)
         set_real_time(False)
-        set_caching(False)
+        #set_caching(False) # Seems to make things worse
         disable_gravity()
         add_data_path()
         set_camera_pose(camera_point=[2, -1.5, 1])

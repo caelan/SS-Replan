@@ -545,6 +545,7 @@ def plan_workspace(world, tool_path, obstacles, randomize=True, teleport=False):
         tolerance = INF if i == 0 else NEARBY_PULL
         full_arm_conf = world.solve_inverse_kinematics(tool_pose, nearby_tolerance=tolerance)
         if full_arm_conf is None:
+            # TODO: this fails when teleport=True
             if PRINT_FAILURES: print('Workspace kinematic failure')
             return None
         if any(pairwise_collision(robot_obstacle, b) for b in obstacles):

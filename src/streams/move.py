@@ -72,9 +72,9 @@ def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=Fal
         bq1.assign()
         aq.assign()
         attachments, obstacles = parse_fluents(world, fluents)
+        obstacles.update(world.static_obstacles)
         if not collisions:
             obstacles = set()
-        obstacles.update(world.static_obstacles)
         robot_saver = BodySaver(world.robot)
         if (bq1 == bq2) or teleport_base or teleport:
             path = [bq1.values, bq2.values]
@@ -123,9 +123,9 @@ def get_arm_motion_gen(world, collisions=True, teleport=False):
         bq.assign()
         aq1.assign()
         attachments, obstacles = parse_fluents(world, fluents)
+        obstacles.update(world.static_obstacles)
         if not collisions:
             obstacles = set()
-        obstacles.update(world.static_obstacles)
         robot_saver = BodySaver(world.robot)
         if teleport:
             path = [aq1.values, aq2.values]
