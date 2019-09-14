@@ -4,7 +4,7 @@ import time
 
 from pybullet_tools.utils import wait_for_duration, wait_for_user, print_separator, INF, elapsed_time
 from src.belief import create_observable_belief, transition_belief_update, create_observable_pose_dist
-from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
+from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan, MAX_MEMORY
 from src.problem import pdddlstream_from_problem
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
     STOCHASTIC_ACTIONS
@@ -60,7 +60,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             if plan is None:
                 print('Failed to adhere to plan')
                 #wait_for_user()
-        elif not constrain and not task.movable_base:
+        elif not constrain and task.movable_base:
             # TODO: process binding blows up for detect_drawer
             num_unconstrained += 1
             problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
@@ -68,12 +68,11 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             print_separator(n=25)
             planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time, args.max_time)
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-                                                            replan_actions=defer_actions)
+                                                            max_memory=MAX_MEMORY, replan_actions=defer_actions)
 
         if plan is None:
-            num_unconstrained += 1
-            problem = pdddlstream_from_problem(belief, fixed_base=not task.movable_base or not constrain,
-                                               additional_init=previous_facts,
+            num_unconstrained += 1 # additional_init=previous_facts,
+            problem = pdddlstream_from_problem(belief, fixed_base=not task.movable_base, # or not constrain,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
             planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time, args.max_time)
@@ -116,8 +115,8 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             previous_skeleton = make_exact_skeleton(world, plan_postfix)  # make_exact_skeleton | make_wild_skeleton
             previous_facts = reuse_facts(problem, certificate, previous_skeleton)  # []
         else:
-            previous_facts = []
             previous_skeleton = None
+            previous_facts = []
 
     if achieved_goal:
         print('Success!')

@@ -211,6 +211,8 @@ class World(object):
         self.initial_confs = [self.goal_bq, self.goal_aq, self.goal_gq]
         set_all_static()
 
+    def is_real(self):
+        return (self.task is not None) and self.task.real
     @property
     def constants(self):
         return self.special_confs + self.gripper_confs + self.initial_confs

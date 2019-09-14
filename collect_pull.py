@@ -14,7 +14,7 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     invert, get_link_pose, has_gui, write_json, get_body_name, get_link_name, \
     get_joint_name, joint_from_name, get_date, SEPARATOR, safe_remove, link_from_name
-from src.utils import CABINET_JOINTS, DRAWER_JOINTS, KNOBS
+from src.utils import CABINET_JOINTS, DRAWER_JOINTS, KNOBS, ZED_LEFT_JOINTS
 from src.world import World
 from src.streams.press import get_press_gen_fn
 from src.streams.pull import get_pull_gen_fn
@@ -44,7 +44,7 @@ def collect_pull(world, joint_name, args):
     start_time = time.time()
     while (len(entries) < args.num_samples) and \
             (elapsed_time(start_time) < args.max_time):
-        if press:
+        if is_press(joint_name):
             result = next(press_gen(joint_name), None)
         else:
             result = next(pull_gen(joint_name, open_conf, closed_conf), None) # Open to closed
@@ -87,7 +87,7 @@ def collect_pull(world, joint_name, args):
         'failures': failures,
         'successes': len(entries),
     }
-    if not press:
+    if not is_press(joint_name):
         data.update({
             'open_conf': open_conf.values,
             'closed_conf': closed_conf.values,
@@ -121,7 +121,8 @@ def main():
     world = World(use_gui=args.visualize)
     world.open_gripper()
 
-    joint_names = DRAWER_JOINTS + CABINET_JOINTS
+    #joint_names = DRAWER_JOINTS + CABINET_JOINTS
+    joint_names = ZED_LEFT_JOINTS
     print('Joints:', joint_names)
     print('Knobs:', KNOBS)
     wait_for_user('Start?')

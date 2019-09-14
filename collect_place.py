@@ -18,7 +18,7 @@ from pybullet_tools.utils import wait_for_user, elapsed_time, multiply, \
     RED, BLUE, LockRenderer, child_link_from_joint, get_date, SEPARATOR, dump_body, safe_remove
 from src.utils import get_block_path, BLOCK_SIZES, BLOCK_COLORS, GRASP_TYPES, TOP_GRASP, \
     SIDE_GRASP, BASE_JOINTS, joint_from_name, ALL_SURFACES, FRANKA_CARTER, EVE, DRAWERS, \
-    OPEN_SURFACES, ENV_SURFACES, CABINETS
+    OPEN_SURFACES, ENV_SURFACES, CABINETS, ZED_LEFT_SURFACES
 from src.world import World
 from src.stream import get_stable_gen, get_grasp_gen, Z_EPSILON
 from src.streams.pick import get_pick_gen_fn
@@ -34,7 +34,7 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
     # TODO: this assumes the drawer is open
 
-    stable_gen_fn = get_stable_gen(world, z_offset=Z_EPSILON, learned=False, collisions=not args.cfree)
+    stable_gen_fn = get_stable_gen(world, z_offset=Z_EPSILON, visibility=False, learned=False, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world)
     ik_ir_gen = get_pick_gen_fn(world, learned=False, collisions=not args.cfree, teleport=args.teleport)
 
@@ -145,9 +145,15 @@ def main():
         TOP_GRASP: RED,
         SIDE_GRASP: BLUE,
     }
-    combinations = list(product(OPEN_SURFACES, GRASP_TYPES)) \
-                   + [(surface_name, TOP_GRASP) for surface_name in DRAWERS] \
-                   + [(surface_name, SIDE_GRASP) for surface_name in CABINETS] # ENV_SURFACES
+    #combinations = list(product(OPEN_SURFACES, GRASP_TYPES)) \
+    #               + [(surface_name, TOP_GRASP) for surface_name in DRAWERS] \
+    #               + [(surface_name, SIDE_GRASP) for surface_name in CABINETS] # ENV_SURFACES
+    combinations = []
+    for surface_name in ZED_LEFT_SURFACES:
+        if surface_name in (OPEN_SURFACES + DRAWERS):
+            combinations.append((surface_name, TOP_GRASP))
+        if surface_name in (OPEN_SURFACES + CABINETS):
+            combinations.append((surface_name, SIDE_GRASP))
 
     # TODO: parallelize
     print('Combinations:', combinations)

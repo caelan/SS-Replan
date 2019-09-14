@@ -11,7 +11,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, Ray, get_distance_fn, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
     INF, apply_affine, get_joint_name, get_unit_vector, get_link_subtree, get_link_name, unit_quat, joint_from_name, \
-    get_extend_fn, wait_for_user
+    get_extend_fn, wait_for_user, set_renderer
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, State, Detect
@@ -136,7 +136,7 @@ def is_visible_by_camera(world, point):
 
 def get_compute_detect(world, ray_trace=True, **kwargs):
     obstacles = world.static_obstacles
-    detect_scale = 1.25 if world.task.real else 0.5 # 0.05 | 0.5 | 1.0 | 1.25
+    detect_scale = 1.25 if world.is_real() else 0.5 # 0.05 | 0.5 | 1.0 | 1.25
 
     def fn(obj_name, pose):
         # TODO: incorporate probability mass
@@ -343,7 +343,7 @@ def get_test_near_joint(world, **kwargs):
 ################################################################################
 
 def get_stable_gen(world, max_attempts=100,
-                   learned=True, collisions=True,
+                   visibility=True, learned=True, collisions=True,
                    pos_scale=0.01, rot_scale=np.pi/16,
                    z_offset=Z_EPSILON, **kwargs):
 
@@ -358,8 +358,7 @@ def get_stable_gen(world, max_attempts=100,
         learned_poses = load_placements(world, surface_name) if learned else [] # TODO: GROW_PLACEMENT
         center = -np.pi/4
         half_extent = np.pi / 16
-        real = world.task and world.task.real
-        yaw_range = (center-half_extent, center+half_extent) if real else (-np.pi, np.pi)
+        yaw_range = (center-half_extent, center+half_extent) if world.is_real() else (-np.pi, np.pi)
         while True:
             for _ in range(max_attempts):
                 if surface_name in STOVES:
@@ -390,7 +389,7 @@ def get_stable_gen(world, max_attempts=100,
                     body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
                     if body_pose_world is None:
                         continue # return?
-                if not is_visible_by_camera(world, point_from_pose(body_pose_world)):
+                if visibility and not is_visible_by_camera(world, point_from_pose(body_pose_world)):
                     continue
                 set_pose(obj_body, body_pose_world)
                 # TODO: make sure the surface is open when doing this
@@ -449,11 +448,11 @@ def is_robot_visible(world, links):
 def inverse_reachability(world, base_generator, obstacles=set(),
                          max_attempts=50, **kwargs):
 
-    min_distance = 0.04 if world.task.real else 0.0
-    special_confs = world.special_confs if world.task.real else []
+    min_distance = 0.04 if world.is_real() else 0.0
+    special_confs = world.special_confs if world.is_real() else []
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
-    ensure_visible = world.task.teleport_base
+    ensure_visible = world.is_real() # world.task.teleport_base
     robot_links = [world.franka_link, world.gripper_link] if ensure_visible else []
     while True:
         for i, base_conf in enumerate(islice(base_generator, max_attempts)):
@@ -780,7 +779,15 @@ def get_cfree_angle_angle_test(world, collisions=True, **kwargs):
         # TODO: pull path collisions
         wp.assign()
         set_configuration(world.gripper, world.open_gq.values)
-        return compute_door_paths(world, j1, a1, a2, obstacles=get_link_obstacles(world, o2))
+        status = compute_door_paths(world, j1, a1, a2, obstacles=get_link_obstacles(world, o2))
+        #print(j1, a1, a2, o2, wp)
+        #if not status:
+        #    set_renderer(enable=True)
+        #    for a in [a1, a2]:
+        #        a.assign()
+        #        wait_for_user()
+        #    set_renderer(enable=False)
+        return status
     return test
 
 ################################################################################

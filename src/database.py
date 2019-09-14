@@ -19,8 +19,8 @@ def get_surface_reference_pose(kitchen, surface_name):
     return get_link_pose(kitchen, link)
 
 def get_place_path(robot_name, surface_name, grasp_type):
-    return os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
-        robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type))
+    return os.path.abspath(os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
+        robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type)))
 
 def has_place_database(robot_name, surface_name, grasp_type):
     return os.path.exists(get_place_path(robot_name, surface_name, grasp_type))
@@ -98,7 +98,7 @@ def get_joint_reference_pose(kitchen, joint_name):
 
 def get_pull_path(robot_name, joint_name):
     ir_filename = PRESS_IR_FILENAME if is_press(joint_name) else PULL_IR_FILENAME
-    return os.path.join(DATABASE_DIRECTORY, ir_filename.format(robot_name, joint_name))
+    return os.path.abspath(os.path.join(DATABASE_DIRECTORY, ir_filename.format(robot_name, joint_name)))
 
 def load_pull_database(robot_name, joint_name):
     data = {}

@@ -137,7 +137,8 @@ DRAWERS = [
 
 STOVE_LOCATIONS = [
     #'back_left', 'back_right',
-    'front_left', 'front_right',
+    #'front_left',
+    'front_right',
 ]
 
 STOVE_TEMPLATE = '{}_stove'

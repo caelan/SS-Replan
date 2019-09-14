@@ -128,7 +128,7 @@ def create_ordered_skeleton(skeleton):
     return [OrderedSkeleton(skeleton, orders)]
 
 def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
-                     max_time=INF, max_memory=MAX_MEMORY, max_cost=INF):
+                     max_time=INF, max_memory=INF, max_cost=INF):
     set_cost_scale(COST_SCALE)
     reset_globals()
     stream_info = get_stream_info()
