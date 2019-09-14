@@ -519,6 +519,9 @@ class World(object):
         del self.body_from_name[name]
     def reset(self):
         #remove_all_debug()
+        for camera in self.cameras.values():
+            remove_body(camera.body)
+        self.cameras = {}
         for name in list(self.body_from_name):
             self.remove_body(name)
     def destroy(self):

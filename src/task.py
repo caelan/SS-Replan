@@ -5,12 +5,12 @@ import random
 import time
 
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
-    create_box, set_all_static, COLOR_FROM_NAME, \
+    create_box, set_all_static, WorldSaver, COLOR_FROM_NAME, \
     stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb, create_cylinder
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, STOVES, TOP_GRASP
+    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, STOVES, TOP_GRASP, get_function_name
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -23,8 +23,9 @@ class Task(object):
                  goal_hand_empty=False, goal_holding=None, goal_detected=[],
                  goal_on={}, goal_open=[], goal_closed=[], goal_cooked=[],
                  init=[], goal=[], real=False, max_cost=MAX_COST):
-        self.world = world
+        self.world = world # TODO: remove world dependency
         world.task = self
+        self.name = get_function_name(depth=2)
         self.prior = dict(prior) # DiscreteDist over
         self.skeletons = list(skeletons)
         self.grasp_types = tuple(grasp_types)

@@ -25,8 +25,8 @@ from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
 
-COST_SCALE = 1e3 # 3 decimal places
-MAX_COST = MAX_FD_COST / COST_SCALE
+COST_SCALE = 1e2 # 3 decimal places
+MAX_COST = MAX_FD_COST / (10*COST_SCALE)
 #MAX_COST = MAX_FD_COST / get_cost_scale()
 # TODO: move this to FD
 

@@ -16,6 +16,7 @@ import os
 import sys
 import traceback
 import resource
+import copy
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
@@ -26,8 +27,8 @@ import pddlstream.language.statistics
 pddlstream.language.statistics.LOAD_STATISTICS = False
 pddlstream.language.statistics.SAVE_STATISTICS = False
 
-from pybullet_tools.utils import elapsed_time, user_input, ensure_dir, \
-    write_json, SEPARATOR, WorldSaver
+from pybullet_tools.utils import has_gui, elapsed_time, user_input, ensure_dir, \
+    write_json, SEPARATOR, WorldSaver, get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user
 from pddlstream.utils import str_from_object, safe_rm_dir
 from pddlstream.algorithms.algorithm import reset_globals
 
@@ -40,33 +41,35 @@ from run_pybullet import create_parser
 
 from multiprocessing import Pool, TimeoutError, cpu_count
 
-DATA_DIRECTORY = 'data/' # TODO: rename to experiments
+EXPERIMENTS_DIRECTORY = 'experiments/'
 TEMP_DIRECTORY = 'temp_parallel/'
-MAX_TIME = 5*60
+MAX_TIME = 10*60
 VERBOSE = False
+SERIAL = False
+SERIALIZE_TASK = True
 
 TIME_PER_TRIAL = (60*60*0.912) / 126 # ~26 sec
 
-N = 100
-MAX_RAM = 28 # Max of 31.1 Gigabytes
-BYTES_PER_KILOBYTE = math.pow(2, 10)
-BYTES_PER_GIGABYTE = math.pow(2, 30)
+N = 10
+#MAX_RAM = 28 # Max of 31.1 Gigabytes
+#BYTES_PER_KILOBYTE = math.pow(2, 10)
+#BYTES_PER_GIGABYTE = math.pow(2, 30)
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
-    {'constrain': True, 'defer': False},
-    {'constrain': False, 'defer': True}, # Move actions grow immensely
+    #{'constrain': True, 'defer': False},
+    #{'constrain': False, 'defer': True}, # Move actions grow immensely
     {'constrain': True, 'defer': True},
 ]
 
 TASK_NAMES = [
-    'detect_block',
-    'hold_block',
-    'detect_drawers',
-    'sugar_drawer',
+    #'detect_block',
+    #'hold_block',
+    #'detect_drawers',
+    #'sugar_drawer',
     'cook_block',
-    'cook_meal',
-    'stow_block',
+    #'cook_meal',
+    #'stow_block',
 ]
 
 # TODO: CPU usage at 300% due to TracIK?
@@ -77,6 +80,10 @@ TASK_NAMES = [
 def map_parallel(fn, inputs, num_cores=None, timeout=None):
     # Processes rather than threads (shared memory)
     # TODO: with statement on Pool
+    if SERIAL:
+        for outputs in map(fn, inputs):
+            yield outputs
+        return
     pool = Pool(processes=num_cores) #, initializer=mute)
     generator = pool.imap_unordered(fn, inputs, chunksize=1)
     # pool_result = pool.map_async(worker, args)
@@ -106,53 +113,60 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
 ################################################################################
 
 def run_experiment(experiment):
-    pid = os.getpid()
+    problem = experiment['problem']
+    task_name = problem['task'].name if SERIALIZE_TASK else problem['task']
+    trial = problem['trial']
+
     if not VERBOSE:
        sys.stdout = open(os.devnull, 'w')
     current_wd = os.getcwd()
-    #trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(pid))
-    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}/'.format(experiment['task'], experiment['trial']))
+    #trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(os.getpid()))
+    trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}/'.format(task_name, trial))
     safe_rm_dir(trial_wd)
     ensure_dir(trial_wd)
     os.chdir(trial_wd)
-
-    random.seed(hash((0, pid, time.time())))
-    numpy.random.seed(hash((1, pid, time.time())) % (2**32))
 
     parser = create_parser()
     args = parser.parse_args()
 
     task_fn_from_name = {fn.__name__: fn for fn in TASKS_FNS}
-    task_fn = task_fn_from_name[experiment['task']]
-    world = World(use_gui=False)
-    task = task_fn(world, fixed=args.fixed)
+    task_fn = task_fn_from_name[task_name]
+    world = World(use_gui=SERIAL)
+    if SERIALIZE_TASK:
+        task_fn(world)
+        task = problem['task']
+        task.world = world
+    else:
+        # TODO: assumes task_fn is deterministic wrt task
+        task = task_fn(world)
+    problem['saver'].restore()
     world._update_initial()
-    saver = WorldSaver()
+    problem['task'] = task_name # for serialization
+    del problem['saver']
 
-    outcomes = []
-    state1 = random.getstate()
-    state2 = numpy.random.get_state()
-    for policy in POLICIES:
-        # TODO: memory error will kill all of these at once...
-        random.setstate(state1)
-        numpy.random.set_state(state2)
-        saver.restore()
-        reset_globals()
-        real_state = create_state(world)
-        #start_time = time.time()
-        try:
-            observation_fn = lambda belief: observe_pybullet(world)
-            transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
-            data = run_policy(task, args, observation_fn, transition_fn,
-                              max_time=MAX_TIME, **policy)
-            data['error'] = False
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt()
-        except:
-            traceback.print_exc()
-            data = {'error': True}
-        data['policy'] = policy
-        outcomes.append(data)
+    random.seed(hash((0, task_name, trial, time.time())))
+    numpy.random.seed(hash((1, task_name, trial, time.time())) % (2**32))
+    #seed1, seed2 = problem['seeds'] # No point unless you maintain the same random state per generator
+    #set_random_seed(seed1)
+    #set_random_seed(seed2)
+    #random.setstate(state1)
+    #numpy.random.set_state(state2)
+    reset_globals()
+    real_state = create_state(world)
+    #start_time = time.time()
+    if has_gui():
+        wait_for_user()
+    try:
+        observation_fn = lambda belief: observe_pybullet(world)
+        transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
+        outcome = run_policy(task, args, observation_fn, transition_fn,
+                          max_time=MAX_TIME, **experiment['policy'])
+        outcome['error'] = False
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt()
+    except:
+        traceback.print_exc()
+        outcome = {'error': True}
 
     world.destroy()
     os.chdir(current_wd)
@@ -162,55 +176,88 @@ def run_experiment(experiment):
 
     result = {
         'experiment': experiment,
-        'outcomes': outcomes,
+        'outcome': outcome,
     }
     return result
 
+def create_problems(args):
+    task_fn_from_name = {fn.__name__: fn for fn in TASKS_FNS}
+    problems = []
+    for trial in range(N):
+        print('\nTrial: {} / {}'.format(trial, N))
+        for task_name in TASK_NAMES:
+            random.seed(hash((0, task_name, trial, time.time())))
+            numpy.random.seed(hash((1, task_name, trial, time.time())) % (2 ** 32))
+            world = World(use_gui=SERIAL)
+            task_fn = task_fn_from_name[task_name]
+            task = task_fn(world, fixed=args.fixed)
+            task.world = None
+            if not SERIALIZE_TASK:
+                task = task_name
+            saver = WorldSaver()
+            problems.append({
+                'task': task,
+                'trial': trial,
+                'saver': saver,
+                #'seeds': [get_random_seed(), get_numpy_seed()],
+                #'seeds': [random.getstate(), numpy.random.get_state()],
+            })
+            #print(world.body_from_name) # TODO: does not remain the same
+            #wait_for_user()
+            #world.reset()
+            if has_gui():
+                wait_for_user()
+            world.destroy()
+    return problems
+
 ################################################################################
 
-def set_soft_limit(name, limit):
-    # TODO: use FastDownward's memory strategy
-    # ulimit -a
-    soft, hard = resource.getrlimit(name) # resource.RLIM_INFINITY
-    soft = limit
-    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+#def set_soft_limit(name, limit):
+#    # TODO: use FastDownward's memory strategy
+#    # ulimit -a
+#    soft, hard = resource.getrlimit(name) # resource.RLIM_INFINITY
+#    soft = limit
+#    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
 
 def main():
-    #parser = create_parser()
+    parser = create_parser()
     #parser.add_argument('-problem', default=task_names[-1], choices=task_names,
-    #                    help='The name of the problem to solve.')
+    #                   help='The name of the problem to solve.')
     #parser.add_argument('-record', action='store_true',
-    #                    help='When enabled, records and saves a video at {}'.format(
-    #                        VIDEO_TEMPLATE.format('<problem>')))
-    #args = parser.parse_args()
+    #                   help='When enabled, records and saves a video at {}'.format(
+    #                       VIDEO_TEMPLATE.format('<problem>')))
+    args = parser.parse_args()
 
     # https://stackoverflow.com/questions/15314189/python-multiprocessing-pool-hangs-at-join
     # https://stackoverflow.com/questions/39884898/large-amount-of-multiprocessing-process-causing-deadlock
     # TODO: alternatively don't destroy the world
     num_cores = cpu_count() - 2
-    directory = os.path.realpath(DATA_DIRECTORY)
+    directory = EXPERIMENTS_DIRECTORY
     date_name = datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
-    json_path = os.path.join(directory, '{}.json'.format(date_name))
-    experiments = [{'task': task, 'trial': trial} for trial in range(N) for task in TASK_NAMES]
+    json_path = os.path.abspath(os.path.join(directory, '{}.json'.format(date_name)))
 
-    memory_per_core = float(MAX_RAM) / num_cores # gigabytes
-    set_soft_limit(resource.RLIMIT_AS, int(BYTES_PER_GIGABYTE * memory_per_core)) # bytes
+    #memory_per_core = float(MAX_RAM) / num_cores # gigabytes
+    #set_soft_limit(resource.RLIMIT_AS, int(BYTES_PER_GIGABYTE * memory_per_core)) # bytes
     #set_soft_limit(resource.RLIMIT_CPU, 2*MAX_TIME) # seconds
     # RLIMIT_MEMLOCK, RLIMIT_STACK, RLIMIT_DATA
 
     print('Results:', json_path)
     print('Num Cores:', num_cores)
-    print('Memory per Core: {:.2f}'.format(memory_per_core))
+    #print('Memory per Core: {:.2f}'.format(memory_per_core))
     print('Tasks: {} | {}'.format(len(TASK_NAMES), TASK_NAMES))
     print('Policies: {} | {}'.format(len(POLICIES), POLICIES))
     print('Num Trials:', N)
-    print('Num Experiments:', len(experiments))
+    print('Num Experiments:', len(TASK_NAMES)*len(POLICIES)*N)
 
     #max_parallel = math.ceil(float(len(trials)) / num_cores)
     #time_per_trial = (MAX_TIME * len(ALGORITHMS)) / HOURS_TO_SECS
     #max_hours = max_parallel * time_per_trial
     #print('Max hours:', max_hours)
     user_input('Begin?')
+
+    problem = create_problems(args) # copy.deepcopy(task)
+    experiments = [{'problem': task, 'policy': policy} #, 'args': args}
+                   for task in problem for policy in POLICIES]
 
     ensure_dir(directory)
     ensure_dir(TEMP_DIRECTORY)
@@ -222,7 +269,7 @@ def main():
             print('{}\nExperiments: {} / {} | Time: {:.3f}'.format(
                 SEPARATOR, len(results), len(experiments), elapsed_time(start_time)))
             print('Experiment:', str_from_object(result['experiment']))
-            print('Outcomes:', str_from_object(result['outcomes']))
+            print('Outcome:', str_from_object(result['outcome']))
             write_json(json_path, results)
     #except BaseException as e:
     #    traceback.print_exc() # e

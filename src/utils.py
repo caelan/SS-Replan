@@ -6,6 +6,7 @@ import yaml
 import string
 import math
 import random
+import inspect
 
 from itertools import cycle
 from collections import namedtuple
@@ -263,6 +264,9 @@ def get_eve_arm_joints(robot, arm):
     return joints_from_names(robot, names)
 
 ################################################################################
+
+def get_function_name(depth=1):
+   return inspect.stack()[depth][3]
 
 def ycb_type_from_file(path):
     return path.split('_', 1)[-1]
