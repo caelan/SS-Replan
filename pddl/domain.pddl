@@ -90,10 +90,11 @@
     (Status ?s)
     (DoorStatus ?j ?s)
     (AngleWithin ?j ?a ?s)
+    (SurfaceJoint ?s ?j)
 
     (On ?o1 ?o2)
     (Holding ?o)
-    (Accessible ?o ?wp)
+    (Accessible ?o)
     (Unsafe)
     (UnsafeRelPose ?o ?rp ?s)
     (UnsafeApproach ?o ?wp ?g)
@@ -194,9 +195,8 @@
                        (GConf ?gq) (= ?gq @open_gq) ; (OpenGConf ?gq))
                        (AtRelPose ?o1 ?rp ?o2) (AtWorldPose ?o1 ?wp1) (HandEmpty)
                        (AtBConf ?bq) (AtAConf ?aq) (AtGConf ?gq)
-                       (Calibrated) ; TODO: detect precondition?
-                       (Localized ?o1)
-                       (Accessible ?o2 ?wp2) (AdmitsGrasp ?o1 ?g ?o2)
+                       (Calibrated) (Localized ?o1) ; TODO: detect precondition?
+                       (AdmitsGrasp ?o1 ?g ?o2) (Accessible ?o2)
                        (not (UnsafeApproach ?o1 ?wp1 ?g))
                        (not (UnsafeATraj ?at))
                        (not (Unsafe)))
@@ -214,7 +214,7 @@
     :precondition (and (Pick ?o1 ?wp1 ?g ?bq ?aq ?at) (PoseKin ?o1 ?wp1 ?rp ?o2 ?wp2) (Value ?wp1) ; (GConf ?gq)
                        (AtGrasp ?o1 ?g) (AtWorldPose ?o2 ?wp2)
                        (AtBConf ?bq) (AtAConf ?aq) ; (AtGConf ?gq)
-                       (Calibrated) (Accessible ?o2 ?wp2) (AdmitsGrasp ?o1 ?g ?o2)
+                       (Calibrated) (AdmitsGrasp ?o1 ?g ?o2) (Accessible ?o2)
                        (not (UnsafeRelPose ?o1 ?rp ?o2))
                        (not (UnsafeApproach ?o1 ?wp1 ?g))
                        (not (UnsafeATraj ?at))
@@ -258,7 +258,7 @@
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)
                        (Detect ?o1 ?wp2 ?r) (BeliefUpdate ?o1 ?rp1 ?obs ?rp2)
                        (AtWorldPose ?o1 ?wp1) ; (AtRelPose ?o1 ?rp1 ?o0) (AtWorldPose ?o0 ?wp0)
-                       (Accessible ?o0 ?wp0) (HandEmpty)
+                       (Accessible ?o0) (HandEmpty)
                        ; (not (UnsafeRelPose ?o1 ?rp2 ?o0))
                        (not (OccludedRay ?r))
                        (not (Unsafe))
@@ -320,11 +320,10 @@
   ;  ;                   (AtGConf ?gq)))
   ;)
 
-  (:derived (Accessible ?o ?wp) (or
-    (and (WorldPose ?o ?wp) (Counter ?o))
-    (exists (?j ?a) (and (AngleKin ?o ?wp ?j ?a) (AngleWithin ?j ?a @open)
-                         (not (Occluded ?j))
-                         (AtAngle ?j ?a)))))
+  (:derived (Accessible ?s) (or (Counter ?s)
+    (exists (?j ?a) (and (SurfaceJoint ?s ?j) (Angle ?j ?a) (AngleWithin ?j ?a @open)
+                         (not (Occluded ?j)) (AtAngle ?j ?a))))
+  )
   (:derived (Occluded ?j1) (and (Drawer ?j1) ; Both drawers can't be open at the same time anyways
     (exists (?j2 ?a2) (and (Angle ?j2 ?a2) (Above ?j2 ?j1)
                            ; (AngleWithin ?j2 ?a2 @open)

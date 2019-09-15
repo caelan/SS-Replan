@@ -17,7 +17,8 @@ from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, COOKABLE, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
-    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
+    KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, \
+    BOWLS, POURABLE, type_from_name, surface_from_joint, dump_body, CABINET_JOINTS
 from src.stream import get_stable_gen, get_grasp_gen, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_relpose_relpose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_compute_angle_kin, \
@@ -284,13 +285,17 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
     compute_pose_kin = get_compute_pose_kin(world)
     compute_angle_kin = get_compute_angle_kin(world)
+    dump_body(world.kitchen)
 
     initial_poses = {}
     for joint_name, init_conf in belief.door_confs.items():
         if joint_name in DRAWER_JOINTS:
             init.append(('Drawer', joint_name))
+        if joint_name in CABINET_JOINTS:
+            init.append(('Cabinet', joint_name))
         joint = joint_from_name(world.kitchen, joint_name)
-        #joint_name = str(joint_name.decode('UTF-8'))
+        surface_name = surface_from_joint(joint_name)
+        init.append(('SurfaceJoint', surface_name, joint_name))
         # Relies on the fact that drawers have identical surface and link names
         link_name = get_link_name(world.kitchen, child_link_from_joint(joint))
         #link_name = str(link_name.decode('UTF-8'))

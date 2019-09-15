@@ -10,12 +10,12 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
     remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
-    step_simulation, apply_alpha, approximate_as_prism, BASE_LINK, RED, \
+    step_simulation, apply_alpha, approximate_as_prism, BASE_LINK, set_color, BLACK, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, set_real_time, set_caching, draw_aabb, \
-    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation
+    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation, get_all_links
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
@@ -50,6 +50,9 @@ JOINT_LIMITS_BUFFER = 0.1
 # TODO: make sure to regenerate databases upon adjusting
 
 Camera = namedtuple('Camera', ['body', 'matrix', 'depth'])
+
+# https://github.com/JenniferBuehler/common-sensors/tree/master/common_sensors/urdf/sensors
+KINECT_URDF = 'models/kinect/kinect.urdf'
 
 ################################################################################
 
@@ -432,9 +435,14 @@ class World(object):
     def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH):
         body = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
                             color=apply_alpha(RED, 0.1), mass=0, collision=False)
+        set_pose(body, pose)
+        #from pybullet_tools.voxels import set_texture
+        #kinect = load_pybullet(KINECT_URDF, fixed_base=True)
+        #set_pose(kinect, pose)
+        #for link in get_all_links(kinect):
+        #    set_color(kinect, BLACK, link=1)
         self.cameras[name] = Camera(body, camera_matrix, max_depth)
         draw_pose(pose)
-        set_pose(body, pose)
         step_simulation()
         return name
 
@@ -521,6 +529,7 @@ class World(object):
         #remove_all_debug()
         for camera in self.cameras.values():
             remove_body(camera.body)
+            #remove_body(camera.kinect)
         self.cameras = {}
         for name in list(self.body_from_name):
             self.remove_body(name)

@@ -11,7 +11,7 @@ from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
     BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, \
-    STOVES, TOP_GRASP, get_function_name, randomize
+    STOVES, TOP_GRASP, get_function_name, randomize, LEFT_DOOR
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -174,7 +174,7 @@ def detect_block(world, fixed=False, **kwargs):
 
     block_poses = [(0.1, 1.05, 0.), (0.1, 1.3, 0.)]
     entity_name = add_block(world, idx=0, pose2d=random.choice(block_poses))
-    #sugar_name = add_sugar_box(world, idx=0, pose2d=(0.2, 1.35, np.pi / 4))
+    sugar_name = add_sugar_box(world, idx=0, pose2d=(0.2, 1.35, np.pi / 4))
     cracker_name = add_cracker_box(world, idx=1, pose2d=(0.2, 1.1, np.pi / 4))
     #other_name = add_box(world, idx=1)
     set_all_static()
@@ -190,7 +190,7 @@ def detect_block(world, fixed=False, **kwargs):
 
     prior = {
         entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
-        #sugar_name: DeltaDist('indigo_tmp'),
+        sugar_name: DeltaDist('indigo_tmp'),
         cracker_name: DeltaDist('indigo_tmp'),
     }
     return Task(world, prior=prior, movable_base=not fixed,
@@ -204,6 +204,30 @@ def detect_block(world, fixed=False, **kwargs):
             )
 
 ################################################################################
+
+def regrasp_block(world, fixed=False, **kwargs):
+    # TODO: Finish this
+    add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
+    entity_name = add_block(world, idx=0)
+    set_all_static()
+    #world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(LEFT_DOOR)))
+
+    #drawer = random.choice(ZED_DRAWERS)
+    drawer = 'indigo_tmp'
+    sample_placement(world, entity_name, drawer, learned=True)
+    prior = {
+        entity_name: UniformDist(drawer),
+    }
+    return Task(world, prior=prior, movable_base=not fixed,
+                #grasp_types=[SIDE_GRASP], #, TOP_GRASP],
+                #goal_holding=entity_name,
+                goal_on={entity_name: LEFT_DOOR},
+                #return_init_bq=True, return_init_aq=True,
+                #goal_open=[JOINT_TEMPLATE.format(LEFT_DOOR)]
+                #goal_closed=ALL_JOINTS,
+            )
 
 def hold_block(world, num=5, fixed=False, **kwargs):
     add_kinect(world)
@@ -439,6 +463,7 @@ def stow_block(world, num=1, fixed=False, **kwargs):
 ################################################################################
 
 TASKS_FNS = [
+    regrasp_block,
     detect_block,
     hold_block,
     inspect_drawer,

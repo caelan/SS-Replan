@@ -52,19 +52,18 @@ SERIALIZE_TASK = True
 TIME_PER_TRIAL = 150 # trial / sec
 HOURS_TO_SECS = 60 * 60
 
-N = 50
+N = 25
 #MAX_RAM = 28 # Max of 31.1 Gigabytes
 #BYTES_PER_KILOBYTE = math.pow(2, 10)
 #BYTES_PER_GIGABYTE = math.pow(2, 30)
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
-    #{'constrain': True, 'defer': False},
-    #{'constrain': False, 'defer': True}, # Move actions grow immensely
+    {'constrain': True, 'defer': False},
+    {'constrain': False, 'defer': True}, # Move actions grow immensely
     {'constrain': True, 'defer': True}, # TODO: serialize
 ]
 
-# Is it because the objects are large files?
 # Switch to psutil
 
 # Tasks
@@ -74,24 +73,28 @@ POLICIES = [
 # 4) Cook meal
 # 6) Object on drawer that needs to be moved
 # 7) Crowded surface
-# 8) Scaling to several tasks (no point if serializing)
+# 8) Scaling to longer tasks (no point if serializing)
 # 9) Packing into drawer
 # 10) Fixed base manipulation
-# 11) Irrelevant distractors that aren't picked up
+# 11) Regrasp using the cabinet
+# 12) Irrelevant distractors that aren't picked up
 
 TASK_NAMES = [
-    #'detect_block',
-    #'hold_block',
-    #'inspect_drawer',
+    'detect_block',
+    'inspect_drawer',
     'swap_drawers',
-    #'sugar_drawer',
+    'sugar_drawer',
+    'cook_meal',
+    # 'hold_block',
     #'cook_block',
-    #'cook_meal',
     #'stow_block',
 ]
 
 # TODO: CPU usage at 300% due to TracIK or the visualizer?
 # TODO: could check collisions only with real (non-observed) values
+
+# Experiments
+# /home/caelan/Programs/srlstream/experiments/19-09-14_22-57-21.json
 
 ################################################################################
 

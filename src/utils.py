@@ -21,7 +21,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
     child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input, \
     get_difference_fn, Euler, approximate_as_prism, wait_for_user, get_joint_positions, get_joint_limits, \
-    set_joint_position, draw_pose
+    set_joint_position, draw_pose, implies
 
 ################################################################################
 
@@ -181,7 +181,7 @@ SURFACE_FROM_NAME = {
 }
 
 ZED_LEFT_SURFACES = [
-    #'dagger_door_left',
+    'dagger_door_left',
     'indigo_tmp',
     #'range',
     'indigo_drawer_top', 'indigo_drawer_bottom',
@@ -409,6 +409,12 @@ class FConf(Conf):
 def surface_from_name(surface_name):
     return SURFACE_FROM_NAME.get(surface_name, Surface(surface_name, SURFACE_TOP, []))
 
+def surface_from_joint(joint_name):
+    for name, surface in SURFACE_FROM_NAME.items():
+        if joint_name in surface.joints:
+            return name
+    raise ValueError(joint_name)
+
 def create_surface_attachment(world, obj_name, surface_name):
     body = world.get_body(obj_name)
     if surface_name in ENV_SURFACES:
@@ -567,7 +573,7 @@ def get_grasps(world, name, grasp_types=GRASP_TYPES, pre_distance=APPROACH_DISTA
     center, extent = approximate_as_prism(body, body_pose)
 
     for grasp_type in grasp_types:
-        if not is_valid_grasp_type(name, grasp_type):
+        if not implies(world.is_real(), is_valid_grasp_type(name, grasp_type)):
             continue
         #assert is_valid_grasp_type(name, grasp_type)
         if grasp_type == TOP_GRASP:
