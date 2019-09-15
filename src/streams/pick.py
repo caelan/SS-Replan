@@ -5,7 +5,7 @@ from pybullet_tools.utils import BodySaver, get_sample_fn, set_joint_positions, 
     pairwise_collision, uniform_pose_generator, get_movable_joints, wait_for_user
 from src.command import Sequence, State, ApproachTrajectory, Detach, AttachGripper
 from src.database import load_place_base_poses
-from src.stream import PRINT_FAILURES, plan_approach, MOVE_ARM, P_RANDOMIZE_IK, inverse_reachability
+from src.stream import PRINT_FAILURES, plan_approach, MOVE_ARM, P_RANDOMIZE_IK, inverse_reachability, BREAK_BASE_FAILURE
 from src.streams.move import get_gripper_motion_gen
 from src.utils import FConf, create_surface_attachment, get_surface_obstacles, iterate_approach_path
 
@@ -131,9 +131,12 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
         while True:
             for i in range(max_attempts):
                 try:
-                    base_conf, = next(safe_base_generator)
+                    base_conf = next(safe_base_generator)
                 except StopIteration:
                     return
+                if base_conf is None:
+                    yield None
+                    continue # TODO: could break if not pose.init
                 randomize = (random.random() < P_RANDOMIZE_IK)
                 ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
                                             randomize=randomize, **kwargs), None)

@@ -140,7 +140,7 @@
                        ; (not (= ?bq1 ?bq2)) ; Causes shared optimistic failure when pick/place two objects
                        ; TODO: could a (!= ?o1 ?o2) predicate
                        (AtBConf ?bq1) (AtAConf @rest_aq)
-                       (CanMoveBase) (Calibrated)
+                       (Calibrated) (CanMoveBase)
                        (not (Unsafe)))
     :effect (and (AtBConf ?bq2)
                  (CanMoveArm)
@@ -325,7 +325,7 @@
     (exists (?j ?a) (and (AngleKin ?o ?wp ?j ?a) (AngleWithin ?j ?a @open)
                          (not (Occluded ?j))
                          (AtAngle ?j ?a)))))
-  (:derived (Occluded ?j1) (and (Drawer ?j1)
+  (:derived (Occluded ?j1) (and (Drawer ?j1) ; Both drawers can't be open at the same time anyways
     (exists (?j2 ?a2) (and (Angle ?j2 ?a2) (Above ?j2 ?j1)
                            ; (AngleWithin ?j2 ?a2 @open)
                            (not (AngleWithin ?j2 ?a2 @closed))

@@ -452,11 +452,14 @@ def inverse_reachability(world, base_generator, obstacles=set(),
         world.robot, world.base_joints, world.custom_limits)
     robot_links = [world.franka_link, world.gripper_link] if world.is_real() else []
     while True:
-        for i, base_conf in enumerate(islice(base_generator, max_attempts)):
+        attempt = 0
+        for base_conf in islice(base_generator, max_attempts):
+            attempt += 1
             if not all_between(lower_limits, base_conf, upper_limits):
                 continue
             bq = FConf(world.robot, world.base_joints, base_conf)
             bq.assign()
+            #wait_for_user()
             for conf in world.special_confs:
                 # Could even sample a special visible conf for this base_conf
                 conf.assign()
@@ -464,13 +467,14 @@ def inverse_reachability(world, base_generator, obstacles=set(),
                         world.robot, b, max_distance=min_distance) for b in obstacles):
                     break
             else:
-                # print('IR attempts:', i)
-                yield (bq,)
+                # print('IR attempts:', attempt)
+                yield bq
                 break
         else:
-            if PRINT_FAILURES: print('Failed after {} IR attempts:'.format(max_attempts))
-            return
-            #yield None # Break or yield none?
+            if PRINT_FAILURES: print('Failed after {} IR attempts:'.format(attempt))
+            if attempt < max_attempts - 1:
+                return
+            yield None
 
 def plan_approach(world, approach_pose, attachments=[], obstacles=set(),
                   teleport=False, switches_only=False,

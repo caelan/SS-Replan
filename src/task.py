@@ -10,7 +10,8 @@ from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pos
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
-    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, STOVES, TOP_GRASP, get_function_name
+    BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, \
+    STOVES, TOP_GRASP, get_function_name, randomize
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -282,7 +283,30 @@ def cook_block(world, fixed=False, **kwargs):
 
 ################################################################################
 
-def detect_drawers(world, fixed=False, **kwargs):
+ZED_DRAWERS = ['indigo_drawer_top', 'indigo_drawer_bottom']
+
+def inspect_drawer(world, fixed=False, **kwargs):
+    add_kinect(world)
+    if fixed:
+        set_fixed_base(world)
+    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    set_all_static()
+
+    initial_surface, goal_surface = randomize(ZED_DRAWERS)
+    if initial_surface != 'indigo_tmp':
+        sample_placement(world, entity_name, initial_surface, learned=True)
+
+    prior = {
+        entity_name: UniformDist(ZED_DRAWERS),
+    }
+    return Task(world, prior=prior, movable_base=not fixed,
+                goal_on={entity_name: goal_surface},
+                return_init_bq=True, return_init_aq=True,
+                goal_closed=ALL_JOINTS,
+            )
+
+
+def swap_drawers(world, fixed=False, **kwargs):
     add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
         set_fixed_base(world)
@@ -292,22 +316,23 @@ def detect_drawers(world, fixed=False, **kwargs):
     set_all_static()
     #open_all_doors(world)
 
-    drawers = ['indigo_drawer_top', 'indigo_drawer_bottom']
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
-    initial_surface, goal_surface = drawers
-    #initial_surface, goal_surface = reversed(drawers)
+    initial_surface, goal_surface = ZED_DRAWERS
+    #initial_surface, goal_surface = reversed(ZED_DRAWERS)
     if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)
 
     #joint_name = JOINT_TEMPLATE.format(goal_surface)
     #world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(goal_surface)))
 
+    # TODO: requiring the drawers to be closed makes this task much harder for some reason...
     # TODO: declare success if already believe it's in the drawer or require detection?
+    # TODO: allow more samples from streams
     prior = {
         #entity_name: UniformDist([initial_surface]),
-        entity_name: UniformDist(drawers),
+        entity_name: UniformDist(ZED_DRAWERS),
         #entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top', 'indigo_drawer_bottom']),
     }
     return Task(world, prior=prior, movable_base=not fixed,
@@ -317,9 +342,10 @@ def detect_drawers(world, fixed=False, **kwargs):
                 goal_on={entity_name: goal_surface},
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
+                #goal_closed=[JOINT_TEMPLATE.format(initial_surface)],
                 #goal_closed=[ALL_JOINTS[0]],
                 #goal_closed=[ALL_JOINTS[1]], # TODO: this causes the non-fixed base planning to fail sometimes?
-                goal_closed=ALL_JOINTS,
+                #goal_closed=ALL_JOINTS,
             )
 
 ################################################################################
@@ -405,7 +431,8 @@ def stow_block(world, num=1, fixed=False, **kwargs):
 TASKS_FNS = [
     detect_block,
     hold_block,
-    detect_drawers,
+    inspect_drawer,
+    swap_drawers,
     sugar_drawer,
     cook_block,
     cook_meal,

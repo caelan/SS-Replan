@@ -27,6 +27,7 @@ from run_experiment import TASK_NAMES, POLICIES, MAX_TIME, name_from_policy
 PRINT_ATTRIBUTES = [
     'achieved_goal',
     'total_time',
+    'error',
     #'plan_time',
     #'plan_start_time',
     #'num_iterations',

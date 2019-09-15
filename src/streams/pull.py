@@ -146,9 +146,12 @@ def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, lea
         while True:
             for i in range(max_attempts):
                 try:
-                    base_conf, = next(safe_base_generator)
+                    base_conf = next(safe_base_generator)
                 except StopIteration:
                     return
+                if base_conf is None:
+                    yield None
+                    continue
                 door_path = random.choice(door_paths)
                 randomize = (random.random() < P_RANDOMIZE_IK)
                 ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,

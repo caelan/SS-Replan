@@ -70,14 +70,14 @@ POLICIES = [
 TASK_NAMES = [
     #'detect_block',
     #'hold_block',
-    'detect_drawers',
+    'swap_drawers',
     #'sugar_drawer',
     #'cook_block',
     #'cook_meal',
     #'stow_block',
 ]
 
-# TODO: CPU usage at 300% due to TracIK?
+# TODO: CPU usage at 300% due to TracIK or the visualizer?
 # TODO: could check collisions only with real (non-observed) values
 
 ################################################################################

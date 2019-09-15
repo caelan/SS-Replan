@@ -94,7 +94,7 @@
 
   (:stream fixed-plan-press
     :inputs (?k ?bq)
-    :domain (NearJoint ?k ?bq) ; TODO: use pose instead?
+    :domain (and (NearJoint ?k ?bq) (Knob ?k)) ; TODO: use pose instead?
     :outputs (?aq ?at)
     :certified (and (ATraj ?at) (AConf ?bq ?aq)
                     (Press ?k ?bq ?aq ?at)))

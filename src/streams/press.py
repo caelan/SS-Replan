@@ -62,41 +62,6 @@ def plan_press(world, knob_name, pose, grasp, base_conf, obstacles, randomize=Tr
 
 ################################################################################
 
-def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):
-    def gen(knob_name):
-        obstacles = world.static_obstacles
-        knob_link = link_from_name(world.kitchen, knob_name)
-        pose = get_link_pose(world.kitchen, knob_link)
-        #pose = RelPose(world.kitchen, knob_link, init=True)
-        presses = cycle(get_grasp_presses(world, knob_name))
-        grasp = next(presses)
-        gripper_pose = multiply(pose, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
-        if learned:
-            base_generator = cycle(load_pull_base_poses(world, knob_name))
-        else:
-            base_generator = uniform_pose_generator(world.robot, gripper_pose)
-        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
-        while True:
-            for i in range(max_attempts):
-                try:
-                    base_conf, = next(safe_base_generator)
-                except StopIteration:
-                    return
-                grasp = next(presses)
-                randomize = (random.random() < P_RANDOMIZE_IK)
-                ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, obstacles,
-                                             randomize=randomize, **kwargs), None)
-                if ik_outputs is not None:
-                    yield (base_conf,) + ik_outputs
-                    break
-            else:
-                if PRINT_FAILURES: print('Pick failure')
-                if not pose.init:
-                    break
-                yield None
-    return gen
-
-
 def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=False, **kwargs):
 
     def gen(knob_name, base_conf):
@@ -114,5 +79,42 @@ def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=Fal
                     break  # return
             else:
                 if PRINT_FAILURES: print('Fixed pull failure')
+                yield None
+    return gen
+
+def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):
+    def gen(knob_name):
+        obstacles = world.static_obstacles
+        knob_link = link_from_name(world.kitchen, knob_name)
+        pose = get_link_pose(world.kitchen, knob_link)
+        #pose = RelPose(world.kitchen, knob_link, init=True)
+        presses = cycle(get_grasp_presses(world, knob_name))
+        grasp = next(presses)
+        gripper_pose = multiply(pose, invert(grasp.grasp_pose)) # w_f_g = w_f_o * (g_f_o)^-1
+        if learned:
+            base_generator = cycle(load_pull_base_poses(world, knob_name))
+        else:
+            base_generator = uniform_pose_generator(world.robot, gripper_pose)
+        safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)
+        while True:
+            for i in range(max_attempts):
+                try:
+                    base_conf = next(safe_base_generator)
+                except StopIteration:
+                    return
+                if base_conf is None:
+                    yield None
+                    continue
+                grasp = next(presses)
+                randomize = (random.random() < P_RANDOMIZE_IK)
+                ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, obstacles,
+                                             randomize=randomize, **kwargs), None)
+                if ik_outputs is not None:
+                    yield (base_conf,) + ik_outputs
+                    break
+            else:
+                if PRINT_FAILURES: print('Pick failure')
+                if not pose.init:
+                    break
                 yield None
     return gen
