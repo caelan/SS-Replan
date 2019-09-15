@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import math
 from itertools import islice
 from collections import namedtuple
 
@@ -11,7 +12,7 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, Ray, get_distance_fn, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
     INF, apply_affine, get_joint_name, get_unit_vector, get_link_subtree, get_link_name, unit_quat, joint_from_name, \
-    get_extend_fn, wait_for_user, set_renderer, child_link_from_joint
+    get_extend_fn, wait_for_user, set_renderer, child_link_from_joint, unit_from_theta
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
 from src.command import Sequence, State, Detect, DoorTrajectory
@@ -25,7 +26,7 @@ from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
 
-COST_SCALE = 1e2 # 3 decimal places
+COST_SCALE = 1 # costs will always be greater than one
 MAX_COST = MAX_FD_COST / (25*COST_SCALE)
 #MAX_COST = MAX_FD_COST / get_cost_scale()
 # TODO: move this to FD
@@ -49,6 +50,7 @@ P_RANDOMIZE_IK = 1.0
 MAX_CONF_DISTANCE = 0.75
 NEARBY_APPROACH = MAX_CONF_DISTANCE
 NEARBY_PULL = 0.25
+FIXED_FAILURES = 5
 
 # TODO: TracIK might not be deterministic in which case it might make sense to try a few
 # http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/trac_ik/trac_ik_tutorial.html
@@ -239,6 +241,7 @@ class Observation(object):
         return 'obs({})'.format(self.value)
 
 def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relative instead?
+                          max_observations=10,
                           mlo_only=False, ordered=False, **kwargs):
     # TODO: incorporate ray tracing
     detect_fn = get_compute_detect(world, ray_trace=False, **kwargs)
@@ -252,15 +255,14 @@ def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relativ
             if 1 <= rp.observations:
                 continue
             prob = pose_dist.discrete_prob(rp)
-            obs = None
-            cost = detect_cost_fn(obj_name, pose_dist, obs, rp)
-            if (cost < MAX_COST): # and (min_prob < prob):
-                # pose = rp.get_world_from_body()
-                result = detect_fn(obj_name, rp)
-                if result is not None:
-                    # detect, = result
-                    # detect.draw()
-                    valid_samples[rp] = prob
+            #cost = detect_cost_fn(obj_name, pose_dist, obs=None, rp_sample=rp)
+            #if (cost < MAX_COST): # and (min_prob < prob):
+            # pose = rp.get_world_from_body()
+            result = detect_fn(obj_name, rp)
+            if result is not None:
+                # detect, = result
+                # detect.draw()
+                valid_samples[rp] = prob
         if not valid_samples:
             return
 
@@ -273,13 +275,15 @@ def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relativ
             for rp in sorted(valid_samples, key=valid_samples.__getitem__, reverse=True):
                 obs = Observation(rp)
                 yield (obs,)
-        else:
-            while valid_samples:
-                dist = DDist(valid_samples)
-                rp = dist.sample()
-                del valid_samples[rp]
-                obs = Observation(rp)
-                yield (obs,)
+            return
+        observations = 0
+        while valid_samples and (observations < max_observations):
+            dist = DDist(valid_samples)
+            rp = dist.sample()
+            del valid_samples[rp]
+            obs = Observation(rp)
+            yield (obs,)
+            observations += 1
     return gen
 
 def update_belief_fn(world, **kwargs):
@@ -347,7 +351,7 @@ def get_test_near_joint(world, **kwargs):
 
 def get_stable_gen(world, max_attempts=100,
                    visibility=True, learned=True, collisions=True,
-                   pos_scale=0.01, rot_scale=np.pi/16,
+                   pos_scale=0.01, rot_scale=np.pi/16, robust_radius=0.0,
                    z_offset=Z_EPSILON, **kwargs):
 
     # TODO: remove fixed collisions with contained surfaces
@@ -389,14 +393,27 @@ def get_stable_gen(world, max_attempts=100,
                 else:
                     # TODO: halton sequence
                     # unit_generator(d, use_halton=True)
-                    body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb, epsilon=z_offset)
+                    body_pose_world = sample_placement_on_aabb(obj_body, surface_aabb,
+                                                               epsilon=z_offset, percent=2.0)
                     if body_pose_world is None:
                         continue # return?
                 if visibility and not is_visible_by_camera(world, point_from_pose(body_pose_world)):
                     continue
-                set_pose(obj_body, body_pose_world)
                 # TODO: make sure the surface is open when doing this
-                if test_supported(world, obj_body, surface_name, collisions=collisions):
+
+                robust = True
+                if robust_radius != 0.:
+                    for theta in np.linspace(0, 5 * np.pi, num=8):
+                        x, y = robust_radius*unit_from_theta(theta)
+                        delta_body = Pose(Point(x, y))
+                        delta_world = multiply(body_pose_world, delta_body)
+                        set_pose(obj_body, delta_world)
+                        if not test_supported(world, obj_body, surface_name, collisions=collisions):
+                            robust = False
+                            break
+
+                set_pose(obj_body, body_pose_world)
+                if robust and test_supported(world, obj_body, surface_name, collisions=collisions):
                     rp = create_relative_pose(world, obj_name, surface_name)
                     yield (rp,)
                     break
@@ -413,7 +430,9 @@ def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
     def gen(obj_name, surface_name, pose2, base_conf):
         #base_conf.assign()
         #pose2.assign()
-        while True:
+        max_failures = FIXED_FAILURES if world.task.movable_base else INF
+        failures = 0
+        while failures <= max_failures:
             for rel_pose, in islice(stable_gen(obj_name, surface_name), max_attempts):
                 pose1, = compute_pose_kin(obj_name, rel_pose, surface_name, pose2)
                 if test_near_pose(obj_name, pose1, base_conf):
@@ -421,6 +440,7 @@ def get_nearby_stable_gen(world, max_attempts=25, **kwargs):
                     break
             else:
                 yield None
+                failures += 1
     return gen
 
 def get_grasp_gen(world, collisions=False, randomize=True, **kwargs): # teleport=False,

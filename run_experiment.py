@@ -17,6 +17,7 @@ import sys
 import traceback
 import resource
 import copy
+import psutil
 
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
@@ -30,7 +31,7 @@ pddlstream.language.statistics.SAVE_STATISTICS = False
 from pybullet_tools.utils import has_gui, elapsed_time, user_input, ensure_dir, \
     write_json, SEPARATOR, WorldSaver, \
     get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user
-from pddlstream.utils import str_from_object, safe_rm_dir, Verbose
+from pddlstream.utils import str_from_object, safe_rm_dir, Verbose, KILOBYTES_PER_GIGABYTE, BYTES_PER_KILOBYTE
 from pddlstream.algorithms.algorithm import reset_globals
 
 from src.command import create_state, iterate_commands
@@ -45,7 +46,7 @@ from multiprocessing import Pool, TimeoutError, cpu_count
 EXPERIMENTS_DIRECTORY = 'experiments/'
 TEMP_DIRECTORY = 'temp_parallel/'
 MAX_TIME = 10*60
-SERIAL = True
+SERIAL = False
 VERBOSE = SERIAL
 SERIALIZE_TASK = True
 
@@ -53,9 +54,27 @@ TIME_PER_TRIAL = 150 # trial / sec
 HOURS_TO_SECS = 60 * 60
 
 N = 10
-#MAX_RAM = 28 # Max of 31.1 Gigabytes
-#BYTES_PER_KILOBYTE = math.pow(2, 10)
-#BYTES_PER_GIGABYTE = math.pow(2, 30)
+MAX_MEMORY = 3.5*KILOBYTES_PER_GIGABYTE
+
+"""
+_memory: 1571984.0, plan_time: 210.628690958, total_cost: 2075, total_time: 211.089640856}
+WARNING: overflow on h^add! Costs clamped to 100000000
+Traceback (most recent call last):
+  File "./run_experiment.py", line 202, in run_experiment
+    max_time=MAX_TIME, **policy)
+  File "/home/caelan/Programs/srlstream/src/policy.py", line 113, in run_policy
+    max_cost=plan_cost, replan_actions=defer_actions)
+  File "/home/caelan/Programs/srlstream/src/policy.py", line 34, in random_restart
+    plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
+  File "/home/caelan/Programs/srlstream/src/planner.py", line 167, in solve_pddlstream
+    search_sample_ratio=search_sample_ratio)
+  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/focused.py", line 134, in solve_focused
+  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/reorder.py", line 167, in reorder_stream_plan
+    ordering = dynamic_programming(nodes, valid_combine, stats_fn, **kwargs)
+  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/reorder.py", line 127, in dynamic_programming
+    new_subset = frozenset([v]) | subset
+MemoryError
+"""
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
@@ -63,6 +82,8 @@ POLICIES = [
     {'constrain': False, 'defer': True}, # Move actions grow immensely
     {'constrain': True, 'defer': True}, # TODO: serialize
 ]
+# 8Gb memory limit
+# https://ipc2018-classical.bitbucket.io/
 
 # Switch to psutil
 
@@ -84,8 +105,9 @@ TASK_NAMES = [
     'inspect_drawer',
     'swap_drawers',
     'sugar_drawer',
-    'cook_meal',
-    # 'hold_block',
+    #'cook_meal',
+    #'regrasp_block',
+    #'hold_block',
     #'cook_block',
     #'stow_block',
 ]
@@ -142,6 +164,17 @@ def run_experiment(experiment):
     trial = problem['trial']
     policy = experiment['policy']
 
+    # ulimit -a
+    # soft, hard = resource.getrlimit(name) # resource.RLIM_INFINITY
+    # resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+    process = psutil.Process(os.getpid())
+    soft_memory = int(BYTES_PER_KILOBYTE*MAX_MEMORY)
+    hard_memory = soft_memory
+    process.rlimit(psutil.RLIMIT_AS, (soft_memory, hard_memory))
+    soft_time = MAX_TIME + 2*60
+    hard_time = soft_time
+    process.rlimit(psutil.RLIMIT_CPU, (soft_time, hard_time))
+
     stdout = sys.stdout
     if not VERBOSE:
        sys.stdout = open(os.devnull, 'w')
@@ -163,6 +196,7 @@ def run_experiment(experiment):
     if SERIALIZE_TASK:
         task_fn(world, fixed=args.fixed)
         task = problem['task']
+        world.task = task
         task.world = world
     else:
         # TODO: assumes task_fn is deterministic wrt task
@@ -242,13 +276,6 @@ def create_problems(args):
 
 ################################################################################
 
-#def set_soft_limit(name, limit):
-#    # TODO: use FastDownward's memory strategy
-#    # ulimit -a
-#    soft, hard = resource.getrlimit(name) # resource.RLIM_INFINITY
-#    soft = limit
-#    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
-
 def main():
     parser = create_parser()
     #parser.add_argument('-problem', default=task_names[-1], choices=task_names,
@@ -261,7 +288,7 @@ def main():
     # https://stackoverflow.com/questions/15314189/python-multiprocessing-pool-hangs-at-join
     # https://stackoverflow.com/questions/39884898/large-amount-of-multiprocessing-process-causing-deadlock
     # TODO: alternatively don't destroy the world
-    num_cores = cpu_count() - 2
+    num_cores = cpu_count() - 4
     directory = EXPERIMENTS_DIRECTORY
     date_name = datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
     json_path = os.path.abspath(os.path.join(directory, '{}.json'.format(date_name)))
@@ -314,6 +341,7 @@ def main():
         # TODO: dump results automatically?
     return results
 
+#  ./run_experiment.py 2>&1 | tee log.txt
 
 if __name__ == '__main__':
     main()

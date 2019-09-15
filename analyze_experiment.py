@@ -35,6 +35,7 @@ PRINT_ATTRIBUTES = [
     #'num_unconstrained',
     #'num_successes',
     #'num_actions',
+    'peak_memory',
     'num_commands',
     #'total_cost',
 ]

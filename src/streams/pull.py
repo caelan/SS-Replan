@@ -3,11 +3,11 @@ from itertools import cycle
 
 from pybullet_tools.pr2_utils import close_until_collision
 from pybullet_tools.utils import multiply, joint_from_name, set_joint_positions, invert, \
-    pairwise_collision, BodySaver, uniform_pose_generator
+    pairwise_collision, BodySaver, uniform_pose_generator, INF
 from src.command import ApproachTrajectory, DoorTrajectory, Sequence, State
 from src.database import load_pull_base_poses
 from src.stream import PRINT_FAILURES, plan_workspace, plan_approach, MOVE_ARM, \
-    P_RANDOMIZE_IK, inverse_reachability, compute_door_paths
+    P_RANDOMIZE_IK, inverse_reachability, compute_door_paths, FIXED_FAILURES
 from src.streams.move import get_gripper_motion_gen
 from src.utils import get_descendant_obstacles, FConf
 
@@ -105,7 +105,9 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
         if not door_plans:
             print('Unable to open door {} at fixed config'.format(joint_name))
             return
-        while True:
+        max_failures = FIXED_FAILURES if world.task.movable_base else INF
+        failures = 0
+        while failures <= max_failures:
             for i in range(max_attempts):
                 door_path = random.choice(door_plans)
                 # TracIK is itself stochastic
@@ -120,6 +122,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
             else:
                 if PRINT_FAILURES: print('Fixed pull failure')
                 yield None
+                failures += 1
     return gen
 
 

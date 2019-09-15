@@ -3,9 +3,10 @@ from itertools import cycle
 
 from pybullet_tools.pr2_utils import get_top_presses
 from pybullet_tools.utils import BodySaver, get_sample_fn, set_joint_positions, multiply, invert, get_moving_links, \
-    pairwise_collision, link_from_name, get_unit_vector, unit_point, Pose, get_link_pose, uniform_pose_generator
+    pairwise_collision, link_from_name, get_unit_vector, unit_point, Pose, get_link_pose, \
+    uniform_pose_generator, INF
 from src.command import Sequence, State, ApproachTrajectory, Wait
-from src.stream import plan_approach, MOVE_ARM, inverse_reachability, P_RANDOMIZE_IK, PRINT_FAILURES
+from src.stream import plan_approach, MOVE_ARM, inverse_reachability, P_RANDOMIZE_IK, PRINT_FAILURES, FIXED_FAILURES
 from src.utils import FConf, APPROACH_DISTANCE, TOOL_POSE, FINGER_EXTENT, Grasp, TOP_GRASP
 from src.database import load_pull_base_poses
 
@@ -68,7 +69,9 @@ def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=Fal
         knob_link = link_from_name(world.kitchen, knob_name)
         pose = get_link_pose(world.kitchen, knob_link)
         presses = cycle(get_grasp_presses(world, knob_name))
-        while True:
+        max_failures = FIXED_FAILURES if world.task.movable_base else INF
+        failures = 0
+        while failures <= max_failures:
             for i in range(max_attempts):
                 grasp = next(presses)
                 randomize = (random.random() < P_RANDOMIZE_IK)
@@ -81,6 +84,7 @@ def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=Fal
             else:
                 if PRINT_FAILURES: print('Fixed pull failure after {} attempts'.format(max_attempts))
                 yield None
+                max_failures += 1
     return gen
 
 def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, learned=True, **kwargs):

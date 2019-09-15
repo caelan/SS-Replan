@@ -2,10 +2,10 @@ import random
 from itertools import cycle
 
 from pybullet_tools.utils import BodySaver, get_sample_fn, set_joint_positions, multiply, invert, get_moving_links, \
-    pairwise_collision, uniform_pose_generator, get_movable_joints, wait_for_user
+    pairwise_collision, uniform_pose_generator, get_movable_joints, wait_for_user, INF
 from src.command import Sequence, State, ApproachTrajectory, Detach, AttachGripper
 from src.database import load_place_base_poses
-from src.stream import PRINT_FAILURES, plan_approach, MOVE_ARM, P_RANDOMIZE_IK, inverse_reachability
+from src.stream import PRINT_FAILURES, plan_approach, MOVE_ARM, P_RANDOMIZE_IK, inverse_reachability, FIXED_FAILURES
 from src.streams.move import get_gripper_motion_gen
 from src.utils import FConf, create_surface_attachment, get_surface_obstacles, iterate_approach_path
 
@@ -95,7 +95,9 @@ def get_fixed_pick_gen_fn(world, max_attempts=25, collisions=True, **kwargs):
             return
         # TODO: increase timeouts if a previously successful value
         # TODO: seed IK using the previous solution
-        while True:
+        max_failures = FIXED_FAILURES if world.task.movable_base else INF
+        failures = 0
+        while failures <= max_failures:
             for i in range(max_attempts):
                 randomize = (random.random() < P_RANDOMIZE_IK)
                 ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
@@ -106,9 +108,10 @@ def get_fixed_pick_gen_fn(world, max_attempts=25, collisions=True, **kwargs):
                     break  # return
             else:
                 if PRINT_FAILURES: print('Fixed pick failure after {} attempts'.format(max_attempts))
-                if not pose.init:
-                    break
+                #if not pose.init:
+                #    break
                 yield None
+                failures += 1
     return gen
 
 
