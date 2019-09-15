@@ -11,7 +11,7 @@ from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
     BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, \
-    STOVES, TOP_GRASP, get_function_name, randomize, LEFT_DOOR
+    STOVES, TOP_GRASP, get_function_name, randomize, LEFT_DOOR, point_from_pose
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief
@@ -144,10 +144,13 @@ def pose2d_on_surface(world, entity_name, surface_name, pose2d=UNIT_POSE2D):
     set_pose(body, pose)
     return pose
 
-def sample_placement(world, entity_name, surface_name, min_distance=0.02, **kwargs):
+def sample_placement(world, entity_name, surface_name, min_x=0.0, min_distance=0.05, **kwargs):
     entity_body = world.get_body(entity_name)
     placement_gen = get_stable_gen(world, pos_scale=0, rot_scale=0, **kwargs)
     for pose, in placement_gen(entity_name, surface_name):
+        x, y, z = point_from_pose(pose.get_world_from_body())
+        if x < min_x:
+            continue
         pose.assign()
         if not any(pairwise_collision(entity_body, obst_body, max_distance=min_distance) for obst_body in
                    world.body_from_name.values() if entity_body != obst_body):

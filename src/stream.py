@@ -448,12 +448,22 @@ def is_robot_visible(world, links):
     #wait_for_user()
     return True
 
-def inverse_reachability(world, base_generator, obstacles=set(),
-                         max_attempts=50, **kwargs):
+def test_base_conf(world, bq, obstacles):
     min_distance = 0.04 if world.is_real() else 0.0
+    robot_links = [world.franka_link, world.gripper_link] if world.is_real() else []
+    bq.assign()
+    for conf in world.special_confs:
+        # Could even sample a special visible conf for this base_conf
+        conf.assign()
+        if not is_robot_visible(world, robot_links) or any(pairwise_collision(
+                world.robot, b, max_distance=min_distance) for b in obstacles):
+            return False
+    return True
+
+def inverse_reachability(world, base_generator, obstacles=set(),
+                         max_attempts=25, **kwargs):
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
-    robot_links = [world.franka_link, world.gripper_link] if world.is_real() else []
     while True:
         attempt = 0
         for base_conf in islice(base_generator, max_attempts):
@@ -461,16 +471,9 @@ def inverse_reachability(world, base_generator, obstacles=set(),
             if not all_between(lower_limits, base_conf, upper_limits):
                 continue
             bq = FConf(world.robot, world.base_joints, base_conf)
-            bq.assign()
             #wait_for_user()
-            for conf in world.special_confs:
-                # Could even sample a special visible conf for this base_conf
-                conf.assign()
-                if not is_robot_visible(world, robot_links) or any(pairwise_collision(
-                        world.robot, b, max_distance=min_distance) for b in obstacles):
-                    break
-            else:
-                # print('IR attempts:', attempt)
+            if test_base_conf(world, bq, obstacles):
+                #if PRINT_FAILURES: print('Success after {} IR attempts:'.format(attempt))
                 yield bq
                 break
         else:

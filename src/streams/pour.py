@@ -7,7 +7,7 @@ from pybullet_tools.utils import approximate_as_cylinder, approximate_as_prism, 
     multiply, invert, BodySaver, Euler, set_pose, wait_for_user, \
     Point, Pose, uniform_pose_generator
 from pybullet_tools.pr2_utils import get_top_grasps
-from src.database import load_place_base_poses, load_inverse_placements, project_base_pose
+from src.database import load_place_base_poses, load_inverse_placements, project_base_pose, load_pour_base_poses
 from src.stream import plan_approach, MOVE_ARM, inverse_reachability, P_RANDOMIZE_IK, PRINT_FAILURES
 from src.command import Sequence, ApproachTrajectory, State, Wait
 from src.stream import MOVE_ARM, plan_workspace
@@ -142,7 +142,7 @@ def get_pour_gen_fn(world, max_attempts=50, learned=True, **kwargs):
             #gripper_pose = multiply(bowl_pose, invert(grasp_pose))  # w_f_g = w_f_o * (g_f_o)^-1
             #set_tool_pose(world, gripper_pose)
             #base_generator = cycle(load_place_base_poses(world, gripper_pose, pose.support, TOP_GRASP))
-            base_generator = cycle(map(project_base_pose, load_inverse_placements(world, pose.support)))
+            base_generator = cycle(load_pour_base_poses(world, pose.support))
         else:
             base_generator = uniform_pose_generator(world.robot, bowl_pose)
         safe_base_generator = inverse_reachability(world, base_generator, obstacles=obstacles, **kwargs)

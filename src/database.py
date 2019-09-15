@@ -60,15 +60,6 @@ def load_forward_placements(world, surface_names=ALL_SURFACES, grasp_types=GRASP
                                                          field='base_from_object'))
     return base_from_objects
 
-def load_inverse_placements(world, surface_name, grasp_types=GRASP_TYPES):
-    surface_from_bases = []
-    for grasp_type in grasp_types:
-        for entry in load_place_entries(world.robot_name, surface_name, grasp_type):
-            surface_from_bases.append(multiply(entry['surface_from_object'],
-                                               invert(entry['base_from_object'])))
-    random.shuffle(surface_from_bases)
-    return surface_from_bases
-
 def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
     # TODO: Gaussian perturbation
     gripper_from_base_list = load_place_database(world.robot_name, surface_name, grasp_type,
@@ -83,6 +74,23 @@ def load_place_base_poses(world, tool_pose, surface_name, grasp_type):
         #_, _, z = get_point(world.floor)
         #set_joint_positions(world.robot, joints_from_names(world.robot, BASE_JOINTS), base_values)
         #handles.extend(draw_point(np.array([x, y, z + 0.01]), color=(1, 0, 0), size=0.05))
+        #wait_for_user()
+        yield base_values
+
+def load_inverse_placements(world, surface_name, grasp_types=GRASP_TYPES):
+    surface_from_bases = []
+    for grasp_type in grasp_types:
+        for entry in load_place_entries(world.robot_name, surface_name, grasp_type):
+            surface_from_bases.append(multiply(entry['surface_from_object'],
+                                               invert(entry['base_from_object'])))
+    random.shuffle(surface_from_bases)
+    return surface_from_bases
+
+def load_pour_base_poses(world, surface_name, **kwargs):
+    world_from_surface = get_surface_reference_pose(world.kitchen, surface_name)
+    for surface_from_base in load_inverse_placements(world, surface_name, **kwargs):
+        base_values = project_base_pose(multiply(world_from_surface, surface_from_base))
+        #world.set_base_conf(base_values)
         #wait_for_user()
         yield base_values
 
