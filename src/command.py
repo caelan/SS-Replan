@@ -143,6 +143,7 @@ class Trajectory(Command):
     def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
         from src.retime import slow_trajectory, ensure_increasing, retime_trajectory
         from scipy.interpolate import interp1d, CubicSpline
+        # TODO: add the current configuration to adjust path
         path = adjust_path(self.robot, self.joints, self.path) # TODO: account for error in the start configuration?
         path, time_from_starts = retime_trajectory(self.robot, self.joints, path, sample_step=None)
         #path = list(self.path)

@@ -45,14 +45,14 @@ from multiprocessing import Pool, TimeoutError, cpu_count
 EXPERIMENTS_DIRECTORY = 'experiments/'
 TEMP_DIRECTORY = 'temp_parallel/'
 MAX_TIME = 10*60
-VERBOSE = False
-SERIAL = False
+SERIAL = True
+VERBOSE = SERIAL
 SERIALIZE_TASK = True
 
 TIME_PER_TRIAL = 150 # trial / sec
 HOURS_TO_SECS = 60 * 60
 
-N = 25
+N = 10
 #MAX_RAM = 28 # Max of 31.1 Gigabytes
 #BYTES_PER_KILOBYTE = math.pow(2, 10)
 #BYTES_PER_GIGABYTE = math.pow(2, 30)
@@ -182,8 +182,8 @@ def run_experiment(experiment):
     reset_globals()
     real_state = create_state(world)
     #start_time = time.time()
-    if has_gui():
-        wait_for_user()
+    #if has_gui():
+    #    wait_for_user()
     try:
         observation_fn = lambda belief: observe_pybullet(world)
         transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
@@ -218,7 +218,7 @@ def create_problems(args):
         for task_name in TASK_NAMES:
             random.seed(hash((0, task_name, trial, time.time())))
             numpy.random.seed(hash((1, task_name, trial, time.time())) % (2 ** 32))
-            world = World(use_gui=SERIAL)
+            world = World(use_gui=False) # SERIAL
             task_fn = task_fn_from_name[task_name]
             task = task_fn(world, fixed=args.fixed)
             task.world = None
@@ -311,6 +311,7 @@ def main():
         print('Duration / experiment: {:.3f}'.format(num_cores*elapsed_time(start_time) / len(experiments)))
         print('Duration: {:.2f} hours'.format(elapsed_time(start_time) / HOURS_TO_SECS))
         safe_rm_dir(TEMP_DIRECTORY)
+        # TODO: dump results automatically?
     return results
 
 

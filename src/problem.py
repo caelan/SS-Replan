@@ -285,7 +285,6 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
 
     compute_pose_kin = get_compute_pose_kin(world)
     compute_angle_kin = get_compute_angle_kin(world)
-    dump_body(world.kitchen)
 
     initial_poses = {}
     for joint_name, init_conf in belief.door_confs.items():

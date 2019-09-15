@@ -10,7 +10,9 @@ from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSER
     STOCHASTIC_ACTIONS
 from src.utils import BOWL
 
-# TODO: max time spent reattempting streams flag
+# TODO: max time spent reattempting streams flag (might not be needed actually)
+# TODO: process binding blows up for detect_drawer
+UNCONSTRAINED_FIXED_BASE = False
 
 def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, serialize=True,
                max_time=5*60, max_constrained_time=2*60, max_unconstrained_time=INF):
@@ -45,6 +47,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         belief.draw()
 
         #wait_for_user('Plan?')
+        fixed_base = UNCONSTRAINED_FIXED_BASE or not task.movable_base  # or not constrain
         plan_start_time = time.time()
         plan, plan_cost = None, INF
         if constrain and (previous_skeleton is not None):
@@ -59,22 +62,23 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
                                                             skeleton=previous_skeleton, replan_actions=defer_actions)
             if plan is None:
-                print('Failed to adhere to plan')
+                print('Failed to solve with plan constraints')
                 #wait_for_user()
-        #elif not constrain and task.movable_base:
-        #    # TODO: process binding blows up for detect_drawer
-        #    num_unconstrained += 1
-        #    problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
-        #                                       collisions=not args.cfree, teleport=args.teleport)
-        #    print_separator(n=25)
-        #    planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time, args.max_time)
-        #    plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-        #                                                    replan_actions=defer_actions)
+        elif not fixed_base:
+            num_unconstrained += 1
+            problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
+                                               collisions=not args.cfree, teleport=args.teleport)
+            print_separator(n=25)
+            planning_time = min(max_time - elapsed_time(total_start_time), args.max_time)
+            plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
+                                                            replan_actions=defer_actions)
+            if plan is None:
+                print('Failed to solve when allowing fixed base')
 
         if plan is None:
+            # TODO: might be helpful to add additional facts here in the future
             num_unconstrained += 1 # additional_init=previous_facts,
-            #problem = pdddlstream_from_problem(belief, fixed_base=not task.movable_base,
-            problem = pdddlstream_from_problem(belief, # fixed_base=not task.movable_base or not constrain,
+            problem = pdddlstream_from_problem(belief, fixed_base=fixed_base,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
             planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time, args.max_time)

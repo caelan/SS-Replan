@@ -28,7 +28,7 @@ from src.utils import RelPose
 VIDEO_TEMPLATE = '{}.mp4'
 #COST_BOUND = 1000.0 # TODO: be careful about the cost bound...
 COST_BOUND = INF
-MAX_MEMORY = 4.0 * KILOBYTES_PER_GIGABYTE
+MAX_MEMORY = 3.0 * KILOBYTES_PER_GIGABYTE
 # TODO: multiple cost bounds
 
 ################################################################################

@@ -48,6 +48,9 @@ REPAIR_DETECTIONS = True
 # TODO: mixture between discrete and growing Mixture of Gaussian
 # TODO: belief fluents
 
+ARM_TOLERANCE = math.radians(2) # Can afford to be larger (just move to new initial conf)
+GRIPPER_TOLERANCE = 1e-2
+
 class Belief(object):
     def __init__(self, world, pose_dists={}, grasped=None):
         self.world = world
@@ -72,12 +75,12 @@ class Belief(object):
         # No use applying this to base confs
         self.base_conf = FConf(self.world.robot, self.world.base_joints, init=True)
         arm_conf = FConf(self.world.robot, self.world.arm_joints, init=True)
-        if (self.arm_conf is None) or not are_confs_close(arm_conf, self.arm_conf, tol=math.radians(1)):
+        if (self.arm_conf is None) or not are_confs_close(arm_conf, self.arm_conf, tol=ARM_TOLERANCE):
             self.arm_conf = arm_conf
         else:
             print('At anticipated arm conf')
         gripper_conf = FConf(self.world.robot, self.world.gripper_joints, init=True)
-        if (self.gripper_conf is None) or not are_confs_close(gripper_conf, self.gripper_conf, tol=1e-2):
+        if (self.gripper_conf is None) or not are_confs_close(gripper_conf, self.gripper_conf, tol=GRIPPER_TOLERANCE):
             self.gripper_conf = gripper_conf
         else:
             print('At anticipated gripper conf')
