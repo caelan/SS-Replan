@@ -2,20 +2,42 @@ from __future__ import print_function
 
 import time
 
-from pybullet_tools.utils import wait_for_duration, wait_for_user, print_separator, INF, elapsed_time
+from pybullet_tools.utils import wait_for_duration, wait_for_user, \
+    print_separator, INF, elapsed_time
+from pddlstream.utils import get_peak_memory_in_kb, str_from_object
+from pddlstream.language.constants import Certificate, PDDLProblem
 from src.belief import create_observable_belief, transition_belief_update, create_observable_pose_dist
 from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
-from src.problem import pdddlstream_from_problem
+from src.problem import pdddlstream_from_problem, get_streams
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
     STOCHASTIC_ACTIONS
 from src.utils import BOWL
 
 # TODO: max time spent reattempting streams flag (might not be needed actually)
 # TODO: process binding blows up for detect_drawer
-UNCONSTRAINED_FIXED_BASE = False
+UNCONSTRAINED_FIXED_BASE = True
+MAX_RESTART_TIME = 2*60
+
+def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
+                   max_planner_time=INF, **kwargs):
+    domain_pddl, constant_map, _, _, init, goal_formula = problem
+    start_time = time.time()
+    task = belief.task
+    world = task.world
+    iterations = 0
+    while (elapsed_time(start_time) < max_time) and (iterations < max_iterations):
+        iterations += 1
+        stream_pddl, stream_map = get_streams(world, teleport_base=task.teleport_base,
+                                              collisions=not args.cfree, teleport=args.teleport)
+        problem = PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)
+        remaining_time = min(max_time - elapsed_time(start_time), max_planner_time)
+        plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
+        if plan is not None:
+            return plan, plan_cost, certificate
+    return None, INF, Certificate(all_facts=[], preimage_facts=[])
 
 def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, serialize=True,
-               max_time=5*60, max_constrained_time=2*60, max_unconstrained_time=INF):
+               max_time=10*60, max_constrained_time=1*60, max_unconstrained_time=INF):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     defer_actions = replan_actions if defer else set()
     world = task.world
@@ -58,7 +80,9 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             print('Reused facts:', sorted(previous_facts, key=lambda f: f[0]))
             problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
-            planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time, args.max_time)
+            planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time) #, args.max_time)
+            #plan, plan_cost, certificate = random_restart(belief, args, problem, max_time=planning_time, max_planner_time=INF,
+            #                                              skeleton=previous_skeleton, replan_actions=defer_actions)
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
                                                             skeleton=previous_skeleton, replan_actions=defer_actions)
             if plan is None:
@@ -69,7 +93,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
-            planning_time = min(max_time - elapsed_time(total_start_time), args.max_time)
+            planning_time = min(max_time - elapsed_time(total_start_time)) # , args.max_time)
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
                                                             replan_actions=defer_actions)
             if plan is None:
@@ -81,9 +105,12 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             problem = pdddlstream_from_problem(belief, fixed_base=fixed_base,
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
-            planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time, args.max_time)
-            plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-                                                            max_cost=plan_cost, replan_actions=defer_actions)
+            planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time) #, args.max_time)
+            #plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
+            #                                                max_cost=plan_cost, replan_actions=defer_actions)
+            plan, plan_cost, certificate = random_restart(belief, args, problem, max_time=planning_time,
+                                                          max_planner_time=MAX_RESTART_TIME,
+                                                          max_cost=plan_cost, replan_actions=defer_actions)
 
         plan_time += elapsed_time(plan_start_time)
         #wait_for_duration(elapsed_time(plan_start_time)) # Mocks the real planning time
@@ -129,7 +156,8 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
     else:
         print('Failure!')
     # TODO: timed out flag
-    return {
+    # TODO: store current and peak memory usage
+    data = {
         'achieved_goal': achieved_goal,
         'total_time': elapsed_time(total_start_time),
         'plan_time': plan_time,
@@ -139,5 +167,8 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         'num_successes': num_successes,
         'num_actions': num_actions,
         'num_commands': num_commands,
+        'peak_memory': get_peak_memory_in_kb(),
         'total_cost': total_cost,
     }
+    print('Data:', str_from_object(data))
+    return data
