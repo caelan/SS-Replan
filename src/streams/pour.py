@@ -161,7 +161,7 @@ def get_pour_gen_fn(world, max_attempts=50, learned=True, **kwargs):
                     break
             else:
                 if PRINT_FAILURES: print('Pour failure')
-                if not pose.init:
-                    break
+                #if not pose.init:
+                #    break
                 yield None
     return gen

@@ -105,6 +105,7 @@ BOWL = 'bowl'
 PUDDING = 'pudding_box'
 BANANA = 'banana'
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT] # + [BOWL, PUDDING, BANANA]
+BLOCK = 'block'
 
 ECHO_COUNTER = 'echo'
 INDIGO_COUNTER = 'indigo_tmp'
@@ -444,6 +445,7 @@ class RelPose(object):
         self.confs = tuple(confs) # Attachment is treated as a conf
         self.support = support
         self.init = init
+        self.observations = 0
         # TODO: method for automatically composing these
     @property
     def bodies(self):
@@ -517,7 +519,7 @@ def compute_surface_aabb(world, surface_name):
 
 INVALID_GRASPS = {
     TOP_GRASP: [MUSTARD, CHEEZIT, BOWL], #, TOMATO_SOUP],
-    SIDE_GRASP: [BOWL, SPAM],
+    SIDE_GRASP: [BOWL, SPAM, BLOCK],
 }
 
 MID_SIDE_GRASPS = [MUSTARD, SUGAR, CHEEZIT]

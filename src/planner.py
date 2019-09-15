@@ -26,7 +26,8 @@ from src.replan import INTERNAL_ACTIONS
 from src.utils import RelPose
 
 VIDEO_TEMPLATE = '{}.mp4'
-COST_BOUND = 1000.0
+#COST_BOUND = 1000.0 # TODO: be careful about the cost bound...
+COST_BOUND = INF
 MAX_MEMORY = 6.0 * KILOBYTES_PER_GIGABYTE
 # TODO: multiple cost bounds
 
@@ -160,7 +161,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
                                  replan_actions=replan_actions, initial_complexity=5,
                                  planner=planner, max_planner_time=max_planner_time,
                                  unit_costs=args.unit, success_cost=success_cost,
-                                 max_time=max_time, max_memory=max_memory, verbose=True, debug=True,
+                                 max_time=max_time, max_memory=max_memory, verbose=True, debug=False,
                                  unit_efforts=True, effort_weight=effort_weight, max_effort=INF,
                                  # bind=True, max_skeletons=None,
                                  search_sample_ratio=search_sample_ratio)

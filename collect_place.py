@@ -24,16 +24,16 @@ from src.stream import get_stable_gen, get_grasp_gen, Z_EPSILON
 from src.streams.pick import get_pick_gen_fn
 from src.database import DATABASE_DIRECTORY, PLACE_IR_FILENAME, get_surface_reference_pose, get_place_path
 
-# TODO: generalize to any manipulation with a fixed entity
+# TODO: condition on the object type (but allow a default object)
+# TODO: generalize to any manipulation with a movable entity
+# TODO: extend to pouring
 
 def collect_place(world, object_name, surface_name, grasp_type, args):
     date = get_date()
     #set_seed(args.seed)
 
     #dump_body(world.robot)
-    surface_pose = get_surface_reference_pose(world.kitchen, surface_name)
-    # TODO: this assumes the drawer is open
-
+    surface_pose = get_surface_reference_pose(world.kitchen, surface_name) # TODO: assumes the drawer is open
     stable_gen_fn = get_stable_gen(world, z_offset=Z_EPSILON, visibility=False,
                                    learned=False, collisions=not args.cfree)
     grasp_gen_fn = get_grasp_gen(world)
@@ -48,7 +48,6 @@ def collect_place(world, object_name, surface_name, grasp_type, args):
     print('Robot name: {} | Object name: {} | Surface name: {} | Grasp type: {} | Filename: {}'.format(
         robot_name, object_name, surface_name, grasp_type, path))
 
-    # TODO: ensure pose is in view of cameras
     entries = []
     start_time = time.time()
     failures = 0

@@ -11,10 +11,10 @@ from pybullet_tools.utils import pairwise_collision, multiply, invert, get_joint
     stable_z_on_aabb, euler_from_quat, quat_from_pose, Ray, get_distance_fn, Point, set_configuration, \
     is_point_in_polygon, grow_polygon, Pose, get_moving_links, get_aabb_extent, get_aabb_center, \
     INF, apply_affine, get_joint_name, get_unit_vector, get_link_subtree, get_link_name, unit_quat, joint_from_name, \
-    get_extend_fn, wait_for_user, set_renderer
+    get_extend_fn, wait_for_user, set_renderer, child_link_from_joint
 from pddlstream.algorithms.downward import MAX_FD_COST #, get_cost_scale
 
-from src.command import Sequence, State, Detect
+from src.command import Sequence, State, Detect, DoorTrajectory
 from src.database import load_placements, get_surface_reference_pose, load_pull_base_poses, load_forward_placements, load_inverse_placements
 from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     get_descendant_obstacles, surface_from_name, RelPose, compute_surface_aabb, create_relative_pose, Z_EPSILON, \
@@ -26,7 +26,7 @@ from src.inference import SurfaceDist
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
 
 COST_SCALE = 1e2 # 3 decimal places
-MAX_COST = MAX_FD_COST / (10*COST_SCALE)
+MAX_COST = MAX_FD_COST / (25*COST_SCALE)
 #MAX_COST = MAX_FD_COST / get_cost_scale()
 # TODO: move this to FD
 
@@ -43,7 +43,8 @@ GRIPPER_RESOLUTION = 0.01
 DOOR_RESOLUTION = 0.025
 
 # TracIK is itself stochastic
-P_RANDOMIZE_IK = 0.25  # 0.0 | 0.5
+#P_RANDOMIZE_IK = 0.25  # 0.0 | 0.5
+P_RANDOMIZE_IK = 1.0
 
 MAX_CONF_DISTANCE = 0.75
 NEARBY_APPROACH = MAX_CONF_DISTANCE
@@ -248,6 +249,8 @@ def get_sample_belief_gen(world, # min_prob=1. / NUM_PARTICLES,  # TODO: relativ
             return
         valid_samples = {}
         for rp in pose_dist.dist.support():
+            if 1 <= rp.observations:
+                continue
             prob = pose_dist.discrete_prob(rp)
             obs = None
             cost = detect_cost_fn(obj_name, pose_dist, obs, rp)
@@ -698,7 +701,7 @@ def get_door_test(world, error_percent=0.35): #, tolerance=1e-2):
 
 ################################################################################
 
-def get_cfree_pose_pose_test(world, collisions=True, **kwargs):
+def get_cfree_relpose_relpose_test(world, collisions=True, **kwargs):
     def test(o1, rp1, o2, rp2, s):
         if not collisions or (o1 == o2):
             return True
@@ -795,14 +798,14 @@ def get_cfree_angle_angle_test(world, collisions=True, **kwargs):
 ################################################################################
 
 def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
-    def test(at, o, p):
+    def test(at, o, wp):
         if not collisions:
             return True
         # TODO: check door collisions
         # TODO: still need to check static links at least once
-        if isinstance(p, SurfaceDist):
+        if isinstance(wp, SurfaceDist):
             return True # TODO: perform this probabilistically
-        p.assign()
+        wp.assign()
         state = at.context.copy()
         state.assign()
         all_bodies = {body for command in at.commands for body in command.bodies}
@@ -812,9 +815,13 @@ def get_cfree_traj_pose_test(world, collisions=True, **kwargs):
             #obstacles = get_link_obstacles(world, o) - command.bodies  # - p.bodies # Doesn't include o at p
             if not obstacles:
                 continue
+            if isinstance(command, DoorTrajectory):
+                [door_joint] = command.door_joints
+                surface_name = get_link_name(world.kitchen, child_link_from_joint(door_joint))
+                if wp.support == surface_name:
+                    return True
             for _ in command.iterate(state):
                 state.derive()
-                # TODO: annote the surface in question
                 #for attachment in state.attachments.values():
                 #    if any(pairwise_collision(attachment.child, obst) for obst in obstacles):
                 #        return False

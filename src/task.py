@@ -71,12 +71,18 @@ UNIT_POSE2D = (0., 0., 0.)
 BOX_POSE2D = (0.1, 1.05, 0.) # 1.15
 SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
 CRACKER_POSE2D = (0.2, 1.1, np.pi/4) # 1.2
+
 BIG_BLOCK_SIDE = 0.065
+
+# TODO: make a box equivalent for the YCB objects
+# http://www.ycbbenchmarks.com/
+# http://ycb-benchmarks.s3-website-us-east-1.amazonaws.com/
 
 def add_block(world, idx=0, **kwargs):
     # TODO: automatically produce a unique name
     color = 'green'
-    block_type = '{}_block'.format(color)
+    #block_type = '{}_block'.format(color)
+    block_type = 'block'.format(color)
     #block_type = BLOCK_TEMPLATE.format(BLOCK_SIZES[-1], BLOCK_COLORS[0])
     #block_type = 'potted_meat_can'
     name = name_from_type(block_type, idx)
@@ -117,6 +123,10 @@ def add_kinect(world, camera_name=LEFT_CAMERA):
     world_from_camera = multiply(get_pose(world.kitchen), CAMERA_POSES[camera_name])
     world.add_camera(camera_name, world_from_camera, CAMERA_MATRIX)
 
+def add_kinects(world):
+    for camera_name in CAMERA_POSES:
+        add_kinect(world, camera_name)
+
 ################################################################################
 
 BASE_POSE2D = (0.74, 0.80, -np.pi)
@@ -155,37 +165,41 @@ def open_all_doors(world):
 ################################################################################
 
 def detect_block(world, fixed=False, **kwargs):
-    for side in CAMERAS[:1]:
-        add_kinect(world, side)
+    add_kinect(world)
+    #for side in CAMERAS[:1]:
+    #    add_kinect(world, side)
+    #add_kinects(world)
     if fixed:
         set_fixed_base(world)
 
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
-    #x, y, yaw = CRACKER_POSE2D
-    sugar_name = add_sugar_box(world, idx=0, pose2d=CRACKER_POSE2D)
-    #cracker_name = add_cracker_box(world, idx=0, pose2d=(x, 1.4, yaw))
+    block_poses = [(0.1, 1.05, 0.), (0.1, 1.3, 0.)]
+    entity_name = add_block(world, idx=0, pose2d=random.choice(block_poses))
+    #sugar_name = add_sugar_box(world, idx=0, pose2d=(0.2, 1.35, np.pi / 4))
+    cracker_name = add_cracker_box(world, idx=1, pose2d=(0.2, 1.1, np.pi / 4))
     #other_name = add_box(world, idx=1)
     set_all_static()
 
-    goal_surface = 'indigo_drawer_top'
-    initial_distribution = UniformDist([goal_surface]) # indigo_tmp
-    initial_surface = initial_distribution.sample()
-    if random.random() < 0.:
-        # TODO: sometimes base/arm failure causes the planner to freeze
-        # Freezing is because the planner is struggling to find new samples
-        sample_placement(world, entity_name, initial_surface, learned=True)
+    #goal_surface = 'indigo_drawer_top'
+    #initial_distribution = UniformDist([goal_surface]) # indigo_tmp
+    #initial_surface = initial_distribution.sample()
+    #if random.random() < 0.0:
+    #    # TODO: sometimes base/arm failure causes the planner to freeze
+    #    # Freezing is because the planner is struggling to find new samples
+    #    sample_placement(world, entity_name, initial_surface, learned=True)
     #sample_placement(world, other_name, 'hitman_tmp', learned=True)
 
     prior = {
         entity_name: UniformDist(['indigo_tmp']),  # 'indigo_tmp', 'indigo_drawer_top'
-        sugar_name: DeltaDist('indigo_tmp'),
-        #cracker_name: DeltaDist('indigo_tmp'),
+        #sugar_name: DeltaDist('indigo_tmp'),
+        cracker_name: DeltaDist('indigo_tmp'),
     }
     return Task(world, prior=prior, movable_base=not fixed,
+                grasp_types=[TOP_GRASP],
                 return_init_bq=True, return_init_aq=True,
                 #goal_detected=[entity_name],
-                goal_holding=entity_name,
-                #goal_on={entity_name: goal_surface},
+                goal_holding=cracker_name,
+                #goal_on={entity_name: random.choice(ZED_DRAWERS)},
+                goal_cooked=[entity_name],
                 goal_closed=ALL_JOINTS,
             )
 
@@ -232,26 +246,24 @@ def sugar_drawer(world, fixed=False, **kwargs):
     if fixed:
         set_fixed_base(world)
 
-    initial_surface = 'indigo_drawer_top' # indigo_drawer_top | indigo_drawer_bottom
-    #initial_surface = 'indigo_tmp'
-    joint_name = JOINT_TEMPLATE.format(initial_surface)
-    world.open_door(joint_from_name(world.kitchen, joint_name))
+    open_drawer = random.choice(ZED_DRAWERS)
+    world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(open_drawer)))
     # open_all_doors(world)
-    # TODO: approach for pull
+
     prior = {}
     block_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     prior[block_name] = DeltaDist('indigo_tmp')
 
-    cracker_name = add_sugar_box(world, idx=0)
-    prior[cracker_name] = DeltaDist(initial_surface)
-    sample_placement(world, cracker_name, initial_surface, learned=True)
-
+    sugar_name = add_sugar_box(world, idx=0)
+    prior[sugar_name] = DeltaDist(open_drawer)
+    sample_placement(world, sugar_name, open_drawer, learned=True)
     set_all_static()
 
     return Task(world, prior=prior, movable_base=not fixed,
-                goal_on={block_name: initial_surface},
+                grasp_types=[TOP_GRASP],
+                goal_on={block_name: open_drawer},
                 return_init_bq=True, return_init_aq=True,
-                #goal_open=[JOINT_TEMPLATE.format('indigo_drawer_top')],
+                #goal_open=[JOINT_TEMPLATE.format(open_drawer)],
                 goal_closed=ALL_JOINTS,
             )
 
@@ -272,6 +284,7 @@ def cook_block(world, fixed=False, **kwargs):
         entity_name: UniformDist([initial_surface]),
     }
     return Task(world, prior=prior, movable_base=not fixed,
+                grasp_types=[TOP_GRASP],
                 #goal_detected=[entity_name],
                 #goal_holding=entity_name,
                 goal_cooked=[entity_name],
@@ -289,29 +302,26 @@ def inspect_drawer(world, fixed=False, **kwargs):
     add_kinect(world)
     if fixed:
         set_fixed_base(world)
-    entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
+    entity_name = add_block(world, idx=0)
     set_all_static()
 
-    initial_surface, goal_surface = randomize(ZED_DRAWERS)
-    if initial_surface != 'indigo_tmp':
-        sample_placement(world, entity_name, initial_surface, learned=True)
+    drawer = random.choice(ZED_DRAWERS)
+    sample_placement(world, entity_name, drawer, learned=True)
 
     prior = {
         entity_name: UniformDist(ZED_DRAWERS),
     }
     return Task(world, prior=prior, movable_base=not fixed,
-                goal_on={entity_name: goal_surface},
+                grasp_types=[TOP_GRASP],
+                goal_on={entity_name: drawer},
                 return_init_bq=True, return_init_aq=True,
                 goal_closed=ALL_JOINTS,
             )
-
 
 def swap_drawers(world, fixed=False, **kwargs):
     add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
         set_fixed_base(world)
-
-    # set_base_values
     entity_name = add_block(world, idx=0, pose2d=BOX_POSE2D)
     set_all_static()
     #open_all_doors(world)
@@ -319,23 +329,23 @@ def swap_drawers(world, fixed=False, **kwargs):
     #initial_surface, goal_surface = 'indigo_tmp', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_top', 'indigo_drawer_top'
     #initial_surface, goal_surface = 'indigo_drawer_bottom', 'indigo_drawer_bottom'
-    initial_surface, goal_surface = ZED_DRAWERS
+    #initial_surface, goal_surface = ZED_DRAWERS
     #initial_surface, goal_surface = reversed(ZED_DRAWERS)
+    initial_surface, goal_surface = randomize(ZED_DRAWERS)
     if initial_surface != 'indigo_tmp':
         sample_placement(world, entity_name, initial_surface, learned=True)
 
     #joint_name = JOINT_TEMPLATE.format(goal_surface)
     #world.open_door(joint_from_name(world.kitchen, JOINT_TEMPLATE.format(goal_surface)))
 
-    # TODO: requiring the drawers to be closed makes this task much harder for some reason...
     # TODO: declare success if already believe it's in the drawer or require detection?
-    # TODO: allow more samples from streams
     prior = {
         #entity_name: UniformDist([initial_surface]),
         entity_name: UniformDist(ZED_DRAWERS),
         #entity_name: UniformDist(['indigo_tmp', 'indigo_drawer_top', 'indigo_drawer_bottom']),
     }
     return Task(world, prior=prior, movable_base=not fixed,
+                grasp_types=[TOP_GRASP],
                 #goal_detected=[entity_name],
                 #goal_holding=entity_name,
                 #goal_cooked=[entity_name],
@@ -343,9 +353,8 @@ def swap_drawers(world, fixed=False, **kwargs):
                 return_init_bq=True, return_init_aq=True,
                 #goal_open=[joint_name],
                 #goal_closed=[JOINT_TEMPLATE.format(initial_surface)],
-                #goal_closed=[ALL_JOINTS[0]],
-                #goal_closed=[ALL_JOINTS[1]], # TODO: this causes the non-fixed base planning to fail sometimes?
-                #goal_closed=ALL_JOINTS,
+                #goal_closed=[JOINT_TEMPLATE.format(goal_surface)], # TODO: this caused non-fixed base planning to fail due to cost
+                goal_closed=ALL_JOINTS,
             )
 
 ################################################################################
@@ -417,6 +426,7 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     #world.open_door(joint_from_name(world.kitchen, joint_name))
 
     return Task(world, prior=prior, movable_base=not fixed,
+                grasp_types=[TOP_GRASP],
                 #goal_holding=list(prior)[0],
                 goal_hand_empty=True,
                 goal_on=goal_on,

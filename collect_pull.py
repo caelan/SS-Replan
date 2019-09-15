@@ -20,6 +20,7 @@ from src.streams.press import get_press_gen_fn
 from src.streams.pull import get_pull_gen_fn
 from src.database import get_joint_reference_pose, get_pull_path, is_press
 
+# TODO: generalize to any manipulation with a fixed entity
 
 def collect_pull(world, joint_name, args):
     date = get_date()

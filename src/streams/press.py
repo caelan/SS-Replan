@@ -114,7 +114,7 @@ def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, le
                     break
             else:
                 if PRINT_FAILURES: print('Pick failure')
-                if not pose.init:
-                    break
+                #if not pose.init:
+                #    break
                 yield None
     return gen

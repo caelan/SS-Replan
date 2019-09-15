@@ -9,7 +9,7 @@ from pddlstream.language.constants import get_args, is_parameter, get_parameter_
     And, Equal, PDDLProblem, Not
 from pddlstream.language.stream import DEBUG
 from pddlstream.language.generator import from_gen_fn, from_fn, from_test
-from pddlstream.utils import read, get_file_path
+from pddlstream.utils import read, get_file_path, implies
 
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
     get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name
@@ -19,7 +19,7 @@ from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, CO
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
     KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, BOWLS, POURABLE, type_from_name
 from src.stream import get_stable_gen, get_grasp_gen, get_door_test, CLOSED, DOOR_STATUSES, \
-    get_cfree_traj_pose_test, get_cfree_pose_pose_test, get_cfree_approach_pose_test, OPEN, \
+    get_cfree_traj_pose_test, get_cfree_relpose_relpose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_compute_angle_kin, \
     get_compute_pose_kin, get_test_near_pose, \
     get_test_near_joint, get_gripper_open_test, BASE_CONSTANT, get_nearby_stable_gen, \
@@ -105,7 +105,7 @@ def get_streams(world, debug=False, teleport_base=False, **kwargs):
 
         'test-cfree-worldpose': from_test(get_cfree_worldpose_test(world, **kwargs)),
         'test-cfree-worldpose-worldpose': from_test(get_cfree_worldpose_worldpose_test(world, **kwargs)),
-        'test-cfree-pose-pose': from_test(get_cfree_pose_pose_test(world, **kwargs)),
+        'test-cfree-pose-pose': from_test(get_cfree_relpose_relpose_test(world, **kwargs)),
         'test-cfree-bconf-pose': from_test(get_cfree_bconf_pose_test(world, **kwargs)),
         'test-cfree-approach-pose': from_test(get_cfree_approach_pose_test(world, **kwargs)),
         'test-cfree-angle-angle': from_test(get_cfree_angle_angle_test(world, **kwargs)),
@@ -367,7 +367,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
             ('Localized', obj_name),
         ]
         init.extend(('ValidGraspType', obj_name, grasp_type) for grasp_type in task.grasp_types
-                    if is_valid_grasp_type(obj_name, grasp_type))
+                    if implies(world.is_real(), is_valid_grasp_type(obj_name, grasp_type)))
 
     for obj_name in world.movable:
         obj_type = type_from_name(obj_name)
@@ -399,7 +399,7 @@ def pdddlstream_from_problem(belief, additional_init=[], fixed_base=True, **kwar
         if graspable:
             #init.append(('Graspable', obj_name))
             init.extend(('ValidGraspType', obj_name, grasp_type) for grasp_type in task.grasp_types
-                        if is_valid_grasp_type(obj_name, grasp_type))
+                        if implies(world.is_real(), is_valid_grasp_type(obj_name, grasp_type)))
 
         # Could also fully decompose into points (but many samples)
         # Could immediately add likely points for collision checking

@@ -213,6 +213,9 @@ class PoseDist(object):
             [detected_pose] = observation[self.name]
             detected_surface = detected_pose.support
             pose_estimate_2d = self.pose2d_from_pose(detected_pose)
+        else:
+            for pose in visible_poses:
+                pose.observations += 1
         if verbose:
             print('Detection: {} | Pose: {}'.format(has_detection, pose_estimate_2d))
         # TODO: could use an UKF to propagate a GMM

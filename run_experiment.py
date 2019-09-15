@@ -59,17 +59,30 @@ N = 50
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
-    {'constrain': True, 'defer': False},
-    {'constrain': False, 'defer': True}, # Move actions grow immensely
-    {'constrain': True, 'defer': True},
+    #{'constrain': True, 'defer': False},
+    #{'constrain': False, 'defer': True}, # Move actions grow immensely
+    {'constrain': True, 'defer': True}, # TODO: serialize
 ]
 
 # Is it because the objects are large files?
 # Switch to psutil
 
+# Tasks
+# 1) Inspect drawers
+# 2) Swap drawers (uniform prior)
+# 3) Object behind one of two objects
+# 4) Cook meal
+# 6) Object on drawer that needs to be moved
+# 7) Crowded surface
+# 8) Scaling to several tasks (no point if serializing)
+# 9) Packing into drawer
+# 10) Fixed base manipulation
+# 11) Irrelevant distractors that aren't picked up
+
 TASK_NAMES = [
     #'detect_block',
     #'hold_block',
+    #'inspect_drawer',
     'swap_drawers',
     #'sugar_drawer',
     #'cook_block',
@@ -292,7 +305,7 @@ def main():
         print(SEPARATOR)
         print('Saved:', json_path)
         print('Results:', len(results))
-        print('Duration / experiment: {:.3f}'.format(num_cores*len(experiments) / elapsed_time(start_time)))
+        print('Duration / experiment: {:.3f}'.format(num_cores*elapsed_time(start_time) / len(experiments)))
         print('Duration: {:.2f} hours'.format(elapsed_time(start_time) / HOURS_TO_SECS))
         safe_rm_dir(TEMP_DIRECTORY)
     return results
