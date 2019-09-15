@@ -101,10 +101,11 @@ def get_fixed_pick_gen_fn(world, max_attempts=25, collisions=True, **kwargs):
                 ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
                                             randomize=randomize, **kwargs), None)
                 if ik_outputs is not None:
+                    print('Fixed pick succeeded after {} attempts'.format(i))
                     yield ik_outputs
                     break  # return
             else:
-                if PRINT_FAILURES: print('Fixed pick failure')
+                if PRINT_FAILURES: print('Fixed pick failure after {} attempts'.format(max_attempts))
                 if not pose.init:
                     break
                 yield None
@@ -141,10 +142,11 @@ def get_pick_gen_fn(world, max_attempts=25, collisions=True, learned=True, **kwa
                 ik_outputs = next(plan_pick(world, obj_name, pose, grasp, base_conf, obstacles,
                                             randomize=randomize, **kwargs), None)
                 if ik_outputs is not None:
+                    print('Pick succeeded after {} attempts'.format(i))
                     yield (base_conf,) + ik_outputs
                     break
             else:
-                if PRINT_FAILURES: print('Pick failure')
+                if PRINT_FAILURES: print('Pick failure after {} attempts'.format(max_attempts))
                 #if not pose.init: # Might be an intended placement blocked by a drawer
                 #    break
                 yield None

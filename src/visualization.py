@@ -30,19 +30,18 @@ def visualize_base_confs(world, name, base_confs, **kwargs):
 
 
 def add_markers(task, placements=True, forward_place=True, pull_bases=True, inverse_place=False):
+    # TODO: decompose
     world = task.world
     handles = []
     if placements:
         for surface_name in ALL_SURFACES:
-            if surface_name in STOVES:
-                continue
             surface = surface_from_name(surface_name)
             surface_link = link_from_name(world.kitchen, surface.link)
             surface_point = point_from_pose(get_link_pose(world.kitchen, surface_link))
             for grasp_type, color in zip(task.grasp_types, spaced_colors(len(task.grasp_types))):
                 object_points = list(map(point_from_pose, load_placements(world, surface_name,
                                                                           grasp_types=[grasp_type])))
-                if placements and object_points:
+                if (surface_name not in STOVES) and object_points:
                     #for object_point in object_points:
                     #    handles.extend(draw_point(object_point, color=color))
                     _, _, z = np.average(object_points, axis=0)
@@ -51,7 +50,7 @@ def add_markers(task, placements=True, forward_place=True, pull_bases=True, inve
                                                 parent=world.kitchen, parent_link=surface_link))
                 base_points = list(map(point_from_pose, load_inverse_placements(world, surface_name,
                                                                                 grasp_types=[grasp_type])))
-                if inverse_place and base_points:
+                if (surface_name in STOVES) and base_points: # and inverse_place
                     #continue
                     #_, _, z = np.average(base_points, axis=0)
                     z = get_floor_z(world) - surface_point[2]

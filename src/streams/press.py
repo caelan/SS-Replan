@@ -75,10 +75,11 @@ def get_fixed_press_gen_fn(world, max_attempts=25, collisions=True, teleport=Fal
                 ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, world.static_obstacles,
                                              randomize=randomize, **kwargs), None)
                 if ik_outputs is not None:
+                    print('Fixed press succeeded after {} attempts'.format(i))
                     yield ik_outputs
                     break  # return
             else:
-                if PRINT_FAILURES: print('Fixed pull failure')
+                if PRINT_FAILURES: print('Fixed pull failure after {} attempts'.format(max_attempts))
                 yield None
     return gen
 
@@ -110,10 +111,11 @@ def get_press_gen_fn(world, max_attempts=50, collisions=True, teleport=False, le
                 ik_outputs = next(plan_press(world, knob_name, pose, grasp, base_conf, obstacles,
                                              randomize=randomize, **kwargs), None)
                 if ik_outputs is not None:
+                    print('Press succeeded after {} attempts'.format(i))
                     yield (base_conf,) + ik_outputs
                     break
             else:
-                if PRINT_FAILURES: print('Pick failure')
+                if PRINT_FAILURES: print('Press failure after {} attempts'.format(max_attempts))
                 #if not pose.init:
                 #    break
                 yield None

@@ -114,6 +114,7 @@ def get_fixed_pull_gen_fn(world, max_attempts=25, collisions=True, teleport=Fals
                                             randomize=randomize, collisions=collisions, teleport=teleport, **kwargs),
                                   None)
                 if ik_outputs is not None:
+                    print('Fixed pull succeeded after {} attempts'.format(i))
                     yield ik_outputs
                     break  # return
             else:
@@ -157,6 +158,7 @@ def get_pull_gen_fn(world, max_attempts=50, collisions=True, teleport=False, lea
                 ik_outputs = next(plan_pull(world, door_joint, door_path, base_conf,
                                             randomize=randomize, collisions=collisions, teleport=teleport, **kwargs), None)
                 if ik_outputs is not None:
+                    print('Pull succeeded after {} attempts'.format(i))
                     yield (base_conf,) + ik_outputs
                     break
             else:

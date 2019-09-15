@@ -18,6 +18,16 @@ def get_surface_reference_pose(kitchen, surface_name):
     link = link_from_name(kitchen, surface.link)
     return get_link_pose(kitchen, link)
 
+def project_base_pose(base_pose):
+    #return base_values_from_pose(base_pose)
+    base_point, base_quat = base_pose
+    x, y, _ = base_point
+    _, _, theta = euler_from_quat(base_quat)
+    base_values = (x, y, theta)
+    return base_values
+
+################################################################################
+
 def get_place_path(robot_name, surface_name, grasp_type):
     return os.path.abspath(os.path.join(DATABASE_DIRECTORY, PLACE_IR_FILENAME.format(
         robot_name=robot_name, surface_name=surface_name, grasp_type=grasp_type)))
@@ -41,14 +51,6 @@ def load_placements(world, surface_name, grasp_types=GRASP_TYPES):
                                               field='surface_from_object'))
     random.shuffle(placements)
     return placements
-
-def project_base_pose(base_pose):
-    #return base_values_from_pose(base_pose)
-    base_point, base_quat = base_pose
-    x, y, _ = base_point
-    _, _, theta = euler_from_quat(base_quat)
-    base_values = (x, y, theta)
-    return base_values
 
 def load_forward_placements(world, surface_names=ALL_SURFACES, grasp_types=GRASP_TYPES):
     base_from_objects = []
