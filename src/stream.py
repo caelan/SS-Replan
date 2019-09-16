@@ -469,28 +469,21 @@ def is_robot_visible(world, links):
     #wait_for_user()
     return True
 
-def test_base_conf(world, bq, obstacles):
-    min_distance = 0.04 if world.is_real() else 0.0
+def test_base_conf(world, bq, obstacles, min_distance=0.0):
     robot_links = [world.franka_link, world.gripper_link] if world.is_real() else []
     bq.assign()
-    base_confs = [bq]
-    if world.is_real():
-        # TODO: could also rotate in place
-        nearby_values = translate_linearly(world, distance=-REVERSE_DISTANCE)
-        bq.nearby_bq = FConf(world.robot, world.base_joints, nearby_values)
-        base_confs.append(bq.nearby_bq)
-    for base_conf in base_confs:
-        base_conf.assign()
-        for conf in world.special_confs:
-            # Could even sample a special visible conf for this base_conf
-            conf.assign()
-            if not is_robot_visible(world, robot_links) or any(pairwise_collision(
-                    world.robot, b, max_distance=min_distance) for b in obstacles):
-                return False
+    for conf in world.special_confs:
+        # Could even sample a special visible conf for this base_conf
+        conf.assign()
+        if not is_robot_visible(world, robot_links) or any(pairwise_collision(
+                world.robot, b, max_distance=min_distance) for b in obstacles):
+            return False
     return True
 
 def inverse_reachability(world, base_generator, obstacles=set(),
                          max_attempts=25, **kwargs):
+    min_distance = 0.01 #if world.is_real() else 0.0
+    min_nearby_distance = 0.1 # if world.is_real() else 0.0
     lower_limits, upper_limits = get_custom_limits(
         world.robot, world.base_joints, world.custom_limits)
     while True:
@@ -501,11 +494,20 @@ def inverse_reachability(world, base_generator, obstacles=set(),
                 continue
             bq = FConf(world.robot, world.base_joints, base_conf)
             #wait_for_user()
-            if test_base_conf(world, bq, obstacles):
-                #if PRINT_FAILURES: print('Success after {} IR attempts:'.format(attempt))
-                bq.assign()
-                yield bq
-                break
+            if not test_base_conf(world, bq, obstacles, min_distance=min_distance):
+                continue
+            if world.is_real():
+                # TODO: could also rotate in place
+                # TODO: restrict orientation to face the counter
+                nearby_values = translate_linearly(world, distance=-REVERSE_DISTANCE)
+                bq.nearby_bq = FConf(world.robot, world.base_joints, nearby_values)
+                if not test_base_conf(world, bq.nearby_bq, obstacles, min_distance=min_nearby_distance):
+                    continue
+            #if PRINT_FAILURES: print('Success after {} IR attempts:'.format(attempt))
+            bq.assign()
+            #wait_for_user()
+            yield bq
+            break
         else:
             if PRINT_FAILURES: print('Failed after {} IR attempts:'.format(attempt))
             if attempt < max_attempts - 1:

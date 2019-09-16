@@ -254,6 +254,9 @@ class Trajectory(Command):
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
 
+#class BaseTrajectory(Trajectory):
+#    def __init__(self, world, robot, joints, path, **kwargs):
+#        super(BaseTrajectory, self).__init__(world, robot, joints, path, **kwargs)
 
 class ApproachTrajectory(Trajectory):
     def __init__(self, objects=[], *args, **kwargs):

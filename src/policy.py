@@ -17,9 +17,10 @@ from src.utils import BOWL
 # TODO: max time spent reattempting streams flag (might not be needed actually)
 # TODO: process binding blows up for detect_drawer
 UNCONSTRAINED_FIXED_BASE = False
-MAX_RESTART_TIME = 3*60
-#REPLAN_ITERATIONS = 1
-REPLAN_ITERATIONS = INF
+MAX_RESTART_TIME = 2*60
+REPLAN_ITERATIONS = INF # 1 | INF
+REPLAN_FAILURES = False
+
 
 def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
                    max_planner_time=INF, **kwargs):
@@ -38,12 +39,17 @@ def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
             plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
             if plan is not None:
                 return plan, plan_cost, certificate
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt()
-        except MemoryError:
-            break
-        except:
-            traceback.print_exc()
+        except KeyboardInterrupt as e:
+            raise e
+        except MemoryError as e:
+            if REPLAN_FAILURES:
+                break
+            raise e
+        except Exception as e:
+            if REPLAN_FAILURES:
+                traceback.print_exc()
+            else:
+                raise e
         # FastDownward translator runs out of memory
     return None, INF, Certificate(all_facts=[], preimage_facts=[])
 

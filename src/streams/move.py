@@ -69,12 +69,33 @@ def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=Fal
     def fn(bq1, bq2, aq, fluents=[]):
         #if bq1 == bq2:
         #    return None
-        bq1.assign()
         aq.assign()
         attachments, obstacles = parse_fluents(world, fluents)
         obstacles.update(world.static_obstacles)
         if not collisions:
             obstacles = set()
+
+        start_path, end_path = [], []
+        if hasattr(bq1, 'nearby_bq'):
+            bq1.assign()
+            start_path = plan_nonholonomic_motion(world.robot, bq2.joints, bq1.nearby_bq.values, attachments=attachments,
+                                            obstacles=obstacles, custom_limits=world.custom_limits,
+                                            reversible=True, self_collisions=False, restarts=-1)
+            if start_path is None:
+                print('Failed to find nearby base conf!')
+                return
+            bq1 = bq1.nearby_bq
+        if hasattr(bq2, 'nearby_bq'):
+            bq2.nearby_bq.assign()
+            end_path = plan_nonholonomic_motion(world.robot, bq2.joints, bq2.values, attachments=attachments,
+                                            obstacles=obstacles, custom_limits=world.custom_limits,
+                                            reversible=True, self_collisions=False, restarts=-1)
+            if end_path is None:
+                print('Failed to find nearby base conf!')
+                return
+            bq2 = bq2.nearby_bq
+
+        bq1.assign()
         robot_saver = BodySaver(world.robot)
         if (bq1 == bq2) or teleport_base or teleport:
             path = [bq1.values, bq2.values]
@@ -94,10 +115,11 @@ def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=Fal
                         wait_for_user()
                     set_renderer(enable=False)
                 return None
+
         # TODO: could actually plan with all joints as long as we return to the same config
         cmd = Sequence(State(world, savers=[robot_saver]), commands=[
-            Trajectory(world, world.robot, world.base_joints, path),
-        ], name='base')
+            Trajectory(world, world.robot, world.base_joints, path)
+            for path in [start_path, path, end_path] if path], name='base')
         return (cmd,)
     return fn
 
