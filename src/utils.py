@@ -21,7 +21,7 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
     child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input, \
     get_difference_fn, Euler, approximate_as_prism, wait_for_user, get_joint_positions, get_joint_limits, \
-    set_joint_position, draw_pose, implies
+    set_joint_position, draw_pose, implies, unit_from_theta
 
 ################################################################################
 
@@ -690,9 +690,19 @@ def get_link_obstacles(world, link_name):
     assert link_name in SURFACE_FROM_NAME
     return set()
 
+################################################################################
 
 def are_confs_close(conf1, conf2, tol=1e-8):
     assert (conf1.body == conf2.body) and (conf1.joints == conf2.joints)
     difference_fn = get_difference_fn(conf1.body, conf1.joints)
     difference = difference_fn(conf1.values, conf2.values)
     return np.allclose(difference, np.zeros(len(conf1.joints)), rtol=0., atol=tol)
+
+
+def translate_linearly(world, distance):
+    # TODO: could just apply in the base frame
+    x, y, theta = get_joint_positions(world.robot, world.base_joints)
+    pos = np.array([x, y])
+    goal_pos = pos + distance * unit_from_theta(theta)
+    goal_pose = np.append(goal_pos, [theta])
+    return goal_pose

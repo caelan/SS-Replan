@@ -153,6 +153,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         if success and constrain:
             plan_postfix = get_plan_postfix(plan, plan_prefix)
             # TODO: exit if plan_postfix is empty?
+            # TODO: make_exact_skeleton still has as bug in it
             previous_skeleton = make_wild_skeleton(world, plan_postfix)
             #previous_skeleton = make_exact_skeleton(world, plan_postfix)  # make_exact_skeleton | make_wild_skeleton
             previous_facts = reuse_facts(problem, certificate, previous_skeleton)  # []

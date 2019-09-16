@@ -6,10 +6,9 @@ import math
 
 import rospy
 from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, \
-    multiply, invert, unit_from_theta, pose_from_pose2d, quat_angle_between
+    multiply, invert, pose_from_pose2d
 
-from src.issac import get_base_pose
-from src.deepim import mean_pose_deviation, wait_until_frames_stabilize
+from src.deepim import wait_until_frames_stabilize
 
 
 
@@ -54,6 +53,7 @@ def command_carter(interface, goal_pose, timeout=30):
     reached_goal = False
     carter = interface.carter
     carter.current_goal = goal_pose
+    #x, y, theta = carter.current_pose # current_velocity
 
     history = []
     print('Initial pose:', np.array(carter.current_pose).round(3))
@@ -117,13 +117,6 @@ def command_carter_to_pybullet_goal(interface, goal_pose2d, **kwargs):
     #timeout = 2*duration
     return command_carter(interface, isaac_from_goal2d, **kwargs) # TODO: customize based on the straight-line distance
 
-
-def heading_waypoint(carter, distance):
-    x, y, theta = carter.current_pose # current_velocity
-    pos = np.array([x, y])
-    goal_pos = pos + distance * unit_from_theta(theta)
-    goal_pose = np.append(goal_pos, [theta])
-    return goal_pose
 
 ################################################################################
 

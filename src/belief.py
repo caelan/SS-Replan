@@ -41,6 +41,7 @@ from src.utils import create_relative_pose, RelPose, FConf, are_confs_close
 
 MIN_GRASP_WIDTH = 0.005
 REPAIR_DETECTIONS = True
+STOCHASTIC_PLACE = False
 
 ################################################################################
 
@@ -208,9 +209,11 @@ def create_observable_pose_dist(world, obj_name):
 
 def create_observable_belief(world, **kwargs):
     with WorldSaver():
-        return Belief(world, pose_dists={
+        belief = Belief(world, pose_dists={
             name: create_observable_pose_dist(world, name)
             for name in world.movable}, **kwargs)
+        belief.task = world.task
+        return belief
 
 def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
     # TODO: likely easier to just make a null surface below ground
@@ -233,9 +236,12 @@ def create_surface_pose_dist(world, obj_name, surface_dist, n=NUM_PARTICLES):
 
 def create_surface_belief(world, surface_dists, **kwargs):
     with WorldSaver():
-        return Belief(world, pose_dists={
+        belief = Belief(world, pose_dists={
             name: create_surface_pose_dist(world, name, surface_dist)
             for name, surface_dist in surface_dists.items()}, **kwargs)
+
+
+        return
 
 ################################################################################
 
@@ -282,14 +288,14 @@ def transition_belief_update(belief, plan):
                 belief.grasped = g
                 # TODO: open gripper afterwards to ensure not in hand
             else:
-                print('Failed to grasp! Delocalizing belief')
                 delocalize_belief(belief, o, rp)
+                print('Failed to grasp! Delocalizing belief')
                 success = False
                 break
         elif action == 'place':
             o, p, g, rp = params[:4]
             belief.grasped = None
-            if belief.world.is_real():
+            if STOCHASTIC_PLACE and belief.world.is_real():
                 delocalize_belief(belief, o, rp)
             else:
                 belief.pose_dists[o] = PoseDist(belief.world, o, DeltaDist(rp))

@@ -21,7 +21,7 @@ from src.utils import get_grasps, iterate_approach_path, ALL_SURFACES, \
     get_descendant_obstacles, surface_from_name, RelPose, compute_surface_aabb, create_relative_pose, Z_EPSILON, \
     get_surface_obstacles, test_supported, \
     get_link_obstacles, ENV_SURFACES, FConf, open_surface_joints, DRAWERS, STOVES, \
-    TOP_GRASP, KNOBS, APPROACH_DISTANCE, FINGER_EXTENT, set_tool_pose
+    TOP_GRASP, KNOBS, APPROACH_DISTANCE, FINGER_EXTENT, set_tool_pose, translate_linearly
 from src.visualization import GROW_INVERSE_BASE, GROW_FORWARD_RADIUS
 from src.inference import SurfaceDist
 from examples.discrete_belief.run import revisit_mdp_cost, clip_cost, DDist #, MAX_COST
@@ -51,6 +51,7 @@ MAX_CONF_DISTANCE = 0.75
 NEARBY_APPROACH = MAX_CONF_DISTANCE
 NEARBY_PULL = 0.25
 FIXED_FAILURES = INF # 5
+REVERSE_DISTANCE = 0.1
 
 # TODO: TracIK might not be deterministic in which case it might make sense to try a few
 # http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/trac_ik/trac_ik_tutorial.html
@@ -472,12 +473,20 @@ def test_base_conf(world, bq, obstacles):
     min_distance = 0.04 if world.is_real() else 0.0
     robot_links = [world.franka_link, world.gripper_link] if world.is_real() else []
     bq.assign()
-    for conf in world.special_confs:
-        # Could even sample a special visible conf for this base_conf
-        conf.assign()
-        if not is_robot_visible(world, robot_links) or any(pairwise_collision(
-                world.robot, b, max_distance=min_distance) for b in obstacles):
-            return False
+    base_confs = [bq]
+    if world.is_real():
+        # TODO: could also rotate in place
+        nearby_values = translate_linearly(world, distance=-REVERSE_DISTANCE)
+        bq.nearby_bq = FConf(world.robot, world.base_joints, nearby_values)
+        base_confs.append(bq.nearby_bq)
+    for base_conf in base_confs:
+        base_conf.assign()
+        for conf in world.special_confs:
+            # Could even sample a special visible conf for this base_conf
+            conf.assign()
+            if not is_robot_visible(world, robot_links) or any(pairwise_collision(
+                    world.robot, b, max_distance=min_distance) for b in obstacles):
+                return False
     return True
 
 def inverse_reachability(world, base_generator, obstacles=set(),
@@ -494,6 +503,7 @@ def inverse_reachability(world, base_generator, obstacles=set(),
             #wait_for_user()
             if test_base_conf(world, bq, obstacles):
                 #if PRINT_FAILURES: print('Success after {} IR attempts:'.format(attempt))
+                bq.assign()
                 yield bq
                 break
         else:

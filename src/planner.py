@@ -91,9 +91,9 @@ def get_stream_info():
         'plan-pour': StreamInfo(opt_gen_fn=opt_gen_fn, overhead=1e1),
 
         # 'plan-calibrate-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
-        'plan-base-motion': StreamInfo(opt_gen_fn=PartialInputs(test=opt_move_base_test),
+        'plan-base-motion': StreamInfo(opt_gen_fn=PartialInputs(),#test=opt_move_base_test),
                                        overhead=1e3, defer=True),
-        'plan-arm-motion': StreamInfo(opt_gen_fn=PartialInputs(test=opt_move_arm_gen_test),
+        'plan-arm-motion': StreamInfo(opt_gen_fn=PartialInputs(),#test=opt_move_arm_gen_test),
                                       overhead=1e2, defer=True),
         # 'plan-gripper-motion': StreamInfo(opt_gen_fn=opt_gen_fn),
 
