@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import time
+import traceback
 
 from pybullet_tools.utils import wait_for_duration, wait_for_user, \
     print_separator, INF, elapsed_time
@@ -27,13 +28,21 @@ def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
     iterations = 0
     while (elapsed_time(start_time) < max_time) and (iterations < max_iterations):
         iterations += 1
-        stream_pddl, stream_map = get_streams(world, teleport_base=task.teleport_base,
-                                              collisions=not args.cfree, teleport=args.teleport)
-        problem = PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)
-        remaining_time = min(max_time - elapsed_time(start_time), max_planner_time)
-        plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
-        if plan is not None:
-            return plan, plan_cost, certificate
+        try:
+            stream_pddl, stream_map = get_streams(world, teleport_base=task.teleport_base,
+                                                  collisions=not args.cfree, teleport=args.teleport)
+            problem = PDDLProblem(domain_pddl, constant_map, stream_pddl, stream_map, init, goal_formula)
+            remaining_time = min(max_time - elapsed_time(start_time), max_planner_time)
+            plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
+            if plan is not None:
+                return plan, plan_cost, certificate
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt()
+        #except MemoryError:
+        #    pass
+        except:
+            traceback.print_exc()
+        # FastDownward translator runs out of memory
     return None, INF, Certificate(all_facts=[], preimage_facts=[])
 
 def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, serialize=True,
@@ -81,23 +90,21 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
                                                collisions=not args.cfree, teleport=args.teleport)
             planning_time = min(max_time - elapsed_time(total_start_time), max_constrained_time) #, args.max_time)
-            #plan, plan_cost, certificate = random_restart(belief, args, problem, max_time=planning_time, max_planner_time=INF,
-            #                                              skeleton=previous_skeleton, replan_actions=defer_actions)
-            plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-                                                            skeleton=previous_skeleton, replan_actions=defer_actions)
+            plan, plan_cost, certificate = random_restart(belief, args, problem, max_time=planning_time, max_iterations=1,
+                                                          skeleton=previous_skeleton, replan_actions=defer_actions)
             if plan is None:
                 print('Failed to solve with plan constraints')
                 #wait_for_user()
-        elif not fixed_base:
-            num_unconstrained += 1
-            problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
-                                               collisions=not args.cfree, teleport=args.teleport)
-            print_separator(n=25)
-            planning_time = min(max_time - elapsed_time(total_start_time)) # , args.max_time)
-            plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-                                                            replan_actions=defer_actions)
-            if plan is None:
-                print('Failed to solve when allowing fixed base')
+        #elif not fixed_base:
+        #    num_unconstrained += 1
+        #    problem = pdddlstream_from_problem(belief, additional_init=previous_facts,
+        #                                       collisions=not args.cfree, teleport=args.teleport)
+        #    print_separator(n=25)
+        #    planning_time = min(max_time - elapsed_time(total_start_time)) # , args.max_time)
+        #    plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
+        #                                                    replan_actions=defer_actions)
+        #    if plan is None:
+        #        print('Failed to solve when allowing fixed base')
 
         if plan is None:
             # TODO: might be helpful to add additional facts here in the future
@@ -106,8 +113,6 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
                                                collisions=not args.cfree, teleport=args.teleport)
             print_separator(n=25)
             planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time) #, args.max_time)
-            #plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=planning_time,
-            #                                                max_cost=plan_cost, replan_actions=defer_actions)
             plan, plan_cost, certificate = random_restart(belief, args, problem, max_time=planning_time,
                                                           max_planner_time=MAX_RESTART_TIME,
                                                           max_cost=plan_cost, replan_actions=defer_actions)

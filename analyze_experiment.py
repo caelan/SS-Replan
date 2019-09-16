@@ -14,7 +14,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 #from run_experiment import DIRECTORY, MAX_TIME
 from pddlstream.utils import str_from_object, implies
-from pybullet_tools.utils import read_json
+from pybullet_tools.utils import read_json, INF
 
 #from tabulate import tabulate
 
@@ -29,7 +29,6 @@ PRINT_ATTRIBUTES = [
     'total_time',
     'error',
     #'plan_time',
-    #'plan_start_time',
     #'num_iterations',
     #'num_constrained',
     #'num_unconstrained',
@@ -41,9 +40,8 @@ PRINT_ATTRIBUTES = [
 ]
 
 ACHIEVED_GOAL = [
-    'total_time',
-    'plan_time',
-    'plan_start_time',
+    #'total_time',
+    #'plan_time',
     'num_actions',
     'total_cost',
 ]
@@ -51,15 +49,15 @@ ACHIEVED_GOAL = [
 
 ERROR_OUTCOME = {
     'achieved_goal': False,
-    'total_time': MAX_TIME,
-    'plan_time': 0,
+    'total_time': INF,
+    'plan_time': INF,
     'num_iterations': 0,
     'num_constrained': 0,
     'num_unconstrained': 0,
     'num_successes': 0,
-    'num_actions': 0,
-    'num_commands': 0,
-    'total_cost': 0,
+    'num_actions': INF,
+    'num_commands': INF,
+    'total_cost': INF,
 }
 
 
@@ -89,7 +87,10 @@ def main():
             for outcome in outcomes_per_task[task][policy]:
                 if outcome['error']:
                     outcome.update(ERROR_OUTCOME)
-                outcome['total_time'] = min(outcome['total_time'], MAX_TIME)
+                if MAX_TIME < outcome['total_time']:
+                    outcome['achieved_goal'] = False
+                if not outcome['achieved_goal']:
+                    outcome['total_time'] = MAX_TIME
                 for attribute, value in outcome.items():
                     if (attribute not in ['policy']) and (attribute in PRINT_ATTRIBUTES) and \
                             not isinstance(value, str) and implies(attribute in ACHIEVED_GOAL, outcome['achieved_goal']):

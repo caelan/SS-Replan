@@ -50,10 +50,10 @@ SERIAL = False
 VERBOSE = SERIAL
 SERIALIZE_TASK = True
 
-TIME_PER_TRIAL = 150 # trial / sec
+TIME_PER_TRIAL = 300 # trial / sec
 HOURS_TO_SECS = 60 * 60
 
-N = 10
+N = 5
 MAX_MEMORY = 3.5*KILOBYTES_PER_GIGABYTE
 
 """
@@ -134,7 +134,8 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
     while True:
         # TODO: need to actually retrieve the info about which thread failed
         try:
-            yield generator.next(timeout=timeout)
+            yield generator.next()
+            #yield generator.next(timeout=timeout)
         except StopIteration:
             break
         except MemoryError: # as e:
