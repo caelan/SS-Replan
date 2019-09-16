@@ -50,7 +50,7 @@ P_RANDOMIZE_IK = 1.0
 MAX_CONF_DISTANCE = 0.75
 NEARBY_APPROACH = MAX_CONF_DISTANCE
 NEARBY_PULL = 0.25
-FIXED_FAILURES = 5
+FIXED_FAILURES = INF # 5
 
 # TODO: TracIK might not be deterministic in which case it might make sense to try a few
 # http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/trac_ik/trac_ik_tutorial.html

@@ -11,13 +11,15 @@ from src.belief import create_observable_belief, transition_belief_update, creat
 from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_plan
 from src.problem import pdddlstream_from_problem, get_streams
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
-    STOCHASTIC_ACTIONS
+    STOCHASTIC_ACTIONS, make_wild_skeleton
 from src.utils import BOWL
 
 # TODO: max time spent reattempting streams flag (might not be needed actually)
 # TODO: process binding blows up for detect_drawer
-UNCONSTRAINED_FIXED_BASE = True
-MAX_RESTART_TIME = 2*60
+UNCONSTRAINED_FIXED_BASE = False
+MAX_RESTART_TIME = 3*60
+#REPLAN_ITERATIONS = 1
+REPLAN_ITERATIONS = INF
 
 def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
                    max_planner_time=INF, **kwargs):
@@ -38,15 +40,15 @@ def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
                 return plan, plan_cost, certificate
         except KeyboardInterrupt:
             raise KeyboardInterrupt()
-        #except MemoryError:
-        #    pass
+        except MemoryError:
+            break
         except:
             traceback.print_exc()
         # FastDownward translator runs out of memory
     return None, INF, Certificate(all_facts=[], preimage_facts=[])
 
 def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, serialize=True,
-               max_time=10*60, max_constrained_time=1*60, max_unconstrained_time=INF):
+               max_time=10*60, max_constrained_time=1.5*60, max_unconstrained_time=INF):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     defer_actions = replan_actions if defer else set()
     world = task.world
@@ -78,7 +80,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         belief.draw()
 
         #wait_for_user('Plan?')
-        fixed_base = UNCONSTRAINED_FIXED_BASE or not task.movable_base  # or not constrain
+        fixed_base = UNCONSTRAINED_FIXED_BASE or not task.movable_base or not constrain
         plan_start_time = time.time()
         plan, plan_cost = None, INF
         if constrain and (previous_skeleton is not None):
@@ -115,6 +117,7 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
             planning_time = min(max_time - elapsed_time(total_start_time), max_unconstrained_time) #, args.max_time)
             plan, plan_cost, certificate = random_restart(belief, args, problem, max_time=planning_time,
                                                           max_planner_time=MAX_RESTART_TIME,
+                                                          max_iterations=REPLAN_ITERATIONS,
                                                           max_cost=plan_cost, replan_actions=defer_actions)
 
         plan_time += elapsed_time(plan_start_time)
@@ -150,7 +153,8 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         if success and constrain:
             plan_postfix = get_plan_postfix(plan, plan_prefix)
             # TODO: exit if plan_postfix is empty?
-            previous_skeleton = make_exact_skeleton(world, plan_postfix)  # make_exact_skeleton | make_wild_skeleton
+            previous_skeleton = make_wild_skeleton(world, plan_postfix)
+            #previous_skeleton = make_exact_skeleton(world, plan_postfix)  # make_exact_skeleton | make_wild_skeleton
             previous_facts = reuse_facts(problem, certificate, previous_skeleton)  # []
         else:
             previous_skeleton = None

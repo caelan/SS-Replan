@@ -128,7 +128,7 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
             yield outputs
         return
     pool = Pool(processes=num_cores) #, initializer=mute)
-    generator = pool.imap_unordered(fn, inputs, chunksize=1)
+    generator = pool.imap_unordered(fn, inputs) #, chunksize=1)
     # pool_result = pool.map_async(worker, args)
     #return generator
     while True:
@@ -172,9 +172,9 @@ def run_experiment(experiment):
     soft_memory = int(BYTES_PER_KILOBYTE*MAX_MEMORY)
     hard_memory = soft_memory
     process.rlimit(psutil.RLIMIT_AS, (soft_memory, hard_memory))
-    soft_time = MAX_TIME + 2*60
-    hard_time = soft_time
-    process.rlimit(psutil.RLIMIT_CPU, (soft_time, hard_time))
+    #soft_time = MAX_TIME + 2*60 # I think this kills the wrong things
+    #hard_time = soft_time
+    #process.rlimit(psutil.RLIMIT_CPU, (soft_time, hard_time))
 
     stdout = sys.stdout
     if not VERBOSE:

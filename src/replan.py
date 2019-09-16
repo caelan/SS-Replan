@@ -17,10 +17,10 @@ INTERNAL_ACTIONS = {'detect', 'calibrate'} # Fake, skippable, etc...
 
 REUSE_ARGUMENTS = {
     # TODO: this should really be done by type instead
-    'pick': [0, 2],  # ?o1 ?g
-    'place': [0, 2, 3, 4], # ?o1 ?g ?rp ?o2
+    'pick': [0, 2],  # ?o1 ?wp1 ?g ?rp ?o2 ?wp2
+    'place': [0, 2, 3, 4], # ?o1 ?wp1 ?g ?rp ?o2 ?wp2
     # TODO: need to maintain the original distribution as well then...
-    'detect': [0, 3, 6], # ?o1 ?obs ?o0
+    'detect': [0, 3, 6], # ?o1 ?wp1 ?rp1 ?obs ?wp2 ?rp2 ?o0 ?wp0
     # The previous pick error I had was because it moved to the carry_aq and then detected
     # However, it was next constrained to move the base rather than the arm
 }

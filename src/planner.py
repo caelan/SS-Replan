@@ -46,6 +46,8 @@ def opt_detect_cost_fn(obj_name, rp_dist, obs, rp_sample):
     return cost
 
 def opt_move_base_test(bq1, bq2, aq): #, fluents=[]):
+    # TODO: what did these previously do then?
+    #print(bq1, bq2, bq1 != bq2)
     if isinstance(bq1, SharedOptValue) or isinstance(bq2, SharedOptValue):
         return True
     #if isinstance(UniqueOptValue, bq1) and (aq1 == bq2):
@@ -157,6 +159,7 @@ def solve_pddlstream(belief, problem, args, skeleton=None, replan_actions=set(),
         # effort_weight = 0 if args.anytime else 1
         effort_weight = 1e-3 if args.anytime else 1
         #effort_weight = 0
+        #effort_weight = None
         solution = solve_focused(problem, constraints=constraints, stream_info=stream_info,
                                  replan_actions=replan_actions, initial_complexity=5,
                                  planner=planner, max_planner_time=max_planner_time,

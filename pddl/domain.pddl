@@ -5,7 +5,9 @@
     @open @closed
     @rest_aq ; @calibrate_aq
     @top @side
-    @open_gq @closed_gq)
+    @open_gq @closed_gq
+    @bq0
+  )
   (:predicates
     (Type ?t ?b)
     (Stackable ?o ?r)
@@ -115,8 +117,10 @@
     (AdmitsGrasp ?o1 ?g ?o2)
     (ValidGraspType ?o ?gty)
     (IsGraspType ?o ?g ?gty)
-    (AdmitsGraspType ?o2 ?gty))
-
+    (AdmitsGraspType ?o2 ?gty)
+    (identical ?bq1 ?bq2)
+    (Stationary)
+  )
   (:functions
     (Distance ?bq1 ?bq2)
     (MoveBaseCost)
@@ -128,6 +132,7 @@
     (PressCost)
     (DetectCost ?o ?rp1 ?obs ?rp2)
   )
+  ; Enforce that it chooses new for all but initial
 
   ; TODO: prevent the robot from moving to the same spot?
   ; TODO: force the search to select new base poses after one manipulation is performed
@@ -138,12 +143,15 @@
     ;                   (AtBConf ?bq1) (AtAConf ?aq)
     :parameters (?bq1 ?bq2 ?bt)
     :precondition (and (BaseMotion ?bq1 ?bq2 @rest_aq ?bt)
+                       (or (Stationary) (not (= ?bq1 @bq0)))
+                       (not (identical ?bq1 ?bq2))
                        ; (not (= ?bq1 ?bq2)) ; Causes shared optimistic failure when pick/place two objects
                        ; TODO: could a (!= ?o1 ?o2) predicate
                        (AtBConf ?bq1) (AtAConf @rest_aq)
                        (Calibrated) (CanMoveBase)
                        (not (Unsafe)))
     :effect (and (AtBConf ?bq2)
+                 (not (Stationary))
                  (CanMoveArm)
                  (not (AtBConf ?bq1))
                  (not (CanMoveBase))
@@ -153,7 +161,7 @@
                  (increase (total-cost) (MoveBaseCost))))
   (:action move_arm
     :parameters (?bq ?aq1 ?aq2 ?at)
-    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at)
+    :precondition (and (ArmMotion ?bq ?aq1 ?aq2 ?at) (not (identical ?aq1 ?aq2))
                        ; (not (= ?aq1 ?aq2)) ; Causes shared optimistic failure
                        (AtBConf ?bq) (AtAConf ?aq1)
                        (CanMoveArm)
@@ -229,7 +237,7 @@
 
   (:action pull
     :parameters (?j ?a1 ?a2 ?o ?wp1 ?wp2 ?bq ?aq1 ?aq2 ?gq ?at)
-    :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at)
+    :precondition (and (Pull ?j ?a1 ?a2 ?bq ?aq1 ?aq2 ?at) (not (identical ?a1 ?a2))
                        (GConf ?gq) (= ?gq @open_gq) ; (OpenGConf ?gq) ; (OpenGripper)
                        (AngleKin ?o ?wp1 ?j ?a1) (AngleKin ?o ?wp2 ?j ?a2)
                        (AtAngle ?j ?a1) (AtWorldPose ?o ?wp1)
