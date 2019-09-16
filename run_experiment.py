@@ -78,8 +78,8 @@ MemoryError
 
 POLICIES = [
     #{'constrain': False, 'defer': False},
+    {'constrain': False, 'defer': True},  # Move actions grow immensely
     {'constrain': True, 'defer': False},
-    {'constrain': False, 'defer': True}, # Move actions grow immensely
     {'constrain': True, 'defer': True}, # TODO: serialize
 ]
 # 8Gb memory limit
@@ -101,16 +101,18 @@ POLICIES = [
 # 12) Irrelevant distractors that aren't picked up
 
 TASK_NAMES = [
-    'detect_block',
+    'sugar_drawer',
     'inspect_drawer',
     'swap_drawers',
-    'sugar_drawer',
+    'detect_block',
     #'cook_meal',
     #'regrasp_block',
     #'hold_block',
     #'cook_block',
     #'stow_block',
 ]
+
+# chris@10.28.133.229
 
 # TODO: CPU usage at 300% due to TracIK or the visualizer?
 # TODO: could check collisions only with real (non-observed) values

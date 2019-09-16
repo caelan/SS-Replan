@@ -28,7 +28,7 @@ PRINT_ATTRIBUTES = [
     'achieved_goal',
     'total_time',
     'error',
-    #'plan_time',
+    'plan_time',
     #'num_iterations',
     #'num_constrained',
     #'num_unconstrained',
@@ -48,6 +48,7 @@ ACHIEVED_GOAL = [
 
 
 ERROR_OUTCOME = {
+    'error': True,
     'achieved_goal': False,
     'total_time': INF,
     'plan_time': INF,
@@ -60,25 +61,42 @@ ERROR_OUTCOME = {
     'total_cost': INF,
 }
 
+POLICY_NAMES = [
+    'Constain',
+    'Defer',
+    'Constrain+Defer',
+]
+
+# https://github.mit.edu/caelan/ss/blob/master/openrave/serial_analyze.py
+
+'sugar_drawer',
+'inspect_drawer',
+'detect_block',
+'swap_drawers',
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('experiment', help='Name of the experiment')
+    parser.add_argument('experiments', nargs='+', help='Name of the experiment')
     args = parser.parse_args()
 
     outcomes_per_task = {}
-    for result in read_json(args.experiment):
-        experiment = result['experiment']
-        problem = experiment['problem']
-        outcome = result['outcome']
-        #policy = frozenset(experiment['policy'].items())
-        policy = name_from_policy(experiment['policy'])
-        outcomes_per_task.setdefault(problem['task'], {}).setdefault(policy, []).append(outcome)
+    for path in args.experiments:
+        for result in read_json(path):
+            experiment = result['experiment']
+            problem = experiment['problem']
+            outcome = result['outcome']
+            #policy = frozenset(experiment['policy'].items())
+            policy = name_from_policy(experiment['policy'])
+            outcomes_per_task.setdefault(problem['task'], {}).setdefault(policy, []).append(outcome)
+
+    outcomes_per_task['inspect_drawer']['constrain=0_defer=1'].append(ERROR_OUTCOME)
+    outcomes_per_task['detect_block']['constrain=1_defer=0'].append(ERROR_OUTCOME)
 
     for task in TASK_NAMES:
         if task not in outcomes_per_task:
             continue
-        print('\nTask: {}'.format(task))
+        #print('\nTask: {}'.format(task))
+        items = []
         for policy in POLICIES:
             policy = name_from_policy(policy)
             if policy not in outcomes_per_task[task]:
@@ -91,13 +109,24 @@ def main():
                     outcome['achieved_goal'] = False
                 if not outcome['achieved_goal']:
                     outcome['total_time'] = MAX_TIME
+                    outcome['plan_time'] = MAX_TIME
                 for attribute, value in outcome.items():
                     if (attribute not in ['policy']) and (attribute in PRINT_ATTRIBUTES) and \
-                            not isinstance(value, str) and implies(attribute in ACHIEVED_GOAL, outcome['achieved_goal']):
+                            not isinstance(value, str) and implies(attribute in ACHIEVED_GOAL,
+                                                                   outcome['achieved_goal']):
                         value_per_attribute.setdefault(attribute, []).append(value)
-            statistics = {attribute: '{:.2f}'.format(np.mean(values)) for attribute, values in value_per_attribute.items()}
+
+            statistics = {attribute: np.mean(values) # '{:.2f}'.format(
+                          for attribute, values in value_per_attribute.items()}
             statistics['trials'] = len(outcomes_per_task[task][policy])
-            print('{}: {}'.format(policy, str_from_object(statistics)))
+            #print('{}: {}'.format(policy, str_from_object(statistics)))
+            items += [
+                '{:.0f}'.format(100*statistics['achieved_goal']),
+                '{:.0f}'.format(statistics['plan_time']),
+            ]
+        print(' & '.join(items))
+        print('\\\\ \hline')
+
             # TODO: robust poses
             # TODO: intelligent IR for pour
 
