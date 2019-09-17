@@ -53,6 +53,8 @@ NEARBY_PULL = 0.25
 FIXED_FAILURES = INF # 5
 REVERSE_DISTANCE = 0.1
 
+DOOR_PROXIMITY = True
+
 # TODO: TracIK might not be deterministic in which case it might make sense to try a few
 # http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/trac_ik/trac_ik_tutorial.html
 # http://wiki.ros.org/trac_ik
@@ -216,7 +218,8 @@ def get_ofree_ray_grasp_test(world, **kwargs):
     def test(detect, bconf, aconf, obj_name, grasp):
         if detect.name == obj_name:
             return True
-        assert obj_name is None # shouldn't happen anymore
+        # TODO: check collisions with the placement distribution
+        # Move top grasps more vertically
         move_occluding(world)
         bconf.assign()
         aconf.assign()
@@ -336,6 +339,8 @@ def get_test_near_joint(world, **kwargs):
     vertices_from_joint = {}
 
     def test(joint_name, base_conf):
+        if not DOOR_PROXIMITY:
+            return True
         if joint_name not in vertices_from_joint:
             base_confs = list(load_pull_base_poses(world, joint_name))
             vertices_from_joint[joint_name] = grow_polygon(base_confs, radius=GROW_INVERSE_BASE)
@@ -364,9 +369,12 @@ def get_stable_gen(world, max_attempts=100,
             surface_body = world.environment_bodies[surface_name]
         surface_aabb = compute_surface_aabb(world, surface_name)
         learned_poses = load_placements(world, surface_name) if learned else [] # TODO: GROW_PLACEMENT
-        center = -np.pi/4
-        half_extent = np.pi / 16
-        yaw_range = (center-half_extent, center+half_extent) if world.is_real() else (-np.pi, np.pi)
+
+        yaw_range = (-np.pi, np.pi)
+        #if world.is_real():
+        #    center = -np.pi/4
+        #    half_extent = np.pi / 16
+        #    yaw_range = (center-half_extent, center+half_extent)
         while True:
             for _ in range(max_attempts):
                 if surface_name in STOVES:

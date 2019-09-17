@@ -43,6 +43,8 @@ DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476
 # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L52
 
 CABINET_OPEN_ANGLE = 4 * np.pi / 9 # out of np.pi / 2
+#CABINET_OPEN_ANGLE = 3 * np.pi / 8
+
 DRAWER_OPEN_FRACTION = 0.75
 
 #JOINT_LIMITS_BUFFER = 0.0

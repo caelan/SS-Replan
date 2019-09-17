@@ -18,7 +18,7 @@ from src.utils import BOWL
 # TODO: process binding blows up for detect_drawer
 UNCONSTRAINED_FIXED_BASE = False
 MAX_RESTART_TIME = 2*60
-REPLAN_ITERATIONS = INF # 1 | INF
+REPLAN_ITERATIONS = 1 # 1 | INF
 REPLAN_FAILURES = False
 
 
@@ -42,13 +42,13 @@ def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
         except KeyboardInterrupt as e:
             raise e
         except MemoryError as e:
-            if REPLAN_FAILURES:
-                break
-            raise e
+            traceback.print_exc()
+            if not REPLAN_FAILURES:
+                raise e
+            break
         except Exception as e:
-            if REPLAN_FAILURES:
-                traceback.print_exc()
-            else:
+            traceback.print_exc()
+            if not REPLAN_FAILURES:
                 raise e
         # FastDownward translator runs out of memory
     return None, INF, Certificate(all_facts=[], preimage_facts=[])

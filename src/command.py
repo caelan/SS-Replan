@@ -7,7 +7,7 @@ import time
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, flatten_links, remove_handles, \
     get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, adjust_path
-from src.utils import create_surface_attachment
+from src.utils import create_surface_attachment, SPAM, TOMATO_SOUP, MUSTARD, SUGAR, CHEEZIT
 
 DEFAULT_TIME_STEP = 0.02
 DEFAULT_SLEEP = 0.5
@@ -17,12 +17,14 @@ TIN_EFFORT = 60
 PLASTIC_EFFORT = 50
 CARDBOARD_EFFORT = 60
 
+TIN_OBJECTS = [SPAM]
+
 EFFORT_FROM_OBJECT = {
-    'potted_meat_can': TIN_EFFORT,
-    'tomato_soup_can': TIN_EFFORT,
-    'mustard_bottle': PLASTIC_EFFORT,
-    'sugar_box': CARDBOARD_EFFORT,
-    'cracker_box': CARDBOARD_EFFORT,
+    SPAM: TIN_EFFORT,
+    TOMATO_SOUP: TIN_EFFORT,
+    MUSTARD: PLASTIC_EFFORT,
+    SUGAR: CARDBOARD_EFFORT,
+    CHEEZIT: CARDBOARD_EFFORT,
 }
 # TODO: grasps per object
 
@@ -144,8 +146,8 @@ class Trajectory(Command):
         from src.retime import slow_trajectory, ensure_increasing, retime_trajectory
         from scipy.interpolate import interp1d, CubicSpline
         # TODO: add the current configuration to adjust path
-        path = adjust_path(self.robot, self.joints, self.path) # TODO: account for error in the start configuration?
-        path, time_from_starts = retime_trajectory(self.robot, self.joints, path, sample_step=None)
+        # TODO: account for error in the start configuration?
+        path, time_from_starts = retime_trajectory(self.robot, self.joints, self.path, sample_step=None)
         #path = list(self.path)
         #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
         #ensure_increasing(path, time_from_starts)

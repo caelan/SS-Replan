@@ -14,11 +14,11 @@ from examples.discrete_belief.dist import UniformDist, DeltaDist
 from pybullet_tools.utils import BodySaver, joint_from_name, LockRenderer, spaced_colors, WorldSaver, \
     pairwise_collision, elapsed_time, randomize, remove_handles, wait_for_duration, wait_for_user, \
     get_joint_positions, get_joint_name, get_joint_position, GREEN
-from src.command import State
+from src.command import State, TIN_OBJECTS
 from src.inference import NUM_PARTICLES, PoseDist
 from src.observe import fix_detections, relative_detections, ELSEWHERE
 from src.stream import get_stable_gen
-from src.utils import create_relative_pose, RelPose, FConf, are_confs_close
+from src.utils import create_relative_pose, RelPose, FConf, are_confs_close, type_from_name
 
 # TODO: prior on the number of false detections to ensure correlated
 # TODO: could do open world or closed world. For open world, can sum independent probabilities
@@ -118,6 +118,11 @@ class Belief(object):
             objects.add(self.holding)
         return sorted(objects)
     def is_gripper_closed(self):
+        # TODO: base this on the object type
+        if self.holding is not None:
+            obj_type = type_from_name(self.holding)
+            if obj_type not in TIN_OBJECTS:
+                return False
         # each joint in [0.00, 0.04] (units coincide with meters on the physical gripper)
         current_gq = get_joint_positions(self.world.robot, self.world.gripper_joints)
         gripper_width = sum(current_gq)
@@ -155,6 +160,7 @@ class Belief(object):
         return self
 
     def sample(self, discrete=True):
+        # TODO: timeout if unable to find
         while True:
             poses = {}
             for name, pose_dist in randomize(self.pose_dists.items()):
@@ -239,9 +245,8 @@ def create_surface_belief(world, surface_dists, **kwargs):
         belief = Belief(world, pose_dists={
             name: create_surface_pose_dist(world, name, surface_dist)
             for name, surface_dist in surface_dists.items()}, **kwargs)
-
-
-        return
+        belief.task = world.task
+        return belief
 
 ################################################################################
 
@@ -283,7 +288,8 @@ def transition_belief_update(belief, plan):
             belief.liquid.add((bowl, liquid))
         elif action == 'pick':
             o, p, g, rp = params[:4]
-            if not belief.is_gripper_closed():
+            obj_type = type_from_name(o)
+            if (obj_type not in TIN_OBJECTS) or not belief.is_gripper_closed():
                 del belief.pose_dists[o]
                 belief.grasped = g
                 # TODO: open gripper afterwards to ensure not in hand

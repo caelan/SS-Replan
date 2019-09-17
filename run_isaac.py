@@ -42,7 +42,7 @@ from src.command import execute_commands, iterate_commands
 from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
     simulation_setup
 from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, \
-    TOP_DRAWER, TOP_GRASP, LEFT_DOOR, BOTTOM_DRAWER, SIDE_GRASP, TOMATO_SOUP, MUSTARD, BOWL, STOVES
+    TOP_DRAWER, TOP_GRASP, LEFT_DOOR, BOTTOM_DRAWER, SIDE_GRASP, TOMATO_SOUP, MUSTARD, BOWL, STOVES, ALL_JOINTS
 from src.visualization import add_markers
 from src.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
@@ -113,19 +113,19 @@ def planning_loop(interface):
         return observe_world(interface, visible=detected)
 
     def transition_fn(belief, commands):
-        sim_state = belief.sample_state()
         if args.watch: # or args.record:
+            sim_state = belief.sample_state()
             wait_for_user()
             # simulate_plan(sim_state.copy(), commands, args)
             iterate_commands(sim_state.copy(), commands)
             wait_for_user()
-        sim_state.assign()
+            sim_state.assign()
         if args.teleport or args.cfree:
             print('Some constraints were ignored. Skipping execution!')
             return False
         current_base_pose = get_base_pose(interface.observer)
         global initial_base_pose
-        translation, rotation = get_pose_distance(initial_base_pose, current_base_pose)
+        #translation, rotation = get_pose_distance(initial_base_pose, current_base_pose)
         #if (0.01 < translation) or ():
         #    return False
 
@@ -134,7 +134,6 @@ def planning_loop(interface):
         success = execute_commands(interface, commands)
         update_robot_conf(interface)
         return success
-
     return run_policy(interface.task, args, observation_fn, transition_fn)
 
 ################################################################################
@@ -161,28 +160,29 @@ def real_setup(domain, world, args):
     prior = {
         #SPAM: UniformDist([TOP_DRAWER, BOTTOM_DRAWER]), # INDIGO_COUNTER
         SPAM: UniformDist([INDIGO_COUNTER]),  # INDIGO_COUNTER
-        #SUGAR: UniformDist([INDIGO_COUNTER]),
+        SUGAR: UniformDist([INDIGO_COUNTER]),
         CHEEZIT: UniformDist([INDIGO_COUNTER]),
         #MUSTARD: UniformDist([INDIGO_COUNTER]),
         #TOMATO_SOUP: UniformDist([INDIGO_COUNTER]),
         # Need to extend the TaskManager class
         #BOWL: UniformDist([STOVES[-1]]),
     }
-    goal_drawer = TOP_DRAWER # INDIGO_COUNTER | TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
+    goal_object = SPAM
+    #goal_drawer = LEFT_DOOR # INDIGO_COUNTER | TOP_DRAWER | BOTTOM_DRAWER | LEFT_DOOR
     task = Task(world, prior=prior, teleport_base=True,
-                #grasp_types=[TOP_GRASP],  #, SIDE_GRASP],
+                grasp_types=[TOP_GRASP],  #, SIDE_GRASP],
                 #grasp_types=[SIDE_GRASP],  # , SIDE_GRASP],
                 #init_liquid=[(TOMATO_SOUP, 'tomato'), (MUSTARD, 'mustard')],
-                #goal_detected=[SPAM],
-                goal_holding=SPAM,
+                #goal_detected=[goal_object],
+                #goal_holding=goal_object,
                 #goal_hand_empty=True,
-                #goal_on={SPAM: goal_drawer},
+                #goal_on={goal_object: goal_drawer},
                 #goal_on={CHEEZIT: STOVES[-1]},
-                #goal_closed=[],
+                #goal_closed=ALL_JOINTS,
                 #goal_closed=[JOINT_TEMPLATE.format(goal_drawer)],
                 #goal_closed=[JOINT_TEMPLATE.format(drawer) for drawer in [TOP_DRAWER, BOTTOM_DRAWER]],
                 #goal_open=[JOINT_TEMPLATE.format(goal_drawer)],
-                # goal_cooked=[SPAM],
+                goal_cooked=[goal_object],
                 #goal_cooked=['tomato', 'mustard'],
                 movable_base=not args.fixed,
                 goal_aq=world.carry_conf,  #.values,

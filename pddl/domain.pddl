@@ -232,7 +232,7 @@
                  (AtGConf @open_gq) ; (not (AtGConf ?gq))
                  (CanMoveBase) (CanMoveArm)
                  (not (AtGrasp ?o1 ?g))
-                 (not (Localized ?o1))
+                 ; (not (Localized ?o1)) ; Forces an observation action
                  (increase (total-cost) (PlaceCost))))
 
   (:action pull
@@ -266,13 +266,14 @@
     :precondition (and (PoseKin ?o1 ?wp1 ?rp1 ?o0 ?wp0) (PoseKin ?o1 ?wp2 ?rp2 ?o0 ?wp0)
                        (Detect ?o1 ?wp2 ?r) (BeliefUpdate ?o1 ?rp1 ?obs ?rp2)
                        (AtWorldPose ?o1 ?wp1) ; (AtRelPose ?o1 ?rp1 ?o0) (AtWorldPose ?o0 ?wp0)
-                       (Accessible ?o0) (HandEmpty)
+                       (Accessible ?o0) (AtAConf @rest_aq) ; (HandEmpty)
                        ; (not (UnsafeRelPose ?o1 ?rp2 ?o0))
                        (not (OccludedRay ?r))
                        (not (Unsafe))
                   )
     :effect (and (Localized ?o1) (On ?o1 ?o0)
                  (AtRelPose ?o1 ?rp2 ?o0) (AtWorldPose ?o1 ?wp2)
+                 (CanMoveArm)
                  ;(not (AtRelPose ?o1 ?rp1 ?o0)) (not (AtWorldPose ?o1 ?wp1))
                  (forall (?rp3) (when (and (RelPose ?o1 ?rp3 ?o0) (AtRelPose ?o1 ?rp3 ?o0))
                                       (not (AtRelPose ?o3 ?rp3 ?o0))))

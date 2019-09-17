@@ -524,7 +524,7 @@ def compute_surface_aabb(world, surface_name):
 ################################################################################
 
 INVALID_GRASPS = {
-    TOP_GRASP: [MUSTARD, CHEEZIT, BOWL], #, TOMATO_SOUP],
+    TOP_GRASP: [MUSTARD, BOWL], #, TOMATO_SOUP],
     SIDE_GRASP: [BOWL, SPAM, BLOCK],
 }
 

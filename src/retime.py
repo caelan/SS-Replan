@@ -3,14 +3,14 @@ import numpy as np
 import rospy
 
 from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn, INF, \
-    waypoints_from_path
+    waypoints_from_path, adjust_path
 
 from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
 
 #ARM_SPEED = 0.15*np.pi # radians / sec
 ARM_SPEED = 0.2 # percent
-DEFAULT_SPEED_FRACTION = 0.4
+DEFAULT_SPEED_FRACTION = 0.3
 
 
 def get_joint_names(body, joints):
@@ -81,7 +81,7 @@ def ensure_increasing(path, time_from_starts):
             path.pop(i)
             time_from_starts.pop(i)
 
-def spline_parameterization(robot, joints, path, **kwargs):
+def spline_parameterization(robot, joints, path, time_step=None, **kwargs):
     from src.issac import ISSAC_FRANKA_FRAME
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
@@ -104,7 +104,7 @@ def spline_parameterization(robot, joints, path, **kwargs):
     #time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
     # TODO: interpolate through the waypoints
     path, time_from_starts = retime_trajectory(robot, joints, path, **kwargs)
-    ensure_increasing(path, time_from_starts)
+    #ensure_increasing(path, time_from_starts)
     #positions = interp1d(time_from_starts, path, kind='linear')
     positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
                             extrapolate=False) # bc_type=((1, 0), (1, 0))
@@ -123,6 +123,9 @@ def spline_parameterization(robot, joints, path, **kwargs):
     trajectory.header.frame_id = ISSAC_FRANKA_FRAME
     trajectory.header.stamp = rospy.Time(0)
     trajectory.joint_names = get_joint_names(robot, joints)
+
+    if time_step is not None:
+        time_from_starts = np.append(np.arange(0, time_from_starts[-1], time_step), [time_from_starts[-1]])
     for t in time_from_starts:
         point = JointTrajectoryPoint()
         point.positions = positions(t) # positions alone is insufficient
@@ -211,6 +214,7 @@ def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACT
     :param sample_step:
     :return:
     """
+    path = adjust_path(robot, joints, path)
     max_velocities = velocity_fraction * np.array([get_max_velocity(robot, joint) for joint in joints])
     assert np.all(max_velocities)
     accelerations = max_velocities * acceleration_fraction

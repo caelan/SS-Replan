@@ -29,8 +29,6 @@ from lula_franka.franka_gripper_commander import FrankaGripperCommander
 # moveit_msgs/ExecuteTrajectoryAction
 # moveit_msgs/MoveGroupAction
 
-CSPACE_TRAJECTORY = False
-
 def publish_display_trajectory(moveit, joint_trajectory, frame=ISSAC_FRANKA_FRAME):
     display_trajectory_pub = rospy.Publisher('/display_planned_path', DisplayTrajectory, queue_size=1)
 
@@ -111,13 +109,25 @@ def joint_state_control(robot, joints, path, interface,
 
 ################################################################################
 
-def lula_joint_trajectory(trajectory):
-    action_topic = '/robot/right/cspace_trajectory/msg'
-    print('Starting', action_topic)
-    pub = rospy.Publisher(action_topic, JointTrajectory, queue_size=1)
-    pub.publish(trajectory)
-    rospy.sleep(trajectory.points[-1].time_from_start)
+def lula_joint_trajectory(interface, trajectory):
+    world_state = interface.update_state()
+    suppress_lula(world_state)
+    print('Using RMPFlow trajectory execution')
+    moveit = interface.moveit
+    moveit.trajectory_client.send(trajectory)
+    moveit.trajectory_client.wait_for_finish()
+    time.sleep(trajectory.points[-1].time_)
+
+    moveit.go_local(q=trajectory.points[-1].positions, wait=True)
+    print('Finished RMPFlow trajectory execution')
+    #time.sleep(5.0)
     return True
+    # action_topic = '/robot/right/cspace_trajectory/msg'
+    # print('Starting', action_topic)
+    # pub = rospy.Publisher(action_topic, JointTrajectory, queue_size=1)
+    # pub.publish(trajectory)
+    # rospy.sleep(trajectory.points[-1].time_from_start)
+    # return True
 
 def follow_joint_trajectory(trajectory):
     action_topic = '/position_joint_trajectory_controller/follow_joint_trajectory'
@@ -165,7 +175,7 @@ def franka_control(robot, joints, path, interface, **kwargs):
 
     #joint_command_control(robot, joints, path, **kwargs)
     #follow_control(robot, joints, path, **kwargs)
-    if interface.simulation or interface.moveit.use_lula:
+    if interface.simulation: # or interface.moveit.use_lula:
         #return joint_state_control(robot, joints, path, interface)
         return moveit_control(robot, joints, path, interface)
 
@@ -184,14 +194,12 @@ def franka_control(robot, joints, path, interface, **kwargs):
     #   pos_vel_controllers/JointTrajectoryController, position_controllers/JointTrajectoryController,
     #   velocity_controllers/JointTrajectoryController]
 
-
-
     update_robot_conf(interface)
     start_conf = get_joint_positions(robot, joints)
     print('Initial error:', (np.array(start_conf) - np.array(path[0])).round(5))
     # TODO: only add if the error is substantial
-    path = path
-    #path = [start_conf] + list(path)
+    #path = path
+    path = [start_conf] + list(path)
     trajectory = spline_parameterization(robot, joints, path, **kwargs)
     total_duration = trajectory.points[-1].time_from_start.to_sec()
     print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(
@@ -203,8 +211,8 @@ def franka_control(robot, joints, path, interface, **kwargs):
     # TODO: adjust to the actual current configuration
 
     start_time = time.time()
-    if CSPACE_TRAJECTORY:
-        lula_joint_trajectory(trajectory)
+    if interface.moveit.use_lula:
+        lula_joint_trajectory(interface, trajectory)
     else:
         follow_joint_trajectory(trajectory)
 
