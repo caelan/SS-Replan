@@ -15,7 +15,8 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, set_real_time, set_caching, draw_aabb, \
-    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation, get_all_links
+    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation, get_all_links, sub_inverse_kinematics
+from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
@@ -67,6 +68,7 @@ TABLE_Y = 3.53 # meters
 # +x distance to computer tables: 240cm
 COMPUTER_X = 2.40
 
+CONSERVITIVE_LIMITS = False
 MAX_FRANKA_JOINT7 = 1.89  # 1.8973
 # rosparam get /robot_description > robot_description.urdf
 # packages/third_party/franka_ros/franka_description/robots/panda_arm.xacro
@@ -198,6 +200,8 @@ class World(object):
         self.ik_solver = IK(base_link=str(base_link), tip_link=str(tip_link),
                             timeout=0.01, epsilon=1e-5, solve_type="Speed",
                             urdf_string=read(urdf_path))
+        if not CONSERVITIVE_LIMITS:
+            return
         lower, upper = self.ik_solver.get_joint_limits()
         buffer = JOINT_LIMITS_BUFFER*np.ones(len(self.ik_solver.joint_names))
         lower, upper = lower + buffer, upper - buffer
@@ -333,51 +337,53 @@ class World(object):
         self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
         self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)
         return self.custom_limits
-    def solve_inverse_kinematics(self, world_from_tool, use_track_ik=True,
-                                 nearby_tolerance=INF, **kwargs):
-        if use_track_ik:
-            assert self.ik_solver is not None
-            init_lower, init_upper = self.ik_solver.get_joint_limits()
-            base_link = link_from_name(self.robot, self.ik_solver.base_link)
-            world_from_base = get_link_pose(self.robot, base_link)
-            tip_link = link_from_name(self.robot, self.ik_solver.tip_link)
-            tool_from_tip = multiply(invert(get_link_pose(self.robot, self.tool_link)),
-                                     get_link_pose(self.robot, tip_link))
-            world_from_tip = multiply(world_from_tool, tool_from_tip)
-            base_from_tip = multiply(invert(world_from_base), world_from_tip)
-            joints = joints_from_names(self.robot, self.ik_solver.joint_names) # self.ik_solver.link_names
-            seed_state = get_joint_positions(self.robot, joints)
-            #seed_state = [0.0] * self.ik_solver.number_of_joints
 
-            lower, upper = init_lower, init_upper
-            if nearby_tolerance < INF:
-                tolerance = nearby_tolerance*np.ones(len(joints))
-                lower = np.maximum(lower, seed_state - tolerance)
-                upper = np.minimum(upper, seed_state + tolerance)
-            self.ik_solver.set_joint_limits(lower, upper)
+    def solve_trac_ik(self, world_from_tool, nearby_tolerance=INF):
+        assert self.ik_solver is not None
+        init_lower, init_upper = self.ik_solver.get_joint_limits()
+        base_link = link_from_name(self.robot, self.ik_solver.base_link)
+        world_from_base = get_link_pose(self.robot, base_link)
+        tip_link = link_from_name(self.robot, self.ik_solver.tip_link)
+        tool_from_tip = multiply(invert(get_link_pose(self.robot, self.tool_link)),
+                                 get_link_pose(self.robot, tip_link))
+        world_from_tip = multiply(world_from_tool, tool_from_tip)
+        base_from_tip = multiply(invert(world_from_base), world_from_tip)
+        joints = joints_from_names(self.robot, self.ik_solver.joint_names)  # self.ik_solver.link_names
+        seed_state = get_joint_positions(self.robot, joints)
+        # seed_state = [0.0] * self.ik_solver.number_of_joints
 
-            (x, y, z), (rx, ry, rz, rw) = base_from_tip
-            # TODO: can also adjust tolerances
-            conf = self.ik_solver.get_ik(seed_state, x, y, z, rx, ry, rz, rw)
-            self.ik_solver.set_joint_limits(init_lower, init_upper)
-            if conf is None:
-                return conf
-            #if nearby_tolerance < INF:
-            #    print(lower.round(3))
-            #    print(upper.round(3))
-            #    print(conf)
-            #    print(get_difference(seed_state, conf).round(3))
-            set_joint_positions(self.robot, joints, conf)
-            return get_configuration(self.robot)
+        lower, upper = init_lower, init_upper
+        if nearby_tolerance < INF:
+            tolerance = nearby_tolerance * np.ones(len(joints))
+            lower = np.maximum(lower, seed_state - tolerance)
+            upper = np.minimum(upper, seed_state + tolerance)
+        self.ik_solver.set_joint_limits(lower, upper)
 
+        (x, y, z), (rx, ry, rz, rw) = base_from_tip
+        # TODO: can also adjust tolerances
+        conf = self.ik_solver.get_ik(seed_state, x, y, z, rx, ry, rz, rw)
+        self.ik_solver.set_joint_limits(init_lower, init_upper)
+        if conf is None:
+            return conf
+        # if nearby_tolerance < INF:
+        #    print(lower.round(3))
+        #    print(upper.round(3))
+        #    print(conf)
+        #    print(get_difference(seed_state, conf).round(3))
+        set_joint_positions(self.robot, joints, conf)
+        return get_configuration(self.robot)
+
+    def solve_inverse_kinematics(self, world_from_tool, **kwargs):
+        if self.ik_solver is not None:
+            return self.solve_trac_ik(world_from_tool, **kwargs)
+        return sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
+                                     custom_limits=self.custom_limits) #, **kwargs)
         conf = sample_tool_ik(self.robot, world_from_tool, max_attempts=100)
         if conf is None:
             return conf
         set_joint_positions(self.robot, self.arm_joints, conf)
         #wait_for_user()
         return get_configuration(self.robot)
-        #return sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
-        #                             custom_limits=self.custom_limits, **kwargs)
 
     #########################
 
