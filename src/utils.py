@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import os
 import numpy as np
-import yaml
 import string
 import math
 import random
@@ -326,6 +325,7 @@ def get_obj_path(obj_type):
 ################################################################################
 
 def load_yaml(path):
+    import yaml
     # grep -r --include="*.py" "yaml\." *
     # yaml.dump()
     with open(path, 'r') as f:
