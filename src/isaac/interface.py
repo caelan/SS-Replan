@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import rospy
 
-from src.issac import update_observer
+from src.isaac.issac import update_observer
 
 class Interface(object):
     def __init__(self, args, task, observer, trial_manager=None, deepim=None):

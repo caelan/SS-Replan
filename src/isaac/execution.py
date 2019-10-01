@@ -5,14 +5,13 @@ import numpy as np
 import rospy
 from sensor_msgs.msg import JointState
 
-from src.retime import spline_parameterization, get_joint_names, linear_parameterization
-from src.issac import ISSAC_FRANKA_FRAME, update_observer, update_robot_conf
-from pybullet_tools.utils import elapsed_time, wait_for_user, get_distance_fn, \
+from src.retime import spline_parameterization, get_joint_names
+from src.isaac.issac import ISSAC_FRANKA_FRAME, update_robot_conf
+from pybullet_tools.utils import elapsed_time, get_distance_fn, \
     get_joint_positions, get_min_limits, get_max_limits, get_length
 from pddlstream.utils import Verbose
 
-from trajectory_msgs.msg import JointTrajectory
-from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory, RobotState
+from moveit_msgs.msg import DisplayRobotState, DisplayTrajectory, RobotTrajectory
 from actionlib import SimpleActionClient, GoalStatus
 #from actionlib_msgs.msg import GoalStatus, GoalState, SimpleClientGoalState
 # http://docs.ros.org/jade/api/actionlib/html/classactionlib_1_1SimpleClientGoalState.html

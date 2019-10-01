@@ -19,7 +19,7 @@ from pybullet_tools.utils import INF, pose_from_tform, point_from_pose, get_dist
     quat_angle_between, read_json, elapsed_time
 from sensor_msgs.msg import Image
 from src.utils import BOWL
-from src.issac import ISSAC_WORLD_FRAME, DEPTH_PREFIX, PANDA_FULL_CONFIG_PATH, PREFIX_FROM_SIDE, RIGHT, lookup_pose
+from src.isaac.issac import ISSAC_WORLD_FRAME, PANDA_FULL_CONFIG_PATH, PREFIX_FROM_SIDE, RIGHT, lookup_pose
 
 #DEEPIM_POSE_TEMPLATE = '/deepim/raw/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame']
 DEEPIM_POSE_TEMPLATE = '/objects/prior_pose/{}_{}' # ['kinect1_depth_optical_frame', 'depth_camera']

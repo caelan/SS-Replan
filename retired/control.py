@@ -3,8 +3,8 @@ from lula_controller_msgs.msg import JointPosVelAccCommand
 from pybullet_tools.utils import wait_for_user, joint_from_name, get_max_force
 from rospy import Publisher
 from sensor_msgs.msg import JointState
-from src.execution import suppress_lula
-from src.issac import update_robot
+from src.isaac.execution import suppress_lula
+from src.isaac.issac import update_robot
 from src.retime import get_joint_names, spline_parameterization
 
 ################################################################################

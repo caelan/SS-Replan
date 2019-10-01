@@ -23,7 +23,7 @@ from brain_ros.kitchen_domain import KitchenDomain
 #from grasps import *
 from brain_ros.ros_world_state import RosObserver
 from isaac_bridge.carter import Carter
-from src.carter import command_carter, HOME_BASE_POSE, test_carter
+from src.isaac.carter import command_carter, HOME_BASE_POSE
 
 #import kitchen_poses
 #kitchen_poses.supported_ycb_objects[:] = []
@@ -32,23 +32,22 @@ from pybullet_tools.utils import LockRenderer, wait_for_user, elapsed_time, \
     point_from_pose, set_camera_pose, \
     link_from_name, get_link_pose, set_pose, get_joint_positions
 from pddlstream.utils import Verbose
-from src.belief import create_observable_pose_dist
 
-from src.deepim import DeepIM, mean_pose_deviation, get_pose_distance
+from src.isaac.deepim import DeepIM, mean_pose_deviation
 #from retired.perception import test_deepim
 from src.policy import run_policy
-from src.interface import Interface
+from src.isaac.interface import Interface
 from src.command import execute_commands, iterate_commands
-from src.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
+from src.isaac.isaac_task import TRIAL_MANAGER_TASKS, set_isaac_sim, \
     simulation_setup
-from src.utils import JOINT_TEMPLATE, SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, \
-    TOP_DRAWER, TOP_GRASP, LEFT_DOOR, BOTTOM_DRAWER, SIDE_GRASP, TOMATO_SOUP, MUSTARD, BOWL, STOVES, ALL_JOINTS
+from src.utils import SPAM, SUGAR, CHEEZIT, YCB_OBJECTS, INDIGO_COUNTER, \
+    TOP_GRASP, BOWL
 from src.visualization import add_markers
-from src.issac import observe_world, kill_lula, update_robot_conf, \
+from src.isaac.issac import observe_world, kill_lula, update_robot_conf, \
     load_objects, display_kinect, update_objects, RIGHT, LEFT, get_base_pose
 from src.world import World
 from src.task import Task
-from src.execution import franka_open_gripper, franka_close_gripper
+from src.isaac.execution import franka_open_gripper
 from run_pybullet import create_parser
 
 from examples.discrete_belief.dist import UniformDist

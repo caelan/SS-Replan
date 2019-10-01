@@ -8,7 +8,7 @@ import rospy
 from pybullet_tools.utils import elapsed_time, pose2d_from_pose, get_joint_positions, \
     multiply, invert, pose_from_pose2d
 
-from src.deepim import wait_until_frames_stabilize
+from src.isaac.deepim import wait_until_frames_stabilize
 
 
 

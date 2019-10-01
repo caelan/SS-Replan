@@ -161,8 +161,8 @@ class Trajectory(Command):
             set_joint_positions(self.robot, self.joints, positions)
             yield
     def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
-        from src.retime import slow_trajectory, ensure_increasing, retime_trajectory
-        from scipy.interpolate import interp1d, CubicSpline
+        from src.retime import retime_trajectory
+        from scipy.interpolate import CubicSpline
         path = list(self.path)
         path = adjust_path(self.robot, self.joints, path)
         path = waypoints_from_path(path)
@@ -204,7 +204,7 @@ class Trajectory(Command):
         #    interface.resume_simulation()
         #    # TODO: teleport attached
         else:
-            from src.carter import command_carter_to_pybullet_goal
+            from src.isaac.carter import command_carter_to_pybullet_goal
             return command_carter_to_pybullet_goal(interface, self.path[-1])
 
             world_state = domain.root
@@ -233,7 +233,7 @@ class Trajectory(Command):
         # move_gripper_action(position)
         joint = self.joints[0]
         average = np.average(get_joint_limits(self.robot, joint))
-        from src.execution import franka_open_gripper, franka_close_gripper
+        from src.isaac.execution import franka_open_gripper, franka_close_gripper
         if position < average:
             franka_close_gripper(interface)
         else:
@@ -247,7 +247,7 @@ class Trajectory(Command):
         elif self.joints == self.world.gripper_joints:
             success = self.execute_gripper(interface)
         else:
-            from src.execution import franka_control
+            from src.isaac.execution import franka_control
             success = franka_control(self.robot, self.joints, self.path, interface)
         #status = joint_state_control(self.robot, self.joints, self.path, domain, moveit, observer)
         #time.sleep(DEFAULT_SLEEP)
@@ -284,7 +284,7 @@ class ApproachTrajectory(Trajectory):
     def reverse(self):
         return self.__class__(self.objects, self.world, self.robot, self.joints, self.path[::-1])
     def execute(self, interface):
-        from src.execution import franka_control
+        from src.isaac.execution import franka_control
         from src.retime import DEFAULT_SPEED_FRACTION
         if len(self.path) == 1:
             return True
@@ -350,7 +350,7 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
         #if self.do_pull:
         #    franka_close_gripper(interface)
         #    time.sleep(DEFAULT_SLEEP)
-        from src.execution import franka_control
+        from src.isaac.execution import franka_control
         success = franka_control(self.robot, self.joints, self.path, interface)
         #time.sleep(DEFAULT_SLEEP)
         return success
@@ -402,7 +402,7 @@ class AttachGripper(Attach):
         name = self.world.get_name(self.body)
         effort = EFFORT_FROM_OBJECT[name]
         print('Grasping {} with effort {}'.format(name, effort))
-        from src.execution import franka_close_gripper
+        from src.isaac.execution import franka_close_gripper
         franka_close_gripper(interface, effort=effort)
         interface.stop_tracking(name)
         time.sleep(DEFAULT_SLEEP)
@@ -438,7 +438,7 @@ class Detach(Command):
         del state.attachments[self.body]
         yield
     def execute(self, interface):
-        from src.execution import franka_open_gripper
+        from src.isaac.execution import franka_open_gripper
         if self.world.robot == self.robot:
             franka_open_gripper(interface)
             time.sleep(DEFAULT_SLEEP)

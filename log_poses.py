@@ -5,7 +5,6 @@ from __future__ import print_function
 import rospy
 import tf.transformations as tra
 import numpy as np
-import json
 import os
 import sys
 import tf
@@ -14,9 +13,8 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
 from pybullet_tools.utils import write_json, tform_from_pose
-from src.issac import UNREAL_WORLD_FRAME, ISSAC_WORLD_FRAME, lookup_pose
+from src.isaac.issac import UNREAL_WORLD_FRAME, ISSAC_WORLD_FRAME, lookup_pose
 
-from isaac_bridge.manager import corrections
 from tf2_msgs.msg import TFMessage
 
 POSES_PATH = 'kitchen_poses.json'

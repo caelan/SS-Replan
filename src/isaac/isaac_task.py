@@ -6,14 +6,14 @@ import numpy as np
 
 from pddlstream.language.constants import Not
 from pddlstream.utils import Verbose
-from src.deepim import FullObserver, Segmentator
-from src.interface import Interface
+from src.isaac.deepim import FullObserver, Segmentator
+from src.isaac.interface import Interface
 from src.task import Task, sample_placement
 from src.problem import door_closed_formula, door_open_formula
 from examples.discrete_belief.dist import DeltaDist, UniformDist
-from src.update_isaac import update_isaac_sim
-from src.issac import NULL_POSE, set_pose
-from src.utils import SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT, ECHO_COUNTER, INDIGO_COUNTER, TOP_DRAWER, \
+from src.isaac.update_isaac import update_isaac_sim
+from src.isaac.issac import NULL_POSE, set_pose
+from src.utils import SPAM, SUGAR, CHEEZIT, INDIGO_COUNTER, TOP_DRAWER, \
     BOTTOM_DRAWER
 
 TRIAL_MANAGER_TASKS = [

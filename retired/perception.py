@@ -3,8 +3,8 @@ from __future__ import print_function
 import numpy as np
 import rospy
 
-from src.deepim import DEEPIM_POSE_TEMPLATE, DeepIM
-from src.issac import PREFIX_FROM_SIDE, RIGHT
+from src.isaac.deepim import DEEPIM_POSE_TEMPLATE, DeepIM
+from src.isaac.issac import PREFIX_FROM_SIDE, RIGHT
 from geometry_msgs.msg import PoseStamped
 from lula_dartpy.object_administrator import ObjectAdministrator
 from sensor_msgs.msg import Image

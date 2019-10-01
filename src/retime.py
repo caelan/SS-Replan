@@ -168,7 +168,7 @@ def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACT
 
 def linear_parameterization(robot, joints, path, speed=ARM_SPEED):
     import rospy
-    from src.issac import ISSAC_FRANKA_FRAME
+    from src.isaac.issac import ISSAC_FRANKA_FRAME
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
     distance_fn = get_distance_fn(robot, joints)
@@ -197,7 +197,7 @@ def linear_parameterization(robot, joints, path, speed=ARM_SPEED):
 
 def spline_parameterization(robot, joints, path, time_step=None, **kwargs):
     import rospy
-    from src.issac import ISSAC_FRANKA_FRAME
+    from src.isaac.issac import ISSAC_FRANKA_FRAME
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
     # Can always interpolate each DOF independently
