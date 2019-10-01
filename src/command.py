@@ -147,8 +147,9 @@ class Trajectory(Command):
         from scipy.interpolate import interp1d, CubicSpline
         # TODO: add the current configuration to adjust path
         # TODO: account for error in the start configuration?
-        path, time_from_starts = retime_trajectory(self.robot, self.joints, self.path, sample_step=None)
         #path = list(self.path)
+        path = adjust_path(self.robot, self.joints, self.path)
+        path, time_from_starts = retime_trajectory(self.robot, self.joints, path, sample_step=None)
         #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
         #ensure_increasing(path, time_from_starts)
         if len(path) <= 1:
@@ -171,7 +172,7 @@ class Trajectory(Command):
         #    wait_for_user('Continue?')
 
         print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(len(path), len(self.joints), time_from_starts[-1]))
-        for t in np.arange(time_from_starts[0], time_from_starts[-1], step=time_step):
+        for t in np.arange(positions_curve.x[0], positions_curve.x[-1], step=time_step):
             positions = positions_curve(t)
             set_joint_positions(self.robot, self.joints, positions)
             state.derive()
@@ -256,6 +257,8 @@ class Trajectory(Command):
     def __repr__(self):
         return '{}({}x{})'.format(self.__class__.__name__, len(self.joints), len(self.path))
 
+################################################################################
+
 #class BaseTrajectory(Trajectory):
 #    def __init__(self, world, robot, joints, path, **kwargs):
 #        super(BaseTrajectory, self).__init__(world, robot, joints, path, **kwargs)
@@ -329,11 +332,11 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
             set_joint_positions(self.robot, self.robot_joints, robot_conf)
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
-    #def simulate(self, state, **kwargs):
-    #    # TODO: linearly interpolate for drawer
-    #    # TODO: interpolate drawer and robot individually
-    #    # TODO: find drawer joint angle that minimizes deviation from transform
-    #    raise NotImplementedError()
+    def simulate(self, state, **kwargs):
+        # TODO: linearly interpolate for drawer
+        # TODO: interpolate drawer and robot individually
+        # TODO: find drawer joint angle that minimizes deviation from transform
+        super(DoorTrajectory, self).simulate(state, time_per_step=2*DEFAULT_TIME_STEP)
     def execute(self, interface):
         #update_robot(self.world, domain, observer, observer.observe())
         #wait_for_user()
@@ -498,8 +501,9 @@ class Wait(Command):
     def simulate(self, state, **kwargs):
         wait_for_duration(self.duration)
     def execute(self, interface):
-        import rospy
-        rospy.sleep(self.duration)
+        time.sleep(self.duration)
+        #import rospy
+        #rospy.sleep(self.duration)
         return True
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.steps)

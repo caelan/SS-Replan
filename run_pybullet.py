@@ -111,9 +111,9 @@ def main():
         #    wait_for_user()
         # restore real_state just in case?
         # wait_for_user()
-        if args.fixed: # args.simulate
-            return simulate_commands(real_state, commands)
-        return iterate_commands(real_state, commands, time_step=time_step, pause=False)
+        #if args.fixed: # args.simulate
+        return simulate_commands(real_state, commands)
+        #return iterate_commands(real_state, commands, time_step=time_step, pause=False)
 
     run_policy(task, args, observation_fn, transition_fn)
 

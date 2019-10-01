@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn, INF, \
-    waypoints_from_path, adjust_path
+    waypoints_from_path, adjust_path, get_difference
 
 from scipy.interpolate import CubicSpline # LinearNDInterpolator, NearestNDInterpolator, bisplev, bisplrep, splprep
 
@@ -35,7 +35,7 @@ def ensure_increasing(path, time_from_starts):
 
 ################################################################################
 
-def retime_path(robot, joints, path, speed=ARM_SPEED):
+def instantaneous_retime_path(robot, joints, path, speed=ARM_SPEED):
     #duration_fn = get_distance_fn(robot, joints)
     duration_fn = get_duration_fn(robot, joints)
     mid_durations = [duration_fn(*pair) for pair in zip(path[:-1], path[1:])]
@@ -48,7 +48,7 @@ def slow_trajectory(robot, joints, path, **kwargs):
     ramp_duration = 1.0 # seconds
     # path = waypoints_from_path(path) # Neither moveit or lula benefit from this
 
-    time_from_starts = retime_path(robot, joints, path, **kwargs)
+    time_from_starts = instantaneous_retime_path(robot, joints, path, **kwargs)
     mid_times = [np.average(pair) for pair in zip(time_from_starts[:-1], time_from_starts[1:])]
     mid_durations = [t2 - t1 for t1, t2 in zip(time_from_starts[:-1], time_from_starts[1:])]
     new_time_from_starts = [0.]
@@ -94,7 +94,6 @@ def compute_min_duration(distance, max_velocity, acceleration):
         total_time = 2 * half_time
     return total_time
 
-
 def compute_ramp_duration(distance, max_velocity, acceleration, duration):
     discriminant = max(0, math.pow(duration * acceleration, 2) - 4 * distance * acceleration)
     velocity = 0.5 * (duration * acceleration - math.sqrt(discriminant))  # +/-
@@ -103,7 +102,6 @@ def compute_ramp_duration(distance, max_velocity, acceleration, duration):
     predicted_distance = velocity * (duration - 2 * ramp_time) + acceleration * math.pow(ramp_time, 2)
     assert abs(distance - predicted_distance) < 1e-6
     return ramp_time
-
 
 def compute_position(ramp_time, max_duration, acceleration, t):
     velocity = acceleration * ramp_time
@@ -115,9 +113,42 @@ def compute_position(ramp_time, max_duration, acceleration, t):
     return 0.5 * acceleration * math.pow(t1, 2) + velocity * t2 + \
            (velocity * t3 - 0.5 * acceleration * math.pow(t3, 2))
 
+def ramp_retime_path(path, max_velocities, acceleration_fraction=1.5, sample_step=None):
+    assert np.all(max_velocities)
+    accelerations = max_velocities * acceleration_fraction
+    dim = len(max_velocities)
+    #difference_fn = get_difference_fn(robot, joints)
+    # TODO: more fine grain when moving longer distances
 
-def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACTION,
-                      acceleration_fraction=1.5, sample_step=None):
+    # Assuming instant changes in accelerations
+    waypoints = [path[0]]
+    time_from_starts = [0.]
+    for q1, q2 in zip(path[:-1], path[1:]):
+        differences = get_difference(q1, q2) # assumes not circular anymore
+        #differences = difference_fn(q1, q2)
+        distances = np.abs(differences)
+        duration = 0
+        for idx in range(dim):
+            total_time = compute_min_duration(distances[idx], max_velocities[idx], accelerations[idx])
+            duration = max(duration, total_time)
+
+        time_from_start = time_from_starts[-1]
+        if sample_step is not None:
+            ramp_durations = [compute_ramp_duration(distances[idx], max_velocities[idx], accelerations[idx], duration)
+                              for idx in range(dim)]
+            directions = np.sign(differences)
+            for t in np.arange(sample_step, duration, sample_step):
+                positions = []
+                for idx in range(dim):
+                    distance = compute_position(ramp_durations[idx], duration, accelerations[idx], t)
+                    positions.append(q1[idx] + directions[idx] * distance)
+                waypoints.append(positions)
+                time_from_starts.append(time_from_start + t)
+        waypoints.append(q2)
+        time_from_starts.append(time_from_start + duration)
+    return waypoints, time_from_starts
+
+def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACTION, **kwargs):
     """
     :param robot:
     :param joints:
@@ -128,38 +159,9 @@ def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACT
     :return:
     """
     path = adjust_path(robot, joints, path)
-    max_velocities = velocity_fraction * np.array([get_max_velocity(robot, joint) for joint in joints])
-    assert np.all(max_velocities)
-    accelerations = max_velocities * acceleration_fraction
     path = waypoints_from_path(path)
-    difference_fn = get_difference_fn(robot, joints)
-    # TODO: more fine grain when moving longer distances
-
-    # Assuming instant changes in accelerations
-    waypoints = [path[0]]
-    time_from_starts = [0.]
-    for q1, q2 in zip(path[:-1], path[1:]):
-        differences = difference_fn(q2, q1)
-        distances = np.abs(differences)
-        duration = 0
-        for idx in range(len(joints)):
-            total_time = compute_min_duration(distances[idx], max_velocities[idx], accelerations[idx])
-            duration = max(duration, total_time)
-
-        time_from_start = time_from_starts[-1]
-        if sample_step is not None:
-            ramp_durations = [compute_ramp_duration(distances[idx], max_velocities[idx], accelerations[idx], duration)
-                              for idx in range(len(joints))]
-            directions = np.sign(differences)
-            for t in np.arange(sample_step, duration, sample_step):
-                positions = []
-                for idx in range(len(joints)):
-                    distance = compute_position(ramp_durations[idx], duration, accelerations[idx], t)
-                    positions.append(q1[idx] + directions[idx] * distance)
-                waypoints.append(positions)
-                time_from_starts.append(time_from_start + t)
-        waypoints.append(q2)
-        time_from_starts.append(time_from_start + duration)
+    max_velocities = velocity_fraction * np.array([get_max_velocity(robot, joint) for joint in joints])
+    waypoints, time_from_starts = ramp_retime_path(path, max_velocities, **kwargs)
     return waypoints, time_from_starts
 
 ################################################################################
