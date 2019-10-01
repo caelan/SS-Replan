@@ -330,7 +330,9 @@ class DoorTrajectory(Command):  # TODO: extend Trajectory
             set_joint_positions(self.door, self.door_joints, door_conf)
             yield
     #def simulate(self, state, **kwargs):
-    #    # TODO: interpolate for drawer
+    #    # TODO: linearly interpolate for drawer
+    #    # TODO: interpolate drawer and robot individually
+    #    # TODO: find drawer joint angle that minimizes deviation from transform
     #    raise NotImplementedError()
     def execute(self, interface):
         #update_robot(self.world, domain, observer, observer.observe())
@@ -531,6 +533,7 @@ def iterate_commands(state, commands, time_step=DEFAULT_TIME_STEP, pause=False):
 def simulate_commands(state, commands, **kwargs):
     if commands is None:
         return False
+    # TODO: simulate commands simultaneously
     for i, command in enumerate(commands):
         print('\nCommand {:2}/{:2}: {}'.format(i + 1, len(commands), command))
         command.simulate(state, **kwargs)

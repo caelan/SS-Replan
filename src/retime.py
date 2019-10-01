@@ -1,6 +1,5 @@
 import math
 import numpy as np
-import rospy
 
 from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn, INF, \
     waypoints_from_path, adjust_path
@@ -26,6 +25,13 @@ def get_duration_fn(body, joints, velocities=None, norm=INF):
         duration = np.divide(distance, velocities)
         return np.linalg.norm(duration, ord=norm)
     return fn
+
+def ensure_increasing(path, time_from_starts):
+    assert len(path) == len(time_from_starts)
+    for i in reversed(range(1, len(path))):
+        if time_from_starts[i-1] == time_from_starts[i]:
+            path.pop(i)
+            time_from_starts.pop(i)
 
 ################################################################################
 
@@ -71,99 +77,6 @@ def slow_trajectory(robot, joints, path, **kwargs):
 #    difference_fn = get_difference_fn(robot, joints)
 #    differences1 = [difference_fn(q2, q1) for q1, q2 in zip(path[:-1], path[1:])]
 #    differences2 = [np.array(d2) - np.array(d1) for d1, d2 in zip(differences1[:-1], differences1[1:])] # TODO: circular case
-
-################################################################################
-
-def ensure_increasing(path, time_from_starts):
-    assert len(path) == len(time_from_starts)
-    for i in reversed(range(1, len(path))):
-        if time_from_starts[i-1] == time_from_starts[i]:
-            path.pop(i)
-            time_from_starts.pop(i)
-
-def spline_parameterization(robot, joints, path, time_step=None, **kwargs):
-    from src.issac import ISSAC_FRANKA_FRAME
-    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-
-    # Can always interpolate each DOF independently
-    # Univariate interpolation just means that the input is one dimensional (aka time)
-    # The output can be arbitrary dimension
-    # Bivariate interpolation has a 2D input space
-
-    # Was initially using scipy 0.17.0
-    # https://docs.scipy.org/doc/scipy-0.17.0/reference/interpolate.html
-    # https://docs.scipy.org/doc/scipy-0.17.0/reference/tutorial/interpolate.html
-    # Upgraded to scipy 0.18.0 to use the CubicSpline method
-    # sudo pip2 install scipy==0.18.0
-    # https://docs.scipy.org/doc/scipy-0.18.0/reference/interpolate.html
-
-    # BPoly.from_derivatives
-    # PPoly.from_spline # PPoly.from_bernstein_basis
-    #path = list(path)
-    #time_from_starts = retime_path(robot, joints, path, **kwargs)
-    #time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
-    # TODO: interpolate through the waypoints
-    path, time_from_starts = retime_trajectory(robot, joints, path, **kwargs)
-    #ensure_increasing(path, time_from_starts)
-    #positions = interp1d(time_from_starts, path, kind='linear')
-    positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
-                            extrapolate=False) # bc_type=((1, 0), (1, 0))
-    #positions = CubicHermiteSpline(time_from_starts, path, extrapolate=False)
-    velocities = positions.derivative(nu=1)
-    accelerations = velocities.derivative(nu=1)
-    # Could resample at this point
-    # TODO: could try passing incorrect accelerations (bounded)
-
-    #for i, t in enumerate(time_from_starts):
-    #    print(i, t, path[i], positions(t), velocities(t), accelerations(t))
-    #wait_for_user('Continue?')
-
-    # https://github.com/scipy/scipy/blob/v1.3.0/scipy/interpolate/_cubic.py#L75-L158
-    trajectory = JointTrajectory()
-    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
-    trajectory.header.stamp = rospy.Time(0)
-    trajectory.joint_names = get_joint_names(robot, joints)
-
-    if time_step is not None:
-        time_from_starts = np.append(np.arange(0, time_from_starts[-1], time_step), [time_from_starts[-1]])
-    for t in time_from_starts:
-        point = JointTrajectoryPoint()
-        point.positions = positions(t) # positions alone is insufficient
-        point.velocities = velocities(t)
-        point.accelerations = accelerations(t) # accelerations aren't strictly needed
-        #point.effort = list(np.ones(len(joints)))
-        point.time_from_start = rospy.Duration(t)
-        trajectory.points.append(point)
-    #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
-    return trajectory
-
-################################################################################
-
-def linear_parameterization(robot, joints, path, speed=ARM_SPEED):
-    from src.issac import ISSAC_FRANKA_FRAME
-    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-
-    distance_fn = get_distance_fn(robot, joints)
-    distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
-    time_from_starts = np.cumsum(distances) / speed
-
-    # https://en.wikipedia.org/wiki/Finite_difference
-    trajectory = JointTrajectory()
-    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
-    trajectory.header.stamp = rospy.Time(0)
-    trajectory.joint_names = get_joint_names(robot, joints)
-    for i in range(len(path)):
-       point = JointTrajectoryPoint()
-       point.positions = list(path[i])
-       # Don't need velocities, accelerations, or efforts
-       #vector = np.array(path[i]) - np.array(path[i-1])
-       #duration = (time_from_starts[i] - time_from_starts[i-1])
-       #point.velocities = list(vector / duration)
-       #point.accelerations = list(np.ones(len(joints)))
-       #point.effort = list(np.ones(len(joints)))
-       point.time_from_start = rospy.Duration(time_from_starts[i])
-       trajectory.points.append(point)
-    return trajectory
 
 ################################################################################
 
@@ -248,3 +161,91 @@ def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACT
         waypoints.append(q2)
         time_from_starts.append(time_from_start + duration)
     return waypoints, time_from_starts
+
+################################################################################
+
+def linear_parameterization(robot, joints, path, speed=ARM_SPEED):
+    import rospy
+    from src.issac import ISSAC_FRANKA_FRAME
+    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+    distance_fn = get_distance_fn(robot, joints)
+    distances = [0] + [distance_fn(*pair) for pair in zip(path[:-1], path[1:])]
+    time_from_starts = np.cumsum(distances) / speed
+
+    # https://en.wikipedia.org/wiki/Finite_difference
+    trajectory = JointTrajectory()
+    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
+    trajectory.header.stamp = rospy.Time(0)
+    trajectory.joint_names = get_joint_names(robot, joints)
+    for i in range(len(path)):
+       point = JointTrajectoryPoint()
+       point.positions = list(path[i])
+       # Don't need velocities, accelerations, or efforts
+       #vector = np.array(path[i]) - np.array(path[i-1])
+       #duration = (time_from_starts[i] - time_from_starts[i-1])
+       #point.velocities = list(vector / duration)
+       #point.accelerations = list(np.ones(len(joints)))
+       #point.effort = list(np.ones(len(joints)))
+       point.time_from_start = rospy.Duration(time_from_starts[i])
+       trajectory.points.append(point)
+    return trajectory
+
+################################################################################
+
+def spline_parameterization(robot, joints, path, time_step=None, **kwargs):
+    import rospy
+    from src.issac import ISSAC_FRANKA_FRAME
+    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+    # Can always interpolate each DOF independently
+    # Univariate interpolation just means that the input is one dimensional (aka time)
+    # The output can be arbitrary dimension
+    # Bivariate interpolation has a 2D input space
+
+    # Was initially using scipy 0.17.0
+    # https://docs.scipy.org/doc/scipy-0.17.0/reference/interpolate.html
+    # https://docs.scipy.org/doc/scipy-0.17.0/reference/tutorial/interpolate.html
+    # Upgraded to scipy 0.18.0 to use the CubicSpline method
+    # sudo pip2 install scipy==0.18.0
+    # https://docs.scipy.org/doc/scipy-0.18.0/reference/interpolate.html
+
+    # BPoly.from_derivatives
+    # PPoly.from_spline # PPoly.from_bernstein_basis
+    #path = list(path)
+    #time_from_starts = retime_path(robot, joints, path, **kwargs)
+    #time_from_starts = slow_trajectory(robot, joints, path, **kwargs)
+    # TODO: interpolate through the waypoints
+    path, time_from_starts = retime_trajectory(robot, joints, path, **kwargs)
+    #ensure_increasing(path, time_from_starts)
+    #positions = interp1d(time_from_starts, path, kind='linear')
+    positions = CubicSpline(time_from_starts, path, bc_type='clamped', # clamped | natural
+                            extrapolate=False) # bc_type=((1, 0), (1, 0))
+    #positions = CubicHermiteSpline(time_from_starts, path, extrapolate=False)
+    velocities = positions.derivative(nu=1)
+    accelerations = velocities.derivative(nu=1)
+    # Could resample at this point
+    # TODO: could try passing incorrect accelerations (bounded)
+
+    #for i, t in enumerate(time_from_starts):
+    #    print(i, t, path[i], positions(t), velocities(t), accelerations(t))
+    #wait_for_user('Continue?')
+
+    # https://github.com/scipy/scipy/blob/v1.3.0/scipy/interpolate/_cubic.py#L75-L158
+    trajectory = JointTrajectory()
+    trajectory.header.frame_id = ISSAC_FRANKA_FRAME
+    trajectory.header.stamp = rospy.Time(0)
+    trajectory.joint_names = get_joint_names(robot, joints)
+
+    if time_step is not None:
+        time_from_starts = np.append(np.arange(0, time_from_starts[-1], time_step), [time_from_starts[-1]])
+    for t in time_from_starts:
+        point = JointTrajectoryPoint()
+        point.positions = positions(t) # positions alone is insufficient
+        point.velocities = velocities(t)
+        point.accelerations = accelerations(t) # accelerations aren't strictly needed
+        #point.effort = list(np.ones(len(joints)))
+        point.time_from_start = rospy.Duration(t)
+        trajectory.points.append(point)
+    #print((np.array(path[-1]) - np.array(trajectory.points[-1].positions)).round(5))
+    return trajectory
