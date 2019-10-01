@@ -2,21 +2,23 @@ from __future__ import print_function
 
 import numpy as np
 import os
+import time
 from collections import namedtuple
 
-from ikfast.ik import sample_tool_ik
+#from ikfast.ik import sample_tool_ik
 from pybullet_tools.pr2_utils import get_viewcone
 from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutput, set_point, Point, stable_z, \
     draw_pose, Pose, get_link_name, parent_link_from_joint, child_link_from_joint, read, joints_from_names, \
     joint_from_name, link_from_name, get_link_subtree, get_links, get_joint_limits, aabb_union, get_aabb, get_point, \
-    remove_debug, draw_base_limits, get_link_pose, multiply, invert, get_joint_positions, \
+    remove_debug, draw_base_limits, get_link_pose, multiply, invert, elapsed_time, get_joint_positions, \
     step_simulation, apply_alpha, approximate_as_prism, BASE_LINK, set_color, BLACK, RED, \
     set_joint_positions, get_configuration, set_joint_position, get_min_limit, get_max_limit, \
     get_joint_name, remove_body, disconnect, get_min_limits, get_max_limits, add_body_name, WorldSaver, \
     is_center_on_aabb, Euler, euler_from_quat, quat_from_pose, point_from_pose, get_pose, set_pose, stable_z_on_aabb, \
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, set_real_time, set_caching, draw_aabb, \
-    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation, get_all_links, sub_inverse_kinematics
-from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics
+    disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation, \
+    get_all_links, sub_inverse_kinematics, get_distance
+from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics, PANDA_INFO, closest_inverse_kinematics
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, load_yaml, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
@@ -373,16 +375,40 @@ class World(object):
         set_joint_positions(self.robot, joints, conf)
         return get_configuration(self.robot)
 
-    def solve_inverse_kinematics(self, world_from_tool, **kwargs):
+    def solve_pybullet_ik(self, world_from_tool, nearby_tolerance):
+        start_time = time.time()
+        # Most of the time is spent creating the robot
+        current_conf = get_joint_positions(self.robot, self.arm_joints)
+        full_conf = sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
+                                           custom_limits=self.custom_limits)  # , max_iterations=1)  # , **kwargs)
+        conf = get_joint_positions(self.robot, self.arm_joints)
+        max_distance = get_distance(current_conf, conf, norm=INF)
+        if nearby_tolerance < max_distance:
+            return None
+        print('Nearby) time: {:.3f} | distance: {:.5f}'.format(elapsed_time(start_time), max_distance))
+        return full_conf
+
+    def solve_inverse_kinematics(self, world_from_tool, nearby_tolerance=INF, **kwargs):
         if self.ik_solver is not None:
             return self.solve_trac_ik(world_from_tool, **kwargs)
-        return sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
-                                     custom_limits=self.custom_limits) #, **kwargs)
-        conf = sample_tool_ik(self.robot, world_from_tool, max_attempts=100)
+        #if nearby_tolerance != INF:
+        #    return self.solve_pybullet_ik(world_from_tool, nearby_tolerance=nearby_tolerance)
+        current_conf = get_joint_positions(self.robot, self.arm_joints)
+        start_time = time.time()
+        if nearby_tolerance == INF:
+            generator = ikfast_inverse_kinematics(self.robot, PANDA_INFO, self.tool_link, world_from_tool,
+                                                  max_attempts=10, use_halton=True)
+        else:
+            generator = closest_inverse_kinematics(self.robot, PANDA_INFO, self.tool_link, world_from_tool,
+                                                   max_time=0.01, max_distance=nearby_tolerance, use_halton=True)
+        conf = next(generator, None)
+        #conf = sample_tool_ik(self.robot, world_from_tool, max_attempts=100)
         if conf is None:
             return conf
+        max_distance = get_distance(current_conf, conf, norm=INF)
+        #print('Time: {:.3f} | distance: {:.5f} | max: {:.5f}'.format(
+        #    elapsed_time(start_time), max_distance, nearby_tolerance))
         set_joint_positions(self.robot, self.arm_joints, conf)
-        #wait_for_user()
         return get_configuration(self.robot)
 
     #########################

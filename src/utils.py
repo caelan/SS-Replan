@@ -53,7 +53,7 @@ MODELS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir
 #FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_carter.urdf')
 #FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_description/robots/panda_arm_hand_on_carter.urdf')
 
-VISUAL = False
+VISUAL = True
 if VISUAL:
     FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_visual.urdf')
 else:
