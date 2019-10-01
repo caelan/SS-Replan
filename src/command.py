@@ -5,8 +5,8 @@ import numpy as np
 import time
 
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
-    wait_for_duration, flatten_links, remove_handles, \
-    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, adjust_path
+    wait_for_duration, flatten_links, get_difference, remove_handles, \
+    get_joint_limits, batch_ray_collision, draw_ray, wait_for_user, WorldSaver, adjust_path, waypoints_from_path
 from src.utils import create_surface_attachment, SPAM, TOMATO_SOUP, MUSTARD, SUGAR, CHEEZIT
 
 DEFAULT_TIME_STEP = 0.02
@@ -121,6 +121,24 @@ class Sequence(object):
 
 ################################################################################
 
+def decompose_into_paths(joints, path):
+    current_path = []
+    joint_sequence = []
+    path_sequence = []
+    for q1, q2 in zip(path[:-1], path[1:]):
+        # Zero velocities aren't enforced otherwise
+        indices, = np.nonzero(get_difference(q1, q2))
+        current_joints = tuple(joints[j] for j in indices)
+        if not joint_sequence or (current_joints != joint_sequence[-1]):
+            if current_path:
+                path_sequence.append(current_path)
+            joint_sequence.append(current_joints)
+            current_path = [tuple(q1[j] for j in indices)]
+        current_path.append(tuple(q2[j] for j in indices))
+    if current_path:
+        path_sequence.append(current_path)
+    return zip(joint_sequence, path_sequence)
+
 class Trajectory(Command):
     def __init__(self, world, robot, joints, path, speed=1.0):
         super(Trajectory, self).__init__(world)
@@ -145,38 +163,26 @@ class Trajectory(Command):
     def simulate(self, state, real_per_sim=1, time_step=1./60, **kwargs):
         from src.retime import slow_trajectory, ensure_increasing, retime_trajectory
         from scipy.interpolate import interp1d, CubicSpline
-        # TODO: add the current configuration to adjust path
-        # TODO: account for error in the start configuration?
-        #path = list(self.path)
-        path = adjust_path(self.robot, self.joints, self.path)
-        path, time_from_starts = retime_trajectory(self.robot, self.joints, path, sample_step=None)
-        #time_from_starts = slow_trajectory(self.robot, self.joints, path, **kwargs)
-        #ensure_increasing(path, time_from_starts)
+        path = list(self.path)
+        path = adjust_path(self.robot, self.joints, path)
+        path = waypoints_from_path(path)
         if len(path) <= 1:
             return True
-        # TODO: interpolate in control space (e.g. for the base)
-        #positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
-        positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
-                                      extrapolate=False)  # bc_type=((1, 0), (1, 0))
-
-        # https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html
-        # Waypoints are followed perfectly, twice continuously differentiable
-        # TODO: iteratively increase spacing until velocity / accelerations is good
-        #velocities_curve = positions_curve.derivative(nu=1)
-        #accelerations_curve = velocities_curve.derivative(nu=1)
-        #for i, t in enumerate(time_from_starts):
-        #    print('{}), t={:.3f}'.format(i, t), np.array(positions_curve(t)).round(5),
-        #          #(np.array(path[i]) - positions_curve(t)).round(5),
-        #          np.array(velocities_curve(t)).round(5), np.array(accelerations_curve(t)).round(5))
-        #if len(self.joints) == 7 and len(path) != 2:
-        #    wait_for_user('Continue?')
-
-        print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(len(path), len(self.joints), time_from_starts[-1]))
-        for t in np.arange(positions_curve.x[0], positions_curve.x[-1], step=time_step):
-            positions = positions_curve(t)
-            set_joint_positions(self.robot, self.joints, positions)
-            state.derive()
-            wait_for_duration(real_per_sim*time_step)
+        for joints, path in decompose_into_paths(self.joints, path):
+            # TODO: interpolate in control space (e.g. for the base)
+            # TODO: iteratively increase spacing until velocity / accelerations meets limits
+            # https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html
+            # Waypoints are followed perfectly, twice continuously differentiable
+            path, time_from_starts = retime_trajectory(self.robot, joints, path, sample_step=None)
+            #positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
+            positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
+                                          extrapolate=False)  # bc_type=((1, 0), (1, 0))
+            print('Following {} {}-DOF waypoints in {:.3f} seconds'.format(len(path), len(joints), time_from_starts[-1]))
+            for t in np.arange(positions_curve.x[0], positions_curve.x[-1], step=time_step):
+                positions = positions_curve(t)
+                set_joint_positions(self.robot, joints, positions)
+                state.derive()
+                wait_for_duration(real_per_sim*time_step)
         return True
 
     def execute_base(self, interface):
