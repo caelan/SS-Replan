@@ -95,14 +95,15 @@ BLOCK_SRL_TEMPLATE = 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf'
 YCB_SRL_PATH = 'packages/kitchen_demo_visualization/ycb/'
 # TODO: ycb obj files have 6 vertex coordinates?
 
+CHEEZIT = 'cracker_box'
+SUGAR = 'sugar_box'
+TOMATO_SOUP = 'tomato_soup_can'
+PUDDING = 'pudding_box'
+JELLO = 'gelatin_box'
 SPAM = 'potted_meat_can'
 MUSTARD = 'mustard_bottle'
-TOMATO_SOUP = 'tomato_soup_can'
-SUGAR = 'sugar_box'
-CHEEZIT = 'cracker_box'
 BOWL = 'bowl'
-PUDDING = 'pudding_box'
-BANANA = 'banana'
+#BANANA = 'banana'
 YCB_OBJECTS = [SPAM, MUSTARD, TOMATO_SOUP, SUGAR, CHEEZIT] # + [BOWL, PUDDING, BANANA]
 BLOCK = 'block'
 
@@ -282,7 +283,8 @@ def get_ycb_obj_path(ycb_type):
     if ycb_type not in path_from_type:
         return None
     # texture_map.png textured.mtl textured.obj textured_simple.obj textured_simple.obj.mtl
-    return os.path.join(ycb_path, path_from_type[ycb_type], 'textured_simple.obj')
+    #return os.path.join(ycb_path, path_from_type[ycb_type], 'textured_simple.obj')
+    return os.path.join(ycb_path, path_from_type[ycb_type], 'textured.obj')
 
 def load_ycb(ycb_name, **kwargs):
     # TODO: simplify geometry
