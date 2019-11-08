@@ -378,6 +378,7 @@ class World(object):
     def solve_pybullet_ik(self, world_from_tool, nearby_tolerance):
         start_time = time.time()
         # Most of the time is spent creating the robot
+        # TODO: use the waypoint version that doesn't repeatedly create the robot
         current_conf = get_joint_positions(self.robot, self.arm_joints)
         full_conf = sub_inverse_kinematics(self.robot, self.arm_joints[0], self.tool_link, world_from_tool,
                                            custom_limits=self.custom_limits)  # , max_iterations=1)  # , **kwargs)

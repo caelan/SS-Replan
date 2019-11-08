@@ -6,3 +6,4 @@ videos
 *.mp4
 *.avi
 *.so
+.DS_Store
