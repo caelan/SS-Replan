@@ -93,6 +93,7 @@ BLOCK_SIZES = ['small', 'big']
 BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
 BLOCK_SRL_TEMPLATE = 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf'
 YCB_SRL_PATH = 'packages/kitchen_demo_visualization/ycb/'
+YCB_PATH = os.path.join(MODELS_PATH, 'ycb/')
 # TODO: ycb obj files have 6 vertex coordinates?
 
 CHEEZIT = 'cracker_box'
@@ -273,12 +274,14 @@ def ycb_type_from_file(path):
     return path.split('_', 1)[-1]
 
 def get_ycb_types():
-    ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
+    #ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
+    ycb_path = YCB_PATH
     return sorted(map(ycb_type_from_file, os.listdir(ycb_path)))
 
 def get_ycb_obj_path(ycb_type):
     # TODO: simplify geometry (although pybullet does this automatically)
-    ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
+    #ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
+    ycb_path = YCB_PATH
     path_from_type = {ycb_type_from_file(path): path for path in os.listdir(ycb_path)}
     if ycb_type not in path_from_type:
         return None
