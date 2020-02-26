@@ -625,7 +625,6 @@ def get_handle_grasps(world, joint, pull=True, pre_distance=APPROACH_DISTANCE):
     for link in get_link_subtree(world.kitchen, joint):
         if 'handle' in get_link_name(world.kitchen, link):
             # TODO: can adjust the position and orientation on the handle
-            # https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/kitchen_poses.py
             for yaw in [0, np.pi]: # yaw=0 DOESN'T WORK WITH LULA
                 handle_grasp = (Point(z=-half_extent), quat_from_euler(Euler(roll=np.pi, pitch=np.pi/2, yaw=yaw)))
                 #if not pull:

@@ -42,9 +42,6 @@ DEFAULT_ARM_CONF = [0.01200158428400755, -0.5697816014289856, 5.6801487517077476
                     -2.8105969429016113, -0.00025768374325707555, 3.0363450050354004, 0.7410701513290405]
 #DEFAULT_ARM_CONF = CARRY_CONF
 
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/isaac_bridge/src/isaac_bridge/manager.py#L59
-# https://gitlab-master.nvidia.com/SRL/srl_system/blob/master/packages/brain/src/brain_ros/moveit.py#L52
-
 CABINET_OPEN_ANGLE = 4 * np.pi / 9 # out of np.pi / 2
 #CABINET_OPEN_ANGLE = 3 * np.pi / 8
 
@@ -72,10 +69,6 @@ COMPUTER_X = 2.40
 
 CONSERVITIVE_LIMITS = False
 MAX_FRANKA_JOINT7 = 1.89  # 1.8973
-# rosparam get /robot_description > robot_description.urdf
-# packages/third_party/franka_ros/franka_description/robots/panda_arm.xacro
-# https://gitlab-master.nvidia.com/srl/srl_system/blob/master/packages/third_party/franka_ros/franka_description/robots/panda_arm.xacro#L157
-# https://gitlab-master.nvidia.com/srl/srl_system/blob/c5747181a24319ed1905029df6ebf49b54f1c803/packages/third_party/franka_ros/franka_control/launch/franka_control_lula.launch#L7
 
 class World(object):
     def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):

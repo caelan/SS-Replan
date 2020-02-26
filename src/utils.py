@@ -22,45 +22,13 @@ from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment,
     get_difference_fn, Euler, approximate_as_prism, wait_for_user, get_joint_positions, get_joint_limits, \
     set_joint_position, draw_pose, implies, unit_from_theta
 
-################################################################################
-
-SRL_VAR = 'SRL_PROJECT_DIR'
-
-def get_srl_path():
-    if SRL_VAR not in os.environ:
-        raise RuntimeError('Please install srl_system and set the {} environment variable'.format(SRL_VAR))
-    return os.environ[SRL_VAR]
-
 MODELS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'models/')
-
-#YUMI_PATH = os.path.join(SRL_PATH, 'packages/external/abb_yumi_model/yumi_description/urdf/yumi_lula.urdf')
-#INTEL_PATH = os.path.join(SRL_PATH, 'packages/external/intel_robot_model/robots/intel_robot_model.urdf')
-#KUKA_ALLEGRO = os.path.join(SRL_PATH, 'packages/external/lula_kuka_allegro/urdf/lula_kuka_allegro.urdf')
-#BAXTER_PATH = os.path.join(SRL_PATH, 'packages/third_party/baxter_common/baxter_description/urdf/baxter.urdf')
-#ALLEGRO = os.path.join(SRL_PATH, 'packages/third_party/allegro_driver/description/allegro.urdf')
-#ABB_PATH = os.path.join(SRL_PATH, 'packages/third_party/abb_irb120_support/urdf/irb120_3_58.urdf') # irb120t_3_58.urdf
-#LBR4_PATH = os.path.join(SRL_PATH, 'packages/third_party/ll4ma_robots_description/urdf/lbr4/lbr4_kdl.urdf') # right_push_stick_rig.urdf |
-
-################################################################################
-
-#FRANKA_PATH = os.path.join(MODELS_PATH, 'lula_franka_gen.urdf')
-#FRANKA_PATH = os.path.join(SRL_PATH, 'packages/external/lula_franka/urdf/lula_franka_gen.urdf')
-# ./packages/third_party/franka_ros/franka_description
-
-#CARTER_PATH = os.path.join(SRL_PATH, 'packages/third_party/carter_description/urdf/carter.urdf')
-#CARTER_FRANKA_PATH = os.path.join(MODELS_PATH, 'carter_description/urdf/carter_franka.urdf')
-
-#FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_carter.urdf')
-#FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'franka_description/robots/panda_arm_hand_on_carter.urdf')
 
 VISUAL = True
 if VISUAL:
     FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_visual.urdf')
 else:
     FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_collision.urdf')
-
-#CARTER_FRANKA_PATH = os.path.join(SRL_PATH, 'packages/third_party/carter_description/urdf/carter_franka.urdf')
-#FRANKA_YAML = os.path.join(SRL_PATH, 'packages/external/lula_franka/config/robot_descriptor.yaml')
 
 BASE_JOINTS = ['x', 'y', 'theta']
 WHEEL_JOINTS = ['left_wheel', 'right_wheel']
@@ -91,8 +59,6 @@ BLOCK_TEMPLATE = '{}_{}_block'
 
 BLOCK_SIZES = ['small', 'big']
 BLOCK_COLORS = ['red', 'green', 'blue', 'yellow']
-BLOCK_SRL_TEMPLATE = 'packages/isaac_bridge/urdf/blocks/{}_block_{}.urdf'
-YCB_SRL_PATH = 'packages/kitchen_demo_visualization/ycb/'
 YCB_PATH = os.path.join(MODELS_PATH, 'ycb/')
 # TODO: ycb obj files have 6 vertex coordinates?
 
@@ -120,11 +86,9 @@ COOKABLE = [BOWL]
 
 ################################################################################
 
-#KITCHEN_PATH = '/home/caelan/Programs/robot_kitchen/model/robot_kitchen.sdf'
 #KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_stl.urdf')
 #KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_obj.urdf')
 KITCHEN_PATH = os.path.join(MODELS_PATH, 'kitchen_description/urdf/kitchen_part_right_gen_convex.urdf')
-#KITCHEN_YAML = os.path.join(SRL_PATH, 'packages/kitchen_description/config/robot_descriptor.yaml')
 
 SURFACE_BOTTOM = 'bottom'
 SURFACE_TOP = 'top'
@@ -274,13 +238,10 @@ def ycb_type_from_file(path):
     return path.split('_', 1)[-1]
 
 def get_ycb_types():
-    #ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
-    ycb_path = YCB_PATH
-    return sorted(map(ycb_type_from_file, os.listdir(ycb_path)))
+    return sorted(map(ycb_type_from_file, os.listdir(YCB_PATH)))
 
 def get_ycb_obj_path(ycb_type):
     # TODO: simplify geometry (although pybullet does this automatically)
-    #ycb_path = os.path.join(get_srl_path(), YCB_SRL_PATH)
     ycb_path = YCB_PATH
     path_from_type = {ycb_type_from_file(path): path for path in os.listdir(ycb_path)}
     if ycb_type not in path_from_type:
@@ -304,30 +265,19 @@ def type_from_name(name):
     return name.strip(string.digits)
 
 def get_block_path(block_name):
+    raise NotImplementedError(block_name)
     block_type = type_from_name(block_name)
     size, color, block = block_type.split('_')
     assert block == 'block'
-    block_srl_path = BLOCK_SRL_TEMPLATE.format(size, color)
-    return os.path.join(get_srl_path(), block_srl_path)
 
 def get_obj_path(obj_type):
     if 'block' in obj_type:
         return get_block_path(obj_type)
     return get_ycb_obj_path(obj_type)
 
-#CABINET_PATH = os.path.join(SRL_PATH, 'packages/sektion_cabinet_model/urdf/sektion_cabinet.urdf')
-# Could recursively find all *.urdf | *.sdf
-# packages/posecnn_pytorch/ycb_render/
-# packages/deepim_pytorch/ycb_render/
-
-# find . -name "*.yaml"
-# find . -name "*.yaml" | grep "franka"
-# ./packages/kitchen_description/config/robot_descriptor.yaml
-# ./packages/external/lula_franka/config/robot_descriptor.yaml
-# ./packages/third_party/carter_description/launch/carter_franka_description.launch
-# ./packages/internal/ros/lula_opt_ros/lula/opt/tracking_priors.cpp
-
 ################################################################################
+
+# TODO: move some of this to ss-pybullet
 
 def load_yaml(path):
     import yaml
