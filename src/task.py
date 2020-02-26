@@ -72,7 +72,7 @@ BOX_POSE2D = (0.1, 1.05, 0.) # 1.15
 SPAM_POSE2D = (0.125, 1.175, -np.pi / 4)
 CRACKER_POSE2D = (0.2, 1.1, np.pi/4) # 1.2
 
-BIG_BLOCK_SIDE = 0.065
+BIG_BLOCK_SIDE = 0.065 # TODO: small_block_side
 
 # TODO: make a box equivalent for the YCB objects
 # http://www.ycbbenchmarks.com/
@@ -213,7 +213,6 @@ def detect_block(world, fixed=False, **kwargs):
 ################################################################################
 
 def regrasp_block(world, fixed=False, **kwargs):
-    # TODO: Finish this
     add_kinect(world)
     if fixed:
         set_fixed_base(world)
@@ -470,13 +469,13 @@ def stow_block(world, num=1, fixed=False, **kwargs):
 ################################################################################
 
 TASKS_FNS = [
-    regrasp_block,
+    #regrasp_block, # TODO: finish this
     detect_block,
     hold_block,
     inspect_drawer,
     swap_drawers,
     sugar_drawer,
     cook_block,
-    cook_meal,
+    #cook_meal, # TODO: introduced a bug
     stow_block,
 ]

@@ -32,6 +32,8 @@ except ImportError:
     USE_TRACK_IK = False
 print('Use Track IK:', USE_TRACK_IK)
 
+POSES_PATH = 'kitchen_poses.json'
+
 DISABLED_FRANKA_COLLISIONS = {
     ('panda_link1', 'chassis_link'),
 }
@@ -71,7 +73,7 @@ CONSERVITIVE_LIMITS = False
 MAX_FRANKA_JOINT7 = 1.89  # 1.8973
 
 class World(object):
-    def __init__(self, robot_name=FRANKA_CARTER, use_gui=True):
+    def __init__(self, robot_name=FRANKA_CARTER, use_gui=True, full_kitchen=False):
         self.task = None
         self.interface = None
         self.client = connect(use_gui=use_gui)
@@ -111,7 +113,8 @@ class World(object):
         self.gripper = create_gripper(self.robot)
 
         self.environment_bodies = {}
-        #self._initialize_environment()
+        if full_kitchen:
+            self._initialize_environment()
         self._initialize_ik(urdf_path)
         self.initial_saver = WorldSaver()
 
@@ -148,7 +151,6 @@ class World(object):
         # fridge to goal: 1.5cm
         # hitman to range: 3.5cm
         # range to indigo: 3.5cm
-        from log_poses import POSES_PATH
         self.environment_poses = read_json(POSES_PATH)
         root_from_world = get_link_pose(self.kitchen, self.world_link)
         for name, world_from_part in self.environment_poses.items():
@@ -460,16 +462,16 @@ class World(object):
 
     #########################
 
-    def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH):
-        body = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
+    def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH, display=False):
+        cone = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
                             color=apply_alpha(RED, 0.1), mass=0, collision=False)
-        set_pose(body, pose)
-        #from pybullet_tools.voxels import set_texture
-        #kinect = load_pybullet(KINECT_URDF, fixed_base=True)
-        #set_pose(kinect, pose)
-        #for link in get_all_links(kinect):
-        #    set_color(kinect, BLACK, link=1)
-        self.cameras[name] = Camera(body, camera_matrix, max_depth)
+        set_pose(cone, pose)
+        if display:
+            kinect = load_pybullet(KINECT_URDF, fixed_base=True)
+            set_pose(kinect, pose)
+            set_color(kinect, BLACK)
+            self.add(name, kinect)
+        self.cameras[name] = Camera(cone, camera_matrix, max_depth)
         draw_pose(pose)
         step_simulation()
         return name
