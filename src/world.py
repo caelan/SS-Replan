@@ -33,8 +33,8 @@ except ImportError:
     USE_TRACK_IK = False
     if not is_ik_compiled(PANDA_INFO):
         # TODO: script to compile automatically
-        raise ModuleNotFoundError('Please install TRAC-IK or compile IKFast '
-                                  '(SS-Replan$ cd ss-pybullet/pybullet_tools/ikfast/franka_panda; ./setup.py)')
+        raise ImportError('Please install TRAC-IK or compile IKFast '
+                          '(SS-Replan$ cd ss-pybullet/pybullet_tools/ikfast/franka_panda; ./setup.py)')
 print('Use Track IK:', USE_TRACK_IK)
 
 POSES_PATH = 'kitchen_poses.json'
