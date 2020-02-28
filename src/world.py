@@ -18,7 +18,8 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     set_quat, quat_from_euler, INF, read_json, set_camera_pose, set_real_time, set_caching, draw_aabb, \
     disable_gravity, set_all_static, get_movable_joints, get_joint_names, wait_for_user, reset_simulation, \
     get_all_links, sub_inverse_kinematics, get_distance, load_yaml
-from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics, PANDA_INFO, closest_inverse_kinematics
+from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics, PANDA_INFO, \
+    closest_inverse_kinematics, is_ik_compiled
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
@@ -30,6 +31,10 @@ try:
     import trac_ik_python
 except ImportError:
     USE_TRACK_IK = False
+    if not is_ik_compiled(PANDA_INFO):
+        # TODO: script to compile automatically
+        raise ModuleNotFoundError('Please install TRAC-IK or compile IKFast '
+                                  '(SS-Replan$ cd ss-pybullet/pybullet_tools/ikfast/franka_panda; ./setup.py)')
 print('Use Track IK:', USE_TRACK_IK)
 
 POSES_PATH = 'kitchen_poses.json'
