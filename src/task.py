@@ -6,12 +6,13 @@ import time
 
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
     create_box, set_all_static, WorldSaver, create_plane, COLOR_FROM_NAME, \
-    stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb, create_cylinder, set_point
+    stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb, create_cylinder, set_point, \
+    get_function_name, wait_for_user
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
     BLOCK_TEMPLATE, name_from_type, GRASP_TYPES, SIDE_GRASP, joint_from_name, \
-    STOVES, TOP_GRASP, get_function_name, randomize, LEFT_DOOR, point_from_pose, wait_for_user
+    STOVES, TOP_GRASP, randomize, LEFT_DOOR, point_from_pose
 from examples.discrete_belief.dist import UniformDist, DeltaDist
 #from examples.pybullet.pr2_belief.problems import BeliefState, BeliefTask, OTHER
 from src.belief import create_surface_belief

@@ -19,8 +19,12 @@ import resource
 import copy
 import psutil
 
-sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
-                for d in ['pddlstream', 'ss-pybullet'])
+PACKAGES = ['pddlstream', 'ss-pybullet']
+
+def add_packages(packages):
+    sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d)) for d in packages)
+
+add_packages(PACKAGES)
 
 np.set_printoptions(precision=3, threshold=3, edgeitems=1, suppress=True) #, linewidth=1000)
 
@@ -29,8 +33,8 @@ pddlstream.language.statistics.LOAD_STATISTICS = False
 pddlstream.language.statistics.SAVE_STATISTICS = False
 
 from pybullet_tools.utils import has_gui, elapsed_time, user_input, ensure_dir, \
-    write_json, SEPARATOR, WorldSaver, \
-    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user
+    timeout, write_json, SEPARATOR, WorldSaver, \
+    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user, get_date
 from pddlstream.utils import str_from_object, safe_rm_dir, Verbose, KILOBYTES_PER_GIGABYTE, BYTES_PER_KILOBYTE
 from pddlstream.algorithms.algorithm import reset_globals
 
@@ -136,15 +140,14 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
     while True:
         # TODO: need to actually retrieve the info about which thread failed
         try:
-            yield generator.next()
-            #yield generator.next(timeout=timeout)
+            yield generator.next(timeout=timeout)
         except StopIteration:
             break
         except MemoryError: # as e:
             traceback.print_exc()
             continue
         except TimeoutError: # as e:
-            traceback.print_exc()
+            traceback.print_exc() # Kills all jobs
             continue
     if pool is not None:
         pool.close()
@@ -161,12 +164,7 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
 def name_from_policy(policy):
     return '_'.join('{}={:d}'.format(key, value) for key, value in sorted(policy.items()))
 
-def run_experiment(experiment):
-    problem = experiment['problem']
-    task_name = problem['task'].name if SERIALIZE_TASK else problem['task']
-    trial = problem['trial']
-    policy = experiment['policy']
-
+def set_memory_limits():
     # ulimit -a
     # soft, hard = resource.getrlimit(name) # resource.RLIM_INFINITY
     # resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
@@ -177,6 +175,13 @@ def run_experiment(experiment):
     #soft_time = MAX_TIME + 2*60 # I think this kills the wrong things
     #hard_time = soft_time
     #process.rlimit(psutil.RLIMIT_CPU, (soft_time, hard_time))
+
+def run_experiment(experiment):
+    problem = experiment['problem']
+    task_name = problem['task'].name if SERIALIZE_TASK else problem['task']
+    trial = problem['trial']
+    policy = experiment['policy']
+    set_memory_limits()
 
     stdout = sys.stdout
     if not VERBOSE:
@@ -221,11 +226,12 @@ def run_experiment(experiment):
     #start_time = time.time()
     #if has_gui():
     #    wait_for_user()
+
+    observation_fn = lambda belief: observe_pybullet(world)
+    transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
     try:
-        observation_fn = lambda belief: observe_pybullet(world)
-        transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
-        outcome = run_policy(task, args, observation_fn, transition_fn,
-                          max_time=MAX_TIME, **policy)
+        with timeout(2*MAX_TIME):
+            outcome = run_policy(task, args, observation_fn, transition_fn, max_time=MAX_TIME, **policy)
         outcome['error'] = False
     except KeyboardInterrupt:
         raise KeyboardInterrupt()
@@ -293,8 +299,7 @@ def main():
     # TODO: alternatively don't destroy the world
     num_cores = cpu_count() - 4
     directory = EXPERIMENTS_DIRECTORY
-    date_name = datetime.datetime.now().strftime('%y-%m-%d_%H-%M-%S')
-    json_path = os.path.abspath(os.path.join(directory, '{}.json'.format(date_name)))
+    json_path = os.path.abspath(os.path.join(directory, '{}.json'.format(get_date())))
 
     #memory_per_core = float(MAX_RAM) / num_cores # gigabytes
     #set_soft_limit(resource.RLIMIT_AS, int(BYTES_PER_GIGABYTE * memory_per_core)) # bytes
@@ -323,7 +328,7 @@ def main():
     start_time = time.time()
     results = []
     try:
-        for result in map_parallel(run_experiment, experiments, num_cores=num_cores, timeout=2*MAX_TIME):
+        for result in map_parallel(run_experiment, experiments, num_cores=num_cores):
             results.append(result)
             print('{}\nExperiments: {} / {} | Time: {:.3f}'.format(
                 SEPARATOR, len(results), len(experiments), elapsed_time(start_time)))

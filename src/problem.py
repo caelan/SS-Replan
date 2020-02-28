@@ -12,13 +12,13 @@ from pddlstream.language.generator import from_gen_fn, from_fn, from_test
 from pddlstream.utils import read, get_file_path, implies
 
 from pybullet_tools.utils import get_joint_name, child_link_from_joint, get_link_name, parent_joint_from_link, link_from_name, \
-    get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name
+    get_difference_fn, euler_from_quat, quat_from_pose, joint_from_name, dump_body
 
 from src.inference import PoseDist
 from src.utils import ALL_SURFACES, surface_from_name, TOP_GRASP, SIDE_GRASP, COOKABLE, COUNTERS, \
     RelPose, FConf, are_confs_close, DRAWERS, OPEN_SURFACES, STOVES, STOVE_LOCATIONS, STOVE_TEMPLATE, KNOB_TEMPLATE, \
     KNOBS, TOP_DRAWER, BOTTOM_DRAWER, JOINT_TEMPLATE, DRAWER_JOINTS, is_valid_grasp_type, \
-    BOWLS, POURABLE, type_from_name, surface_from_joint, dump_body, CABINET_JOINTS
+    BOWLS, POURABLE, type_from_name, surface_from_joint, CABINET_JOINTS
 from src.stream import get_stable_gen, get_grasp_gen, get_door_test, CLOSED, DOOR_STATUSES, \
     get_cfree_traj_pose_test, get_cfree_relpose_relpose_test, get_cfree_approach_pose_test, OPEN, \
     get_calibrate_gen, get_compute_angle_kin, \

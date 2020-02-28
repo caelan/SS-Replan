@@ -25,32 +25,31 @@ from src.policy import run_policy
 def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('-anytime', action='store_true',
-                        help='Runs in an anytime mode')
+                        help='Runs the planner in an anytime mode.')
     parser.add_argument('-cfree', action='store_true',
                         help='When enabled, disables collision checking (for debugging).')
     #parser.add_argument('-defer', action='store_true',
     #                    help='When enabled, defers evaluation of motion planning streams.')
     parser.add_argument('-deterministic', action='store_true',
-                        help='Treats actions as fully deterministic')
+                        help='Treats actions as having deterministic effects.')
     parser.add_argument('-fixed', action='store_true',
-                        help="When enabled, fixes the robot_entity's base")
+                        help="When enabled, fixes the robot's base.")
     parser.add_argument('-max_time', default=5*60, type=int,
-                        help='The max computation time')
+                        help='The max computation time across execution.')
     parser.add_argument('-num', default=1, type=int,
-                        help='The number of objects')
+                        help='The number of objects (when applicable).')
     parser.add_argument('-observable', action='store_true',
-                        help='Treats the state as fully observable')
+                        help='Treats the state as being fully observable.')
     #parser.add_argument('-seed', default=None,
     #                    help='The random seed to use.')
     parser.add_argument('-simulate', action='store_true',
                         help='When enabled, trajectories are simulated')
     parser.add_argument('-teleport', action='store_true',
-                        help='When enabled, motion planning is skipped')
+                        help='When enabled, transit motion planning is skipped (for debugging).')
     parser.add_argument('-unit', action='store_true',
-                        help='When enabled, uses unit costs')
+                        help='When enabled, uses unit action costs.')
     parser.add_argument('-visualize', action='store_true',
-                        help='When enabled, visualizes the planning world '
-                             'rather than the simulated world (for debugging).')
+                        help='When enabled, visualizes the planning world rather than the simulated world (for debugging).')
     return parser
     # TODO: get rid of funky orientations by dropping them from some height
 

@@ -62,6 +62,8 @@ def parse_fluents(world, fluents):
 
 ################################################################################
 
+# TODO: more efficient collision checking
+
 def get_base_motion_fn(world, teleport_base=False, collisions=True, teleport=False,
                        restarts=4, iterations=75, smooth=100):
     # TODO: lazy planning on a common base roadmap

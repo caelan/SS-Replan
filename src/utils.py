@@ -5,7 +5,6 @@ import numpy as np
 import string
 import math
 import random
-import inspect
 
 from itertools import cycle
 from collections import namedtuple
@@ -14,13 +13,11 @@ from pybullet_tools.pr2_primitives import Conf
 from pybullet_tools.pr2_utils import get_top_grasps, get_side_grasps, close_until_collision
 from pybullet_tools.utils import joints_from_names, joint_from_name, Attachment, link_from_name, get_unit_vector, \
     unit_pose, BodySaver, multiply, Pose, \
-    get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, get_pose, \
-    set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, \
+    get_link_subtree, clone_body, get_all_links, invert, get_link_pose, set_pose, interpolate_poses, set_color, LockRenderer, get_body_name, randomize, unit_point, create_obj, BASE_LINK, get_link_descendants, \
     get_aabb, get_collision_data, point_from_pose, get_data_pose, get_data_extents, AABB, \
     apply_affine, get_aabb_vertices, aabb_from_points, read_obj, tform_mesh, create_attachment, draw_point, \
-    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, dump_body, user_input, \
-    get_difference_fn, Euler, approximate_as_prism, wait_for_user, get_joint_positions, get_joint_limits, \
-    set_joint_position, draw_pose, implies, unit_from_theta
+    child_link_from_joint, is_placed_on_aabb, pairwise_collision, flatten_links, has_link, get_difference_fn, Euler, approximate_as_prism, \
+    get_joint_positions, implies, unit_from_theta
 
 MODELS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'models/')
 
@@ -231,9 +228,6 @@ def get_eve_arm_joints(robot, arm):
 
 ################################################################################
 
-def get_function_name(depth=1):
-   return inspect.stack()[depth][3]
-
 def ycb_type_from_file(path):
     return path.split('_', 1)[-1]
 
@@ -274,20 +268,6 @@ def get_obj_path(obj_type):
     if 'block' in obj_type:
         return get_block_path(obj_type)
     return get_ycb_obj_path(obj_type)
-
-################################################################################
-
-# TODO: move some of this to ss-pybullet
-
-def load_yaml(path):
-    import yaml
-    # grep -r --include="*.py" "yaml\." *
-    # yaml.dump()
-    with open(path, 'r') as f:
-        try:
-            return yaml.safe_load(f)
-        except yaml.YAMLError as exc:
-            raise exc
 
 ################################################################################
 
