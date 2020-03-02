@@ -7,8 +7,9 @@ Online observation, estimatation, planning, and control for a Franka Panda Robot
 SS-Replan supports both Python 2 and Python 3.
 
 <!--* `sudo apt install cmake g++ make python ros-kinetic-trac-ik`-->
+* [Install Git LFS](https://github.com/git-lfs/git-lfs/wiki/Installation)
 * `$ pip install numpy scipy pybullet sklearn`
-* `$ git clone --branch master --recurse-submodules https://github.com/caelan/SS-Replan.git`
+* `$ git lfs clone --branch master --recurse-submodules https://github.com/caelan/SS-Replan.git`
 * `$ cd SS-Replan`
 * `SS-Replan$ ./pddlstream/FastDownward/build.py release64`
 * `SS-Replan$ cd ss-pybullet/pybullet_tools/ikfast/franka_panda`
