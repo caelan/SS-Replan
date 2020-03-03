@@ -14,7 +14,7 @@ sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
 
 #from run_experiment import DIRECTORY, MAX_TIME
 from pddlstream.utils import str_from_object, implies
-from pybullet_tools.utils import read_json, INF
+from pybullet_tools.utils import read_json, INF, SEPARATOR
 
 #from tabulate import tabulate
 
@@ -69,11 +69,6 @@ POLICY_NAMES = [
 
 # https://github.mit.edu/caelan/ss/blob/master/openrave/serial_analyze.py
 
-'sugar_drawer',
-'inspect_drawer',
-'detect_block',
-'swap_drawers',
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('experiments', nargs='+', help='Name of the experiment')
@@ -88,14 +83,16 @@ def main():
             #policy = frozenset(experiment['policy'].items())
             policy = name_from_policy(experiment['policy'])
             outcomes_per_task.setdefault(problem['task'], {}).setdefault(policy, []).append(outcome)
+    #outcomes_per_task['inspect_drawer']['constrain=0_defer=1'].append(ERROR_OUTCOME)
+    #outcomes_per_task['detect_block']['constrain=1_defer=0'].append(ERROR_OUTCOME)
 
-    outcomes_per_task['inspect_drawer']['constrain=0_defer=1'].append(ERROR_OUTCOME)
-    outcomes_per_task['detect_block']['constrain=1_defer=0'].append(ERROR_OUTCOME)
-
+    # TODO: robust poses
+    # TODO: intelligent IR for pour
+    table = ''
     for task in TASK_NAMES:
         if task not in outcomes_per_task:
             continue
-        #print('\nTask: {}'.format(task))
+        print('\nTask: {}'.format(task))
         items = []
         for policy in POLICIES:
             policy = name_from_policy(policy)
@@ -116,19 +113,18 @@ def main():
                                                                    outcome['achieved_goal']):
                         value_per_attribute.setdefault(attribute, []).append(value)
 
-            statistics = {attribute: np.mean(values) # '{:.2f}'.format(
+            statistics = {attribute: np.round(np.mean(values), 3) # '{:.2f}'.format(
                           for attribute, values in value_per_attribute.items()}
             statistics['trials'] = len(outcomes_per_task[task][policy])
-            #print('{}: {}'.format(policy, str_from_object(statistics)))
+            print('{}: {}'.format(policy, str_from_object(statistics)))
             items += [
                 '{:.0f}'.format(100*statistics['achieved_goal']),
                 '{:.0f}'.format(statistics['plan_time']),
             ]
-        print(' & '.join(items))
-        print('\\\\ \hline')
+        table += '{}\n\\\\ \hline\n'.format(' & '.join(items))
+    print(SEPARATOR)
+    print(table)
 
-            # TODO: robust poses
-            # TODO: intelligent IR for pour
 
 if __name__ == '__main__':
     main()
