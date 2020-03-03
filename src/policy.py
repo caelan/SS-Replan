@@ -53,7 +53,7 @@ def random_restart(belief, args, problem, max_time=INF, max_iterations=INF,
         # FastDownward translator runs out of memory
     return None, INF, Certificate(all_facts=[], preimage_facts=[])
 
-def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, serialize=True,
+def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=True, # serialize=True,
                max_time=10*60, max_constrained_time=1.5*60, max_unconstrained_time=INF):
     replan_actions = OBSERVATION_ACTIONS if args.deterministic else STOCHASTIC_ACTIONS
     defer_actions = replan_actions if defer else set()

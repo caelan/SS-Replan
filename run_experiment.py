@@ -33,8 +33,8 @@ pddlstream.language.statistics.LOAD_STATISTICS = False
 pddlstream.language.statistics.SAVE_STATISTICS = False
 
 from pybullet_tools.utils import has_gui, elapsed_time, user_input, ensure_dir, \
-    timeout, write_json, SEPARATOR, WorldSaver, \
-    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user, get_date
+    wrap_numpy_seed, timeout, write_json, SEPARATOR, WorldSaver, \
+    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user, get_date, is_darwin
 from pddlstream.utils import str_from_object, safe_rm_dir, Verbose, KILOBYTES_PER_GIGABYTE, BYTES_PER_KILOBYTE
 from pddlstream.algorithms.algorithm import reset_globals
 
@@ -50,46 +50,26 @@ from multiprocessing import Pool, TimeoutError, cpu_count
 EXPERIMENTS_DIRECTORY = 'experiments/'
 TEMP_DIRECTORY = 'temp_parallel/'
 MAX_TIME = 10*60
-SERIAL = False
+SERIAL = is_darwin()
 VERBOSE = SERIAL
 SERIALIZE_TASK = True
 
-TIME_PER_TRIAL = 300 # trial / sec
+MEAN_TIME_PER_TRIAL = 300 # trial / sec
 HOURS_TO_SECS = 60 * 60
 
-N = 5
+N_TRIALS = 1 # 1
 MAX_MEMORY = 3.5*KILOBYTES_PER_GIGABYTE
-
-"""
-_memory: 1571984.0, plan_time: 210.628690958, total_cost: 2075, total_time: 211.089640856}
-WARNING: overflow on h^add! Costs clamped to 100000000
-Traceback (most recent call last):
-  File "./run_experiment.py", line 202, in run_experiment
-    max_time=MAX_TIME, **policy)
-  File "/home/caelan/Programs/srlstream/src/policy.py", line 113, in run_policy
-    max_cost=plan_cost, replan_actions=defer_actions)
-  File "/home/caelan/Programs/srlstream/src/policy.py", line 34, in random_restart
-    plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
-  File "/home/caelan/Programs/srlstream/src/planner.py", line 167, in solve_pddlstream
-    search_sample_ratio=search_sample_ratio)
-  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/focused.py", line 134, in solve_focused
-  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/reorder.py", line 167, in reorder_stream_plan
-    ordering = dynamic_programming(nodes, valid_combine, stats_fn, **kwargs)
-  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/reorder.py", line 127, in dynamic_programming
-    new_subset = frozenset([v]) | subset
-MemoryError
-"""
+SPARE_CORES = 4
 
 POLICIES = [
-    #{'constrain': False, 'defer': False},
+    {'constrain': False, 'defer': False},
     {'constrain': False, 'defer': True},  # Move actions grow immensely
     {'constrain': True, 'defer': False},
-    {'constrain': True, 'defer': True}, # TODO: serialize
+    {'constrain': True, 'defer': True},
+    # TODO: serialize
 ]
 # 8Gb memory limit
 # https://ipc2018-classical.bitbucket.io/
-
-# Switch to psutil
 
 # Tasks
 # 1) Inspect drawers
@@ -109,6 +89,7 @@ TASK_NAMES = [
     'inspect_drawer',
     'swap_drawers',
     'detect_block',
+
     #'cook_meal',
     #'regrasp_block',
     #'hold_block',
@@ -116,17 +97,12 @@ TASK_NAMES = [
     #'stow_block',
 ]
 
-# chris@10.28.133.229
-
 # TODO: CPU usage at 300% due to TracIK or the visualizer?
 # TODO: could check collisions only with real (non-observed) values
 
-# Experiments
-# /home/caelan/Programs/srlstream/experiments/19-09-14_22-57-21.json
-
 ################################################################################
 
-def map_parallel(fn, inputs, num_cores=None, timeout=None):
+def map_parallel(fn, inputs, num_cores=None): #, timeout=None):
     # Processes rather than threads (shared memory)
     # TODO: with statement on Pool
     if SERIAL:
@@ -140,15 +116,15 @@ def map_parallel(fn, inputs, num_cores=None, timeout=None):
     while True:
         # TODO: need to actually retrieve the info about which thread failed
         try:
-            yield generator.next(timeout=timeout)
+            yield generator.next() # timeout=timeout)
         except StopIteration:
             break
-        except MemoryError: # as e:
-            traceback.print_exc()
-            continue
-        except TimeoutError: # as e:
-            traceback.print_exc() # Kills all jobs
-            continue
+        #except MemoryError: # as e:
+        #    traceback.print_exc()
+        #    continue
+        #except TimeoutError: # as e:
+        #    traceback.print_exc() # Kills all jobs
+        #    continue
     if pool is not None:
         pool.close()
         pool.terminate()
@@ -172,9 +148,12 @@ def set_memory_limits():
     soft_memory = int(BYTES_PER_KILOBYTE*MAX_MEMORY)
     hard_memory = soft_memory
     process.rlimit(psutil.RLIMIT_AS, (soft_memory, hard_memory))
+    # TODO: AttributeError: 'Process' object has no attribute 'rlimit'
     #soft_time = MAX_TIME + 2*60 # I think this kills the wrong things
     #hard_time = soft_time
     #process.rlimit(psutil.RLIMIT_CPU, (soft_time, hard_time))
+
+################################################################################
 
 def run_experiment(experiment):
     problem = experiment['problem']
@@ -183,12 +162,12 @@ def run_experiment(experiment):
     policy = experiment['policy']
     set_memory_limits()
 
-    stdout = sys.stdout
     if not VERBOSE:
        sys.stdout = open(os.devnull, 'w')
-    current_wd = os.getcwd()
-    #trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(os.getpid()))
+       stdout = sys.stdout
     if not SERIAL:
+        current_wd = os.getcwd()
+        # trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, '{}/'.format(os.getpid()))
         trial_wd = os.path.join(current_wd, TEMP_DIRECTORY, 't={}_n={}_{}/'.format(
             task_name, trial, name_from_policy(policy)))
         safe_rm_dir(trial_wd)
@@ -230,7 +209,7 @@ def run_experiment(experiment):
     observation_fn = lambda belief: observe_pybullet(world)
     transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
     try:
-        with timeout(2*MAX_TIME):
+        with timeout(MAX_TIME + 60):
             outcome = run_policy(task, args, observation_fn, transition_fn, max_time=MAX_TIME, **policy)
         outcome['error'] = False
     except KeyboardInterrupt:
@@ -240,12 +219,12 @@ def run_experiment(experiment):
         outcome = {'error': True}
 
     world.destroy()
-    os.chdir(current_wd)
     if not SERIAL:
+        os.chdir(current_wd)
         safe_rm_dir(trial_wd)
     if not VERBOSE:
         sys.stdout.close()
-    sys.stdout = stdout
+        sys.stdout = stdout
 
     result = {
         'experiment': experiment,
@@ -253,14 +232,16 @@ def run_experiment(experiment):
     }
     return result
 
+################################################################################
+
 def create_problems(args):
     task_fn_from_name = {fn.__name__: fn for fn in TASKS_FNS}
     problems = []
-    for trial in range(N):
-        print('\nTrial: {} / {}'.format(trial, N))
+    for num in range(N_TRIALS):
         for task_name in TASK_NAMES:
-            random.seed(hash((0, task_name, trial, time.time())))
-            numpy.random.seed(hash((1, task_name, trial, time.time())) % (2 ** 32))
+            print('Trial: {} / {} | Task: {}'.format(num, N_TRIALS, task_name))
+            random.seed(hash((0, task_name, num, time.time())))
+            numpy.random.seed(wrap_numpy_seed(hash((1, task_name, num, time.time()))))
             world = World(use_gui=False) # SERIAL
             task_fn = task_fn_from_name[task_name]
             task = task_fn(world, fixed=args.fixed)
@@ -270,7 +251,7 @@ def create_problems(args):
             saver = WorldSaver()
             problems.append({
                 'task': task,
-                'trial': trial,
+                'trial': num,
                 'saver': saver,
                 #'seeds': [get_random_seed(), get_numpy_seed()],
                 #'seeds': [random.getstate(), numpy.random.get_state()],
@@ -287,19 +268,14 @@ def create_problems(args):
 
 def main():
     parser = create_parser()
-    #parser.add_argument('-problem', default=task_names[-1], choices=task_names,
-    #                   help='The name of the problem to solve.')
-    #parser.add_argument('-record', action='store_true',
-    #                   help='When enabled, records and saves a video at {}'.format(
-    #                       VIDEO_TEMPLATE.format('<problem>')))
     args = parser.parse_args()
+    print(args)
 
     # https://stackoverflow.com/questions/15314189/python-multiprocessing-pool-hangs-at-join
     # https://stackoverflow.com/questions/39884898/large-amount-of-multiprocessing-process-causing-deadlock
     # TODO: alternatively don't destroy the world
-    num_cores = cpu_count() - 4
-    directory = EXPERIMENTS_DIRECTORY
-    json_path = os.path.abspath(os.path.join(directory, '{}.json'.format(get_date())))
+    num_cores = max(1, cpu_count() - SPARE_CORES)
+    json_path = os.path.abspath(os.path.join(EXPERIMENTS_DIRECTORY, '{}.json'.format(get_date())))
 
     #memory_per_core = float(MAX_RAM) / num_cores # gigabytes
     #set_soft_limit(resource.RLIMIT_AS, int(BYTES_PER_GIGABYTE * memory_per_core)) # bytes
@@ -311,18 +287,24 @@ def main():
     #print('Memory per Core: {:.2f}'.format(memory_per_core))
     print('Tasks: {} | {}'.format(len(TASK_NAMES), TASK_NAMES))
     print('Policies: {} | {}'.format(len(POLICIES), POLICIES))
-    print('Num Trials:', N)
-    num_experiments = len(TASK_NAMES)*len(POLICIES)*N
+    print('Num Trials:', N_TRIALS)
+    num_experiments = len(TASK_NAMES) * len(POLICIES) * N_TRIALS
     print('Num Experiments:', num_experiments)
     max_parallel = math.ceil(float(num_experiments) / num_cores)
-    print('Estimated duration: {:.2f} hours'.format(TIME_PER_TRIAL*max_parallel / HOURS_TO_SECS))
+    print('Estimated duration: {:.2f} hours'.format(MEAN_TIME_PER_TRIAL * max_parallel / HOURS_TO_SECS))
     user_input('Begin?')
+    print(SEPARATOR)
 
-    problem = create_problems(args)
-    experiments = [{'problem': copy.deepcopy(task), 'policy': policy} #, 'args': args}
-                   for task in problem for policy in POLICIES]
+    print('Creating problems')
+    start_time = time.time()
+    problems = create_problems(args)
+    experiments = [{'problem': copy.deepcopy(problem), 'policy': policy} #, 'args': args}
+                   for problem in problems for policy in POLICIES]
+    print('Created {} problems and {} experiments in {:.3f} seconds'.format(
+        len(problems), len(experiments), elapsed_time(start_time)))
+    print(SEPARATOR)
 
-    ensure_dir(directory)
+    ensure_dir(EXPERIMENTS_DIRECTORY)
     safe_rm_dir(TEMP_DIRECTORY)
     ensure_dir(TEMP_DIRECTORY)
     start_time = time.time()
@@ -353,3 +335,23 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+"""
+_memory: 1571984.0, plan_time: 210.628690958, total_cost: 2075, total_time: 211.089640856}
+WARNING: overflow on h^add! Costs clamped to 100000000
+Traceback (most recent call last):
+  File "./run_experiment.py", line 202, in run_experiment
+    max_time=MAX_TIME, **policy)
+  File "/home/caelan/Programs/srlstream/src/policy.py", line 113, in run_policy
+    max_cost=plan_cost, replan_actions=defer_actions)
+  File "/home/caelan/Programs/srlstream/src/policy.py", line 34, in random_restart
+    plan, plan_cost, certificate = solve_pddlstream(belief, problem, args, max_time=remaining_time, **kwargs)
+  File "/home/caelan/Programs/srlstream/src/planner.py", line 167, in solve_pddlstream
+    search_sample_ratio=search_sample_ratio)
+  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/focused.py", line 134, in solve_focused
+  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/reorder.py", line 167, in reorder_stream_plan
+    ordering = dynamic_programming(nodes, valid_combine, stats_fn, **kwargs)
+  File "/home/caelan/Programs/srlstream/pddlstream/pddlstream/algorithms/reorder.py", line 127, in dynamic_programming
+    new_subset = frozenset([v]) | subset
+MemoryError
+"""
