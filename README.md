@@ -21,8 +21,10 @@ It's also possible to use [TRAC-IK](http://wiki.ros.org/trac_ik) instead of [IKF
 
 ## PyBullet Examples
 
-* `git pull --recurse-submodules`
-* `./run_pybullet.py [-h]`
+<!--* `SS-Replan$ git pull --recurse-submodules`-->
+* `SS-Replan$ git pull`
+* `SS-Replan$ git submodule update --init --recursive`
+* `SS-Replan$ ./run_pybullet.py [-h]`
 
 [<img src="https://img.youtube.com/vi/TvZqMDBZEnc/0.jpg" height="250">](https://youtu.be/TvZqMDBZEnc)
 
