@@ -11,6 +11,7 @@ SS-Replan supports both Python 2 and Python 3.
 * `$ pip install numpy scipy pybullet sklearn`
 * `$ git lfs clone --branch master --recurse-submodules https://github.com/caelan/SS-Replan.git`
 * `$ cd SS-Replan`
+* `SS-Replan$ git lfs install`
 * `SS-Replan$ ./pddlstream/FastDownward/build.py release64`
 * `SS-Replan$ cd ss-pybullet/pybullet_tools/ikfast/franka_panda`
 * `SS-Replan/ss-pybullet/pybullet_tools/ikfast/franka_panda$ ./setup.py`
@@ -21,8 +22,10 @@ It's also possible to use [TRAC-IK](http://wiki.ros.org/trac_ik) instead of [IKF
 
 ## PyBullet Examples
 
-* `git pull --recurse-submodules`
-* `./run_pybullet.py [-h]`
+<!--* `SS-Replan$ git pull --recurse-submodules`-->
+* `SS-Replan$ git pull`
+* `SS-Replan$ git submodule update --init --recursive`
+* `SS-Replan$ ./run_pybullet.py [-h]`
 
 [<img src="https://img.youtube.com/vi/TvZqMDBZEnc/0.jpg" height="250">](https://youtu.be/TvZqMDBZEnc)
 
