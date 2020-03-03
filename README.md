@@ -11,6 +11,7 @@ SS-Replan supports both Python 2 and Python 3.
 * `$ pip install numpy scipy pybullet sklearn`
 * `$ git lfs clone --branch master --recurse-submodules https://github.com/caelan/SS-Replan.git`
 * `$ cd SS-Replan`
+* `SS-Replan$ git lfs install`
 * `SS-Replan$ ./pddlstream/FastDownward/build.py release64`
 * `SS-Replan$ cd ss-pybullet/pybullet_tools/ikfast/franka_panda`
 * `SS-Replan/ss-pybullet/pybullet_tools/ikfast/franka_panda$ ./setup.py`
