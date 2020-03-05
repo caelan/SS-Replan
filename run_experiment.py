@@ -34,7 +34,7 @@ pddlstream.language.statistics.SAVE_STATISTICS = False
 
 from pybullet_tools.utils import has_gui, elapsed_time, user_input, ensure_dir, \
     wrap_numpy_seed, timeout, write_json, SEPARATOR, WorldSaver, \
-    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user, get_date, is_darwin
+    get_random_seed, get_numpy_seed, set_random_seed, set_numpy_seed, wait_for_user, get_date, is_darwin, INF
 from pddlstream.utils import str_from_object, safe_rm_dir, Verbose, KILOBYTES_PER_GIGABYTE, BYTES_PER_KILOBYTE
 from pddlstream.algorithms.algorithm import reset_globals
 
@@ -50,6 +50,7 @@ from multiprocessing import Pool, TimeoutError, cpu_count
 EXPERIMENTS_DIRECTORY = 'experiments/'
 TEMP_DIRECTORY = 'temp_parallel/'
 MAX_TIME = 10*60
+TIME_BUFFER = 60
 SERIAL = is_darwin()
 VERBOSE = SERIAL
 SERIALIZE_TASK = True
@@ -63,8 +64,8 @@ SPARE_CORES = 4
 
 POLICIES = [
     {'constrain': False, 'defer': False},
-    {'constrain': False, 'defer': True},  # Move actions grow immensely
     {'constrain': True, 'defer': False},
+    {'constrain': False, 'defer': True},  # Move actions grow immensely
     {'constrain': True, 'defer': True},
     # TODO: serialize
 ]
@@ -85,8 +86,8 @@ POLICIES = [
 # 12) Irrelevant distractors that aren't picked up
 
 TASK_NAMES = [
-    'sugar_drawer',
     'inspect_drawer',
+    'sugar_drawer',
     'swap_drawers',
     'detect_block',
 
@@ -99,6 +100,22 @@ TASK_NAMES = [
 
 # TODO: CPU usage at 300% due to TracIK or the visualizer?
 # TODO: could check collisions only with real (non-observed) values
+
+ERROR_OUTCOME = {
+    'error': True,
+    'achieved_goal': False,
+    'total_time': INF,
+    'plan_time': INF,
+    'num_iterations': 0,
+    'num_constrained': 0,
+    'num_unconstrained': 0,
+    'num_successes': 0,
+    'num_actions': INF,
+    'num_commands': INF,
+    'total_cost': INF,
+}
+
+# TODO: doesn't work on flakey
 
 ################################################################################
 
@@ -208,15 +225,16 @@ def run_experiment(experiment):
 
     observation_fn = lambda belief: observe_pybullet(world)
     transition_fn = lambda belief, commands: iterate_commands(real_state, commands, time_step=0)
+    outcome = dict(ERROR_OUTCOME)
     try:
-        with timeout(MAX_TIME + 60):
+        with timeout(MAX_TIME + TIME_BUFFER):
             outcome = run_policy(task, args, observation_fn, transition_fn, max_time=MAX_TIME, **policy)
-        outcome['error'] = False
+            outcome['error'] = False
     except KeyboardInterrupt:
         raise KeyboardInterrupt()
     except:
         traceback.print_exc()
-        outcome = {'error': True}
+        #outcome = {'error': True}
 
     world.destroy()
     if not SERIAL:

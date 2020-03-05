@@ -330,6 +330,7 @@ def cook_block(world, fixed=False, **kwargs):
 ZED_DRAWERS = ['indigo_drawer_top', 'indigo_drawer_bottom']
 
 def inspect_drawer(world, fixed=False, **kwargs):
+    # Starts in the correct drawer
     add_kinect(world)
     if fixed:
         set_fixed_base(world)
@@ -350,6 +351,7 @@ def inspect_drawer(world, fixed=False, **kwargs):
             )
 
 def swap_drawers(world, fixed=False, **kwargs):
+    # Starts in the incorrect drawer
     add_kinect(world) # previously needed to be after set_all_static?
     if fixed:
         set_fixed_base(world)

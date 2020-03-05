@@ -11,18 +11,20 @@ import numpy as np
 sys.path.extend(os.path.abspath(os.path.join(os.getcwd(), d))
                 for d in ['pddlstream', 'ss-pybullet'])
 
+from itertools import islice
 
 #from run_experiment import DIRECTORY, MAX_TIME
 from pddlstream.utils import str_from_object, implies
-from pybullet_tools.utils import read_json, INF, SEPARATOR
+from pybullet_tools.utils import read_json, SEPARATOR, INF
 
 #from tabulate import tabulate
 
-from run_experiment import TASK_NAMES, POLICIES, MAX_TIME, name_from_policy
+from run_experiment import TASK_NAMES, POLICIES, MAX_TIME, name_from_policy, ERROR_OUTCOME
 
 # https://github.mit.edu/caelan/pddlstream-experiments/blob/master/analyze_experiment.py
 # https://github.mit.edu/Learning-and-Intelligent-Systems/ltamp_pr2/blob/d1e6024c5c13df7edeab3a271b745e656a794b02/learn_tools/analyze_experiment.py
 
+MAX_TRIALS = INF
 
 PRINT_ATTRIBUTES = [
     'achieved_goal',
@@ -40,32 +42,26 @@ PRINT_ATTRIBUTES = [
 ]
 
 ACHIEVED_GOAL = [
-    #'total_time',
-    #'plan_time',
+    'total_time',
+    'plan_time',
     'num_actions',
     'total_cost',
 ]
-
-
-ERROR_OUTCOME = {
-    'error': True,
-    'achieved_goal': False,
-    'total_time': INF,
-    'plan_time': INF,
-    'num_iterations': 0,
-    'num_constrained': 0,
-    'num_unconstrained': 0,
-    'num_successes': 0,
-    'num_actions': INF,
-    'num_commands': INF,
-    'total_cost': INF,
-}
 
 POLICY_NAMES = [
     'Constain',
     'Defer',
     'Constrain+Defer',
 ]
+
+################################################################################
+
+def take(iterable, n=INF):
+    if n == INF:
+        n = None  # NOTE - islice takes None instead of INF
+    return islice(iterable, n)
+
+################################################################################
 
 # https://github.mit.edu/caelan/ss/blob/master/openrave/serial_analyze.py
 
@@ -93,16 +89,17 @@ def main():
         if task not in outcomes_per_task:
             continue
         print('\nTask: {}'.format(task))
-        items = []
+        items = [task]
         for policy in POLICIES:
             policy = name_from_policy(policy)
             if policy not in outcomes_per_task[task]:
                 continue
+            outcomes = list(take(outcomes_per_task[task][policy], MAX_TRIALS))
             value_per_attribute = {}
-            for outcome in outcomes_per_task[task][policy]:
+            for outcome in outcomes:
                 if outcome['error']:
                     outcome.update(ERROR_OUTCOME)
-                if MAX_TIME < outcome['total_time']:
+                if MAX_TIME < outcome.get('total_time', INF):
                     outcome['achieved_goal'] = False
                 if not outcome['achieved_goal']:
                     outcome['total_time'] = MAX_TIME
@@ -111,11 +108,11 @@ def main():
                     if (attribute not in ['policy']) and (attribute in PRINT_ATTRIBUTES) and \
                             not isinstance(value, str) and implies(attribute in ACHIEVED_GOAL,
                                                                    outcome['achieved_goal']):
-                        value_per_attribute.setdefault(attribute, []).append(value)
+                        value_per_attribute.setdefault(attribute, []).append(float(value))
 
-            statistics = {attribute: np.round(np.mean(values), 3) # '{:.2f}'.format(
-                          for attribute, values in value_per_attribute.items()}
-            statistics['trials'] = len(outcomes_per_task[task][policy])
+            statistics = {attribute: np.round(np.average(values), 3) # '{:.2f}'.format(
+                          for attribute, values in value_per_attribute.items()} # median, min, max of solved?
+            statistics['trials'] = len(outcomes)
             print('{}: {}'.format(policy, str_from_object(statistics)))
             items += [
                 '{:.0f}'.format(100*statistics['achieved_goal']),
@@ -123,6 +120,7 @@ def main():
             ]
         table += '{}\n\\\\ \hline\n'.format(' & '.join(items))
     print(SEPARATOR)
+    print(POLICIES)
     print(table)
 
 

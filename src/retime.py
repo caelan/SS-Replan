@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 from pybullet_tools.utils import get_distance_fn, get_joint_name, clip, get_max_velocity, get_difference_fn, INF, \
-    waypoints_from_path, adjust_path, get_difference
+    waypoints_from_path, adjust_path, get_difference, get_pairs
 
 
 #ARM_SPEED = 0.15*np.pi # radians / sec
@@ -31,24 +31,49 @@ def ensure_increasing(path, time_from_starts):
             path.pop(i)
             time_from_starts.pop(i)
 
+def decompose_into_paths(joints, path):
+    current_path = []
+    joint_sequence = []
+    path_sequence = []
+    for q1, q2 in get_pairs(path):
+        # Zero velocities aren't enforced otherwise
+        indices, = np.nonzero(get_difference(q1, q2))
+        current_joints = tuple(joints[j] for j in indices)
+        if not joint_sequence or (current_joints != joint_sequence[-1]):
+            if current_path:
+                path_sequence.append(current_path)
+            joint_sequence.append(current_joints)
+            current_path = [tuple(q1[j] for j in indices)]
+        current_path.append(tuple(q2[j] for j in indices))
+    if current_path:
+        path_sequence.append(current_path)
+    return zip(joint_sequence, path_sequence)
+
 ################################################################################
+
+# TODO: retain based on the end effector velocity
 
 def instantaneous_retime_path(robot, joints, path, speed=ARM_SPEED):
     #duration_fn = get_distance_fn(robot, joints)
     duration_fn = get_duration_fn(robot, joints)
-    mid_durations = [duration_fn(*pair) for pair in zip(path[:-1], path[1:])]
+    mid_durations = [duration_fn(*pair) for pair in get_pairs(path)]
     durations = [0.] + mid_durations
     time_from_starts = np.cumsum(durations) / speed
     return time_from_starts
 
-def slow_trajectory(robot, joints, path, **kwargs):
-    min_fraction = 0.1 # percentage
-    ramp_duration = 1.0 # seconds
-    # path = waypoints_from_path(path) # Neither moveit or lula benefit from this
-
+def slow_trajectory(robot, joints, path, min_fraction=0.1, ramp_duration=1.0, **kwargs):
+    """
+    :param robot:
+    :param joints:
+    :param path:
+    :param min_fraction: percentage
+    :param ramp_duration: seconds
+    :param kwargs:
+    :return:
+    """
     time_from_starts = instantaneous_retime_path(robot, joints, path, **kwargs)
-    mid_times = [np.average(pair) for pair in zip(time_from_starts[:-1], time_from_starts[1:])]
-    mid_durations = [t2 - t1 for t1, t2 in zip(time_from_starts[:-1], time_from_starts[1:])]
+    mid_times = [np.average(pair) for pair in get_pairs(time_from_starts)]
+    mid_durations = [t2 - t1 for t1, t2 in get_pairs(time_from_starts)]
     new_time_from_starts = [0.]
     for mid_time, mid_duration in zip(mid_times, mid_durations):
         time_from_start = mid_time - time_from_starts[0]
@@ -121,7 +146,7 @@ def ramp_retime_path(path, max_velocities, acceleration_fraction=1.5, sample_ste
     # Assuming instant changes in accelerations
     waypoints = [path[0]]
     time_from_starts = [0.]
-    for q1, q2 in zip(path[:-1], path[1:]):
+    for q1, q2 in get_pairs(path):
         differences = get_difference(q1, q2) # assumes not circular anymore
         #differences = difference_fn(q1, q2)
         distances = np.abs(differences)
@@ -161,3 +186,15 @@ def retime_trajectory(robot, joints, path, velocity_fraction=DEFAULT_SPEED_FRACT
     max_velocities = velocity_fraction * np.array([get_max_velocity(robot, joint) for joint in joints])
     waypoints, time_from_starts = ramp_retime_path(path, max_velocities, **kwargs)
     return waypoints, time_from_starts
+
+
+def interpolate_path(robot, joints, path):
+    from scipy.interpolate import CubicSpline
+    # TODO: iteratively increase spacing until velocity / accelerations meets limits
+    # https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html
+    # Waypoints are followed perfectly, twice continuously differentiable
+    path, time_from_starts = retime_trajectory(robot, joints, path, sample_step=None)
+    # positions_curve = interp1d(time_from_starts, path, kind='linear', axis=0, assume_sorted=True)
+    positions_curve = CubicSpline(time_from_starts, path, bc_type='clamped',  # clamped | natural
+                                  extrapolate=False)  # bc_type=((1, 0), (1, 0))
+    return positions_curve
