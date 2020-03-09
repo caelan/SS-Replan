@@ -152,8 +152,7 @@ ZED_LEFT_SURFACES = [
 ALL_SURFACES = ZED_LEFT_SURFACES
 #ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
-#IKEA_PATH = '/home/caelan/Documents/IKEA/OBJ/'
-IKEA_PATH = os.path.join(MODELS_PATH, 'kitchen')
+LEFT_KITCHEN_PATH = os.path.join(MODELS_PATH, 'left_kitchen')
 
 ################################################################################
 
