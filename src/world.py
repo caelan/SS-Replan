@@ -23,7 +23,7 @@ from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics, PAN
 from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
-    get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, LEFT_KITCHEN_PATH, \
+    get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, KITCHEN_LEFT_PATH, \
     FConf, are_confs_close
 
 USE_TRACK_IK = True
@@ -161,8 +161,8 @@ class World(object):
         for name, world_from_part in self.environment_poses.items():
             if name in ['range']:
                 continue
-            visual_path = os.path.join(LEFT_KITCHEN_PATH, '{}.obj'.format(name))
-            collision_path = os.path.join(LEFT_KITCHEN_PATH, '{}_collision.obj'.format(name))
+            visual_path = os.path.join(KITCHEN_LEFT_PATH, '{}.obj'.format(name))
+            collision_path = os.path.join(KITCHEN_LEFT_PATH, '{}_collision.obj'.format(name))
             mesh_path = None
             for path in [collision_path, visual_path]:
                 if os.path.exists(path):

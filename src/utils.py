@@ -152,7 +152,7 @@ ZED_LEFT_SURFACES = [
 ALL_SURFACES = ZED_LEFT_SURFACES
 #ALL_SURFACES = [] + OPEN_SURFACES + DRAWERS + CABINETS
 
-LEFT_KITCHEN_PATH = os.path.join(MODELS_PATH, 'left_kitchen')
+KITCHEN_LEFT_PATH = os.path.join(MODELS_PATH, 'kitchen_left')
 
 ################################################################################
 
