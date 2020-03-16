@@ -201,32 +201,6 @@ ALL_JOINTS = ZED_LEFT_JOINTS
 
 ################################################################################
 
-EVE_PATH = os.path.join(MODELS_PATH, 'eve-model-master/eve/urdf/eve_7dof_arms.urdf')
-
-EVE_GRIPPER_LINK = 'qbhand_{arm}_base_link' # qbhand_{arm}_base_link
-#EVE_GRIPPER_LINK = '{a}_palm' # Technically the start
-
-#EVE_TOOL_LINK = 'qbhand_{arm}_palm_link'
-EVE_TOOL_LINK = 'qbhand_{arm}_tendon_virtual_link'
-
-EVE_WHEEL_JOINTS = ['j_{a}_wheel_y', 'j_{a}_wheel_y']
-EVE_ANKLE_JOINTS = ['j_knee_y', 'j_ankle_y', 'j_ankle_x']
-EVE_HIP_JOINTS = ['j_hip_z', 'j_hip_x', 'j_hip_y']
-EVE_ARM_JOINTS = ['j_{a}_shoulder_y', 'j_{a}_shoulder_x', 'j_{a}_shoulder_z',
-                  'j_{a}_elbow_y', 'j_{a}_elbow_z', 'j_{a}_wrist_y', 'j_{a}_wrist_x'] # j_neck_y
-
-EVE = 'Eve'
-ARMS = ['left', 'right']
-DEFAULT_ARM = ARMS[0]
-
-# TODO: the Eve URDF is strange
-
-def get_eve_arm_joints(robot, arm):
-    names = [j.format(a=arm[0]) for j in EVE_ARM_JOINTS]
-    return joints_from_names(robot, names)
-
-################################################################################
-
 def ycb_type_from_file(path):
     return path.split('_', 1)[-1]
 
@@ -297,17 +271,17 @@ def get_gripper_link(robot):
     robot_name = get_body_name(robot)
     if robot_name == FRANKA_CARTER:
         return FRANKA_GRIPPER_LINK
-    elif robot_name == EVE:
-        #return EVE_GRIPPER_LINK.format(a='l') # TODO: issue copying *.dae
-        return EVE_GRIPPER_LINK.format(arm=DEFAULT_ARM)
+    #elif robot_name == EVE:
+    #    #return EVE_GRIPPER_LINK.format(a='l') # TODO: issue copying *.dae
+    #    return EVE_GRIPPER_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
 def get_tool_link(robot):
     robot_name = get_body_name(robot)
     if robot_name == FRANKA_CARTER:
         return FRANKA_TOOL_LINK
-    elif robot_name == EVE:
-        return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
+    #elif robot_name == EVE:
+    #    return EVE_TOOL_LINK.format(arm=DEFAULT_ARM)
     raise ValueError(robot_name)
 
 def create_gripper(robot, visual=False):

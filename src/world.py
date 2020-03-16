@@ -20,11 +20,11 @@ from pybullet_tools.utils import connect, add_data_path, load_pybullet, HideOutp
     get_all_links, sub_inverse_kinematics, get_distance, load_yaml
 from pybullet_tools.ikfast.franka_panda.ik import ikfast_inverse_kinematics, PANDA_INFO, \
     closest_inverse_kinematics, is_ik_compiled
-from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, EVE, EVE_PATH, create_gripper, \
-    KITCHEN_PATH, BASE_JOINTS, get_eve_arm_joints, DEFAULT_ARM, ALL_JOINTS, \
-    get_tool_link, custom_limits_from_base_limits, ARMS, CABINET_JOINTS, DRAWER_JOINTS, \
+from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, create_gripper, \
+    KITCHEN_PATH, BASE_JOINTS, ALL_JOINTS, \
+    get_tool_link, custom_limits_from_base_limits, CABINET_JOINTS, DRAWER_JOINTS, \
     get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, KITCHEN_LEFT_PATH, \
-    FConf, are_confs_close
+    FConf, are_confs_close # DEFAULT_ARM, ARMS, EVE, EVE_PATH, get_eve_arm_joints
 
 USE_TRACK_IK = True
 try:
@@ -102,8 +102,8 @@ class World(object):
         if self.robot_name == FRANKA_CARTER:
             urdf_path, yaml_path = FRANKA_CARTER_PATH, None
             #urdf_path, yaml_path = FRANKA_CARTER_PATH, FRANKA_YAML
-        elif self.robot_name == EVE:
-            urdf_path, yaml_path = EVE_PATH, None
+        #elif self.robot_name == EVE:
+        #    urdf_path, yaml_path = EVE_PATH, None
         else:
             raise ValueError(self.robot_name)
         self.robot_yaml = yaml_path if yaml_path is None else load_yaml(yaml_path)
@@ -235,8 +235,8 @@ class World(object):
         return joints_from_names(self.robot, BASE_JOINTS)
     @property
     def arm_joints(self):
-        if self.robot_name == EVE:
-            return get_eve_arm_joints(self.robot, arm=DEFAULT_ARM)
+        #if self.robot_name == EVE:
+        #    return get_eve_arm_joints(self.robot, arm=DEFAULT_ARM)
         joint_names = ['panda_joint{}'.format(1+i) for i in range(7)]
         #joint_names = self.robot_yaml['cspace']
         return joints_from_names(self.robot, joint_names)
@@ -295,12 +295,13 @@ class World(object):
         return self.movable | self.fixed | {self.robot}
     @property
     def default_conf(self):
-        if self.robot_name == EVE:
-            # Eve starts outside of joint limits
-            conf = [np.average(get_joint_limits(self.robot, joint)) for joint in self.arm_joints]
-            #conf = np.zeros(len(self.arm_joints))
-            #conf[3] -= np.pi / 2
-            return conf
+        # if self.robot_name == EVE:
+        #     # Eve starts outside of joint limits
+        #     # Eve starts outside of joint limits
+        #     conf = [np.average(get_joint_limits(self.robot, joint)) for joint in self.arm_joints]
+        #     #conf = np.zeros(len(self.arm_joints))
+        #     #conf[3] -= np.pi / 2
+        #     return conf
         return DEFAULT_ARM_CONF
         #conf = np.array(self.robot_yaml['default_q'])
         ##conf[1] += np.pi / 4
@@ -420,10 +421,10 @@ class World(object):
         #    joint = joint_from_name(self.robot, rule['name'])
         #    set_joint_position(self.robot, joint, rule['value'])
         set_joint_positions(self.robot, self.arm_joints, self.default_conf)  # active_task_spaces
-        if self.robot_name == EVE:
-            for arm in ARMS:
-                joints = get_eve_arm_joints(self.robot, arm)[2:4]
-                set_joint_positions(self.robot, joints, -0.2*np.ones(len(joints)))
+        # if self.robot_name == EVE:
+        #     for arm in ARMS:
+        #         joints = get_eve_arm_joints(self.robot, arm)[2:4]
+        #         set_joint_positions(self.robot, joints, -0.2*np.ones(len(joints)))
     def set_gripper(self, value):
         positions = value*np.ones(len(self.gripper_joints))
         set_joint_positions(self.robot, self.gripper_joints, positions)
