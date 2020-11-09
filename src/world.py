@@ -24,7 +24,7 @@ from src.utils import FRANKA_CARTER, FRANKA_CARTER_PATH, create_gripper, \
     KITCHEN_PATH, BASE_JOINTS, ALL_JOINTS, \
     get_tool_link, custom_limits_from_base_limits, CABINET_JOINTS, DRAWER_JOINTS, \
     get_obj_path, type_from_name, ALL_SURFACES, compute_surface_aabb, KINECT_DEPTH, KITCHEN_LEFT_PATH, \
-    FConf, are_confs_close # DEFAULT_ARM, ARMS, EVE, EVE_PATH, get_eve_arm_joints
+    FConf, are_confs_close, DEBUG # DEFAULT_ARM, ARMS, EVE, EVE_PATH, get_eve_arm_joints
 
 USE_TRACK_IK = True
 try:
@@ -87,7 +87,8 @@ class World(object):
         disable_gravity()
         add_data_path()
         set_camera_pose(camera_point=[2, -1.5, 1])
-        draw_pose(Pose(), length=3)
+        if DEBUG:
+            draw_pose(Pose(), length=3)
 
         #self.kitchen_yaml = load_yaml(KITCHEN_YAML)
         with HideOutput(enable=True):
@@ -337,7 +338,8 @@ class World(object):
         self.base_limits_handles = []
         #self.base_limits_handles.extend(draw_aabb(world_aabb))
         z = get_point(self.floor)[2] + 1e-2
-        self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
+        if DEBUG:
+            self.base_limits_handles.extend(draw_base_limits(base_limits, z=z))
         self.custom_limits = custom_limits_from_base_limits(self.robot, base_limits)
         return self.custom_limits
 
@@ -469,8 +471,9 @@ class World(object):
     #########################
 
     def add_camera(self, name, pose, camera_matrix, max_depth=KINECT_DEPTH, display=False):
+        color = apply_alpha(RED, 0.1 if DEBUG else 0)
         cone = get_viewcone(depth=max_depth, camera_matrix=camera_matrix,
-                            color=apply_alpha(RED, 0.1), mass=0, collision=False)
+                            color=color, mass=0, collision=False)
         set_pose(cone, pose)
         if display:
             kinect = load_pybullet(KINECT_URDF, fixed_base=True)
@@ -478,7 +481,8 @@ class World(object):
             set_color(kinect, BLACK)
             self.add(name, kinect)
         self.cameras[name] = Camera(cone, camera_matrix, max_depth)
-        draw_pose(pose)
+        if DEBUG:
+            draw_pose(pose)
         step_simulation()
         return name
 
@@ -534,7 +538,8 @@ class World(object):
 
     def add(self, name, body):
         assert name not in self.body_from_name
-        add_body_name(body, name)
+        if DEBUG:
+            add_body_name(body, name)
         self.body_from_name[name] = body
         return name
     def add_body(self, name, **kwargs):

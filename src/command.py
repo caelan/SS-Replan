@@ -8,7 +8,7 @@ from pybullet_tools.utils import get_moving_links, set_joint_positions, create_a
     wait_for_duration, flatten_links, remove_handles, \
     batch_ray_collision, draw_ray, wait_for_user, WorldSaver, adjust_path, waypoints_from_path
 from src.retime import interpolate_path, decompose_into_paths
-from src.utils import create_surface_attachment, SPAM, TOMATO_SOUP, MUSTARD, SUGAR, CHEEZIT
+from src.utils import create_surface_attachment, SPAM, TOMATO_SOUP, MUSTARD, SUGAR, CHEEZIT, DEBUG
 
 DEFAULT_TIME_STEP = 0.02
 DEFAULT_SLEEP = 0.5
@@ -312,7 +312,7 @@ class Detect(Command):
             handles.extend(draw_ray(ray, result))
         return handles
     def iterate(self, state):
-        handles = self.draw()
+        handles = self.draw() if DEBUG else []
         steps = int(math.ceil(self.duration / 0.02))
         for _ in range(steps):
             yield

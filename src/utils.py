@@ -27,6 +27,8 @@ if VISUAL:
 else:
     FRANKA_CARTER_PATH = os.path.join(MODELS_PATH, 'panda_arm_hand_on_carter_collision.urdf')
 
+DEBUG = True
+
 BASE_JOINTS = ['x', 'y', 'theta']
 WHEEL_JOINTS = ['left_wheel', 'right_wheel']
 

@@ -12,7 +12,7 @@ from src.planner import solve_pddlstream, extract_plan_prefix, commands_from_pla
 from src.problem import pdddlstream_from_problem, get_streams
 from src.replan import get_plan_postfix, make_exact_skeleton, reuse_facts, OBSERVATION_ACTIONS, \
     STOCHASTIC_ACTIONS, make_wild_skeleton
-from src.utils import BOWL
+from src.utils import BOWL, DEBUG
 
 # TODO: max time spent reattempting streams flag (might not be needed actually)
 # TODO: process binding blows up for detect_drawer
@@ -83,7 +83,8 @@ def run_policy(task, args, observation_fn, transition_fn, constrain=True, defer=
         print('Observation:', observation)
         belief.update(observation)
         print('Belief:', belief)
-        belief.draw()
+        if DEBUG:
+            belief.draw()
 
         #wait_for_user('Plan?')
         fixed_base = UNCONSTRAINED_FIXED_BASE or not task.movable_base or not constrain

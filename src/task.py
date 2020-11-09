@@ -7,7 +7,7 @@ import time
 from pybullet_tools.utils import set_pose, Pose, Point, Euler, multiply, get_pose, \
     create_box, set_all_static, WorldSaver, create_plane, COLOR_FROM_NAME, \
     stable_z_on_aabb, pairwise_collision, elapsed_time, get_aabb_extent, get_aabb, create_cylinder, set_point, \
-    get_function_name, wait_for_user
+    get_function_name, wait_for_user, dump_world
 from src.stream import get_stable_gen, MAX_COST
 from src.utils import JOINT_TEMPLATE, BLOCK_SIZES, BLOCK_COLORS, COUNTERS, \
     ALL_JOINTS, LEFT_CAMERA, CAMERA_MATRIX, CAMERA_POSES, CAMERAS, compute_surface_aabb, \
@@ -455,8 +455,15 @@ def stow_block(world, num=1, fixed=False, **kwargs):
     #sample_placement(world, obstruction_name, 'hitman_tmp')
     set_all_static()
 
-    #joint_name = 'indigo_drawer_top_joint'
-    #world.open_door(joint_from_name(world.kitchen, joint_name))
+    # dump_world()
+    # open_names = [
+    #     'chewie_door_right_joint',
+    #     'dagger_door_right_joint',
+    #     'hitman_drawer_bottom_joint',
+    #     # 'indigo_drawer_top_joint',
+    # ]
+    # for joint_name in open_names:
+    #     world.open_door(joint_from_name(world.kitchen, joint_name))
 
     return Task(world, prior=prior, movable_base=not fixed,
                 grasp_types=[TOP_GRASP],
