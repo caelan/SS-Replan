@@ -7,7 +7,7 @@ import time
 from pybullet_tools.utils import get_moving_links, set_joint_positions, create_attachment, \
     wait_for_duration, flatten_links, remove_handles, \
     batch_ray_collision, draw_ray, wait_for_user, WorldSaver, adjust_path, waypoints_from_path
-from src.retime import interpolate_path, decompose_into_paths
+from pybullet_tools.retime import interpolate_path, decompose_into_paths
 from src.utils import create_surface_attachment, SPAM, TOMATO_SOUP, MUSTARD, SUGAR, CHEEZIT, DEBUG
 
 DEFAULT_TIME_STEP = 0.02
