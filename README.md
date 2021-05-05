@@ -43,6 +43,20 @@ Executed using the [IssacSim](https://developer.nvidia.com/isaac-sim) 3D robot s
 
 <!-- https://developer.nvidia.com/isaac-sdk -->
 
+## Citation
+
+Caelan R. Garrett, Chris Paxton, Tomás Lozano-Pérez, Leslie P. Kaelbling, Dieter Fox. Online Replanning in Belief Space for Partially Observable Task and Motion Problems, IEEE International Conference on Robotics and Automation (ICRA), 2020.
+
+## Publications
+
+* [Online Replanning in Belief Space for Partially Observable Task and Motion Problems](https://arxiv.org/abs/1911.04577)
+* [PDDLStream: Integrating Symbolic Planners and Blackbox Samplers via Optimistic Adaptive Planning](https://arxiv.org/abs/1802.08705)
+
+## Videos
+
+* [SS-Replan](https://www.youtube.com/watch?v=o_RW91sm9PU&list=PLNpZKR7uv5ARTi1sNQRcd5rpa8XxamW2l)
+* [PDDLStream](https://www.youtube.com/playlist?list=PLNpZKR7uv5AQIyT6Az31a3WqiXyQJX7Rx)
+
 ## Resources
 
 * This repository uses [PDDLStream](https://github.com/caelan/pddlstream) to perform hybrid robotic planning. 
@@ -70,17 +84,3 @@ Executed using the [IssacSim](https://developer.nvidia.com/isaac-sim) 3D robot s
 <!--# Resources
 
 Please email Caelan Garrett at <caelan@mit.edu> for installation and usage help.-->
-
-## Publications
-
-* [Online Replanning in Belief Space for Partially Observable Task and Motion Problems](https://arxiv.org/abs/1911.04577)
-* [PDDLStream: Integrating Symbolic Planners and Blackbox Samplers via Optimistic Adaptive Planning](https://arxiv.org/abs/1802.08705)
-
-## Videos
-
-* [SS-Replan](https://www.youtube.com/watch?v=o_RW91sm9PU&list=PLNpZKR7uv5ARTi1sNQRcd5rpa8XxamW2l)
-* [PDDLStream](https://www.youtube.com/playlist?list=PLNpZKR7uv5AQIyT6Az31a3WqiXyQJX7Rx)
-
-## Citation
-
-Caelan R. Garrett, Chris Paxton, Tomás Lozano-Pérez, Leslie P. Kaelbling, Dieter Fox. Online Replanning in Belief Space for Partially Observable Task and Motion Problems, IEEE International Conference on Robotics and Automation (ICRA), 2020.
